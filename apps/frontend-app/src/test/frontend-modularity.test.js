@@ -13,6 +13,11 @@ import {
   getPassportSerialNumberForType,
 } from "../user/dashboard/passports/utils/passportListHelpers";
 import { buildPassportJsonLdExport } from "../shared/utils/semanticPassportExport";
+import {
+  buildInactivePassportPath,
+  buildPreviewPassportPath,
+  buildPublicPassportPath,
+} from "../passports/utils/passportRoutes";
 
 describe("frontend modularity helpers", () => {
   test("consumer theme falls back to a neutral passport theme", () => {
@@ -70,6 +75,32 @@ describe("frontend modularity helpers", () => {
       internalAliasId: "SKU-001",
       uniqueProductIdentifier: "did:web:example:product:001",
     }, typeDefinitions)).toBe("");
+  });
+
+  test("public and preview routes require DPP IDs and never fall back to internal aliases", () => {
+    expect(buildPublicPassportPath({
+      companyName: "Example Company",
+      modelName: "Model One",
+      dppId: "dppId-public-1",
+      internalAliasId: "PRIVATE-SKU",
+    })).toBe("/dpp/example-company/model-one/dppId-public-1");
+
+    expect(buildPublicPassportPath({
+      companyName: "Example Company",
+      internalAliasId: "PRIVATE-SKU",
+    })).toBeNull();
+
+    expect(buildInactivePassportPath({
+      companyName: "Example Company",
+      dppId: "dppId-public-1",
+      versionNumber: 2,
+    })).toBe("/dpp/inactive/example-company/dppid-public-1/dppId-public-1/2");
+
+    expect(buildPreviewPassportPath({
+      companyName: "Example Company",
+      previewId: "dppId-preview-1",
+      internalAliasId: "PRIVATE-SKU",
+    })).toBe("/dpp/preview/example-company/dppid-preview-1/dppId-preview-1");
   });
 
   test("semantic JSON-LD export includes the selected model context", () => {

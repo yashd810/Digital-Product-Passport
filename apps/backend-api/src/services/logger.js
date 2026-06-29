@@ -20,6 +20,7 @@ const redactPaths = [
   "otpCode",
   "otpCodeHash",
   "accessKey",
+  "apiKey",
   externalSecretPath("access", "key"),
   "secretAccessKey",
   "privateKey",
@@ -30,14 +31,19 @@ const redactPaths = [
   "*.clientSecret",
   "*.token",
   "*.accessKey",
+  "*.apiKey",
   `*.${externalSecretPath("access", "key")}`,
   "*.secretAccessKey",
   "*.privateKey",
   "*.preAuthToken",
   "req.headers.authorization",
   "req.headers.cookie",
+  "req.headers['x-api-key']",
+  "req.headers['x-security-group-key']",
   "headers.authorization",
   "headers.cookie",
+  "headers['x-api-key']",
+  "headers['x-security-group-key']",
 ];
 
 const logger = pino({

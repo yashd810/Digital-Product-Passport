@@ -2,6 +2,13 @@ const logger = require("../../services/logger");
 const { recordSignedDppRelease } = require("../../services/dpp-release-record-service");
 const { buildDashboardPath } = require("../../shared/navigation/dashboard-paths");
 
+function canAccessWorkflowCompany(user, workflowCompanyId) {
+  if (user?.role === "superAdmin") return true;
+  if (user?.companyId === null || user?.companyId === undefined) return false;
+  if (workflowCompanyId === null || workflowCompanyId === undefined) return false;
+  return String(user.companyId) === String(workflowCompanyId);
+}
+
 module.exports = function registerWorkflowRoutes(app, {
   pool,
   authenticateToken,
@@ -172,6 +179,9 @@ module.exports = function registerWorkflowRoutes(app, {
       );
       if (!wfRes.rows.length) return res.status(404).json({ error: "No workflow found" });
       const wf = mapWorkflowRow(wfRes.rows[0]);
+      if (!canAccessWorkflowCompany(req.user, wf.companyId)) {
+        return res.status(403).json({ error: "Unauthorised access to this company" });
+      }
 
       const userRes = await pool.query("SELECT role FROM users WHERE id = $1", [userId]);
       const userRole = userRes.rows[0]?.role;
@@ -240,6 +250,9 @@ module.exports = function registerWorkflowRoutes(app, {
       );
       if (!wfRes.rows.length) return res.status(404).json({ error: "No active workflow found for this passport" });
       const wf = mapWorkflowRow(wfRes.rows[0]);
+      if (!canAccessWorkflowCompany(req.user, wf.companyId)) {
+        return res.status(403).json({ error: "Unauthorised access to this company" });
+      }
 
       const regRes = await pool.query(
         'SELECT "passportType" FROM "passportRegistry" WHERE "dppId" = $1 LIMIT 1',
@@ -411,8 +424,7 @@ module.exports = function registerWorkflowRoutes(app, {
             const releasePath = buildCurrentPublicPassportPath({
               companyName: pInfo.companyName,
               modelName: pInfo.modelName,
-              dppId,
-              internalAliasId: pInfo.internalAliasId
+              dppId
             });
             await runBestEffort("Workflow review approved notification error", async () => createNotification(
               wf.submittedBy,
@@ -518,8 +530,7 @@ module.exports = function registerWorkflowRoutes(app, {
           const releasePath = buildCurrentPublicPassportPath({
             companyName: pInfo.companyName,
             modelName: pInfo.modelName,
-            dppId,
-            internalAliasId: pInfo.internalAliasId
+            dppId
           });
           await runBestEffort("Workflow approval approved notification error", async () => createNotification(
             wf.submittedBy,
@@ -619,3 +630,5 @@ module.exports = function registerWorkflowRoutes(app, {
     }
   });
 };
+
+module.exports.canAccessWorkflowCompany = canAccessWorkflowCompany;

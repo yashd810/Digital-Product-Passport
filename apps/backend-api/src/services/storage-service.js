@@ -150,7 +150,6 @@ function createS3StorageService(options) {
     bucket,
     accessKeyId,
     secretAccessKey,
-    publicBaseUrl,
     forcePathStyle,
     serverBaseUrl
   } = options;
@@ -159,12 +158,8 @@ function createS3StorageService(options) {
     throw new Error("S3 storage provider requires endpoint, region, bucket, access key, and secret key");
   }
 
-  const endpointUrl = new URL(endpoint);
+  new URL(endpoint);
   const appPublicBase = normalizeBaseUrl(serverBaseUrl);
-  const normalizedPublicBase = normalizeBaseUrl(publicBaseUrl) || (
-  forcePathStyle ?
-  `${endpointUrl.origin}/${bucket}` :
-  `${endpointUrl.protocol}//${bucket}.${endpointUrl.host}`);
   const s3 = new S3Client({
     region,
     endpoint,
@@ -219,7 +214,7 @@ function createS3StorageService(options) {
         provider: "s3",
         storageKey: key,
         path: null,
-        url: joinUrl(normalizedPublicBase, key),
+        url: appPublicBase ? joinUrl(appPublicBase, `/storage/${key}`) : null,
         contentType
       };
     },
@@ -241,9 +236,7 @@ function createS3StorageService(options) {
       };
     },
     getPublicUrl(storageKey) {
-      return appPublicBase ?
-      joinUrl(appPublicBase, `/storage/${storageKey}`) :
-      joinUrl(normalizedPublicBase, storageKey);
+      return appPublicBase ? joinUrl(appPublicBase, `/storage/${storageKey}`) : null;
     }
   };
 }
@@ -269,7 +262,6 @@ function createStorageService(options) {
         bucket: process.env.STORAGE_S3_BUCKET,
         accessKeyId: process.env.STORAGE_S3_ACCESS_KEY_ID,
         secretAccessKey: process.env.STORAGE_S3_SECRET_ACCESS_KEY,
-        publicBaseUrl: process.env.STORAGE_S3_PUBLIC_BASE_URL,
         forcePathStyle: String(process.env.STORAGE_S3_FORCE_PATH_STYLE || "true") !== "false",
         serverBaseUrl
       })

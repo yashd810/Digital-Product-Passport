@@ -81,7 +81,6 @@ export function usePassportListState({ user, companyId, filterByUser }) {
         companyName: user?.companyName,
         modelName: passport.modelName,
         dppId: passport.dppId,
-        internalAliasId: passport.internalAliasId,
       });
     }
 
@@ -90,7 +89,6 @@ export function usePassportListState({ user, companyId, filterByUser }) {
         companyName: user?.companyName,
         modelName: passport.modelName,
         dppId: passport.dppId,
-        internalAliasId: passport.internalAliasId,
         versionNumber: passport.versionNumber,
       });
     }
@@ -98,7 +96,6 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     return buildPreviewPassportPath({
       companyName: user?.companyName,
       modelName: passport.modelName,
-      internalAliasId: passport.internalAliasId,
       previewId: passport.dppId,
     });
   }, [user?.companyName]);

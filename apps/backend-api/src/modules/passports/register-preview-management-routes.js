@@ -29,7 +29,8 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
   const {
     buildRestrictedUnlockPassportPayload,
     checkSecurityGroupApiKeyAccess,
-    findMatchingApiKeyRecord,
+    getSecurityGroupKeyFromRequest,
+    resolveSecurityGroupApiKey,
   } = createApiKeyHelpers({ crypto });
 
   app.get("/api/companies/:companyId/passports/:passportKey/preview", authenticateToken, checkCompanyAccess, async (req, res) => {
@@ -51,7 +52,10 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       const normalizedPassport = normalizePassportRow(sourcePassport, typeDef);
       const passport = rewriteRepositoryLinksForSignedAccessDeep(
         normalizedPassport,
-        { appBaseUrl: previewAppBaseUrl }
+        {
+          appBaseUrl: previewAppBaseUrl,
+          passportDppId: normalizedPassport.dppId,
+        }
       );
       const company = resolvedCompanyId
         ? (await pool.query(
@@ -106,7 +110,6 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufacturedBy,
           modelName: passport.modelName,
-          internalAliasId: passport.internalAliasId,
           previewDppId: passport.dppId,
         }),
         publicPath: buildCurrentPublicPassportPath({
@@ -115,7 +118,6 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
           manufacturedBy: passport.manufacturedBy,
           modelName: passport.modelName,
           dppId: passport.dppId,
-          internalAliasId: passport.internalAliasId,
         }),
         inactivePath: buildInactivePublicPassportPath({
           companyName,
@@ -123,7 +125,6 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
           manufacturedBy: passport.manufacturedBy,
           modelName: passport.modelName,
           dppId: passport.dppId,
-          internalAliasId: passport.internalAliasId,
           versionNumber: passport.versionNumber,
         }),
       });
@@ -132,12 +133,6 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       res.status(500).json({ error: "Failed to fetch passport preview" });
     }
   });
-
-  function getSecurityGroupKeyFromRequest(req) {
-    const headerValue = req.headers["x-security-group-key"] || req.headers["x-api-key"];
-    const raw = Array.isArray(headerValue) ? headerValue[0] : headerValue;
-    return String(raw || "").trim();
-  }
 
   app.get("/api/companies/:companyId/passports/:dppId/preview-unlock", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
@@ -159,26 +154,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       );
       const typeDef = typeDefResult.rows[0] || resolved.typeDef || null;
 
-      const keyPrefix = String(apiKey || "").slice(0, 16);
-      const keyRows = await pool.query(
-        `SELECT id,
-                "companyId" AS "companyId",
-                name,
-                "keyHash" AS "keyHash",
-                "keySalt" AS "keySalt",
-                "hashAlgorithm" AS "hashAlgorithm",
-                "passportType" AS "passportType",
-                "scopeType" AS "scopeType",
-                "fieldKeys" AS "fieldKeys",
-                "passportDppIds" AS "passportDppIds"
-         FROM "apiKeys"
-         WHERE "keyPrefix" = $1
-           AND "isActive" = true
-           AND ("expiresAt" IS NULL OR "expiresAt" > NOW())`,
-        [keyPrefix]
-      );
-      const matchedKey = findMatchingApiKeyRecord(apiKey, keyRows.rows);
-      if (!matchedKey) return res.status(401).json({ error: "Invalid or revoked API key" });
+      const matchedKey = await resolveSecurityGroupApiKey(pool, apiKey);
 
       const normalizedPassport = {
         ...normalizePassportRow(sourcePassport, typeDef),
@@ -223,7 +199,13 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
 
       res.json({
         success: true,
-        passport: unlockPayload.passport,
+        passport: rewriteRepositoryLinksForSignedAccessDeep(
+          unlockPayload.passport,
+          {
+            appBaseUrl: previewAppBaseUrl,
+            passportDppId: normalizedPassport.dppId,
+          }
+        ),
         unlockedFieldKeys: unlockPayload.unlockedFieldKeys,
         securityGroup: {
           id: matchedKey.id,
@@ -233,7 +215,9 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       });
     } catch (error) {
       if (error.code === "ambiguousProductId") return res.status(409).json({ error: error.message });
-      res.status(500).json({ error: "Failed to unlock passport preview" });
+      res.status(error.statusCode || 500).json({
+        error: error.statusCode ? error.message : "Failed to unlock passport preview",
+      });
     }
   });
 

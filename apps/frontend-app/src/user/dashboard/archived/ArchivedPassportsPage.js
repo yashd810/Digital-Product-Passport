@@ -94,7 +94,7 @@ function ArchivedPassports({ user, companyId }) {
 
     const payload = await response.json().catch(() => null);
     const history = Array.isArray(payload?.history) ? payload.history : [];
-    const matchingEntry = history.find((entry) => Number(entry.versionNumber ?? entry.versionNumber) === Number(publicVersionNumber));
+    const matchingEntry = history.find((entry) => Number(entry.versionNumber) === Number(publicVersionNumber));
     const resolvedPath = matchingEntry?.isCurrent
       ? matchingEntry?.publicPath
       : matchingEntry?.inactivePath;

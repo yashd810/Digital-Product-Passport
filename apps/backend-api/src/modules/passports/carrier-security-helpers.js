@@ -28,14 +28,12 @@ function createCarrierSecurityHelpers({
         companyName,
         modelName: passport.modelName,
         dppId: passport.dppId,
-        internalAliasId: passport.internalAliasId,
       });
     }
 
     return buildPreviewPassportPath({
       companyName,
       modelName: passport.modelName,
-      internalAliasId: passport.internalAliasId,
       previewDppId: passport.dppId,
     });
   }

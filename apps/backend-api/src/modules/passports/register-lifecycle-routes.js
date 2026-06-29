@@ -4,6 +4,16 @@ const { joinQuotedSqlIdentifiers } = require("../../shared/passports/passport-he
 
 const { createValidationMiddleware } = require("../../shared/validation/request-schema");
 
+function getPublicAttachmentFieldKeys(typeDef) {
+  return (typeDef?.fieldsJson?.sections || [])
+    .flatMap((section) => section.fields || [])
+    .filter((field) =>
+      field?.key
+      && String(field.confidentiality || "").trim().toLowerCase() === "public"
+    )
+    .map((field) => field.key);
+}
+
 module.exports = function registerLifecycleRoutes(app, deps) {
   const {
     pool,
@@ -218,11 +228,14 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       }
 
       await markOlderVersionsObsolete(tableName, dppId, released.versionNumber, passportType);
+      const publicAttachmentFieldKeys = getPublicAttachmentFieldKeys(typeDef);
       await pool.query(
-        "UPDATE \"passportAttachments\" SET \"isPublic\" = true WHERE \"passportDppId\" = $1",
-        [dppId]
+        `UPDATE "passportAttachments"
+         SET "isPublic" = ("fieldKey" = ANY($2::text[]))
+         WHERE "passportDppId" = $1`,
+        [dppId, publicAttachmentFieldKeys]
       ).catch((error) => {
-        logger.warn({ err: error, dppId }, "Failed to mark passport attachments public after release");
+        logger.warn({ err: error, dppId }, "Failed to synchronize passport attachment visibility after release");
       });
       await logAudit(companyId, req.user.userId, "release", tableName, dppId, { releaseStatus: "draftOrInRevision" }, { releaseStatus: "released" });
       await replicatePassportToBackup({
@@ -620,3 +633,5 @@ module.exports = function registerLifecycleRoutes(app, deps) {
     }
   });
 };
+
+module.exports.getPublicAttachmentFieldKeys = getPublicAttachmentFieldKeys;

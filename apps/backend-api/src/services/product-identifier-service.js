@@ -14,7 +14,7 @@ function createProductIdentifierService({ didService, pool = null }) {
   }
 
   function getBusinessIdentifierField(typeDef = null) {
-    const fieldsJson = typeDef?.fieldsJson || typeDef?.fieldsJson || typeDef || {};
+    const fieldsJson = typeDef?.fieldsJson || typeDef || {};
     return normalizeRawProductId(fieldsJson?.identity?.businessIdentifierField || "");
   }
 

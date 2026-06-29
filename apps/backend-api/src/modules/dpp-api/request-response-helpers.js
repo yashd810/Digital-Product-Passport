@@ -1,20 +1,10 @@
 "use strict";
 
 const { randomUUID } = require("crypto");
-const { rewriteRepositoryLinksForSignedAccessDeep } = require("../../shared/repository/repository-file-links");
-const { mapPassportTypeRow } = require("../../shared/passports/passport-helpers");
 
 function createRequestResponseHelpers({
-  pool,
-  getTable,
-  normalizeInternalAliasIdValue,
-  stripRestrictedFieldsForPublicView,
-  getCompanyNameMap,
-  resolveReleasedPassportByInternalAliasId,
-  buildOperationalDppPayload,
   buildCanonicalPassportPayload,
   buildExpandedPassportPayload,
-  dppIdentity,
 }) {
   const standardResultCodeByHttp = new Map([
     [200, "Success"],
@@ -32,10 +22,6 @@ function createRequestResponseHelpers({
     [501, "ServerNotImplemented"],
     [502, "ServerErrorBadGateway"],
   ]);
-
-  function getAppUrl() {
-    return process.env.APP_URL || "http://localhost:3001";
-  }
 
   function getStandardResultCode(httpStatus) {
     return standardResultCodeByHttp.get(Number(httpStatus)) || (
@@ -129,50 +115,6 @@ function createRequestResponseHelpers({
     return body;
   }
 
-  async function loadReleasedPassport(companyId, rawProductId, options = {}) {
-    const internalAliasId = normalizeInternalAliasIdValue ?
-      normalizeInternalAliasIdValue(rawProductId) :
-      rawProductId;
-    if (!internalAliasId) return null;
-
-    const result = await resolveReleasedPassportByInternalAliasId(internalAliasId, {
-      companyId,
-      versionNumber: options.versionNumber ?? null,
-      granularity: options.granularity || "item"
-    });
-    if (!result?.passport) return null;
-
-    const [companyNameMap, typeRes] = await Promise.all([
-      getCompanyNameMap([result.passport.companyId]),
-      pool.query(
-        `SELECT "typeName" AS "typeName",
-                "productCategory" AS "productCategory",
-                "semanticModelKey" AS "semanticModelKey",
-                "fieldsJson" AS "fieldsJson"
-         FROM "passportTypes"
-         WHERE "typeName" = $1`,
-        [result.passport.passportType]
-      )]
-    );
-
-    return {
-      passport: result.passport,
-      typeDef: typeRes.rows[0] ? mapPassportTypeRow(typeRes.rows[0]) : null,
-      companyName: companyNameMap.get(String(result.passport.companyId)) || "",
-      tableName: getTable(result.passport.passportType)
-    };
-  }
-
-  function acceptsJsonLd(req) {
-    const accept = req.headers.accept || "";
-    return accept.includes("application/ld+json");
-  }
-
-  function getRepresentation(req) {
-    const raw = String(req.query.representation || "").trim().toLowerCase();
-    return raw === "full" ? "full" : "compressed";
-  }
-
   function getRepresentationFromValue(value) {
     return String(value || "").trim().toLowerCase() === "full" ? "full" : "compressed";
   }
@@ -184,72 +126,10 @@ function createRequestResponseHelpers({
     return buildCanonicalPassportPayload(passport, typeDef, { companyName });
   }
 
-  function scrubInternalPublicIdentifiers(value) {
-    if (Array.isArray(value)) return value.map(scrubInternalPublicIdentifiers);
-    if (!value || typeof value !== "object") return value;
-    const scrubbed = {};
-    for (const [key, childValue] of Object.entries(value)) {
-      if (key === "internalAliasId" || key === "internalAliasIds" || key === "companyId") continue;
-      scrubbed[key] = scrubInternalPublicIdentifiers(childValue);
-    }
-    return scrubbed;
-  }
-
-  async function buildPassportResponse(req, passport, typeDef, companyName) {
-    const sanitized = rewriteRepositoryLinksForSignedAccessDeep(
-      await stripRestrictedFieldsForPublicView(passport, passport.passportType),
-      { appBaseUrl: getAppUrl() }
-    );
-    if (getRepresentation(req) === "full") {
-      return scrubInternalPublicIdentifiers(buildExpandedPassportPayload(sanitized, typeDef, { companyName }));
-    }
-    return scrubInternalPublicIdentifiers(buildOperationalDppPayload(sanitized, typeDef, {
-      companyName,
-      granularity: sanitized.granularity || "model",
-      dppIdentity
-    }));
-  }
-
-  async function dbLookupByCompanyAndProduct(companyId, internalAliasId) {
-    return loadReleasedPassport(companyId, internalAliasId);
-  }
-
-  async function dbLookupByInternalAliasIdOnly(internalAliasId, { versionNumber = null } = {}) {
-    const result = await resolveReleasedPassportByInternalAliasId(internalAliasId, {
-      versionNumber,
-      strictProductId: true
-    });
-    if (!result?.passport) return null;
-    const [companyNameMap, typeRes] = await Promise.all([
-      getCompanyNameMap([result.passport.companyId]),
-      pool.query(
-        `SELECT "typeName" AS "typeName",
-                "productCategory" AS "productCategory",
-                "semanticModelKey" AS "semanticModelKey",
-                "fieldsJson" AS "fieldsJson"
-         FROM "passportTypes"
-         WHERE "typeName" = $1`,
-        [result.passport.passportType]
-      )]
-    );
-    return {
-      passport: result.passport,
-      typeDef: typeRes.rows[0] ? mapPassportTypeRow(typeRes.rows[0]) : null,
-      companyName: companyNameMap.get(String(result.passport.companyId)) || ""
-    };
-  }
-
   return {
-    getAppUrl,
     applyStandardsResultEnvelope,
-    loadReleasedPassport,
-    acceptsJsonLd,
-    getRepresentation,
     getRepresentationFromValue,
     buildMutationPassportPayload,
-    buildPassportResponse,
-    dbLookupByCompanyAndProduct,
-    dbLookupByInternalAliasIdOnly,
   };
 }
 

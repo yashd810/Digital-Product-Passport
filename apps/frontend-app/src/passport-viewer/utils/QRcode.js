@@ -41,7 +41,7 @@ export const renderPassportQrToCanvas = async (canvas, {
 
 export function buildQrPrintSpecification({
   url,
-  internalAliasId,
+  dppId,
   granularity = "item",
   widthPx = defaultQrWidthPx,
   quietZoneModules = defaultQuietZoneModules,
@@ -101,7 +101,7 @@ export function buildQrPrintSpecification({
     moduleCount,
     modulePixelSize: Number(modulePixels.toFixed(2)),
     minimumRecommendedPrintWidthMm: recommendedMinWidthMm,
-    hriText: internalAliasId || "",
+    hriText: dppId || "",
     dppGraphicalMarking: shouldRenderIec61406Marker(granularity) ? dppGraphicalMarking : null,
     printAsset: {
       format: "PNG",
@@ -123,7 +123,7 @@ export function buildQrPrintSpecification({
 
 export async function renderPassportQrLabelToCanvas(canvas, {
   url,
-  internalAliasId,
+  dppId,
   granularity = "item",
   title = "Digital Product Passport",
   width = defaultQrWidthPx,
@@ -149,9 +149,9 @@ export async function renderPassportQrLabelToCanvas(canvas, {
   context.fillText(title, labelPadding, qrCanvas.height + 42);
   context.font = "600 14px ui-monospace, SFMono-Regular, Menlo, monospace";
   context.fillStyle = "#26435d";
-  context.fillText(internalAliasId || "", labelPadding, qrCanvas.height + 64);
+  context.fillText(dppId || "", labelPadding, qrCanvas.height + 64);
 
-  const trustedHost = buildQrPrintSpecification({ url, internalAliasId, granularity, width, quietZoneModules: margin })?.trustedViewerHost;
+  const trustedHost = buildQrPrintSpecification({ url, dppId, granularity, width, quietZoneModules: margin })?.trustedViewerHost;
   if (trustedHost) {
     context.textAlign = "right";
     context.fillStyle = "#0b1826";
@@ -165,7 +165,6 @@ export async function renderPassportQrLabelToCanvas(canvas, {
 
 export const generateQRCodeBundle = async ({
   dppId = "",
-  internalAliasId,
   companyName = "",
   modelName = "",
   manufacturerName = "",
@@ -178,7 +177,6 @@ export const generateQRCodeBundle = async ({
     manufacturedBy,
     modelName,
     dppId,
-    internalAliasId,
   });
   if (!passportPath) return null;
   const passportLink = buildPublicViewerUrl(passportPath);
@@ -197,7 +195,7 @@ export const generateQRCodeBundle = async ({
 
   const qrPrintSpecification = buildQrPrintSpecification({
     url: passportLink,
-    internalAliasId,
+    dppId,
     granularity,
     widthPx: defaultQrWidthPx,
     quietZoneModules: defaultQuietZoneModules,
@@ -244,11 +242,10 @@ export const generateQRCodeBundle = async ({
  * physical X-dimension at or above 0.25 mm when rendered in print workflows.
  * Returns base64 encoded PNG data URL.
  */
-export const generateQRCode = async ({ dppId = "", internalAliasId, companyName = "", modelName = "", manufacturerName = "", manufacturedBy = "", granularity = "item" }) => {
+export const generateQRCode = async ({ dppId = "", companyName = "", modelName = "", manufacturerName = "", manufacturedBy = "", granularity = "item" }) => {
   try {
     const bundle = await generateQRCodeBundle({
       dppId,
-      internalAliasId,
       companyName,
       modelName,
       manufacturerName,

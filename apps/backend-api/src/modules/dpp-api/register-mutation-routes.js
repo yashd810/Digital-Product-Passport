@@ -10,6 +10,8 @@ module.exports = function registerMutationRoutes(app, deps) {
     pool,
     logger,
     authenticateToken,
+    requireBearerToken,
+    integrationWriteRateLimit,
     requireEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
@@ -52,10 +54,9 @@ module.exports = function registerMutationRoutes(app, deps) {
   const updateDpp = updateDppUseCase(deps);
   const dppCreateSchema = {
     type: "object",
-    anyOf: [["passportType"], ["internalAliasId", "productIdentifier"]],
+    required: ["passportType", "productIdentifier"],
     properties: {
       passportType: { type: "string", minLength: 1 },
-      internalAliasId: { type: "string", minLength: 1 },
       productIdentifier: { type: "string", minLength: 1 },
     },
   };
@@ -78,12 +79,12 @@ module.exports = function registerMutationRoutes(app, deps) {
   function attachIntegrationCompanyContext(req, _res, next) {
     req.body = {
       ...(req.body || {}),
-      companyId: req.body?.companyId ?? req.params.companyId,
+      companyId: req.params.companyId,
     };
     next();
   }
 
-  app.post(integrationPassportsBase, authenticateToken, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, attachIntegrationCompanyContext, createValidationMiddleware({
+  app.post(integrationPassportsBase, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, attachIntegrationCompanyContext, createValidationMiddleware({
     body: dppCreateSchema,
   }), async (req, res) => {
     try {
@@ -104,7 +105,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     return res.status(204).send();
   });
 
-  app.patch(`${integrationPassportsBase}/:dppId`, authenticateToken, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, createValidationMiddleware({
+  app.patch(`${integrationPassportsBase}/:dppId`, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, createValidationMiddleware({
     params: {
       type: "object",
       required: ["companySlug", "dppId"],
@@ -130,7 +131,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     }
   });
 
-  app.delete(`${integrationPassportsBase}/:dppId`, authenticateToken, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, async (req, res) => {
+  app.delete(`${integrationPassportsBase}/:dppId`, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, async (req, res) => {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
       const routeCompanyId = Number.parseInt(req.params.companyId, 10);
@@ -208,6 +209,14 @@ module.exports = function registerMutationRoutes(app, deps) {
              RETURNING "dppId"`,
             [editable.passport.dppId]
           );
+          if (deleted.rows.length) {
+            await client.query(
+              `DELETE FROM "passportRegistry"
+               WHERE "dppId" = $1
+                 AND "companyId" = $2`,
+              [editable.passport.dppId, routeCompanyId]
+            );
+          }
           await client.query("COMMIT");
         } catch (err) {
           await client.query("ROLLBACK");
@@ -246,7 +255,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     }
   });
 
-  app.post(`${integrationPassportsBase}/:dppId/archive`, authenticateToken, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, async (req, res) => {
+  app.post(`${integrationPassportsBase}/:dppId/archive`, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, async (req, res) => {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
       const routeCompanyId = Number.parseInt(req.params.companyId, 10);

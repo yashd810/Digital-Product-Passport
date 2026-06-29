@@ -40,16 +40,14 @@ module.exports = function createAuthMiddleware({ jwt, pool, jwtSecret, sessionCo
       });
   };
   const parseBearerToken = (req) => {
-    const authHeader = String(req.headers["authorization"] || "");
-    if (!authHeader.startsWith("Bearer ")) return "";
-    return authHeader.slice(7).trim();
+    const authHeader = String(req.headers["authorization"] || "").trim();
+    const match = authHeader.match(/^Bearer\s+(\S+)$/i);
+    return match ? match[1] : "";
   };
   const getCandidateSessionTokens = (req) => {
-    const tokens = [];
     const bearerToken = parseBearerToken(req);
-    if (bearerToken) tokens.push(bearerToken);
-    tokens.push(...parseCookieValues(req, sessionCookieName));
-    return [...new Set(tokens.filter(Boolean))];
+    if (bearerToken) return [bearerToken];
+    return [...new Set(parseCookieValues(req, sessionCookieName).filter(Boolean))];
   };
 
   const buildActorIdentity = (row = {}) => ({
@@ -128,6 +126,13 @@ module.exports = function createAuthMiddleware({ jwt, pool, jwtSecret, sessionCo
     }
   };
 
+  const requireBearerToken = (req, res, next) => {
+    if (!parseBearerToken(req)) {
+      return res.status(401).json({ error: "Bearer token required" });
+    }
+    next();
+  };
+
   const isSuperAdmin = (req, res, next) =>
     req.user.role === "superAdmin" ? next()
       : res.status(403).json({ error: "Super Admin access required" });
@@ -163,6 +168,7 @@ module.exports = function createAuthMiddleware({ jwt, pool, jwtSecret, sessionCo
 
   return {
     parseCookies,
+    requireBearerToken,
     authenticateToken,
     isSuperAdmin,
     checkCompanyAccess,

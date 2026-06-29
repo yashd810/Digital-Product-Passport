@@ -69,6 +69,7 @@ function buildRepositoryFilePublicUrl({ appBaseUrl, companyId, itemId }) {
 }
 
 const opaqueRepositoryFileRoute = /\/repository-files\/([^/?#]+)(?:[/?#].*)?$/i;
+const opaquePassportAttachmentRoute = /\/public-files\/([a-zA-Z0-9_-]{8,24})(?:[?#].*)?$/i;
 
 function buildRepositoryFileAccessPayload({ companyId, itemId, expiresAt }) {
   return JSON.stringify({
@@ -114,6 +115,78 @@ function decodeRepositoryFileAccessToken(token) {
   return { companyId, itemId, expiresAt };
 }
 
+function encodePassportAttachmentAccessToken({
+  publicId,
+  passportDppId,
+  fieldKey,
+  expiresAt = Date.now() + (getRepositoryFileAccessTtlSeconds() * 1000),
+}) {
+  const normalizedPublicId = String(publicId || "").trim();
+  const normalizedPassportDppId = String(passportDppId || "").trim();
+  const normalizedFieldKey = String(fieldKey || "").trim();
+  if (!/^[a-zA-Z0-9_-]{8,24}$/.test(normalizedPublicId)) {
+    throw new Error("Invalid passport attachment identifier");
+  }
+  if (!normalizedPassportDppId || normalizedPassportDppId.length > 200) {
+    throw new Error("Invalid passport attachment DPP identifier");
+  }
+  if (!/^[a-z][A-Za-z0-9]{0,99}$/.test(normalizedFieldKey)) {
+    throw new Error("Invalid passport attachment field key");
+  }
+  const payload = JSON.stringify({
+    publicId: normalizedPublicId,
+    passportDppId: normalizedPassportDppId,
+    fieldKey: normalizedFieldKey,
+    exp: Number.parseInt(expiresAt, 10),
+  });
+  const encodedPayload = Buffer.from(payload, "utf8").toString("base64url");
+  return `${encodedPayload}.${signPayload(encodedPayload)}`;
+}
+
+function decodePassportAttachmentAccessToken(token) {
+  const [encodedPayload, signature] = String(token || "").split(".");
+  if (!encodedPayload || !signature) return null;
+  const expectedSignature = signPayload(encodedPayload);
+  const left = Buffer.from(signature);
+  const right = Buffer.from(expectedSignature);
+  if (left.length !== right.length || !crypto.timingSafeEqual(left, right)) return null;
+
+  let parsed;
+  try {
+    parsed = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+
+  const publicId = String(parsed?.publicId || "").trim();
+  const passportDppId = String(parsed?.passportDppId || "").trim();
+  const fieldKey = String(parsed?.fieldKey || "").trim();
+  const expiresAt = Number.parseInt(parsed?.exp, 10);
+  if (!/^[a-zA-Z0-9_-]{8,24}$/.test(publicId)) return null;
+  if (!passportDppId || passportDppId.length > 200) return null;
+  if (!/^[a-z][A-Za-z0-9]{0,99}$/.test(fieldKey)) return null;
+  if (!Number.isInteger(expiresAt) || expiresAt <= 0 || Date.now() > expiresAt) return null;
+  return { publicId, passportDppId, fieldKey, expiresAt };
+}
+
+function buildPassportAttachmentAccessPath({ publicId, passportDppId, fieldKey, expiresAt }) {
+  return `/public-files/access/${encodePassportAttachmentAccessToken({
+    publicId,
+    passportDppId,
+    fieldKey,
+    expiresAt,
+  })}`;
+}
+
+function buildPassportAttachmentAccessUrl({ appBaseUrl, publicId, passportDppId, fieldKey, expiresAt }) {
+  return joinUrl(appBaseUrl, buildPassportAttachmentAccessPath({
+    publicId,
+    passportDppId,
+    fieldKey,
+    expiresAt,
+  }));
+}
+
 function buildRepositoryFileAccessPath({ companyId, itemId, expiresAt = Date.now() + (getRepositoryFileAccessTtlSeconds() * 1000) }) {
   return `/repository-files/access/${encodeRepositoryFileAccessToken({ companyId, itemId, expiresAt })}`;
 }
@@ -138,6 +211,19 @@ function parseRepositoryFileReference(value) {
   return decodeRepositoryFileToken(opaqueMatch[1]);
 }
 
+function parsePassportAttachmentReference(value) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  let pathname = value.trim();
+  try {
+    const parsed = new URL(pathname, "http://local.invalid");
+    pathname = `${parsed.pathname}${parsed.search || ""}${parsed.hash || ""}`;
+  } catch {
+    // Keep the original relative path.
+  }
+  const match = pathname.match(opaquePassportAttachmentRoute);
+  return match ? { publicId: match[1] } : null;
+}
+
 function rewriteRepositoryFileLink(value, { appBaseUrl } = {}) {
   const resolved = parseRepositoryFileReference(value);
   if (!resolved) return value;
@@ -159,11 +245,38 @@ function rewriteRepositoryLinksDeep(value, options = {}) {
   return next;
 }
 
-function rewriteRepositoryFileLinkForSignedAccess(value, { appBaseUrl, expiresAt } = {}) {
+function rewriteRepositoryFileLinkForSignedAccess(value, {
+  appBaseUrl,
+  passportDppId,
+  fieldKey,
+  expiresAt,
+} = {}) {
   const resolved = parseRepositoryFileReference(value);
-  if (!resolved) return value;
-  if (!appBaseUrl) return buildRepositoryFileAccessPath({ ...resolved, expiresAt });
-  return buildRepositoryFileAccessUrl({ appBaseUrl, ...resolved, expiresAt });
+  if (resolved) {
+    if (!appBaseUrl) return buildRepositoryFileAccessPath({ ...resolved, expiresAt });
+    return buildRepositoryFileAccessUrl({ appBaseUrl, ...resolved, expiresAt });
+  }
+
+  const attachment = parsePassportAttachmentReference(value);
+  if (!attachment) return value;
+  const normalizedPassportDppId = String(passportDppId || "").trim();
+  const normalizedFieldKey = String(fieldKey || "").trim();
+  if (!normalizedPassportDppId || !normalizedFieldKey) return value;
+  if (!appBaseUrl) {
+    return buildPassportAttachmentAccessPath({
+      ...attachment,
+      passportDppId: normalizedPassportDppId,
+      fieldKey: normalizedFieldKey,
+      expiresAt,
+    });
+  }
+  return buildPassportAttachmentAccessUrl({
+    appBaseUrl,
+    ...attachment,
+    passportDppId: normalizedPassportDppId,
+    fieldKey: normalizedFieldKey,
+    expiresAt,
+  });
 }
 
 function rewriteRepositoryLinksForSignedAccessDeep(value, options = {}) {
@@ -175,18 +288,26 @@ function rewriteRepositoryLinksForSignedAccessDeep(value, options = {}) {
 
   const next = {};
   for (const [key, entry] of Object.entries(value)) {
-    next[key] = rewriteRepositoryLinksForSignedAccessDeep(entry, options);
+    next[key] = rewriteRepositoryLinksForSignedAccessDeep(entry, {
+      ...options,
+      fieldKey: options.fieldKey || key,
+    });
   }
   return next;
 }
 
 module.exports = {
+  buildPassportAttachmentAccessPath,
+  buildPassportAttachmentAccessUrl,
   buildRepositoryFileAccessPath,
   buildRepositoryFileAccessUrl,
   buildRepositoryFilePublicPath,
   buildRepositoryFilePublicUrl,
+  decodePassportAttachmentAccessToken,
   decodeRepositoryFileAccessToken,
   decodeRepositoryFileToken,
+  encodePassportAttachmentAccessToken,
+  parsePassportAttachmentReference,
   parseRepositoryFileReference,
   rewriteRepositoryFileLink,
   rewriteRepositoryLinksDeep,

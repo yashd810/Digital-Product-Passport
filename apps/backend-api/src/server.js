@@ -10,8 +10,8 @@ const {
   initEnvironment,
   isPassportStorageKey,
   isPlainRecord,
-  normalizeIncomingDppIdentifiers,
-  normalizeOutgoingDppIdentifiers,
+  normalizeIncomingJsonValue,
+  normalizeOutgoingJsonValue,
   normalizeStorageRequestKey,
   toBooleanEnv,
 } = require("./bootstrap/runtime-config");
@@ -43,8 +43,6 @@ const { createRateLimiters, startRateLimitMaintenance } = require("./http/middle
 const createAssetService       = require("./services/asset-management");
 const createPassportService    = require("./services/passport-service");
 const createSemanticPassportExportService = require("./services/semantic-passport-export");
-const createPassportRepresentationService = require("./services/passport-representation-service");
-const dppIdentity                         = require("./services/dpp-identity-service");
 const createSemanticModelRegistry         = require("./services/semantic-model-registry");
 const createComplianceService             = require("./services/required-fields-service");
 const createProductIdentifierService      = require("./services/product-identifier-service");
@@ -65,7 +63,6 @@ const {
   getWritablePassportColumns, getStoredPassportValues,
   quoteSqlIdentifier, joinQuotedSqlIdentifiers,
   buildCurrentPublicPassportPath, buildInactivePublicPassportPath, buildPreviewPassportPath,
-  resolvePublicPathToSubjects,
   coerceBulkFieldValue, getHistoryFieldDefs, formatHistoryFieldValue, comparableHistoryFieldValue,
   isPlainObject, getPassportFieldValue, getAssetFieldMap, getValueAtPath, normalizeAssetHeaders,
   coerceAssetFieldValue, toDynamicStoredValue,
@@ -97,8 +94,8 @@ configureHttp(app, {
   globalSymbolsDir: globalSymbolsDir,
   isPlainRecord,
   isProduction: isProduction,
-  normalizeIncomingDppIdentifiers,
-  normalizeOutgoingDppIdentifiers,
+  normalizeIncomingJsonValue,
+  normalizeOutgoingJsonValue,
   port: port,
 });
 
@@ -251,14 +248,14 @@ const oauthService = createOauthService({
 // ─── AUTH MIDDLEWARE ─────────────────────────────────────────────────────────
 const {
   authenticateToken, isSuperAdmin, checkCompanyAccess,
-  requireEditor, requireDraftEditor, checkCompanyAdmin,
+  requireBearerToken, requireEditor, requireDraftEditor, checkCompanyAdmin,
 } = createAuthMiddleware({ jwt, pool, jwtSecret, sessionCookieName });
 
 // ─── RATE LIMITERS ───────────────────────────────────────────────────────────
 const {
   authRateLimit, otpRateLimit, passwordResetRateLimit, publicReadRateLimit,
   publicHeavyRateLimit, publicUnlockRateLimit,
-  assetWriteRateLimit, assetSourceFetchRateLimit,
+  integrationWriteRateLimit, assetWriteRateLimit, assetSourceFetchRateLimit,
 } = createRateLimiters(pool);
 const rateLimitMaintenanceTimer = startRateLimitMaintenance(pool);
 
@@ -349,7 +346,6 @@ const canonicalPassportSerializer = createCanonicalPassportSerializer({
 const {
   buildCanonicalPassportPayload,
   buildExpandedPassportPayload,
-  buildExpandedDataElement,
 } = canonicalPassportSerializer;
 
 // ─── SIGNING SERVICE ─────────────────────────────────────────────────────────
@@ -362,16 +358,9 @@ const signingService = createSigningService({
 });
 const { signPassport, verifyPassportSignature } = signingService;
 
-// ─── PASSPORT REPRESENTATION SERVICE ────────────────────────────────────────
-const { buildOperationalDppPayload } = createPassportRepresentationService({
-  productIdentifierService,
-  buildCanonicalPassportPayload,
-});
-
 // ─── SEMANTICS + COMPLIANCE SERVICES ─────────────────────────────────────────
 const {
   buildSemanticPassportJsonExport,
-  buildPassportJsonLdContext,
 } = createSemanticPassportExportService({ semanticModelRegistry });
 const complianceService = createComplianceService({
   pool,
@@ -388,12 +377,11 @@ const backupProviderService = createBackupProviderService({
 const passportService = createPassportService({
   pool,
   getTable, normalizePassportRow, normalizeReleaseStatus, isPublicHistoryStatus, isEditablePassportStatus,
-  normalizeInternalAliasIdValue, generateInternalAliasIdValue, inRevisionStatus, systemPassportFields,
+  generateInternalAliasIdValue, inRevisionStatus, systemPassportFields,
   getWritablePassportColumns, getStoredPassportValues, toStoredPassportValue,
   quoteSqlIdentifier, joinQuotedSqlIdentifiers,
   coerceBulkFieldValue, comparableHistoryFieldValue, formatHistoryFieldValue, getHistoryFieldDefs,
   buildCurrentPublicPassportPath, buildInactivePublicPassportPath,
-  productIdentifierService,
   createTransporter, brandedEmail,
 });
 
@@ -408,7 +396,7 @@ const {
   getPassportTypeSchema, findExistingPassportByInternalAliasId,
   getPassportLineageContext, getPassportVersionsByLineage,
   getCompanyNameMap, stripRestrictedFieldsForPublicView,
-  fetchCompanyPassportRecord, resolveReleasedPassportByInternalAliasId,
+  fetchCompanyPassportRecord,
   resolvePublicPassportByDppId, resolveCompanyPreviewPassport,
   archivePassportSnapshot, archivePassportSnapshots,
   updatePassportRowById, buildPassportVersionHistory,
@@ -512,9 +500,11 @@ registerAppRoutes(app, {
   publicReadRateLimit,
   publicHeavyRateLimit,
   publicUnlockRateLimit,
+  integrationWriteRateLimit,
   assetWriteRateLimit,
   assetSourceFetchRateLimit,
   authenticateToken,
+  requireBearerToken,
   isSuperAdmin,
   checkCompanyAccess,
   requireEditor,
@@ -602,17 +592,11 @@ registerAppRoutes(app, {
   productIdentifierService,
   buildExpandedPassportPayload,
   createPassportTable,
-  resolveReleasedPassportByInternalAliasId,
   resolvePublicPassportByDppId,
-  resolvePublicPathToSubjects,
   verifyPassportSignature,
-  buildJsonLdContext: buildPassportJsonLdContext,
   buildCanonicalPassportPayload,
   signingService,
   didService,
-  buildOperationalDppPayload,
-  buildExpandedDataElement,
-  dppIdentity,
   semanticModelRegistry,
   isPathInsideBase,
   normalizePassportTypeSchema,
@@ -620,9 +604,6 @@ registerAppRoutes(app, {
   buildPassportTypeSchemaChange,
   passportTypeHasStoredRecords,
   validatePassportTypeStorage,
-  buildPassportJsonLdContext,
-  buildCanonicalPassportPayload,
-  buildExpandedPassportPayload,
   createNotification,
   getAssetFieldMap,
   isPlainObject,

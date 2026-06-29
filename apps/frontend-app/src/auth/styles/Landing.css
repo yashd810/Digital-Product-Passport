@@ -450,6 +450,52 @@
   box-shadow: 0 10px 40px rgba(0,15,8,0.1);
 }
 
+.auth-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  text-align: left;
+}
+
+.auth-logo-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(13, 181, 176, 0.14);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.auth-logo-text {
+  color: var(--text-primary);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.auth-logo-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--steel);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+[data-theme="light"] .auth-logo-text {
+  color: var(--onyx);
+}
+
+[data-theme="light"] .auth-logo-sub {
+  color: #5d7273;
+}
+
 .auth-card h1 {
   color: var(--text-primary);
   margin: 0 0 8px 0;

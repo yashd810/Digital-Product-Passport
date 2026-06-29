@@ -26,6 +26,7 @@ test("implicit env backup provider is normalized before passport replication", a
 
   let replicationParams = null;
   let savedObject = null;
+  let savedPayload = null;
   const pool = {
     async query(sql, params = []) {
       if (sql.includes("FROM \"backupServiceProviders\"")) return { rows: [] };
@@ -47,6 +48,7 @@ test("implicit env backup provider is normalized before passport replication", a
     provider: "local",
     async saveObject(input) {
       savedObject = input;
+      savedPayload = JSON.parse(input.buffer.toString("utf8"));
       return { storageKey: input.key, url: `http://files.example/${input.key}` };
     },
   };
@@ -66,8 +68,21 @@ test("implicit env backup provider is normalized before passport replication", a
       lineageId: "lineage-1",
       passportType: "exampleProductPassportV1",
       versionNumber: 2,
+      publicField: "public-value",
+      restrictedField: "restricted-value",
+      unknownColumn: "unknown-value",
     },
-    typeDef: { typeName: "exampleProductPassportV1", fieldsJson: { sections: [] } },
+    typeDef: {
+      typeName: "exampleProductPassportV1",
+      fieldsJson: {
+        sections: [{
+          fields: [
+            { key: "publicField", confidentiality: "public" },
+            { key: "restrictedField", confidentiality: "restricted" },
+          ],
+        }],
+      },
+    },
     snapshotScope: "releasedCurrent",
   });
 
@@ -76,6 +91,9 @@ test("implicit env backup provider is normalized before passport replication", a
   assert.equal(replicationParams[9], "synced");
   assert.equal(savedObject.contentType, "application/json");
   assert.equal(savedObject.key, "custom-prefix/company-7/passport-lineage-1/v2/releasedCurrent.json");
+  assert.equal(savedPayload.publicRowData.publicField, "public-value");
+  assert.equal(savedPayload.publicRowData.restrictedField, undefined);
+  assert.equal(savedPayload.publicRowData.unknownColumn, undefined);
 });
 
 test("public handover rows expose camelCase fields expected by callers", async () => {

@@ -8,14 +8,24 @@ export function authHeaders(headers = {}) {
  * Avoids infinite redirect loops on login page.
  */
 export async function fetchWithAuth(url, options = {}) {
+  const {
+    skipAuthRedirect = false,
+    ...fetchOptions
+  } = options;
   const response = await fetch(url, {
     credentials: "include",
-    ...options,
+    ...fetchOptions,
   });
 
   const pathname = window.location.pathname;
   const isLoginPage = pathname.startsWith("/login");
   const urlString = String(url);
+  const isPublicApiRequest =
+    urlString.includes("/api/public/") ||
+    urlString.includes("/.well-known/") ||
+    urlString.includes("/did/") ||
+    urlString.includes("/resolve") ||
+    urlString.includes("/contexts/");
   
   // Don't redirect on auth bootstrap requests (login, logout, SSO, user check)
   const isAuthBootstrapRequest =
@@ -28,7 +38,13 @@ export async function fetchWithAuth(url, options = {}) {
 
   // Redirect to login only when the server indicates the session is no longer valid.
   // Business-rule 403s should stay on the page and surface their actual error message.
-  if (response.status === 401 && !isLoginPage && !isAuthBootstrapRequest) {
+  if (
+    response.status === 401
+    && !skipAuthRedirect
+    && !isPublicApiRequest
+    && !isLoginPage
+    && !isAuthBootstrapRequest
+  ) {
     window.location.replace("/login?session=expired");
   }
 

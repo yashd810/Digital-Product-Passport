@@ -202,7 +202,7 @@ module.exports = function createRequiredFieldsService({
 
   async function evaluatePassport(passport, passportType = null, providedTypeDef = null) {
     const basePassport = passport || {};
-    const requestedPassportType = passportType || basePassport.passportType || basePassport.passportType || "";
+    const requestedPassportType = passportType || basePassport.passportType || "";
     const resolvedTypeDef = normalizePassportTypeDefinition(providedTypeDef)
       || await loadPassportTypeDefinition(requestedPassportType);
 

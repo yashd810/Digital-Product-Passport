@@ -17,6 +17,27 @@ import "../styles/PassportViewer.css";
 
 const api = import.meta.env.VITE_API_URL || "";
 
+function buildRestrictedPassportFromPublicResponse(response, passport) {
+  const fieldKeys = Array.isArray(response?.restrictedAccess?.fieldKeys)
+    ? response.restrictedAccess.fieldKeys
+    : [];
+  if (!fieldKeys.length) return null;
+
+  const restrictedPassport = {
+    dppId: response?.dppId || passport?.dppId || null,
+    passportType: response?.passportType || passport?.passportType || null,
+    versionNumber: response?.versionNumber ?? passport?.versionNumber ?? null,
+  };
+  for (const fieldKey of fieldKeys) {
+    if (Object.prototype.hasOwnProperty.call(response?.fields || {}, fieldKey)) {
+      restrictedPassport[fieldKey] = response.fields[fieldKey];
+    } else if (Object.prototype.hasOwnProperty.call(response || {}, fieldKey)) {
+      restrictedPassport[fieldKey] = response[fieldKey];
+    }
+  }
+  return restrictedPassport;
+}
+
 function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const { dppId, versionNumber, previewId } = useParams();
   const navigate   = useNavigate();
@@ -98,7 +119,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     setVerificationBundle(null);
   }, [passportIdentityKey]);
 
-  const fetchPublicHistoryPayload = useCallback(async (passportData) => {
+  const fetchPublicHistoryPayload = useCallback(async (passportData, apiKey = "") => {
     const endpoints = [
       passportData?.dppId
         ? `${api}/api/public/passports/${encodeURIComponent(passportData.dppId)}/history`
@@ -107,7 +128,9 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
     for (const endpoint of endpoints) {
       try {
-        const response = await fetchWithAuth(endpoint);
+        const response = await fetchWithAuth(endpoint, apiKey
+          ? { headers: { "X-API-Key": apiKey } }
+          : undefined);
         const payload = await response.json().catch(() => null);
         if (response.ok && payload) return payload;
       } catch {
@@ -191,7 +214,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       try {
         const generatedBundle = await generateQRCodeBundle({
           dppId: passport.dppId,
-          internalAliasId: passport.internalAliasId,
           companyName: companyData?.companyName,
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufacturedBy,
@@ -222,7 +244,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         setQrLoading(false);
       }
     })();
-  }, [companyData?.companyName, isPreviewMode, passport?.companyId, passport?.dppId, passport?.granularity, passport?.manufacturedBy, passport?.manufacturer, passport?.modelName, passport?.passportType, passport?.internalAliasId]);
+  }, [companyData?.companyName, isPreviewMode, passport?.companyId, passport?.dppId, passport?.granularity, passport?.manufacturedBy, passport?.manufacturer, passport?.modelName, passport?.passportType]);
 
   // Fetch + poll dynamic field values every 30 s
   useEffect(() => {
@@ -286,14 +308,22 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       const r = await fetchWithAuth(unlockEndpoint, isPreviewMode ? {
         method: "GET",
         headers: { "X-API-Key": apiKeyInput.trim() },
+        skipAuthRedirect: true,
       } : {
         method: "GET",
         headers: { "X-API-Key": apiKeyInput.trim() },
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Invalid API key");
-      setUnlockedPassport(d.unlockedPassport || d.passport || {});
+      const restrictedPassport = isPreviewMode
+        ? d.passport
+        : buildRestrictedPassportFromPublicResponse(d, passport);
+      if (!restrictedPassport) throw new Error("This security group does not grant access to restricted fields");
+      setUnlockedPassport(restrictedPassport);
       setSecurityGroupApiKey(apiKeyInput.trim());
+      if (!isPreviewMode) {
+        setPublicHistoryPayload(await fetchPublicHistoryPayload(passport, apiKeyInput.trim()));
+      }
       if (!isPreviewMode && d?.viewerSchema) setTypeDef(d.viewerSchema);
       setShowRestrictedUnlockForm(false);
       setApiKeyInput("");
@@ -331,7 +361,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
     dppId: passport?.dppId,
-    internalAliasId: passport?.internalAliasId,
   });
   const canonicalTechnicalPath = buildTechnicalPassportPath({
     companyName: companyData?.companyName,
@@ -339,7 +368,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
     dppId: passport?.dppId,
-    internalAliasId: passport?.internalAliasId,
   });
   const canonicalInactivePath = buildInactivePassportPath({
     companyName: companyData?.companyName,
@@ -347,7 +375,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
     dppId: passport?.dppId,
-    internalAliasId: passport?.internalAliasId,
     versionNumber,
   });
   const canonicalInactiveTechnicalPath = buildInactiveTechnicalPassportPath({
@@ -355,7 +382,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
-    internalAliasId: passport?.internalAliasId,
+    dppId: passport?.dppId,
     versionNumber,
   });
   const canonicalPreviewPath = buildPreviewPassportPath({
@@ -363,7 +390,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
-    internalAliasId: passport?.internalAliasId,
     previewId: passport?.dppId,
   });
   const canonicalPreviewTechnicalPath = buildPreviewTechnicalPassportPath({
@@ -371,13 +397,11 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
-    internalAliasId: passport?.internalAliasId,
     previewId: passport?.dppId,
   });
   const releasedAtTimestamp =
     verificationBundle?.releasedAt
     || sigVerification?.releasedAt
-    || passport?.releasedAt
     || passport?.releasedAt
     || null;
 
@@ -460,7 +484,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
                 Cancel
               </button>
               <button className="restricted-unlock-btn submit" onClick={handleUnlock} disabled={unlocking || !apiKeyInput.trim()}>
-                {unlocking ? "Verifying…" : "Unlock"}
+                {unlocking ? "Verifying…" : "Access fields"}
               </button>
             </div>
           </div>

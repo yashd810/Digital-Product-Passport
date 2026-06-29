@@ -119,7 +119,7 @@ function isUnlockPayloadForPassport(passport, unlockedPassport) {
 }
 
 function resolveFieldValue(field, passport, unlockedPassport, dynamicValues) {
-  const isPublic = String(field.confidentiality || "public").toLowerCase() !== "restricted";
+  const isPublic = String(field.confidentiality || "").toLowerCase() === "public";
   const isDynamic = !!field.dynamic;
   const dynEntry = isDynamic ? dynamicValues?.[field.key] : null;
   const scopedUnlockedPassport = isUnlockPayloadForPassport(passport, unlockedPassport) ? unlockedPassport : null;
@@ -644,7 +644,7 @@ export default function PublicPassportPortal({
     return () => {
       cancelled = true;
     };
-  }, [passport?.dppId, passport?.internalAliasId, publicHistoryPayload, publicHistoryState.loaded, publicHistoryState.loading]);
+  }, [passport?.dppId, publicHistoryPayload, publicHistoryState.loaded, publicHistoryState.loading]);
 
   const productOverviewCards = buildProductOverviewCards(fields, passport, unlockedPassport, dynamicValues, lang);
   const displayModelName = passport?.modelName || productOverviewCards[0]?.value || "";
@@ -721,7 +721,7 @@ export default function PublicPassportPortal({
             >
               Access restricted fields
             </button>
-            {unlockedPassport && <span className="badge ok">Unlocked</span>}
+            {unlockedPassport && <span className="badge ok">Authorised view</span>}
           </div>
         </div>
       </nav>

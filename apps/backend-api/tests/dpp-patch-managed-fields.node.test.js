@@ -139,3 +139,22 @@ test("standards PATCH reconciles policy-owned fields from the passport type", as
   assert.equal(result.body.passport.fields.passportPolicyKey, "exampleProductDppV1");
   assert.equal(result.body.passport.fields.contentSpecificationIds, JSON.stringify(["exampleProductDictionaryV1"]));
 });
+
+test("standards PATCH rejects the internal alias field name", async () => {
+  const { getCapturedUpdateData, updateDpp } = createUseCaseHarness();
+  const result = await updateDpp({
+    req: {
+      params: { dppId: "dppPatchTest", companyId: "7" },
+      query: {},
+      body: {
+        internalAliasId: "private-alias-must-not-be-external",
+      },
+      user: { userId: 9, companyId: 7, role: "companyAdmin" },
+    },
+    res: createResponse(),
+  });
+
+  assert.equal(result.statusCode, 400);
+  assert.deepEqual(result.body.fields, ["internalAliasId"]);
+  assert.equal(getCapturedUpdateData(), null);
+});

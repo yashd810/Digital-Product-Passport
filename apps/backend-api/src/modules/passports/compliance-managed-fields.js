@@ -85,6 +85,7 @@ function createComplianceManagedFieldHelpers({
   async function buildComplianceManagedFields({
     companyId,
     passportType,
+    typeDef = null,
     granularity,
     requestedFields = {},
     facilitySource = requestedFields,
@@ -94,7 +95,7 @@ function createComplianceManagedFieldHelpers({
     allowPolicyOverride = false,
     allowContentSpecificationOverride = false,
   }) {
-    const policy = complianceService.resolvePassportPolicyMetadata({ passportType, granularity });
+    const policy = complianceService.resolvePassportPolicyMetadata({ passportType, typeDef, granularity });
     const companyIdentity = await loadCompanyComplianceIdentity(companyId);
     let resolvedFacilityId = null;
 

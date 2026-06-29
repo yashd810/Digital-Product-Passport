@@ -100,11 +100,11 @@ function normalizeJsonFriendlyValue(value) {
   );
 }
 
-function normalizeIncomingDppIdentifiers(value) {
+function normalizeIncomingJsonValue(value) {
   return normalizeJsonFriendlyValue(value);
 }
 
-function normalizeOutgoingDppIdentifiers(value) {
+function normalizeOutgoingJsonValue(value) {
   return normalizeJsonFriendlyValue(value);
 }
 
@@ -245,8 +245,8 @@ module.exports = {
   initEnvironment,
   isPassportStorageKey,
   isPlainRecord,
-  normalizeIncomingDppIdentifiers,
-  normalizeOutgoingDppIdentifiers,
+  normalizeIncomingJsonValue,
+  normalizeOutgoingJsonValue,
   normalizeStorageRequestKey,
   toBooleanEnv,
 };

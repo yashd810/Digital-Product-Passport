@@ -25,8 +25,8 @@ export const coreDatabaseTables = [
       },
       {
         name: "apiKeys",
-        purpose: "Security group API keys used for restricted-field unlocking and scoped `/api/public/passports/:dppId with optional X-API-Key` reads.",
-        columns: ["id", "companyId", "name", "keyHash", "keyPrefix", "keySalt", "hashAlgorithm", "scopes", "passportType", "scopeType", "fieldKeys", "passportDppIds", "expiresAt", "createdBy", "createdAt", "updatedAt", "lastUsedAt", "isActive"],
+        purpose: "Security group API keys used for scoped `/api/public/passports/:dppId` reads with an optional `X-API-Key` header.",
+        columns: ["id", "companyId", "name", "keyHash", "keyPrefix", "keySalt", "hashAlgorithm", "passportType", "scopeType", "fieldKeys", "passportDppIds", "expiresAt", "createdBy", "createdAt", "updatedAt", "lastUsedAt", "isActive"],
       },
     ],
   },
@@ -331,7 +331,7 @@ export const backendApiFamilies = [
       "Stores company branding, introduction content, public-page styling, and logo assets.",
       "Stores economic-operator identity and managed facility identifiers used by DID, VC, JSON-LD, and standards API flows.",
       "Creates scoped, revocable security group API keys from the dashboard Security page for restricted public-view unlocking and read-only external `/api/public/passports/:dppId` access.",
-      "Separates security group API keys from browser sessions/bearer tokens, integration Bearer tokens, and Asset Management launch credentials.",
+      "Separates security group API keys from browser sessions and company integration Bearer tokens.",
     ],
   },
   {
@@ -354,11 +354,12 @@ export const backendApiFamilies = [
   },
   {
     name: "Asset Management operational layer",
-    route: "/api/companies/:companyId/asset-management/launch and /api/asset-management/*",
+    route: "/api/companies/:companyId/passport-data-management/*",
     details: [
-      "Launches the separate Asset Management workspace for bulk updates on already existing passports.",
+      "Runs inside the authenticated company dashboard for bulk updates on existing passports.",
       "Supports staged CSV, JSON, and ERP/API ingestion, then validates rows before pushing updates into the backend.",
-      "Includes its own launch token, optional shared-secret header, saved jobs, recent runs, and scheduled server-side fetch-and-push flows.",
+      "Uses the normal session or Bearer authentication model with company access checks, plus editor authorization for writes.",
+      "Includes saved jobs, recent runs, and scheduled server-side fetch-and-push flows.",
     ],
   },
   {
@@ -381,11 +382,11 @@ export const backendApiFamilies = [
   },
   {
     name: "Platform utility and file delivery",
-    route: "/health, /api/contact, /public-files/:publicId, /storage/*",
+    route: "/health, /api/contact, /public-files/:publicId, /public-files/access/:token, /storage/uploads/symbols/:fileName",
     details: [
       "Provides a health probe for deployment checks.",
       "Accepts public contact form submissions from the marketing/public surface.",
-      "Serves app-mediated public files and storage-backed assets used by repository, symbols, attachments, and public passport views.",
+      "Serves explicitly public attachments by opaque ID and restricted attachments only through short-lived DPP-and-field-bound URLs returned after authorised reads.",
     ],
   },
 ];
@@ -464,7 +465,7 @@ export const backendOperationFlows = [
   {
     title: "Asset Management bulk-update flow",
     steps: [
-      "A company editor launches Asset Management from the dashboard, which issues a short-lived asset platform token and optional extra asset key.",
+      "A company editor opens Asset Management inside the authenticated dashboard.",
       "The tool loads the company's allowed passport types and current passports for the selected type.",
       "Users stage changes by CSV, JSON, blank rows, or ERP/API fetch, then preview the package before anything is written.",
       "Preview checks matching by dppId or internalAliasId, rejects unknown columns, and shows row-by-row validation results.",
@@ -502,8 +503,8 @@ export const securityKeyTable = {
       "Company integration Bearer token",
       "Company service account or authenticated company automation user",
       "Authorization: Bearer <company service token>",
-      "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values for live measurements such as temperature, mass, or product-specific sensor data",
-      "Listing all passports, editing normal passport fields, or calling company admin endpoints",
+      "Create, patch, archive, delete, and dynamic-value writes under /api/companies/:companySlug/integrations/v1/passports",
+      "Public restricted reads, dashboard administration, or another company's passports",
     ],
     [
       "Security group API key",
@@ -513,18 +514,11 @@ export const securityKeyTable = {
       "General API authentication, company APIs, or device integrations",
     ],
     [
-      "Asset Management launch token",
-      "Created automatically when an editor launches Asset Management from the dashboard",
-      "x-asset-platform-token header",
-      "Calling /api/asset-management/* after the tool is launched",
-      "Normal company APIs such as /api/companies/:companyId/passports",
-    ],
-    [
-      "Asset Management shared secret",
-      "Environment configuration handled by platform operators, not by normal users",
-      "x-asset-key header when the server says it is required",
-      "Adds an extra protection layer to Asset Management",
-      "General dashboard login or external partner access",
+      "Passport Data Management session or Bearer token",
+      "Log in through the dashboard or issue a company user Bearer token",
+      "Browser cookie or Authorization: Bearer <token>",
+      "Calling /api/companies/:companyId/passport-data-management/* within the user's company and role",
+      "Public passport reads or restricted-field sharing",
     ],
   ],
 };
@@ -575,10 +569,10 @@ export const apiGettingStartedFlows = [
   {
     title: "How Asset Management authentication works",
     steps: [
-      "A logged-in editor or company admin launches Asset Management from the normal dashboard.",
-      "The backend issues an asset launch token and, if enabled, also requires the extra x-asset-key header.",
-      "The Asset Management page stores those launch credentials privately and uses them for /api/asset-management/* calls.",
-      "Normal users should not copy these values into unrelated scripts unless their process really needs the asset layer.",
+      "A logged-in editor or company admin opens Asset Management from the normal dashboard.",
+      "The browser uses the same authenticated session as the rest of the company dashboard.",
+      "Scripts may use a company user Bearer token against /api/companies/:companyId/passport-data-management/*.",
+      "Every request is company-scoped, and write actions additionally require editor permissions.",
     ],
   },
 ];
@@ -589,7 +583,7 @@ export const companyWriteApiTable = {
   rows: [
     ["Create one passport", "POST /api/companies/:companyId/passports", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, modelName, internalAliasId, granularity, uniqueProductIdentifier, economicOperatorId, facilityId, ...fieldKeys }", "Creates one new draft passport. internalAliasId must be unique."],
     ["Bulk create many passports", "POST /api/companies/:companyId/passports/bulk", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, passports: [ {...}, {...} ] } up to 500 rows", "Creates many passports and returns a per-row summary instead of failing the whole batch."],
-    ["Update one editable passport", "PATCH /api/companies/:companyId/passports/:dppId", "Session cookie or bearer token, company access, editor or company admin", "{ passportType or passportType, granularity, uniqueProductIdentifier, economicOperatorId, facilityId, ...fieldsToChange }", "Updates one draft or in-revision passport. Released granularity cannot be changed in place."],
+    ["Update one editable passport", "PATCH /api/companies/:companyId/passports/:dppId", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, granularity, uniqueProductIdentifier, economicOperatorId, facilityId, ...fieldsToChange }", "Updates one draft or in-revision passport. Released granularity cannot be changed in place."],
     ["Bulk update matched passports", "PATCH /api/companies/:companyId/passports", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, passports: [ { dppId or internalAliasId, ...fields }, ... ] } up to 500 rows", "Updates many existing editable passports. It does not create new ones."],
     ["Bulk update many records with the same value", "PATCH /api/companies/:companyId/passports/bulk-update-all", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, filter, update }", "Applies one update object to every matching editable passport. internalAliasId cannot be bulk-set."],
     ["Upsert from CSV text", "POST /api/companies/:companyId/passports/upsert-csv", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, csv: \"...csv text...\" }", "Creates new passports when no dppId is present, or updates matching editable passports when dppId or internalAliasId matches."],
@@ -636,13 +630,13 @@ export const publicAndLiveApiTable = {
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What it returns or does"],
   rows: [
     ["Public passport read", "GET /api/public/passports/:dppId", "None for public fields; optional X-API-Key for selected restricted fields", "Optional query: version", "Returns public passport data and, when the key is valid, only the restricted fields selected for that security group."],
-    ["Integration create passport", "POST /api/companies/:companySlug/integrations/v1/passports", "Authorization: Bearer <company service token>", "{ passportType, productIdentifier, granularity, fields, economicOperatorId, facilityId }", "Creates a company-scoped DPP draft through the external automation surface."],
-    ["Integration patch passport", "PATCH /api/companies/:companySlug/integrations/v1/passports/:dppId", "Authorization: Bearer <company service token>", "{ fields, granularity, economicOperatorId, facilityId }", "Updates an editable company passport by DPP ID."],
+    ["Integration create passport", "POST /api/companies/:companySlug/integrations/v1/passports", "Authorization: Bearer <company service token>", "{ passportType, productIdentifier, granularity, camelCaseFieldKey: value, ... }", "Creates a company-scoped DPP draft. Passport values use canonical semantic camelCase field keys directly at the top level."],
+    ["Integration patch passport", "PATCH /api/companies/:companySlug/integrations/v1/passports/:dppId", "Authorization: Bearer <company service token>", "{ camelCaseFieldKey: value, granularity, economicOperatorId, facilityId }", "Updates an editable company passport by DPP ID using canonical semantic camelCase field keys directly."],
     ["Integration archive passport", "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/archive", "Authorization: Bearer <company service token>", "{ reason }", "Archives a released company passport."],
     ["Integration delete passport", "DELETE /api/companies/:companySlug/integrations/v1/passports/:dppId", "Authorization: Bearer <company service token>", "No body", "Deletes an editable company passport or directs released records to archive."],
     ["Canonical passport by DPP ID", "GET /api/public/passports/:dppId", "No auth", "Optional version query", "Canonical public-safe passport payload and linked-data references."],
-    ["Public passport history", "GET /api/public/passports/:dppId/history", "No auth", "No body", "Public version history only."],
-    ["Unlock restricted fields", "GET /api/public/passports/:dppId", "X-API-Key or X-Security-Group-Key header", "No body", "Returns only the restricted fields selected for that security group when the key applies to the passport."],
+    ["Public passport history", "GET /api/public/passports/:dppId/history", "None for public changes; optional X-API-Key for selected restricted fields", "No body", "Public version history plus changes to restricted fields selected for a valid security group."],
+    ["Access restricted fields", "GET /api/public/passports/:dppId", "X-API-Key or X-Security-Group-Key header", "No body", "Returns only the restricted fields selected for that security group when the key applies to the passport."],
     ["Verify signature", "GET /api/public/passports/:dppId/signature", "No auth", "Optional query param: version", "Public verification status, signing key, hash, proof type, issuer, and credential ID metadata without exposing the stored credential payload."],
     ["Get current signing key", "GET /api/public/signing-key", "No auth", "No body", "The active public signing key metadata."],
     ["Get DID document", "GET /.well-known/did.json", "No auth", "No body", "A DID document that helps outside verifiers validate released passport signatures."],
@@ -693,17 +687,16 @@ export const assetManagementApiTable = {
   title: "Asset Management APIs",
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What it does"],
   rows: [
-    ["Launch the tool", "POST /api/companies/:companyId/asset-management/launch", "Session cookie or bearer token, company access, editor or company admin", "No body", "Returns an asset launch token and the asset URL for the separate Asset Management page."],
-    ["Load bootstrap data", "GET /api/asset-management/bootstrap", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Returns company info, allowed passport types, ERP presets, and security hints."],
-    ["Load current passports", "GET /api/asset-management/passports", "x-asset-platform-token and, if enabled, x-asset-key", "Query param: passportType", "Returns the current passports and editable summary for the selected type."],
-    ["Fetch ERP or API rows", "POST /api/asset-management/source/fetch", "x-asset-platform-token and, if enabled, x-asset-key", "{ sourceConfig } with url, method, headers, body, recordPath, fieldMap", "Fetches external rows and maps them into asset rows."],
-    ["Preview staged changes", "POST /api/asset-management/preview", "x-asset-platform-token and, if enabled, x-asset-key", "{ passportType, records }", "Validates matching and field rules, then builds the JSON package without changing any passports."],
-    ["Push staged changes", "POST /api/asset-management/push", "x-asset-platform-token and, if enabled, x-asset-key", "{ generatedPayload } or { passportType, records }", "Writes the prepared changes into the normal backend passport records."],
-    ["List saved jobs", "GET /api/asset-management/jobs", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Returns saved schedules for the current company."],
-    ["Create a job", "POST /api/asset-management/jobs", "x-asset-platform-token and, if enabled, x-asset-key", "{ passportType, name, records, sourceKind, sourceConfig, startAt, intervalMinutes, isActive }", "Saves a recurring job that can run later on the server."],
-    ["Update a job", "PATCH /api/asset-management/jobs/:jobId", "x-asset-platform-token and, if enabled, x-asset-key", "Name, schedule, source, records, and active state fields", "Edits an existing saved job."],
-    ["Run one job immediately", "POST /api/asset-management/jobs/:jobId/run", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Executes the saved job immediately instead of waiting for its next schedule."],
-    ["See recent runs", "GET /api/asset-management/runs", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Shows recent manual pushes and scheduled job runs."],
+    ["Load bootstrap data", "GET /api/companies/:companyId/passport-data-management/bootstrap", "Session cookie or Bearer token and company access", "No body", "Returns company info, allowed passport types, ERP presets, and security hints."],
+    ["Load current passports", "GET /api/companies/:companyId/passport-data-management/passports", "Session cookie or Bearer token and company access", "Query param: passportType", "Returns the current passports and editable summary for the selected type."],
+    ["Fetch ERP or API rows", "POST /api/companies/:companyId/passport-data-management/source/fetch", "Session cookie or Bearer token, company access, and editor role", "{ sourceConfig } with url, method, headers, body, recordPath, fieldMap", "Fetches external rows and maps them into asset rows."],
+    ["Preview staged changes", "POST /api/companies/:companyId/passport-data-management/preview", "Session cookie or Bearer token, company access, and editor role", "{ passportType, records }", "Validates matching and field rules, then builds the JSON package without changing any passports."],
+    ["Push staged changes", "POST /api/companies/:companyId/passport-data-management/push", "Session cookie or Bearer token, company access, and editor role", "{ generatedPayload } or { passportType, records }", "Writes the prepared changes into the normal backend passport records."],
+    ["List saved jobs", "GET /api/companies/:companyId/passport-data-management/jobs", "Session cookie or Bearer token and company access", "No body", "Returns saved schedules for the current company."],
+    ["Create a job", "POST /api/companies/:companyId/passport-data-management/jobs", "Session cookie or Bearer token, company access, and editor role", "{ passportType, name, records, sourceKind, sourceConfig, startAt, intervalMinutes, isActive }", "Saves a recurring job that can run later on the server."],
+    ["Update a job", "PATCH /api/companies/:companyId/passport-data-management/jobs/:jobId", "Session cookie or Bearer token, company access, and editor role", "Name, schedule, source, records, and active state fields", "Edits an existing saved job."],
+    ["Run one job immediately", "POST /api/companies/:companyId/passport-data-management/jobs/:jobId/run", "Session cookie or Bearer token, company access, and editor role", "No body", "Executes the saved job immediately instead of waiting for its next schedule."],
+    ["See recent runs", "GET /api/companies/:companyId/passport-data-management/runs", "Session cookie or Bearer token and company access", "No body", "Shows recent manual pushes and scheduled job runs."],
   ],
 };
 

@@ -4,17 +4,10 @@ const { isPublicVersionVisible } = require("../public-passports/visibility");
 
 function createPassportQueryRepository({
   pool,
-  logger,
   getTable,
   normalizePassportRow,
-  normalizeInternalAliasIdValue,
-  productIdentifierService,
   isPublicHistoryStatus,
 }) {
-  function isMissingRelationError(error) {
-    return error?.code === "42P01";
-  }
-
   async function findExistingPassportByInternalAliasId({
     tableName,
     companyId,
@@ -275,6 +268,7 @@ function createPassportQueryRepository({
         AND phv."versionNumber" = pa."versionNumber"
        WHERE pa."dppId" = $1
          AND pa."passportType" = $2
+         AND pa."releaseStatus" IN ('released', 'obsolete')
        ORDER BY pa."versionNumber" DESC, pa."archivedAt" DESC
        LIMIT 1`,
       [normalizedDppId, passportType]
@@ -291,136 +285,6 @@ function createPassportQueryRepository({
       passport: { ...normalizePassportRow(rowData), passportType, archived: true },
       archived: true,
     };
-  }
-
-  async function resolveReleasedPassportByInternalAliasId(internalAliasId, {
-    versionNumber = null,
-    companyId = null,
-    passportType = "passport",
-    granularity = "item",
-    strictProductId = false,
-  } = {}) {
-    const normalizedProductId = normalizeInternalAliasIdValue(internalAliasId);
-    if (!normalizedProductId) return { passport: null, archived: false };
-    const isDidIdentifier = productIdentifierService?.isDidIdentifier?.(normalizedProductId);
-    const candidates = strictProductId
-      ? [normalizedProductId]
-      : isDidIdentifier
-        ? [normalizedProductId]
-        : productIdentifierService?.buildLookupCandidates?.({
-            companyId,
-            passportType,
-            internalAliasId: normalizedProductId,
-            granularity,
-          }) || [normalizedProductId];
-    const liveMatchSql = strictProductId
-      ? `"internalAliasId" = ANY($1::text[])`
-      : `("internalAliasId" = ANY($1::text[]) OR "uniqueProductIdentifier" = ANY($1::text[]))`;
-    const archiveMatchSql = strictProductId
-      ? 'pa."internalAliasId" = ANY($1::text[])'
-      : '(pa."internalAliasId" = ANY($1::text[]) OR pa."productIdentifierDid" = ANY($1::text[]))';
-
-    const ptRows = await pool.query('SELECT "typeName" AS "typeName" FROM "passportTypes" ORDER BY "typeName"');
-    const matches = [];
-
-    for (const { typeName } of ptRows.rows) {
-      const tableName = getTable(typeName);
-      const liveParams = [candidates];
-      let versionSql = "";
-      let companySql = "";
-      if (companyId !== null && companyId !== undefined) {
-        liveParams.push(companyId);
-        companySql = ` AND "companyId" = $${liveParams.length}`;
-      }
-      if (versionNumber !== null && versionNumber !== undefined) {
-        liveParams.push(versionNumber);
-        versionSql = ` AND "versionNumber" = $${liveParams.length}`;
-      }
-
-      let liveRes;
-      try {
-        liveRes = await pool.query(
-          `SELECT *
-           FROM ${tableName}
-           WHERE ${liveMatchSql}
-             AND ${
-               versionNumber !== null && versionNumber !== undefined
-                 ? `"releaseStatus" IN ('released', 'obsolete')`
-                 : `"releaseStatus" = 'released'`
-             }${companySql}
-             AND "deletedAt" IS NULL${versionSql}
-           ORDER BY "versionNumber" DESC, "updatedAt" DESC
-           LIMIT 1`,
-          liveParams
-        );
-      } catch (error) {
-        if (isMissingRelationError(error)) {
-          logger.warn({ tableName, passportType: typeName }, "Skipping passport type lookup because storage table does not exist yet");
-          continue;
-        }
-        throw error;
-      }
-      if (liveRes.rows.length) {
-        matches.push({
-          passport: { ...normalizePassportRow(liveRes.rows[0]), passportType: typeName },
-          archived: false,
-        });
-        continue;
-      }
-
-      const archiveParams = [candidates, typeName];
-      let archiveCompanySql = "";
-      let archiveVersionSql = "";
-      if (companyId !== null && companyId !== undefined) {
-        archiveParams.push(companyId);
-        archiveCompanySql = ` AND pa."companyId" = $${archiveParams.length}`;
-      }
-      if (versionNumber !== null && versionNumber !== undefined) {
-        archiveParams.push(versionNumber);
-        archiveVersionSql = ` AND pa."versionNumber" = $${archiveParams.length}`;
-      }
-      const archiveRes = await pool.query(
-        `SELECT pa."productIdentifierDid",
-                pa."versionNumber",
-                pa."rowData",
-                phv."isPublic" AS "isPublic"
-         FROM "passportArchives" pa
-         LEFT JOIN "passportHistoryVisibility" phv
-           ON phv."passportDppId" = pa."dppId"
-          AND phv."versionNumber" = pa."versionNumber"
-         WHERE ${archiveMatchSql}
-           AND pa."passportType" = $2${archiveCompanySql}
-           ${archiveVersionSql}
-         ORDER BY pa."versionNumber" DESC, pa."archivedAt" DESC
-         LIMIT 1`,
-        archiveParams
-      );
-      if (archiveRes.rows.length) {
-        const rowData = typeof archiveRes.rows[0].rowData === "string"
-          ? JSON.parse(archiveRes.rows[0].rowData)
-          : archiveRes.rows[0].rowData;
-        if (!isPublicVersionVisible(rowData?.releaseStatus, archiveRes.rows[0].isPublic, isPublicHistoryStatus)) {
-          continue;
-        }
-        matches.push({
-          passport: {
-            ...normalizePassportRow(rowData),
-            uniqueProductIdentifier: archiveRes.rows[0].productIdentifierDid || rowData?.uniqueProductIdentifier,
-            passportType: typeName,
-            archived: true,
-          },
-          archived: true,
-        });
-      }
-    }
-
-    if (!matches.length) return { passport: null, archived: false };
-    if (matches.length > 1) {
-      const error = new Error(`Multiple released passports share product identifier "${normalizedProductId}".`);
-      error.code = "ambiguousProductId";
-      throw error;
-    }
-    return matches[0];
   }
 
   async function resolvePublicPassportByDppId(dppId, { versionNumber = null } = {}) {
@@ -505,90 +369,7 @@ function createPassportQueryRepository({
     return resolveReleasedPassportByDppId(normalizedDppId);
   }
 
-  async function resolveCompanyPreviewPassportByInternalAliasId(companyId, internalAliasId) {
-    const normalizedProductId = normalizeInternalAliasIdValue(internalAliasId);
-    if (!companyId || !normalizedProductId) return { passport: null, archived: false };
-    const candidates = productIdentifierService?.buildLookupCandidates?.({
-      companyId,
-      internalAliasId: normalizedProductId,
-    }) || [normalizedProductId];
-
-    const ptRows = await pool.query('SELECT "typeName" AS "typeName" FROM "passportTypes" ORDER BY "typeName"');
-    const liveMatches = [];
-
-    for (const { typeName } of ptRows.rows) {
-      const tableName = getTable(typeName);
-      let liveRes;
-      try {
-        liveRes = await pool.query(
-          `SELECT *
-           FROM ${tableName}
-           WHERE "companyId" = $1
-             AND ("internalAliasId" = ANY($2::text[]) OR "uniqueProductIdentifier" = ANY($2::text[]))
-             AND "deletedAt" IS NULL
-           ORDER BY "versionNumber" DESC, "updatedAt" DESC, id DESC
-           LIMIT 1`,
-          [companyId, candidates]
-        );
-      } catch (error) {
-        if (isMissingRelationError(error)) {
-          logger.warn({ tableName, passportType: typeName }, "Skipping preview lookup because storage table does not exist yet");
-          continue;
-        }
-        throw error;
-      }
-      if (liveRes.rows.length) {
-        liveMatches.push({
-          passport: { ...normalizePassportRow(liveRes.rows[0]), passportType: typeName },
-          archived: false,
-        });
-      }
-    }
-
-    if (liveMatches.length > 1) {
-      const error = new Error(`Multiple passports in company "${companyId}" share product identifier "${normalizedProductId}".`);
-      error.code = "ambiguousProductId";
-      throw error;
-    }
-    if (liveMatches.length === 1) return liveMatches[0];
-
-    const archiveMatches = [];
-    for (const { typeName } of ptRows.rows) {
-      const archiveRes = await pool.query(
-        `SELECT "rowData"
-         FROM "passportArchives"
-         WHERE "companyId" = $1
-           AND "passportType" = $2
-           AND ("internalAliasId" = ANY($3::text[]) OR "productIdentifierDid" = ANY($3::text[]))
-         ORDER BY "versionNumber" DESC, "archivedAt" DESC
-         LIMIT 1`,
-        [companyId, typeName, candidates]
-      );
-      if (archiveRes.rows.length) {
-        const rowData = typeof archiveRes.rows[0].rowData === "string"
-          ? JSON.parse(archiveRes.rows[0].rowData)
-          : archiveRes.rows[0].rowData;
-        archiveMatches.push({
-          passport: { ...normalizePassportRow(rowData), passportType: typeName, archived: true },
-          archived: true,
-        });
-      }
-    }
-
-    if (archiveMatches.length > 1) {
-      const error = new Error(`Multiple archived passports in company "${companyId}" share product identifier "${normalizedProductId}".`);
-      error.code = "ambiguousProductId";
-      throw error;
-    }
-    return archiveMatches[0] || { passport: null, archived: false };
-  }
-
   async function resolveCompanyPreviewPassport({ companyId, passportKey }) {
-    const normalizedPassportKey = normalizeInternalAliasIdValue(passportKey);
-    if (normalizedPassportKey) {
-      const productMatch = await resolveCompanyPreviewPassportByInternalAliasId(companyId, normalizedPassportKey);
-      if (productMatch?.passport) return productMatch;
-    }
     return fetchCompanyPassportRecord({ companyId, dppId: passportKey });
   }
 
@@ -599,9 +380,7 @@ function createPassportQueryRepository({
     getPassportVersionsByLineage,
     fetchCompanyPassportRecord,
     resolveReleasedPassportByDppId,
-    resolveReleasedPassportByInternalAliasId,
     resolvePublicPassportByDppId,
-    resolveCompanyPreviewPassportByInternalAliasId,
     resolveCompanyPreviewPassport,
   };
 }

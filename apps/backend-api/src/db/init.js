@@ -14,68 +14,6 @@ function quoteDbIdentifier(value) {
   return `"${identifier.replace(/"/g, "\"\"")}"`;
 }
 
-function sanitizePassportSchemaGovernance(value) {
-  if (Array.isArray(value)) {
-    let changed = false;
-    const next = value.map((item) => {
-      const result = sanitizePassportSchemaGovernance(item);
-      changed = changed || result.changed;
-      return result.value;
-    });
-    return { value: next, changed };
-  }
-  if (!value || typeof value !== "object") return { value, changed: false };
-
-  const legacyAccess = Array.isArray(value.access)
-    ? value.access.map((entry) => String(entry || "").trim().toLowerCase()).filter(Boolean)
-    : [];
-  let changed = Object.prototype.hasOwnProperty.call(value, "access")
-    || Object.prototype.hasOwnProperty.call(value, "updateAuthority");
-  const next = {};
-  for (const [key, item] of Object.entries(value)) {
-    if (key === "access" || key === "updateAuthority") continue;
-    const result = sanitizePassportSchemaGovernance(item);
-    changed = changed || result.changed;
-    next[key] = result.value;
-  }
-
-  const looksLikeField = !!next.key && (!!next.label || !!next.type || Object.prototype.hasOwnProperty.call(value, "access"));
-  const hasConfidentiality = Object.prototype.hasOwnProperty.call(value, "confidentiality");
-  if (looksLikeField || hasConfidentiality) {
-    const rawConfidentiality = String(value.confidentiality || "").trim().toLowerCase();
-    const restricted = rawConfidentiality === "restricted"
-      || (!!rawConfidentiality && rawConfidentiality !== "public")
-      || (!!legacyAccess.length && !legacyAccess.includes("public"));
-    const normalizedConfidentiality = restricted ? "restricted" : "public";
-    if (next.confidentiality !== normalizedConfidentiality) changed = true;
-    next.confidentiality = normalizedConfidentiality;
-  }
-
-  return { value: next, changed };
-}
-
-async function removeDeprecatedPassportSchemaGovernance(pool) {
-  const passportTypes = await pool.query(`SELECT id, "fieldsJson" FROM "passportTypes"`);
-  for (const row of passportTypes.rows) {
-    const result = sanitizePassportSchemaGovernance(row.fieldsJson);
-    if (!result.changed) continue;
-    await pool.query(
-      `UPDATE "passportTypes" SET "fieldsJson" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2`,
-      [JSON.stringify(result.value), row.id]
-    );
-  }
-
-  const drafts = await pool.query(`SELECT id, "draftJson" FROM "passportTypeDrafts"`);
-  for (const row of drafts.rows) {
-    const result = sanitizePassportSchemaGovernance(row.draftJson);
-    if (!result.changed) continue;
-    await pool.query(
-      `UPDATE "passportTypeDrafts" SET "draftJson" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2`,
-      [JSON.stringify(result.value), row.id]
-    );
-  }
-}
-
 const schemaMigrationLockKey = 18224027;
 
 async function ensureSchemaMigrationsTable(pool) {
@@ -346,10 +284,6 @@ async function initDb(pool, {
         "createdAt"                 TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
-    await pool.query(`ALTER TABLE "passportRegistry" DROP COLUMN IF EXISTS "accessKeyHash"`);
-    await pool.query(`ALTER TABLE "passportRegistry" DROP COLUMN IF EXISTS "accessKeyPrefix"`);
-    await pool.query(`ALTER TABLE "passportRegistry" DROP COLUMN IF EXISTS "accessKeyLastRotatedAt"`);
-
     await pool.query(`
       CREATE INDEX IF NOT EXISTS "idxPassportRegistryCompany"
         ON "passportRegistry"("companyId")
@@ -505,8 +439,8 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "auditLogs" (
       id               SERIAL PRIMARY KEY,
-      "companyId"       INTEGER REFERENCES companies(id) ON DELETE SET NULL,
-      "userId"          INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "companyId"       INTEGER,
+      "userId"          INTEGER,
       action           VARCHAR(100) NOT NULL,
       "tableName"       VARCHAR(100),
       "recordId"        VARCHAR(100),
@@ -527,7 +461,7 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "auditLogAnchors" (
       id                   SERIAL PRIMARY KEY,
-      "companyId"           INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+      "companyId"           INTEGER,
       "logCount"            INTEGER NOT NULL DEFAULT 0,
       "firstLogId"         INTEGER,
       "latestLogId"        INTEGER,
@@ -538,7 +472,7 @@ async function initDb(pool, {
       "anchorReference"     TEXT,
       notes                TEXT,
       "metadataJson"        JSONB NOT NULL DEFAULT '{}'::jsonb,
-      "anchoredBy"          INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "anchoredBy"          INTEGER,
       "anchoredAt"          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       "createdAt"           TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -751,10 +685,9 @@ async function initDb(pool, {
       name         VARCHAR(100) NOT NULL,
       "keyHash"     VARCHAR(64)  NOT NULL UNIQUE,
       "keyPrefix"   VARCHAR(16)  NOT NULL,
-      "keySalt"     VARCHAR(64),
+      "keySalt"     VARCHAR(64)  NOT NULL,
       "hashAlgorithm" VARCHAR(32) NOT NULL DEFAULT 'hmacSha256',
-      scopes       TEXT[]       NOT NULL DEFAULT ARRAY['dpp:read','dpp:restricted:read']::text[],
-      "passportType" VARCHAR(100),
+      "passportType" VARCHAR(100) NOT NULL REFERENCES "passportTypes"("typeName") ON UPDATE CASCADE ON DELETE CASCADE,
       "scopeType"  VARCHAR(24) NOT NULL DEFAULT 'passportType',
       "fieldKeys"  TEXT[]       NOT NULL DEFAULT ARRAY[]::text[],
       "passportDppIds" TEXT[]   NOT NULL DEFAULT ARRAY[]::text[],
@@ -763,41 +696,24 @@ async function initDb(pool, {
       "createdAt"   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
       "updatedAt"   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
       "lastUsedAt" TIMESTAMPTZ,
-      "isActive"    BOOLEAN      NOT NULL DEFAULT true
+      "isActive"    BOOLEAN      NOT NULL DEFAULT true,
+      CONSTRAINT "apiKeys_scopeType_check"
+        CHECK ("scopeType" IN ('passportType', 'passports')),
+      CONSTRAINT "apiKeys_hashAlgorithm_check"
+        CHECK ("hashAlgorithm" = 'hmacSha256' AND "keyHash" ~ '^[0-9a-fA-F]{64}$'),
+      CONSTRAINT "apiKeys_fieldKeys_check"
+        CHECK (cardinality("fieldKeys") > 0),
+      CONSTRAINT "apiKeys_passportScope_check"
+        CHECK (
+          ("scopeType" = 'passportType' AND cardinality("passportDppIds") = 0)
+          OR ("scopeType" = 'passports' AND cardinality("passportDppIds") > 0)
+        )
     )
   `);
-  await pool.query(`ALTER TABLE "apiKeys" ADD COLUMN IF NOT EXISTS "passportType" VARCHAR(100)`);
-  await pool.query(`ALTER TABLE "apiKeys" ADD COLUMN IF NOT EXISTS "scopeType" VARCHAR(24) NOT NULL DEFAULT 'passportType'`);
-  await pool.query(`ALTER TABLE "apiKeys" ADD COLUMN IF NOT EXISTS "fieldKeys" TEXT[] NOT NULL DEFAULT ARRAY[]::text[]`);
-  await pool.query(`ALTER TABLE "apiKeys" ADD COLUMN IF NOT EXISTS "passportDppIds" TEXT[] NOT NULL DEFAULT ARRAY[]::text[]`);
-  await pool.query(`ALTER TABLE "apiKeys" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-  await pool.query(`ALTER TABLE "apiKeys" ALTER COLUMN scopes SET DEFAULT ARRAY['dpp:read','dpp:restricted:read']::text[]`);
-  await pool.query(`
-    UPDATE "apiKeys"
-    SET scopes = ARRAY['dpp:read','dpp:restricted:read']::text[],
-        "updatedAt" = NOW()
-    WHERE scopes && ARRAY['dpp:update','dpp:history:read','dpp:element:read']::text[]
-  `);
-  await pool.query(`
-    UPDATE "apiKeys"
-    SET "isActive" = false,
-        "updatedAt" = NOW()
-    WHERE "isActive" = true
-      AND (
-        "passportType" IS NULL
-        OR cardinality("fieldKeys") = 0
-      )
-  `);
-  await pool.query(`ALTER TABLE "apiKeys" DROP COLUMN IF EXISTS "operatorType"`);
-  await pool.query(`ALTER TABLE "apiKeys" DROP COLUMN IF EXISTS "accessMode"`);
-  await pool.query(`ALTER TABLE "apiKeys" DROP COLUMN IF EXISTS "maxConfidentiality"`);
   await pool.query(`CREATE INDEX IF NOT EXISTS "idxApiKeysCompany" ON "apiKeys"("companyId")`);
   await pool.query(`CREATE INDEX IF NOT EXISTS "idxApiKeysHash"    ON "apiKeys"("keyHash")`);
   await pool.query(`CREATE INDEX IF NOT EXISTS "idxApiKeysPrefix"   ON "apiKeys"("keyPrefix")`);
   await pool.query(`CREATE INDEX IF NOT EXISTS "idxApiKeysPassportType" ON "apiKeys"("companyId", "passportType", "scopeType")`);
-
-  await pool.query(`DROP TABLE IF EXISTS "passportAccessGrants"`);
-  await pool.query(`DROP TABLE IF EXISTS "userAccessAudiences"`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "requestRateLimits" (
@@ -985,8 +901,6 @@ async function initDb(pool, {
       "updatedAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
-  await removeDeprecatedPassportSchemaGovernance(pool);
-
     await pool.query(`
       CREATE TABLE IF NOT EXISTS "passportEditSessions" (
       id               SERIAL PRIMARY KEY,

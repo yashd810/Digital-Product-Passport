@@ -3,7 +3,10 @@
 const logger = require("../../services/logger");
 
 const envInt = (name, fallback) => {
-  const raw = process.env[name];
+  const environmentName = String(name || "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toUpperCase();
+  const raw = process.env[name] ?? process.env[environmentName];
   const parsed = Number.parseInt(raw || "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
@@ -143,6 +146,13 @@ const createRateLimiters = (pool) => {
       limit: envInt("rateLimitPublicUnlockMax", 10),
       windowMs: envInt("rateLimitPublicUnlockWindowMs", 15 * 60 * 1000),
       message: "Too many unlock attempts. Please wait before trying again."
+    }),
+
+    integrationWriteRateLimit: rateLimit({
+      key: (req) => `integration-write:${req.ip}:${req.user?.userId || ""}:${req.path}`,
+      limit: envInt("rateLimitIntegrationWriteMax", 180),
+      windowMs: envInt("rateLimitIntegrationWriteWindowMs", 60 * 1000),
+      message: "Too many integration write requests. Please slow down and try again shortly."
     }),
 
     publicScanRateLimit: rateLimit({

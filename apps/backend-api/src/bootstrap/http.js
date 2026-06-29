@@ -10,8 +10,8 @@ function configureHttp(app, {
   globalSymbolsDir,
   isPlainRecord,
   isProduction,
-  normalizeIncomingDppIdentifiers,
-  normalizeOutgoingDppIdentifiers,
+  normalizeIncomingJsonValue,
+  normalizeOutgoingJsonValue,
   port,
 }) {
   app.disable("x-powered-by");
@@ -61,7 +61,7 @@ function configureHttp(app, {
   app.use((req, res, next) => {
     if (!isProduction) return next();
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return next();
-    if (req.headers["x-api-key"] || req.headers["x-asset-key"]) return next();
+    if (/^Bearer\s+\S+$/i.test(String(req.headers.authorization || "").trim())) return next();
     const origin = req.headers.origin || req.headers.referer;
     if (!origin) return res.status(403).json({ error: "Forbidden: missing origin header" });
     try {
@@ -82,11 +82,11 @@ function configureHttp(app, {
 
   app.use((req, res, next) => {
     if (req.body && (Array.isArray(req.body) || isPlainRecord(req.body))) {
-      req.body = normalizeIncomingDppIdentifiers(req.body);
+      req.body = normalizeIncomingJsonValue(req.body);
     }
 
     const originalJson = res.json.bind(res);
-    res.json = (payload) => originalJson(normalizeOutgoingDppIdentifiers(payload));
+    res.json = (payload) => originalJson(normalizeOutgoingJsonValue(payload));
     next();
   });
 

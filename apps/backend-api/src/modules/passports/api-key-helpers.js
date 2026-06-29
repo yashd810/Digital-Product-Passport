@@ -1,27 +1,5 @@
 function createApiKeyHelpers({ crypto }) {
-  const allowedApiKeyScopes = new Set(["dpp:read", "dpp:restricted:read", "*"]);
   const apiKeyPrefixLength = 16;
-
-  function parseApiKeyScopes(scopes) {
-    const normalized = Array.isArray(scopes)
-      ? scopes.map((scope) => String(scope || "").trim()).filter(Boolean)
-      : ["dpp:read", "dpp:restricted:read"];
-    const unique = [...new Set(normalized)];
-    const invalid = unique.filter((scope) => !allowedApiKeyScopes.has(scope));
-    if (invalid.length) {
-      const error = new Error(`Invalid API key scope(s): ${invalid.join(", ")}`);
-      error.statusCode = 400;
-      throw error;
-    }
-    return unique.length ? unique : ["dpp:read", "dpp:restricted:read"];
-  }
-
-  function buildSecurityGroupApiKeyScopes(requestedScopes = []) {
-    const derived = new Set(parseApiKeyScopes(requestedScopes));
-    derived.add("dpp:read");
-    derived.add("dpp:restricted:read");
-    return [...derived];
-  }
 
   function flattenTypeFields(typeDef) {
     return (typeDef?.fieldsJson?.sections || []).flatMap((section) => section.fields || []);
@@ -62,23 +40,6 @@ function createApiKeyHelpers({ crypto }) {
     const scopeType = String(apiKey.scopeType || "passportType").trim();
     if (scopeType !== "passports") return true;
     return normalizeApiKeyPassportDppIds(apiKey).has(String(passport.dppId || ""));
-  }
-
-  function sanitizePassportForApiKey(passport, typeDef, apiKey) {
-    if (!passport || !typeDef) return passport;
-    const sanitized = { ...passport };
-    delete sanitized.companyId;
-    delete sanitized.internalAliasId;
-    delete sanitized.internalAliasIds;
-    const selectedFieldKeys = normalizeApiKeyFieldKeys(apiKey);
-    const appliesToPassport = apiKeyAppliesToPassport(apiKey, passport);
-    for (const field of flattenTypeFields(typeDef)) {
-      if (!isRestrictedField(field)) continue;
-      if (!appliesToPassport || !selectedFieldKeys.has(field.key)) {
-        delete sanitized[field.key];
-      }
-    }
-    return sanitized;
   }
 
   function verifyApiKeyHashRecord(rawKey, record) {
@@ -213,7 +174,6 @@ function createApiKeyHelpers({ crypto }) {
     apiKeyAppliesToPassport,
     buildApiKeyHashRecord,
     buildRestrictedUnlockPassportPayload,
-    buildSecurityGroupApiKeyScopes,
     checkSecurityGroupApiKeyAccess,
     findMatchingApiKeyRecord,
     flattenTypeFields,
@@ -221,7 +181,6 @@ function createApiKeyHelpers({ crypto }) {
     isRestrictedField,
     normalizeApiKeyFieldKeys,
     normalizeApiKeyPassportDppIds,
-    sanitizePassportForApiKey,
     resolveSecurityGroupApiKey,
     verifyApiKeyHashRecord,
   };

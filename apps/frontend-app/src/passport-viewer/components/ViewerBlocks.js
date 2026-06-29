@@ -357,7 +357,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, dynamicVal
   })();
   const visibleFields = (sectionDef.fields || []).filter(field => !isHeroSummaryField(field, translateSchemaLabel(lang, field)));
   const fieldEntries = visibleFields.map(f => {
-    const isPublic = String(f.confidentiality || "public").toLowerCase() !== "restricted";
+    const isPublic = String(f.confidentiality || "").toLowerCase() === "public";
     const fieldLabel = formatFieldLabelWithUnit(translateSchemaLabel(lang, f), f);
     const isDynamic = !!f.dynamic;
     const dynEntry = isDynamic ? dynamicValues?.[f.key] : null;
@@ -767,7 +767,7 @@ export function PrintView({ passport, companyData, sections }) {
           <table className="print-table">
             <tbody>
               {section.fields.map(f => {
-                const isPublic = String(f.confidentiality || "public").toLowerCase() !== "restricted";
+                const isPublic = String(f.confidentiality || "").toLowerCase() === "public";
                 const raw = passport[f.key];
                 let display;
 

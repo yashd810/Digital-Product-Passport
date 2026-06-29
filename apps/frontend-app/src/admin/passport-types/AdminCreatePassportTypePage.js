@@ -1407,27 +1407,27 @@ function AdminCreatePassportType() {
                         onClick={() => removeField(section.localId, field.localId)} title="Remove field">✕</button>
                     </div>
 
-                    <div className="acpt-field-top-row acpt-field-options-grid">
-                      <div className="acpt-field-governance-stack">
-                        <div className="acpt-field-access">
-                          <label className="acpt-access-check">
-                            <span>🛡️ Confidentiality:</span>
-                            <AdminSelectMenu
-                              value={field.confidentiality || "public"}
-                              onChange={(nextValue) => updateField(section.localId, field.localId, { confidentiality: nextValue })}
-                              options={confidentialityLevels.map((level) => ({
-                                value: level.value,
-                                label: level.label,
-                              }))}
-                              className="acpt-select acpt-select-inline"
-                              triggerClassName="acpt-governance-select acpt-select-trigger acpt-select-trigger-sm"
-                              menuClassName="acpt-select-menu acpt-select-menu-compact"
-                              optionClassName="acpt-select-option"
-                              ariaLabel="Confidentiality"
-                            />
-                          </label>
+                      <div className="acpt-field-top-row acpt-field-options-grid">
+                        <div className="acpt-field-governance-stack">
+                          <div className="acpt-field-confidentiality">
+                            <label className="acpt-confidentiality-control">
+                              <span>🛡️ Confidentiality:</span>
+                              <AdminSelectMenu
+                                value={field.confidentiality || "public"}
+                                onChange={(nextValue) => updateField(section.localId, field.localId, { confidentiality: nextValue })}
+                                options={confidentialityLevels.map((level) => ({
+                                  value: level.value,
+                                  label: level.label,
+                                }))}
+                                className="acpt-select acpt-select-inline"
+                                triggerClassName="acpt-governance-select acpt-select-trigger acpt-select-trigger-sm"
+                                menuClassName="acpt-select-menu acpt-select-menu-compact"
+                                optionClassName="acpt-select-option"
+                                ariaLabel="Confidentiality"
+                              />
+                            </label>
+                          </div>
                         </div>
-                      </div>
 
                       <div className="acpt-field-side-options">
                         <div className="acpt-field-required">

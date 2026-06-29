@@ -10,7 +10,6 @@ module.exports = function registerApiKeyRoutes(app, deps) {
     checkCompanyAdmin,
     logAudit,
     buildApiKeyHashRecord,
-    buildSecurityGroupApiKeyScopes,
     getTable,
     isRestrictedField,
     normalizePassportRow,
@@ -18,7 +17,11 @@ module.exports = function registerApiKeyRoutes(app, deps) {
   } = deps;
 
   function normalizeScopeType(value) {
-    return String(value || "passportType").trim() === "passports" ? "passports" : "passportType";
+    const normalized = String(value || "passportType").trim();
+    if (normalized === "passportType" || normalized === "passports") return normalized;
+    const error = new Error("scopeType must be either passportType or passports");
+    error.statusCode = 400;
+    throw error;
   }
 
   function normalizeStringList(values) {
@@ -42,7 +45,6 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       id: row.id,
       name: row.name ?? null,
       keyPrefix: row.keyPrefix ?? null,
-      scopes: Array.isArray(row.scopes) ? row.scopes : [],
       passportType: row.passportType ?? null,
       scopeType: row.scopeType ?? "passportType",
       fieldKeys: Array.isArray(row.fieldKeys) ? row.fieldKeys : [],
@@ -80,14 +82,14 @@ module.exports = function registerApiKeyRoutes(app, deps) {
     const selected = normalizeStringList(passportDppIds);
     if (!selected.length) return [];
 
-    const tableName = getTable(passportType);
     const registry = await pool.query(
       `SELECT DISTINCT "dppId"
-       FROM ${tableName}
+       FROM "passportRegistry"
        WHERE "companyId" = $1
-         AND "dppId" = ANY($2::text[])
-         AND "deletedAt" IS NULL`,
-      [companyId, selected]
+         AND "passportType" = $2
+         AND "dppId" = ANY($3::text[])
+      `,
+      [companyId, passportType, selected]
     );
     const found = new Set(registry.rows.map((row) => String(row.dppId || "")));
     const missing = selected.filter((dppId) => !found.has(dppId));
@@ -106,7 +108,6 @@ module.exports = function registerApiKeyRoutes(app, deps) {
         `SELECT id,
                 name,
                 "keyPrefix" AS "keyPrefix",
-                scopes,
                 "passportType" AS "passportType",
                 "scopeType" AS "scopeType",
                 "fieldKeys" AS "fieldKeys",
@@ -133,18 +134,46 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       if (!typeDef) return res.status(404).json({ error: "Passport type not found for this company" });
       const tableName = getTable(typeDef.typeName);
       const result = await pool.query(
-        `SELECT "dppId",
-                "internalAliasId",
-                "modelName",
-                "releaseStatus",
-                "versionNumber",
-                "updatedAt"
-         FROM ${tableName}
-         WHERE "companyId" = $1
-           AND "deletedAt" IS NULL
+        `WITH latest_live AS (
+           SELECT DISTINCT ON ("dppId")
+                  "dppId",
+                  "internalAliasId",
+                  "modelName",
+                  "releaseStatus",
+                  "versionNumber",
+                  "updatedAt",
+                  false AS archived
+           FROM ${tableName}
+           WHERE "companyId" = $1
+             AND "deletedAt" IS NULL
+           ORDER BY "dppId", "versionNumber" DESC, "updatedAt" DESC
+         ),
+         latest_archived AS (
+           SELECT DISTINCT ON (pa."dppId")
+                  pa."dppId",
+                  pa."internalAliasId",
+                  pa."modelName",
+                  pa."releaseStatus",
+                  pa."versionNumber",
+                  pa."archivedAt" AS "updatedAt",
+                  true AS archived
+           FROM "passportArchives" pa
+           WHERE pa."companyId" = $1
+             AND pa."passportType" = $2
+             AND pa."releaseStatus" IN ('released', 'obsolete')
+             AND NOT EXISTS (
+               SELECT 1 FROM latest_live live WHERE live."dppId" = pa."dppId"
+             )
+           ORDER BY pa."dppId", pa."versionNumber" DESC, pa."archivedAt" DESC
+         )
+         SELECT * FROM (
+           SELECT * FROM latest_live
+           UNION ALL
+           SELECT * FROM latest_archived
+         ) passports
          ORDER BY "updatedAt" DESC
          LIMIT 500`,
-        [req.params.companyId]
+        [req.params.companyId, typeDef.typeName]
       );
       res.json(result.rows.map((row) => ({
         ...normalizePassportRow(row, typeDef),
@@ -226,7 +255,6 @@ module.exports = function registerApiKeyRoutes(app, deps) {
 
       const rawKey = `dppSg${require("crypto").randomBytes(24).toString("hex")}`;
       const keyRecord = buildApiKeyHashRecord(rawKey);
-      const scopes = buildSecurityGroupApiKeyScopes(["dpp:read", "dpp:restricted:read"]);
 
       const result = await pool.query(
         `INSERT INTO "apiKeys" (
@@ -236,7 +264,6 @@ module.exports = function registerApiKeyRoutes(app, deps) {
            "keyPrefix",
            "keySalt",
            "hashAlgorithm",
-           scopes,
            "passportType",
            "scopeType",
            "fieldKeys",
@@ -244,11 +271,10 @@ module.exports = function registerApiKeyRoutes(app, deps) {
            "expiresAt",
            "createdBy"
          )
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          RETURNING id,
                    name,
                    "keyPrefix" AS "keyPrefix",
-                   scopes,
                    "passportType" AS "passportType",
                    "scopeType" AS "scopeType",
                    "fieldKeys" AS "fieldKeys",
@@ -263,7 +289,6 @@ module.exports = function registerApiKeyRoutes(app, deps) {
           keyRecord.keyPrefix,
           keyRecord.keySalt,
           keyRecord.hashAlgorithm,
-          scopes,
           typeDef.typeName,
           parsedScopeType,
           selectedFieldKeys,
@@ -295,8 +320,11 @@ module.exports = function registerApiKeyRoutes(app, deps) {
 
       res.status(201).json({ ...mapApiKeyRow(result.rows[0]), key: rawKey });
     } catch (error) {
-      logger.error("Create security group error:", error.message);
-      res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : "Failed to create security group" });
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({ error: error.message });
+      }
+      logger.error({ err: error }, "Create security group error");
+      return res.status(500).json({ error: "Failed to create security group" });
     }
   });
 
@@ -311,7 +339,6 @@ module.exports = function registerApiKeyRoutes(app, deps) {
        RETURNING id,
                  "companyId" AS "companyId",
                  name,
-                 scopes,
                  "passportType" AS "passportType",
                  "scopeType" AS "scopeType",
                  "fieldKeys" AS "fieldKeys",
@@ -346,7 +373,6 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       revocationMode: emergency ? "emergency" : "standard",
       reason,
       metadata: {
-        scopes: result.rows[0].scopes || [],
         keyName: result.rows[0].name || null,
         passportType: result.rows[0].passportType || null,
         scopeType: result.rows[0].scopeType || null,
@@ -364,15 +390,6 @@ module.exports = function registerApiKeyRoutes(app, deps) {
   }
 
   app.delete("/api/companies/:companyId/api-keys/:keyId", authenticateToken, checkCompanyAdmin, async (req, res) => {
-    try {
-      await revokeApiKey(req, res);
-    } catch (error) {
-      logger.error("Revoke security group error:", error.message);
-      res.status(500).json({ error: "Failed to revoke security group" });
-    }
-  });
-
-  app.post("/api/companies/:companyId/api-keys/:keyId/revoke", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       await revokeApiKey(req, res);
     } catch (error) {

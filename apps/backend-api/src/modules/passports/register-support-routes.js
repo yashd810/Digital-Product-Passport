@@ -100,11 +100,44 @@ function registerPassportSupportRoutes(app, deps) {
         if (!fieldKey || !passportType) {
           return res.status(400).json({ error: "fieldKey and passportType required" });
         }
-        if (!/^[a-zA-Z][a-zA-Z0-9_]+$/.test(fieldKey)) {
+        if (!/^[a-z][A-Za-z0-9]{0,99}$/.test(fieldKey)) {
           return res.status(400).json({ error: "Invalid fieldKey" });
         }
 
+        const passportContext = await pool.query(
+          `SELECT pt."fieldsJson"
+           FROM "passportRegistry" pr
+           JOIN "passportTypes" pt ON pt."typeName" = pr."passportType"
+           WHERE pr."dppId" = $1
+             AND pr."companyId" = $2
+             AND pr."passportType" = $3
+           LIMIT 1`,
+          [dppId, companyId, passportType]
+        );
+        if (!passportContext.rows.length) {
+          return res.status(404).json({ error: "Passport not found" });
+        }
+        const fieldDefinition = (passportContext.rows[0].fieldsJson?.sections || [])
+          .flatMap((section) => section.fields || [])
+          .find((field) => field?.key === fieldKey);
+        if (!fieldDefinition || fieldDefinition.type !== "file") {
+          return res.status(400).json({ error: "fieldKey must identify a file field on this passport type" });
+        }
+
         const tableName = getTable(passportType);
+        const row = await pool.query(
+          `SELECT id FROM ${tableName}
+           WHERE "dppId" = $1
+             AND "companyId" = $2
+             AND "releaseStatus" IN ${editableReleaseStatusesSql}
+             AND "deletedAt" IS NULL
+           ORDER BY "versionNumber" DESC LIMIT 1`,
+          [dppId, companyId]
+        );
+        if (!row.rows.length) {
+          return res.status(404).json({ error: "Editable passport not found" });
+        }
+
         const stored = await storageService.savePassportFile({
           dppId,
           fieldKey,
@@ -113,45 +146,51 @@ function registerPassportSupportRoutes(app, deps) {
           contentType: req.file.mimetype,
         });
         const fileUrl = stored.url;
-
-        const row = await pool.query(
-          `SELECT id FROM ${tableName}
-           WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
-           ORDER BY "versionNumber" DESC LIMIT 1`,
-          [dppId]
-        );
-        if (!row.rows.length) {
-          return res.status(404).json({ error: "Editable passport not found" });
-        }
-
         const publicId = crypto.randomBytes(10).toString("base64url").slice(0, 16);
-        const appUrl = process.env.APP_URL || "http://localhost:3001";
-        const publicFileUrl = `${appUrl}/public-files/${publicId}`;
-        await pool.query(
-          `INSERT INTO "passportAttachments"
-             ("publicId", "companyId", "passportDppId", "fieldKey", "filePath", "storageKey", "storageProvider", "fileUrl", "mimeType", "sizeBytes", "isPublic")
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false)
-           ON CONFLICT ("publicId") DO NOTHING`,
-        [
-          publicId,
-          companyId,
-            dppId,
-            fieldKey,
-            stored.path || null,
-            stored.storageKey || null,
-            stored.provider || null,
-            fileUrl,
-          req.file.mimetype || "application/octet-stream",
-          req.file.size || null,
-        ]
-        ).catch((error) => {
-          logger.warn({ err: error, dppId, fieldKey, publicId }, "Failed to record passport attachment metadata");
-        });
-
-        await pool.query(
-          `UPDATE ${tableName} SET ${fieldKey} = $1, "updatedAt" = NOW() WHERE id = $2`,
-          [publicFileUrl, row.rows[0].id]
-        );
+        const apiUrl = String(process.env.SERVER_URL || process.env.APP_URL || "http://localhost:3001").replace(/\/+$/, "");
+        const publicFileUrl = `${apiUrl}/public-files/${publicId}`;
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          await client.query(
+            `UPDATE "passportAttachments"
+             SET "isPublic" = false
+             WHERE "passportDppId" = $1
+               AND "companyId" = $2
+               AND "fieldKey" = $3`,
+            [dppId, companyId, fieldKey]
+          );
+          await client.query(
+            `INSERT INTO "passportAttachments"
+               ("publicId", "companyId", "passportDppId", "fieldKey", "filePath", "storageKey", "storageProvider", "fileUrl", "mimeType", "sizeBytes", "isPublic")
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false)`,
+            [
+              publicId,
+              companyId,
+              dppId,
+              fieldKey,
+              stored.path || null,
+              stored.storageKey || null,
+              stored.provider || null,
+              fileUrl,
+              req.file.mimetype || "application/octet-stream",
+              req.file.size || null,
+            ]
+          );
+          await client.query(
+            `UPDATE ${tableName}
+             SET ${fieldKey} = $1, "updatedAt" = NOW()
+             WHERE id = $2
+               AND "companyId" = $3`,
+            [publicFileUrl, row.rows[0].id, companyId]
+          );
+          await client.query("COMMIT");
+        } catch (error) {
+          await client.query("ROLLBACK").catch(() => {});
+          throw error;
+        } finally {
+          client.release();
+        }
         await logAudit(companyId, req.user.userId, "upload", tableName, dppId, null, { fieldKey, publicFileUrl });
         res.json({ success: true, url: publicFileUrl, fieldKey });
       } catch (e) {

@@ -44,15 +44,15 @@ module.exports = function registerPassportPublicRoutes(app, {
     resolveSecurityGroupApiKey,
   } = createApiKeyHelpers({ crypto });
 
-  function securePublicRepositoryLinks(value) {
+  function securePublicRepositoryLinks(value, passportDppId) {
     return rewriteRepositoryLinksForSignedAccessDeep(value, {
       appBaseUrl: apiOrigin,
+      passportDppId,
     });
   }
 
   const getPassportType = (passport, fallback = null) => passport?.passportType || fallback;
   const getCompanyId = (passport, fallback = null) => passport?.companyId ?? fallback;
-  const getInternalAliasId = (passport, fallback = null) => passport?.internalAliasId || fallback;
   const getModelName = (passport, fallback = null) => passport?.modelName || fallback;
   const getVersionNumber = (passport, fallback = null) => passport?.versionNumber ?? fallback;
   const getReleaseStatus = (passport, fallback = null) => passport?.releaseStatus || fallback;
@@ -200,7 +200,6 @@ module.exports = function registerPassportPublicRoutes(app, {
       manufacturedBy: passport.manufacturedBy,
       modelName: getModelName(passport),
       dppId: passport.dppId,
-      internalAliasId: getInternalAliasId(passport),
       versionNumber: getVersionNumber(passport)
     }) :
     buildCurrentPublicPassportPath({
@@ -208,8 +207,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       manufacturerName: passport.manufacturer,
       manufacturedBy: passport.manufacturedBy,
       modelName: getModelName(passport),
-      dppId: passport.dppId,
-      internalAliasId: getInternalAliasId(passport)
+      dppId: passport.dppId
     });
     return didService.buildPublicPassportUrl(path);
   }
@@ -291,6 +289,37 @@ module.exports = function registerPassportPublicRoutes(app, {
     };
   }
 
+  function buildPublicPassportEnvelope(passport, typeDef) {
+    const publicFields = {};
+    for (const section of typeDef?.fieldsJson?.sections || []) {
+      for (const field of section.fields || []) {
+        if (!field?.key || !Object.prototype.hasOwnProperty.call(passport || {}, field.key)) continue;
+        publicFields[field.key] = passport[field.key];
+      }
+    }
+
+    const metadata = {
+      dppId: passport?.dppId || null,
+      passportType: getPassportType(passport, typeDef?.typeName),
+      versionNumber: getVersionNumber(passport),
+      releaseStatus: getReleaseStatus(passport),
+      archived: Boolean(passport?.archived),
+      modelName: getModelName(passport),
+      granularity: passport?.granularity || null,
+      manufacturer: passport?.manufacturer || null,
+      manufacturedBy: passport?.manufacturedBy || null,
+      createdAt: passport?.createdAt || null,
+      updatedAt: passport?.updatedAt || null,
+      releasedAt: passport?.releasedAt || null,
+      carrierAuthenticity: passport?.carrierAuthenticity || null,
+    };
+
+    return {
+      ...Object.fromEntries(Object.entries(metadata).filter(([, value]) => value !== null)),
+      ...publicFields,
+    };
+  }
+
   function scrubInternalPublicIdentifiers(value) {
     if (Array.isArray(value)) return value.map(scrubInternalPublicIdentifiers);
     if (!value || typeof value !== "object") return value;
@@ -330,13 +359,9 @@ module.exports = function registerPassportPublicRoutes(app, {
     if (Array.isArray(value)) return value.map(scrubPublicSchemaMetadata);
     if (!value || typeof value !== "object") return value;
     const omittedKeys = new Set([
-      "accessAuthority",
-      "accessLevel",
-      "authorization",
       "canonicalLocked",
       "elementIdPath",
       "objectType",
-      "securityLayer",
       "semanticId",
       "sourceModule",
       "sourceModuleColumnKey",
@@ -348,7 +373,7 @@ module.exports = function registerPassportPublicRoutes(app, {
     for (const [key, child] of Object.entries(value)) {
       if (omittedKeys.has(key)) continue;
       if (key === "confidentiality") {
-        result[key] = String(child || "").toLowerCase() === "restricted" ? "restricted" : "public";
+        result[key] = String(child || "").toLowerCase() === "public" ? "public" : "restricted";
         continue;
       }
       result[key] = scrubPublicSchemaMetadata(child);
@@ -358,12 +383,22 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   function buildViewerSafeTypeDef(typeDef) {
     if (!typeDef) return null;
+    const fieldsJson = scrubPublicSchemaMetadata(typeDef.fieldsJson || {});
+    fieldsJson.sections = (fieldsJson.sections || []).map((section) => ({
+      ...section,
+      fields: (section.fields || []).map((field) => ({
+        ...field,
+        confidentiality: String(field?.confidentiality || "").trim().toLowerCase() === "public"
+          ? "public"
+          : "restricted",
+      })),
+    }));
     return {
       typeName: typeDef.typeName || null,
       displayName: typeDef.displayName || typeDef.typeName || null,
       productCategory: typeDef.productCategory || null,
       productIcon: typeDef.productIcon || null,
-      fieldsJson: scrubPublicSchemaMetadata(typeDef.fieldsJson || {}),
+      fieldsJson,
     };
   }
 
@@ -394,9 +429,6 @@ module.exports = function registerPassportPublicRoutes(app, {
         ...(payload.fields || {}),
         ...selectedFields,
       },
-      unlockedPassport: restrictedAccessPayload.passport,
-      unlockedFieldKeys: restrictedAccessPayload.unlockedFieldKeys,
-      securityGroup: restrictedAccessPayload.securityGroup,
       restrictedAccess: {
         unlocked: true,
         fieldKeys: restrictedAccessPayload.unlockedFieldKeys,
@@ -566,6 +598,7 @@ module.exports = function registerPassportPublicRoutes(app, {
             AND phv."versionNumber" = pa."versionNumber"
            WHERE pa."dppId" = $1
              AND pa."passportType" = $2
+             AND pa."releaseStatus" IN ('released', 'obsolete')
            ORDER BY pa."versionNumber" DESC, pa."archivedAt" DESC
            LIMIT 1`,
           [normalizedGuid, passportType]
@@ -595,10 +628,11 @@ module.exports = function registerPassportPublicRoutes(app, {
     const loaded = await loadPublicPassportByGuid(dppId, { versionNumber });
     if (!loaded?.passport) return null;
 
+    const passportDppId = loaded.passport.dppId || loaded.passport.guid || dppId;
     const sanitizedPassport = securePublicRepositoryLinks(
-      await stripRestrictedFieldsForPublicView(loaded.passport, getPassportType(loaded.passport))
+      await stripRestrictedFieldsForPublicView(loaded.passport, getPassportType(loaded.passport)),
+      passportDppId
     );
-    const passportDppId = loaded.passport.dppId || loaded.passport.dppId || loaded.passport.guid || dppId;
     const resolvedVersion = versionNumber || getVersionNumber(sanitizedPassport) || getVersionNumber(loaded.passport) || 1;
     const verifyResult = await verifyPassportSignature(passportDppId, resolvedVersion);
     const signatureRecord = await pool.query(
@@ -608,7 +642,6 @@ module.exports = function registerPassportPublicRoutes(app, {
               ps."signingKeyId" AS "signingKeyId",
               ps."releasedAt" AS "signatureReleasedAt",
               ps."signedAt" AS "signedAt",
-              rr."releasedByEmail" AS "releasedByEmail",
               rr."releasedAt" AS "releaseRecordReleasedAt",
               rr.companyname AS "companyName"
        FROM "passportSignatures" ps
@@ -633,7 +666,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   function buildPublicVerificationPayload(verificationContext) {
     const { passport, company, sanitizedPassport, signatureRow, verifyResult } = verificationContext;
-    const passportDppId = passport.dppId || passport.dppId || passport.guid || null;
+    const passportDppId = passport.dppId || passport.guid || null;
     const dppUrl = buildPublicPassportUrl(sanitizedPassport, company?.companyName || "");
     const signatureUrl = didService.buildApiUrl(`/api/public/passports/${passportDppId}/signature`);
     const canonicalDppJsonUrl = didService.buildApiUrl(`/api/public/passports/${passportDppId}`);
@@ -646,7 +679,6 @@ module.exports = function registerPassportPublicRoutes(app, {
       dppId: passportDppId,
       companyName: company?.companyName || signatureRow?.companyName || "",
       trustLevel: company?.customerTrustLevel || "basic",
-      releasedBy: signatureRow?.releasedByEmail || null,
       releasedAt: signatureRow?.releaseRecordReleasedAt || verifyResult?.releasedAt || signatureRow?.signatureReleasedAt || null,
       dppHash: verifyResult?.dataHash || signatureRow?.dataHash || null,
       signature: signatureRow?.signature || null,
@@ -667,20 +699,17 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   async function loadBackupHandoverPassport({
     passportDppId = null,
-    internalAliasId = null,
     versionNumber = null
   }) {
     if (!backupProviderService?.getActivePublicHandover) return null;
 
     let handover = await backupProviderService.getActivePublicHandover({
       passportDppId,
-      internalAliasId,
       versionNumber,
     });
     if (!handover && backupProviderService?.ensureAutomaticPublicHandover) {
       handover = await backupProviderService.ensureAutomaticPublicHandover({
         passportDppId,
-        internalAliasId,
         versionNumber,
       });
     }
@@ -697,10 +726,8 @@ module.exports = function registerPassportPublicRoutes(app, {
       lineageId: rawRow?.lineageId || handover.lineageId || handover.passportDppId,
       companyId: rawRow?.companyId || handover.companyId,
       passportType: rawRow?.passportType || handover.passportType,
-      internalAliasId: rawRow?.internalAliasId || handover.internalAliasId,
       versionNumber: rawRow?.versionNumber || handover.versionNumber,
       backupPublicHandover: true,
-      backupPublicUrl: handover.publicUrl || null,
       backupHandoverSource: {
         providerKey: handover.backupProviderKey || null,
         sourceReplicationId: handover.sourceReplicationId || null,
@@ -754,6 +781,7 @@ module.exports = function registerPassportPublicRoutes(app, {
           AND phv."versionNumber" = pa."versionNumber"
          WHERE pa."lineageId" = $1
            AND pa."passportType" = $2
+           AND pa."releaseStatus" IN ('released', 'obsolete')
          ORDER BY pa."versionNumber" DESC, pa."archivedAt" DESC
          LIMIT 1`,
         [lineageId, registryRow.passportType]
@@ -777,7 +805,11 @@ module.exports = function registerPassportPublicRoutes(app, {
   function getFacilityFieldKeys(typeDef) {
     return (typeDef?.fieldsJson?.sections || []).
     flatMap((section) => section.fields || []).
-    filter((field) => field?.key && isSafeDbFieldKey(field.key)).
+    filter((field) =>
+      field?.key
+      && isSafeDbFieldKey(field.key)
+      && String(field.confidentiality || "").trim().toLowerCase() === "public"
+    ).
     filter((field) => {
       const compact = String(field.key || "").toLowerCase().replace(/[^a-z0-9]/g, "");
       return compact.includes("facility");
@@ -802,7 +834,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       const tableName = getTable(typeDef.typeName);
       const selectFields = facilityFieldKeys.map((fieldKey) => `"${fieldKey}"`).join(", ");
       const candidateRes = await pool.query(
-        `SELECT "dppId", "lineageId", "companyId", "modelName", "internalAliasId", "releaseStatus", "versionNumber", "updatedAt", "createdAt", ${selectFields}
+        `SELECT "dppId", "lineageId", "companyId", "modelName", "releaseStatus", "versionNumber", "updatedAt", "createdAt", ${selectFields}
          FROM ${tableName}
          WHERE "deletedAt" IS NULL
            AND "releaseStatus" IN ('released', 'obsolete')
@@ -850,25 +882,33 @@ module.exports = function registerPassportPublicRoutes(app, {
         loaded.typeDef,
         versionNumber
       );
+      const securedRestrictedAccessPayload = restrictedAccessPayload
+        ? {
+            ...restrictedAccessPayload,
+            passport: securePublicRepositoryLinks(
+              restrictedAccessPayload.passport,
+              loaded.passport.dppId
+            ),
+          }
+        : null;
       const selectedRestrictedFields = pickUnlockedRestrictedFields(
-        restrictedAccessPayload?.passport,
-        restrictedAccessPayload?.unlockedFieldKeys || []
+        securedRestrictedAccessPayload?.passport,
+        securedRestrictedAccessPayload?.unlockedFieldKeys || []
       );
       const responsePassport = securePublicRepositoryLinks({
         ...sanitizedPassport,
         ...selectedRestrictedFields,
-      });
+      }, loaded.passport.dppId);
       const companyName = loaded.company?.companyName || "";
       const publicPath = buildCurrentPublicPassportPath({
         companyName,
         manufacturerName: responsePassport.manufacturer,
         manufacturedBy: responsePassport.manufacturedBy,
         modelName: getModelName(responsePassport),
-        dppId: responsePassport.dppId,
-        internalAliasId: getInternalAliasId(responsePassport)
+        dppId: responsePassport.dppId
       });
       let canonicalPayload = {
-        ...responsePassport,
+        ...buildPublicPassportEnvelope(responsePassport, loaded.typeDef),
         ...buildRequestedPassportPayload(req, responsePassport, loaded.typeDef, loaded.company),
         viewerSchema: buildViewerSafeTypeDef(loaded.typeDef),
         companyProfile: buildPublicCompanyProfile(loaded.company),
@@ -879,20 +919,18 @@ module.exports = function registerPassportPublicRoutes(app, {
           manufacturedBy: responsePassport.manufacturedBy,
           modelName: getModelName(responsePassport),
           dppId: responsePassport.dppId,
-          internalAliasId: getInternalAliasId(responsePassport),
           versionNumber: getVersionNumber(responsePassport)
         }),
         inactivePublicVersion: versionNumber !== null && Number(versionNumber) === Number(getVersionNumber(responsePassport)),
         linkedData: {
           publicUrl: didService.buildPublicPassportUrl(publicPath),
           canonicalJsonUrl: didService.buildApiUrl(`/api/public/passports/${responsePassport.dppId}`),
-          backupPublicUrl: responsePassport.backupPublicUrl || null,
           publicSourceMode: responsePassport.backupPublicHandover ? "backupHandover" : "economicOperator",
         }
       };
 
       canonicalPayload = scrubInternalPublicIdentifiers(
-        mergeRestrictedFieldsIntoPublicPayload(canonicalPayload, restrictedAccessPayload)
+        mergeRestrictedFieldsIntoPublicPayload(canonicalPayload, securedRestrictedAccessPayload)
       );
 
       if (wantsSemanticResponse(req)) {
@@ -903,9 +941,6 @@ module.exports = function registerPassportPublicRoutes(app, {
         delete semanticPayload.companyProfile;
         delete semanticPayload.linkedData;
         delete semanticPayload.viewerSchema;
-        delete semanticPayload.unlockedPassport;
-        delete semanticPayload.unlockedFieldKeys;
-        delete semanticPayload.securityGroup;
         delete semanticPayload.restrictedAccess;
         return sendSemanticPassport(res, semanticPayload, getPassportType(responsePassport), loaded.typeDef);
       }
@@ -922,20 +957,46 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   app.get("/api/public/passports/:dppId", publicReadRateLimit, securityGroupReadLimiter, handleCanonicalPassportRequest);
 
-  app.get("/api/public/passports/:dppId/history", publicReadRateLimit, async (req, res) => {
+  app.get("/api/public/passports/:dppId/history", publicReadRateLimit, securityGroupReadLimiter, async (req, res) => {
     try {
       const loaded = await loadPublicPassportByGuid(req.params.dppId);
       if (!loaded?.passport) return res.status(404).json({ error: "Passport not found" });
 
+      let allowedRestrictedFieldKeys = [];
+      let allowedRestrictedPassportDppIds = [];
+      const rawApiKey = getSecurityGroupKeyFromRequest(req);
+      if (rawApiKey) {
+        const matchedKey = await resolveSecurityGroupApiKey(pool, rawApiKey);
+        const accessDecision = checkSecurityGroupApiKeyAccess(matchedKey, {
+          dppId: loaded.passport.dppId,
+          companyId: getCompanyId(loaded.passport),
+          passportType: getPassportType(loaded.passport, loaded.typeDef?.typeName),
+        });
+        if (!accessDecision.allowed) {
+          return res.status(accessDecision.statusCode).json({ error: accessDecision.error });
+        }
+        allowedRestrictedFieldKeys = Array.isArray(matchedKey.fieldKeys) ? matchedKey.fieldKeys : [];
+        allowedRestrictedPassportDppIds = matchedKey.scopeType === "passports"
+          ? (Array.isArray(matchedKey.passportDppIds) ? matchedKey.passportDppIds : [])
+          : null;
+        pool.query('UPDATE "apiKeys" SET "lastUsedAt" = NOW() WHERE id = $1', [matchedKey.id]).catch((error) => {
+          logger.warn({ err: error, apiKeyId: matchedKey.id }, "Failed to update security group API key last used timestamp");
+        });
+      }
+
       const historyPayload = await buildPassportVersionHistory({
         dppId: req.params.dppId,
         passportType: getPassportType(loaded.passport),
-        publicOnly: true
+        publicOnly: true,
+        allowedRestrictedFieldKeys,
+        allowedRestrictedPassportDppIds,
       });
 
       res.json(historyPayload);
-    } catch {
-      res.status(500).json({ error: "Failed to fetch passport history" });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        error: error.statusCode ? error.message : "Failed to fetch passport history",
+      });
     }
   });
 
@@ -943,80 +1004,42 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   app.get("/api/public/passports/:dppId/signature", publicReadRateLimit, async (req, res) => {
     try {
-      const { dppId: dppId } = req.params;
-      const versionNum = req.query.version ? parseInt(req.query.version, 10) : null;
-
-      let version = versionNum;
-      if (!version) {
-        const reg = await pool.query(
-          `SELECT "passportType"
-           FROM "passportRegistry"
-           WHERE "dppId" = $1`,
-          [dppId]
-        );
-        if (reg.rows.length) {
-          const tableName = getTable(reg.rows[0].passportType);
-          const liveVersion = await pool.query(
-            `SELECT "versionNumber"
-             FROM ${tableName}
-             WHERE "dppId" = $1
-               AND "releaseStatus" = 'released'
-             ORDER BY "versionNumber" DESC
-             LIMIT 1`,
-            [dppId]
-          );
-          if (liveVersion.rows.length) {
-            version = liveVersion.rows[0].versionNumber;
-          } else {
-            const archiveVersion = await pool.query(
-              `SELECT "versionNumber"
-               FROM "passportArchives"
-               WHERE "dppId" = $1
-                 AND "releaseStatus" = 'released'
-               ORDER BY "versionNumber" DESC
-               LIMIT 1`,
-              [dppId]
-            );
-            version = archiveVersion.rows[0]?.versionNumber || 1;
-          }
-        }
-        version = version || 1;
+      const requestedVersion = req.query.version ? parseInt(req.query.version, 10) : null;
+      if (requestedVersion !== null && (!Number.isInteger(requestedVersion) || requestedVersion < 1)) {
+        return res.status(400).json({ error: "version must be a positive integer" });
       }
+      const verificationContext = await loadPublicVerificationContext(req.params.dppId, {
+        versionNumber: requestedVersion,
+      });
+      if (!verificationContext?.passport) return res.status(404).json({ error: "Passport not found" });
 
-      const verifyResult = await verifyPassportSignature(dppId, version);
+      const { verifyResult } = verificationContext;
       if (["invalid", "tampered", "keyMissing"].includes(String(verifyResult.status || "")) && typeof logAudit === "function") {
-        const registryRow = await pool.query(
-          `SELECT "companyId"
-           FROM "passportRegistry"
-           WHERE "dppId" = $1
-           LIMIT 1`,
-          [dppId]
-        ).catch((error) => {
-          logger.warn({ err: error, dppId }, "Failed to resolve company for public signature verification audit");
-          return { rows: [] };
-        });
-        const companyId = registryRow.rows[0]?.companyId || null;
+        const companyId = getCompanyId(verificationContext.passport);
         if (companyId) {
-        await logAudit(
-          companyId,
-          null,
-          "verifySignatureFailure",
-          "passportSignatures",
-          dppId,
-          null,
-          {
-            versionNumber: version,
-            verificationStatus: verifyResult.status,
-            keyId: verifyResult.keyId || null,
-            algorithm: verifyResult.algorithm || null
-          },
-          {
-            actorIdentifier: "public:signature-verifier",
-            audience: "public",
-          }
-        ).catch((error) => {
-          logger.warn({ err: error, dppId, versionNumber: version }, "Failed to record public signature verification audit");
-        });
+          await logAudit(
+            companyId,
+            null,
+            "verifySignatureFailure",
+            "passportSignatures",
+            req.params.dppId,
+            null,
+            {
+              versionNumber: verificationContext.passport.versionNumber || requestedVersion,
+              verificationStatus: verifyResult.status,
+              keyId: verifyResult.keyId || null,
+              algorithm: verifyResult.algorithm || null
+            },
+            {
+              actorIdentifier: "public:signature-verifier",
+              audience: "public",
+            }
+          ).catch((error) => {
+            logger.warn(
+              { err: error, dppId: req.params.dppId, versionNumber: requestedVersion },
+              "Failed to record public signature verification audit"
+            );
+          });
         }
       }
 
@@ -1027,43 +1050,14 @@ module.exports = function registerPassportPublicRoutes(app, {
     }
   });
 
-  app.get("/api/public/passports/:dppId/signature-proof", publicReadRateLimit, async (req, res) => {
-    try {
-      const verificationContext = await loadPublicVerificationContext(req.params.dppId, {
-        versionNumber: req.query.version ? parseInt(req.query.version, 10) : null,
-      });
-      if (!verificationContext?.passport) return res.status(404).json({ error: "Passport not found" });
-
-      const { verifyResult, signatureRow } = verificationContext;
-
-      return res.json({
-        ...verifyResult,
-        signature: signatureRow?.signature || null,
-        algorithm: verifyResult?.algorithm || signatureRow?.algorithm || null,
-        signingKeyId: signatureRow?.signingKeyId || verifyResult?.keyId || null,
-        releasedBy: signatureRow?.releasedByEmail || null,
-      });
-    } catch {
-      return res.status(500).json({ error: "Failed to fetch signature proof" });
-    }
-  });
-
-  app.get("/api/public/passports/:dppId/verify", publicReadRateLimit, async (req, res) => {
-    try {
-      const verificationContext = await loadPublicVerificationContext(req.params.dppId, {
-        versionNumber: req.query.version ? parseInt(req.query.version, 10) : null,
-      });
-      if (!verificationContext?.passport) return res.status(404).json({ error: "Passport not found" });
-      return res.json(buildPublicVerificationPayload(verificationContext));
-    } catch {
-      return res.status(500).json({ error: "Failed to build verification summary" });
-    }
-  });
-
   app.get("/api/public/passports/:dppId/verification-bundle", publicReadRateLimit, async (req, res) => {
     try {
+      const requestedVersion = req.query.version ? Number.parseInt(req.query.version, 10) : null;
+      if (requestedVersion !== null && (!Number.isInteger(requestedVersion) || requestedVersion < 1)) {
+        return res.status(400).json({ error: "version must be a positive integer" });
+      }
       const verificationContext = await loadPublicVerificationContext(req.params.dppId, {
-        versionNumber: req.query.version ? parseInt(req.query.version, 10) : null,
+        versionNumber: requestedVersion,
       });
       if (!verificationContext?.passport) return res.status(404).json({ error: "Passport not found" });
 

@@ -12,7 +12,6 @@ module.exports = function registerCatalogRoutes(app, deps) {
     multer,
     authenticateToken,
     isSuperAdmin,
-    checkCompanyAccess,
     verifyPassword,
     logAudit,
     getTable,
@@ -697,26 +696,4 @@ module.exports = function registerCatalogRoutes(app, deps) {
     }
   });
 
-  app.get("/api/companies/:companyId/passport-types", authenticateToken, checkCompanyAccess, async (req, res) => {
-    try {
-      const result = await pool.query(`
-        SELECT DISTINCT pt.id,
-          pt."typeName" AS "typeName",
-          pt."displayName" AS "displayName",
-          pt."productCategory" AS "productCategory",
-          pt."productIcon" AS "productIcon",
-          pt."fieldsJson" AS "fieldsJson",
-          (NOT cpa."accessRevoked") AS "accessGranted"
-        FROM "passportTypes" pt
-        JOIN "companyPassportAccess" cpa ON pt.id = cpa."passportTypeId"
-        WHERE cpa."companyId" = $1
-        ORDER BY pt."productCategory", pt."displayName"
-      `, [req.params.companyId]);
-
-      res.json(result.rows.map(mapPassportTypeRow));
-    } catch (error) {
-      logger.error("passport-types fetch error:", error.message);
-      res.status(500).json({ error: "Failed to fetch passport types" });
-    }
-  });
 };

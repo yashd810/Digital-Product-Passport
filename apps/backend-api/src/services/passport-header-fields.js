@@ -124,7 +124,7 @@ function getSystemPassportHeader(typeDef = {}) {
 
 function getSystemPassportHeaderFields(typeDef = {}) {
   const header = getSystemPassportHeader(typeDef);
-  const sections = typeDef?.fieldsJson?.sections || typeDef?.fieldsJson?.sections || typeDef?.sections || [];
+  const sections = typeDef?.fieldsJson?.sections || typeDef?.sections || [];
   const fieldMap = new Map(
     sections
       .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])

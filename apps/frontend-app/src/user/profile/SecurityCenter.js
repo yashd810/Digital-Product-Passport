@@ -194,6 +194,17 @@ function SecurityCenter({ user, companyId }) {
     setPassports([]);
   };
 
+  const copyNewApiKey = async () => {
+    if (!newKey?.key) return;
+    try {
+      await navigator.clipboard.writeText(newKey.key);
+      setCopiedApiKey(true);
+    } catch {
+      setCopiedApiKey(false);
+      flash("error", "Failed to copy the API key. Select the key text and copy it manually.");
+    }
+  };
+
   const generateSecurityGroup = async (event) => {
     event.preventDefault();
     if (!groupName.trim() || !selectedPassportType || selectedFieldKeys.length === 0) return;
@@ -257,8 +268,10 @@ function SecurityCenter({ user, companyId }) {
     || !selectedPassportType
     || selectedFieldKeys.length === 0
     || (scopeType === "passports" && selectedPassportDppIds.length === 0);
-  const bearerExample = `curl -X GET ${api}/api/users/me \\
-  -H "Authorization: Bearer yourTokenHere"`;
+  const bearerExample = `curl -X POST ${api}/api/companies/your-company-name/integrations/v1/passports \\
+  -H "Authorization: Bearer yourTokenHere" \\
+  -H "Content-Type: application/json" \\
+  -d '{"passportType":"yourPassportType","productIdentifier":"yourProductIdentifier"}'`;
 
   return (
     <div className="profile-page">
@@ -277,7 +290,7 @@ function SecurityCenter({ user, companyId }) {
         <div className="profile-card">
           <h4 className="card-section-title">Bearer Token</h4>
           <p className="profile-helper-text">
-            Use this token for authenticated internal API calls in the <code>Authorization: Bearer &lt;token&gt;</code> header.
+            Use this token for authenticated company integration calls in the <code>Authorization: Bearer &lt;token&gt;</code> header.
           </p>
 
           <div className="token-section">
@@ -327,7 +340,7 @@ function SecurityCenter({ user, companyId }) {
         <div className="profile-card">
           <h4 className="card-section-title">Security Groups</h4>
           <p className="profile-helper-text">
-            Security groups generate API keys for the public passport viewer. A key unlocks only the restricted fields selected for its passport type or selected unique passports.
+            Security groups generate API keys for the public passport viewer. A key grants access only to the restricted fields selected for its passport type or selected unique passports.
           </p>
 
           {!resolvedCompanyId && (
@@ -353,7 +366,7 @@ function SecurityCenter({ user, companyId }) {
                     <code className="security-key-reveal-code">{newKey.key}</code>
                     <button
                       type="button"
-                      onClick={() => { navigator.clipboard.writeText(newKey.key); setCopiedApiKey(true); }}
+                      onClick={copyNewApiKey}
                       className={`security-key-reveal-copy-btn${copiedApiKey ? " copied" : ""}`}
                     >
                       {copiedApiKey ? "Copied" : "Copy"}
@@ -459,7 +472,7 @@ function SecurityCenter({ user, companyId }) {
                             />
                             <span>
                               <strong>{passport.modelName || passport.internalAliasId || passport.dppId}</strong>
-                              <small>{passport.internalAliasId || passport.dppId} · v{passport.versionNumber || 1} · {passport.releaseStatus || "draft"}</small>
+                              <small>{passport.internalAliasId || passport.dppId} · v{passport.versionNumber || 1} · {passport.archived ? "archived" : (passport.releaseStatus || "draft")}</small>
                             </span>
                           </label>
                         ))}

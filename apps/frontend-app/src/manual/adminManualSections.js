@@ -566,7 +566,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         { label: "Dashboard access", value: "Uses browser session cookies; bearer tokens are optional for scripts/tests" },
         { label: "Read-only external access", value: "Uses security group API keys, not dashboard sessions or bearer tokens" },
         { label: "Restricted read access", value: "Use security group API keys scoped to one passport type and selected restricted fields" },
-        { label: "Asset Management protection", value: "Uses a launch token and can require an additional shared secret" },
+        { label: "Asset Management protection", value: "Uses normal session or Bearer authentication, company scoping, and editor checks for writes" },
         { label: "Public-view restriction", value: "Restricted fields unlock with a security group API key scoped to the passport type or selected passports" },
       ],
       journeys: [
@@ -585,7 +585,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           items: [
             "If a tenant wants recurring bulk updates, decide whether they really need Asset Management or whether normal company APIs are enough.",
             "If a tenant wants outside read access, encourage one named security group API key per external integration so revocation is simple later.",
-            "If Asset Management is enabled with a shared secret, make sure support teams understand that missing `x-asset-key` causes authorization failures even when the asset launch token is valid.",
+            "For Asset Management automation, use a company user Bearer token and the company-scoped `/passport-data-management` route base.",
           ],
         },
       ],
@@ -600,7 +600,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Operations",
       audience: "Super admins enabling or troubleshooting Asset Management",
       title: "Enable Asset Management carefully and understand the job scheduler behind it",
-      summary: "Asset Management is not just another page. It is a separate operational layer with launch credentials, source fetching, preview validation, push execution, saved jobs, and scheduled runs. Super admins control whether a company can use it at all, and that decision matters because the tool can update many passports quickly.",
+      summary: "Asset Management is an operational dashboard area with source fetching, preview validation, push execution, saved jobs, and scheduled runs. It uses normal company authentication and authorization. Super admins control whether a company can use it at all, and that decision matters because the tool can update many passports quickly.",
       facts: [
         { label: "Company switch", value: "PATCH /api/admin/companies/:companyId/asset-management with { enabled: true or false }" },
         { label: "Who can launch", value: "Company users still need editor or company-admin permissions even if the company is enabled" },

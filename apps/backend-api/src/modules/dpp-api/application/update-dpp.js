@@ -36,7 +36,7 @@ function updateDppUseCase(deps) {
   } = deps;
 
   function resolvePolicyOwnedPatchFields({ editable, granularity }) {
-    const passportType = editable.passport.passportType || editable.passport.passportType || editable.typeDef?.typeName || editable.typeDef?.typeName;
+    const passportType = editable.passport.passportType || editable.typeDef?.typeName;
     const policy = complianceService.resolvePassportPolicyMetadata({
       passportType,
       typeDef: editable.typeDef,
@@ -85,8 +85,8 @@ function updateDppUseCase(deps) {
       representation: requestedRepresentation,
       companyId,
       granularity,
-      internalAliasId,
       productIdentifier,
+      uniqueProductIdentifier,
       modelName,
       passportPolicyKey,
       contentSpecificationIds,
@@ -173,13 +173,13 @@ function updateDppUseCase(deps) {
       });
     }
 
-    const explicitUniqueProductIdentifier = normalizedBody.uniqueProductIdentifier || null;
-    const nextProductId = normalizeInternalAliasIdValue(internalAliasId || productIdentifier);
+    const explicitUniqueProductIdentifier = uniqueProductIdentifier || null;
+    const nextProductId = normalizeInternalAliasIdValue(productIdentifier);
     if (explicitUniqueProductIdentifier && !usesConfiguredGlobalProductIdentifierScheme(explicitUniqueProductIdentifier)) {
       return { statusCode: 400, body: { error: "uniqueProductIdentifier must use the configured global DID-based identifier scheme" } };
     }
-    if (internalAliasId !== undefined || productIdentifier !== undefined || explicitUniqueProductIdentifier !== null) {
-      if (!nextProductId) return { statusCode: 400, body: { error: "internalAliasId cannot be blank" } };
+    if (productIdentifier !== undefined || explicitUniqueProductIdentifier !== null) {
+      if (!nextProductId) return { statusCode: 400, body: { error: "productIdentifier cannot be blank" } };
       const existingByProductId = await findExistingPassportByInternalAliasId({
         tableName: editable.tableName,
         companyId: editable.passport.companyId,
@@ -191,7 +191,7 @@ function updateDppUseCase(deps) {
         return {
           statusCode: 409,
           body: {
-            error: `A passport with Internal Alias ID "${nextProductId}" already exists.`,
+            error: `A passport with productIdentifier "${nextProductId}" already exists.`,
             existingDppId: existingByProductId.dppId,
             releaseStatus: existingByProductId.releaseStatus || null,
           },

@@ -22,12 +22,12 @@ module.exports = function registerRepositoryRoutes(app, {
   storageService,
 }) {
   const appBaseUrlFromRequest = (req) => `${req.protocol}://${req.get("host")}`;
-  const getCompanyId = (row) => row?.companyId || row?.companyId || null;
-  const getStorageKey = (row) => row?.storageKey || row?.storageKey || "";
-  const getFilePath = (row) => row?.filePath || row?.filePath || "";
-  const getFileUrl = (row) => row?.fileUrl || row?.fileUrl || null;
+  const getCompanyId = (row) => row?.companyId || null;
+  const getStorageKey = (row) => row?.storageKey || "";
+  const getFilePath = (row) => row?.filePath || "";
+  const getFileUrl = (row) => row?.fileUrl || null;
   const hasStorageProviderMismatch = (row) => {
-    const rowProvider = String(row?.storageProvider || row?.storageProvider || "").trim().toLowerCase();
+    const rowProvider = String(row?.storageProvider || "").trim().toLowerCase();
     const activeProvider = String(storageService?.provider || storageService?.name || "").trim().toLowerCase();
     return Boolean(rowProvider && activeProvider && rowProvider !== activeProvider);
   };
@@ -48,19 +48,19 @@ module.exports = function registerRepositoryRoutes(app, {
   const withResolvedFileUrl = (req, row) => ({
     id: row.id,
     companyId: getCompanyId(row),
-    parentId: row.parentId ?? row.parentId ?? null,
+    parentId: row.parentId ?? null,
     name: row.name || "",
     type: row.type || "",
     fileUrl: repositoryFileUrl(req, row),
     storageKey: getStorageKey(row) || null,
     filePath: getFilePath(row) || null,
-    mimeType: row.mimeType ?? row.mimeType ?? null,
-    sizeBytes: row.sizeBytes ?? row.sizeBytes ?? null,
-    createdAt: row.createdAt ?? row.createdAt ?? null,
+    mimeType: row.mimeType ?? null,
+    sizeBytes: row.sizeBytes ?? null,
+    createdAt: row.createdAt ?? null,
   });
 
   const setRepositoryFileHeaders = (res, row) => {
-    const mimeType = row.mimeType || row.mimeType || "application/octet-stream";
+    const mimeType = row.mimeType || "application/octet-stream";
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Content-Type", mimeType);
     res.setHeader("Cache-Control", "private, max-age=300");
@@ -398,11 +398,18 @@ module.exports = function registerRepositoryRoutes(app, {
 
   app.get(
     "/repository-files/:token",
+    authenticateToken,
     publicReadRateLimit,
     async (req, res) => {
       try {
         const resolved = decodeRepositoryFileToken(req.params.token);
         if (!resolved) return res.status(404).json({ error: "File not found" });
+        if (
+          req.user?.role !== "superAdmin"
+          && String(req.user?.companyId) !== String(resolved.companyId)
+        ) {
+          return res.status(404).json({ error: "File not found" });
+        }
 
         const item = await pool.query(
           `SELECT *

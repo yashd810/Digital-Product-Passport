@@ -10,6 +10,7 @@
     "start": "node src/server.js",
     "db:migrate": "node scripts/migrate-db.js",
     "check:passport-storage": "node scripts/check-passport-storage.js",
+    "verify:live-confidentiality": "node scripts/verify-live-confidentiality.js",
     "check:boundaries": "node scripts/check-module-boundaries.js",
     "check:syntax": "node scripts/check-syntax.js",
     "check:style": "node scripts/check-js-style.js",

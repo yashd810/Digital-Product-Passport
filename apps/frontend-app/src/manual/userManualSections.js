@@ -563,7 +563,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       category: "Security",
       audience: "Company admins primarily, with session and optional bearer-token access available to logged-in users",
       title: "Understand security, tokens, API keys, and who should use each one",
-      summary: "The product uses several different credentials because each one has a different purpose. Keeping them separate is part of the security model: browser sessions are for the dashboard, optional bearer tokens are for protected scripts, security group API keys are for restricted public fields and scoped read-only integrations, company Bearer tokens are for integration writes, and Asset Management has its own launch credentials.",
+      summary: "The product uses separate credentials for separate purposes: browser sessions are for dashboard work, company Bearer tokens are for authenticated integration writes, and security group API keys are only for selected restricted fields on public reads. Asset Management uses the same company session or Bearer authentication as the dashboard APIs.",
       simpleGuide: {
         title: "Which credential should I use?",
         intro: "Most users only need one of these most of the time:",
@@ -610,12 +610,12 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           ],
         },
         {
-          title: "Use Bearer tokens, security group keys, and asset credentials correctly",
+          title: "Use Bearer tokens and security group keys correctly",
           items: [
-            "Use the company integration Bearer token only for live dynamic-value updates tied to company passports.",
+            "Use a company Bearer token for create, patch, archive, delete, or dynamic-value operations under `/api/companies/:companySlug/integrations/v1/passports`.",
             "Rotate the company service token if the integration endpoint has been shared too broadly or a device is replaced.",
             "Use the security group API key in the public viewer unlock flow when selected restricted fields must be revealed to an allowed audience.",
-            "Use Asset Management launch credentials only inside the Asset Management tool or tightly controlled automation around that tool. They are not general-purpose API credentials.",
+            "Use the normal company session or Bearer token for Passport Data Management; its write routes still enforce company and editor permissions.",
           ],
         },
       ],
@@ -803,7 +803,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           title: "Simple create or update pattern",
           items: [
             "For one new record, send `passportType` plus the normal field keys to `POST /api/companies/:companyId/passports`.",
-            "For one existing editable record, send the same fields to `PATCH /api/companies/:companyId/passports/:dppId` and include `passportType` or `passportType` in the body.",
+            "For one existing editable record, send the same fields to `PATCH /api/companies/:companyId/passports/:dppId` and include `passportType` in the body.",
             "For many existing editable records, use `PATCH /api/companies/:companyId/passports` and give each row a `dppId` or `internalAliasId` so the backend can match it safely.",
           ],
         },
@@ -875,10 +875,10 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       category: "API",
       audience: "Teams automating Asset Management or documenting it for operators",
       title: "Asset Management APIs, scheduling, and security rules",
-      summary: "Asset Management has its own API surface because it is a separate operational layer. It uses its own launch token, can have an extra shared-secret header, and supports source fetch, preview, push, saved jobs, and recent run history. Think of it as a controlled staging service in front of the normal passport APIs.",
+      summary: "Asset Management uses company-scoped Passport Data Management routes with the same session or Bearer authentication as the dashboard. It supports source fetch, preview, push, saved jobs, and recent run history as a controlled staging service in front of normal passport writes.",
       facts: [
-        { label: "Primary auth header", value: "x-asset-platform-token" },
-        { label: "Optional extra header", value: "x-asset-key when the platform operator has enabled the shared secret" },
+        { label: "Authentication", value: "Dashboard session cookie or Authorization: Bearer <token>" },
+        { label: "Route base", value: "/api/companies/:companyId/passport-data-management" },
         { label: "Preview behavior", value: "Preview is a dry run. Push is the write action." },
         { label: "Schedule behavior", value: "Scheduled jobs run later on the server and can fetch from an external ERP or API source first" },
       ],
@@ -888,7 +888,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       ],
       warnings: [
         "Asset Management is not direct database access. It still goes through the backend and its validation rules.",
-        "If the platform operator has enabled the shared asset key, both required headers must be present or the request will be rejected.",
+        "Read routes require company access; source, preview, push, and job mutations additionally require editor permissions.",
       ],
     },
     {

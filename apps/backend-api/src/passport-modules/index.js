@@ -144,10 +144,10 @@ function getPassportTypeModule(moduleKeyOrTypeName, options = {}) {
 }
 
 function getPassportPolicyForPassportType(moduleKeyOrTypeName, typeDef = null, options = {}) {
-  const sourceModule = typeDef?.fieldsJson?.sourceModule || typeDef?.fieldsJson?.sourceModule || null;
+  const sourceModule = typeDef?.fieldsJson?.sourceModule || null;
   const resolvedModule = getPassportTypeModule(sourceModule, options)
     || getPassportTypeModule(moduleKeyOrTypeName, options)
-    || getPassportTypeModule(typeDef?.typeName || typeDef?.typeName, options);
+    || getPassportTypeModule(typeDef?.typeName, options);
   if (resolvedModule?.passportPolicy) return clone(resolvedModule.passportPolicy);
   return null;
 }

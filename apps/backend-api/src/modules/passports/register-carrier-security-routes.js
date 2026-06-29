@@ -1,12 +1,54 @@
 "use strict";
 
 const { createIntegrationCompanySlugResolver } = require("../../shared/http/integration-company-resolver");
+const {
+  rewriteRepositoryLinksForSignedAccessDeep,
+} = require("../../shared/repository/repository-file-links");
+
+function createRouteError(message, statusCode = 400) {
+  return Object.assign(new Error(message), { statusCode });
+}
+
+function normalizeDynamicValueEntries(updates, dynamicFieldKeys) {
+  if (!updates || typeof updates !== "object" || Array.isArray(updates)) {
+    throw createRouteError("Body must be an object of { fieldKey: value }");
+  }
+
+  const entries = Object.entries(updates);
+  if (!entries.length) throw createRouteError("At least one dynamic field is required");
+
+  const invalidKeys = entries
+    .map(([fieldKey]) => fieldKey)
+    .filter((fieldKey) => !/^[a-z][A-Za-z0-9]{0,99}$/.test(fieldKey));
+  if (invalidKeys.length) {
+    throw createRouteError(`Invalid dynamic field key(s): ${invalidKeys.join(", ")}`);
+  }
+
+  const nonDynamicKeys = entries
+    .map(([fieldKey]) => fieldKey)
+    .filter((fieldKey) => !dynamicFieldKeys.has(fieldKey));
+  if (nonDynamicKeys.length) {
+    throw createRouteError(`Field(s) are not configured as dynamic: ${nonDynamicKeys.join(", ")}`);
+  }
+
+  return entries.map(([fieldKey, value]) => {
+    let storedValue = value;
+    if (value !== null && value !== undefined) {
+      storedValue = Array.isArray(value) || typeof value === "object"
+        ? JSON.stringify(value)
+        : String(value);
+    }
+    return [fieldKey, storedValue];
+  });
+}
 
 function registerCarrierSecurityRoutes(app, deps) {
   const {
     pool,
     logger,
     authenticateToken,
+    requireBearerToken,
+    integrationWriteRateLimit,
     checkCompanyAccess,
     requireEditor,
     publicReadRateLimit,
@@ -29,6 +71,15 @@ function registerCarrierSecurityRoutes(app, deps) {
     recordPassportSecurityEvent,
     resolveSecurityGroupApiKey,
   } = deps;
+  const publicApiOrigin = String(process.env.SERVER_URL || process.env.APP_URL || "http://localhost:3001").replace(/\/+$/, "");
+
+  function secureDynamicLinks(value, passportDppId, fieldKey = null) {
+    return rewriteRepositoryLinksForSignedAccessDeep(value, {
+      appBaseUrl: publicApiOrigin,
+      passportDppId,
+      ...(fieldKey ? { fieldKey } : {}),
+    });
+  }
 
   async function loadPassportContext(dppId, { publicOnly = false } = {}) {
     const registryResult = await pool.query(
@@ -43,23 +94,26 @@ function registerCarrierSecurityRoutes(app, deps) {
     const passportType = registryResult.rows[0].passportType;
     const tableName = getTable(passportType);
     const passportResult = await pool.query(
-      `SELECT "releaseStatus"
+      `SELECT id, "releaseStatus", "versionNumber"
        FROM ${tableName}
        WHERE "dppId" = $1
          AND "deletedAt" IS NULL
+         ${publicOnly ? "AND \"releaseStatus\" IN ('released', 'obsolete')" : ""}
+       ORDER BY "versionNumber" DESC
        LIMIT 1`,
       [dppId]
     );
     if (!passportResult.rows.length) return null;
 
     const releaseStatus = String(passportResult.rows[0].releaseStatus || "").trim().toLowerCase();
-    if (publicOnly && !["released", "obsolete"].includes(releaseStatus)) return null;
 
     return {
       companyId: registryResult.rows[0].companyId,
       passportType,
+      passportRowId: passportResult.rows[0].id,
       releaseStatus,
       tableName,
+      versionNumber: passportResult.rows[0].versionNumber,
     };
   }
 
@@ -78,7 +132,7 @@ function registerCarrierSecurityRoutes(app, deps) {
         if (!field?.key || !field.dynamic) continue;
         if (
           publicOnly
-          && String(field.confidentiality || "public").trim().toLowerCase() === "restricted"
+          && String(field.confidentiality || "").trim().toLowerCase() !== "public"
         ) continue;
         fieldKeys.add(field.key);
       }
@@ -101,6 +155,26 @@ function registerCarrierSecurityRoutes(app, deps) {
       }
     }
     return values;
+  }
+
+  async function appendDynamicValues(dppId, entries) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      for (const [fieldKey, value] of entries) {
+        await client.query(
+          `INSERT INTO "passportDynamicValues" ("passportDppId", "fieldKey", value, "updatedAt")
+           VALUES ($1, $2, $3, NOW())`,
+          [dppId, fieldKey, value]
+        );
+      }
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   function buildPublicCarrierAuthenticityResponseFields(value) {
@@ -177,9 +251,9 @@ function registerCarrierSecurityRoutes(app, deps) {
       const currentPassportResult = await pool.query(
         `SELECT "dppId", "internalAliasId", "modelName", "releaseStatus", "companyId", "carrierAuthenticity"
          FROM ${tableName}
-         WHERE "dppId" = $1 AND "deletedAt" IS NULL
+         WHERE id = $1
          LIMIT 1`,
-        [req.params.dppId]
+        [passportContext.passportRowId]
       );
       if (!currentPassportResult.rows.length) {
         return res.status(404).json({ error: "Passport not found" });
@@ -211,8 +285,8 @@ function registerCarrierSecurityRoutes(app, deps) {
          SET "qrCode" = $1,
              "carrierAuthenticity" = $2,
              "updatedAt" = NOW()
-         WHERE "dppId" = $3`,
-        [qrCode, buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity), req.params.dppId]
+         WHERE id = $3`,
+        [qrCode, buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity), passportContext.passportRowId]
       );
       await logAudit(
         passportCompanyId,
@@ -247,8 +321,9 @@ function registerCarrierSecurityRoutes(app, deps) {
       const r = await pool.query(
         `SELECT "qrCode", "carrierAuthenticity"
          FROM ${passportContext.tableName}
-         WHERE "dppId" = $1 AND "deletedAt" IS NULL LIMIT 1`,
-        [dppId]
+         WHERE id = $1
+         LIMIT 1`,
+        [passportContext.passportRowId]
       );
       if (!r.rows.length || !r.rows[0].qrCode) return res.status(404).json({ error: "QR code not found" });
 
@@ -264,20 +339,17 @@ function registerCarrierSecurityRoutes(app, deps) {
   app.post("/api/companies/:companyId/passports/:dppId/data-carrier-verifications", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
-      const reg = await pool.query(
-        `SELECT "companyId", "passportType" FROM "passportRegistry" WHERE "dppId" = $1 LIMIT 1`,
-        [dppId]
-      );
-      if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
-      if (String(reg.rows[0].companyId) !== String(companyId)) return res.status(404).json({ error: "Passport not found" });
-
-      const tableName = getTable(reg.rows[0].passportType);
+      const passportContext = await loadPassportContext(dppId);
+      if (!passportContext || String(passportContext.companyId) !== String(companyId)) {
+        return res.status(404).json({ error: "Passport not found" });
+      }
+      const tableName = passportContext.tableName;
       const current = await pool.query(
         `SELECT "carrierAuthenticity"
          FROM ${tableName}
-         WHERE "dppId" = $1 AND "deletedAt" IS NULL
+         WHERE id = $1
          LIMIT 1`,
-        [dppId]
+        [passportContext.passportRowId]
       );
       if (!current.rows.length) return res.status(404).json({ error: "Passport not found" });
 
@@ -295,8 +367,8 @@ function registerCarrierSecurityRoutes(app, deps) {
         `UPDATE ${tableName}
          SET "carrierAuthenticity" = $1,
              "updatedAt" = NOW()
-         WHERE "dppId" = $2`,
-        [buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity), dppId]
+         WHERE id = $2`,
+        [buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity), passportContext.passportRowId]
       );
 
       await recordPassportSecurityEvent({
@@ -361,7 +433,9 @@ function registerCarrierSecurityRoutes(app, deps) {
       if (!passportContext) return res.status(404).json({ error: "Passport not found" });
       const allowedFieldKeys = await getAuthorizedDynamicFieldKeys(req, passportContext);
       if (!allowedFieldKeys) return res.status(404).json({ error: "Passport type not found" });
-      return res.json({ values: await loadLatestDynamicValues(dppId, allowedFieldKeys) });
+      return res.json({
+        values: secureDynamicLinks(await loadLatestDynamicValues(dppId, allowedFieldKeys), dppId),
+      });
     } catch (error) {
       return res.status(error.statusCode || 500).json({
         error: error.statusCode ? error.message : "Failed to fetch dynamic values",
@@ -372,7 +446,7 @@ function registerCarrierSecurityRoutes(app, deps) {
   app.get("/api/public/passports/:dppId/dynamic-values/:fieldKey/history", publicReadRateLimit, securityGroupReadLimiter, async (req, res) => {
     try {
       const { dppId, fieldKey } = req.params;
-      const limit = Math.min(parseInt(req.query.limit, 10) || 500, 2000);
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 500, 1), 2000);
       const passportContext = await loadPassportContext(dppId, { publicOnly: true });
       if (!passportContext) return res.status(404).json({ error: "Passport not found" });
       const allowedFieldKeys = await getAuthorizedDynamicFieldKeys(req, passportContext);
@@ -382,7 +456,13 @@ function registerCarrierSecurityRoutes(app, deps) {
         `SELECT value, "updatedAt" FROM "passportDynamicValues" WHERE "passportDppId" = $1 AND "fieldKey" = $2 ORDER BY "updatedAt" ASC LIMIT $3`,
         [dppId, fieldKey, limit]
       );
-      res.json({ history: r.rows.map((row) => ({ value: row.value, updatedAt: row.updatedAt })) });
+      res.json({
+        history: secureDynamicLinks(
+          r.rows.map((row) => ({ value: row.value, updatedAt: row.updatedAt })),
+          dppId,
+          fieldKey
+        ),
+      });
     } catch (error) {
       res.status(error.statusCode || 500).json({
         error: error.statusCode ? error.message : "Failed to fetch history",
@@ -399,7 +479,9 @@ function registerCarrierSecurityRoutes(app, deps) {
       }
       const dynamicFieldKeys = await getDynamicFieldKeys(passportContext.passportType);
       if (!dynamicFieldKeys) return res.status(404).json({ error: "Passport type not found" });
-      return res.json({ values: await loadLatestDynamicValues(dppId, dynamicFieldKeys) });
+      return res.json({
+        values: secureDynamicLinks(await loadLatestDynamicValues(dppId, dynamicFieldKeys), dppId),
+      });
     } catch {
       return res.status(500).json({ error: "Failed to fetch dynamic values" });
     }
@@ -408,7 +490,7 @@ function registerCarrierSecurityRoutes(app, deps) {
   app.get("/api/companies/:companyId/passports/:dppId/dynamic-values/:fieldKey/history", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const { companyId, dppId, fieldKey } = req.params;
-      const limit = Math.min(parseInt(req.query.limit, 10) || 500, 2000);
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 500, 1), 2000);
       const passportContext = await loadPassportContext(dppId);
       if (!passportContext || String(passportContext.companyId) !== String(companyId)) {
         return res.status(404).json({ error: "Passport not found" });
@@ -425,74 +507,66 @@ function registerCarrierSecurityRoutes(app, deps) {
         [dppId, fieldKey, limit]
       );
       return res.json({
-        history: result.rows.map((row) => ({ value: row.value, updatedAt: row.updatedAt })),
+        history: secureDynamicLinks(
+          result.rows.map((row) => ({ value: row.value, updatedAt: row.updatedAt })),
+          dppId,
+          fieldKey
+        ),
       });
     } catch {
       return res.status(500).json({ error: "Failed to fetch history" });
     }
   });
 
-  app.post("/api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values", authenticateToken, resolveIntegrationCompanySlug, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values", requireBearerToken, authenticateToken, integrationWriteRateLimit, resolveIntegrationCompanySlug, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
-
-      const reg = await pool.query(
-        `SELECT "companyId" AS "companyId" FROM "passportRegistry" WHERE "dppId" = $1`,
-        [dppId]
-      );
-      if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
-      if (String(reg.rows[0].companyId) !== String(companyId)) {
+      const passportContext = await loadPassportContext(dppId);
+      if (!passportContext || String(passportContext.companyId) !== String(companyId)) {
         return res.status(404).json({ error: "Passport not found for this company" });
       }
+      const dynamicFieldKeys = await getDynamicFieldKeys(passportContext.passportType);
+      if (!dynamicFieldKeys) return res.status(404).json({ error: "Passport type not found" });
+      const entries = normalizeDynamicValueEntries(req.body, dynamicFieldKeys);
+      await appendDynamicValues(dppId, entries);
+      await logAudit(companyId, req.user.userId, "updateDynamicValues", "passportDynamicValues", dppId, null, {
+        fieldKeys: entries.map(([fieldKey]) => fieldKey),
+      }).catch((error) => {
+        logger?.warn?.({ err: error, companyId, dppId }, "Failed to audit integration dynamic value update");
+      });
 
-      const updates = req.body;
-      if (!updates || typeof updates !== "object" || Array.isArray(updates)) {
-        return res.status(400).json({ error: "Body must be an object of { fieldKey: value }" });
-      }
-
-      const entries = Object.entries(updates).filter(([k]) => /^[a-z][A-Za-z0-9]{0,99}$/.test(k));
-      if (!entries.length) return res.status(400).json({ error: "No valid field keys provided" });
-
-      for (const [fieldKey, value] of entries) {
-        let storedValue = value;
-        if (value !== null && value !== undefined) {
-          if (Array.isArray(value) || typeof value === "object") storedValue = JSON.stringify(value);
-          else storedValue = String(value);
-        }
-        await pool.query(
-          `INSERT INTO "passportDynamicValues" ("passportDppId", "fieldKey", value, "updatedAt") VALUES ($1, $2, $3, NOW())`,
-          [dppId, fieldKey, storedValue]
-        );
-      }
-
-      res.json({ success: true, updated: entries.map(([k]) => k) });
-    } catch {
-      res.status(500).json({ error: "Failed to update dynamic values" });
+      res.json({ success: true, updated: entries.map(([fieldKey]) => fieldKey) });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        error: error.statusCode ? error.message : "Failed to update dynamic values",
+      });
     }
   });
 
   app.patch("/api/companies/:companyId/passports/:dppId/dynamic-values", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { dppId } = req.params;
-      const updates = req.body;
-      if (!updates || typeof updates !== "object" || Array.isArray(updates)) {
-        return res.status(400).json({ error: "Body must be an object of { fieldKey: value }" });
+      const { companyId, dppId } = req.params;
+      const passportContext = await loadPassportContext(dppId);
+      if (!passportContext || String(passportContext.companyId) !== String(companyId)) {
+        return res.status(404).json({ error: "Passport not found" });
       }
-
-      const entries = Object.entries(updates).filter(([k]) => /^[a-z][A-Za-z0-9]{0,99}$/.test(k));
-      if (!entries.length) return res.status(400).json({ error: "No valid field keys provided" });
-
-      for (const [fieldKey, value] of entries) {
-        await pool.query(
-          `INSERT INTO "passportDynamicValues" ("passportDppId", "fieldKey", value, "updatedAt") VALUES ($1, $2, $3, NOW())`,
-          [dppId, fieldKey, value === null || value === undefined ? null : String(value)]
-        );
-      }
-      res.json({ success: true });
-    } catch {
-      res.status(500).json({ error: "Failed to update dynamic values" });
+      const dynamicFieldKeys = await getDynamicFieldKeys(passportContext.passportType);
+      if (!dynamicFieldKeys) return res.status(404).json({ error: "Passport type not found" });
+      const entries = normalizeDynamicValueEntries(req.body, dynamicFieldKeys);
+      await appendDynamicValues(dppId, entries);
+      await logAudit(companyId, req.user.userId, "updateDynamicValues", "passportDynamicValues", dppId, null, {
+        fieldKeys: entries.map(([fieldKey]) => fieldKey),
+      }).catch((error) => {
+        logger?.warn?.({ err: error, companyId, dppId }, "Failed to audit dashboard dynamic value update");
+      });
+      res.json({ success: true, updated: entries.map(([fieldKey]) => fieldKey) });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        error: error.statusCode ? error.message : "Failed to update dynamic values",
+      });
     }
   });
 }
 
 module.exports = registerCarrierSecurityRoutes;
+module.exports.normalizeDynamicValueEntries = normalizeDynamicValueEntries;

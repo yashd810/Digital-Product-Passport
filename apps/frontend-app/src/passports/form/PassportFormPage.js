@@ -205,7 +205,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   const effectiveCompanyId = String(
     companyId ||
     user?.companyId ||
-    user?.companyId ||
     localStorage.getItem("companyId") ||
     ""
   );

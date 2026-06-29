@@ -275,30 +275,6 @@ const normalizePassportRequestBody = (body = {}) => {
 const normalizeInternalAliasIdValue = (value) =>
   typeof value === "string" ? value.trim() : "";
 
-const internalAliasRequestArrayKeys = [
-  "internalAliasId",
-  "internalAliasIds",
-  "productIdentifiers",
-];
-
-const collectRequestedInternalAliasIds = (body = {}) => {
-  for (const key of internalAliasRequestArrayKeys) {
-    const candidate = body?.[key];
-    if (!Array.isArray(candidate)) continue;
-    return candidate
-      .map((value) => {
-        const normalized = normalizeInternalAliasIdValue(String(value ?? ""));
-        try {
-          return decodeURIComponent(normalized);
-        } catch {
-          return normalized;
-        }
-      })
-      .filter(Boolean);
-  }
-  return [];
-};
-
 const generateInternalAliasIdValue = (dppId) =>
   String(dppId || "").trim();
 
@@ -347,9 +323,8 @@ const buildCurrentPublicPassportPath = ({
   manufacturedBy = "",
   modelName = "",
   dppId = "",
-  internalAliasId = "",
 }) => {
-  const publicPassportId = String(dppId || "").trim() || normalizeInternalAliasIdValue(internalAliasId);
+  const publicPassportId = String(dppId || "").trim();
   if (!publicPassportId) return null;
   const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
   const modelSlug = slugifyRouteSegment(modelName || publicPassportId, "product");
@@ -362,10 +337,9 @@ const buildInactivePublicPassportPath = ({
   manufacturedBy = "",
   modelName = "",
   dppId = "",
-  internalAliasId = "",
   versionNumber,
 }) => {
-  const publicPassportId = String(dppId || "").trim() || normalizeInternalAliasIdValue(internalAliasId);
+  const publicPassportId = String(dppId || "").trim();
   if (!publicPassportId || versionNumber === null || versionNumber === undefined || versionNumber === "") return null;
   const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
   const modelSlug = slugifyRouteSegment(modelName || publicPassportId, "product");
@@ -377,131 +351,14 @@ const buildPreviewPassportPath = ({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  internalAliasId = "",
   previewDppId = "",
 }) => {
-  const routeKey = normalizeInternalAliasIdValue(internalAliasId) || String(previewDppId || "").trim();
+  const routeKey = String(previewDppId || "").trim();
   if (!routeKey) return null;
   const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
   const modelSlug = slugifyRouteSegment(modelName || routeKey, "product");
   return `/dpp/preview/${manufacturerSlug}/${modelSlug}/${encodeURIComponent(routeKey)}`;
 };
-
-const decodePathSegment = (value) => {
-  try {
-    return decodeURIComponent(String(value || ""));
-  } catch {
-    return String(value || "");
-  }
-};
-
-const getExplicitFacilityStableId = (passport) => extractExplicitFacilityId(passport);
-
-async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didService }) {
-  const rawPath = String(publicPath || "").trim();
-  if (!rawPath) return null;
-
-  let pathname = rawPath;
-  try {
-    pathname = new URL(rawPath, didService?.getPublicOrigin?.() || "http://localhost").pathname || rawPath;
-  } catch (_error) {
-    pathname = rawPath;
-  }
-
-  const currentMatch = pathname.match(/^\/dpp\/([^/]+)\/([^/]+)\/([^/]+)$/i);
-  const inactiveMatch = pathname.match(/^\/dpp\/inactive\/([^/]+)\/([^/]+)\/([^/]+)\/([^/]+)$/i);
-  const match = inactiveMatch || currentMatch;
-  if (!match) return null;
-
-  const manufacturerSlug = String(match[1] || "").toLowerCase();
-  const modelSlug = String(match[2] || "").toLowerCase();
-  const internalAliasId = normalizeInternalAliasIdValue(decodePathSegment(match[3]));
-  const versionNumber = inactiveMatch ? Number.parseInt(decodePathSegment(match[4]), 10) : null;
-  if (!internalAliasId) return null;
-
-  const companyRows = await pool.query(
-    `SELECT id,
-            "companyName" AS "companyName",
-            "didSlug" AS "didSlug"
-     FROM companies
-     ORDER BY id ASC`
-  );
-
-  const matchingCompanies = companyRows.rows.filter((company) => {
-    const companySlug = String(company.didSlug || "").trim().toLowerCase();
-    const nameSlug = slugifyRouteSegment(company.companyName || "", "manufacturer");
-    return companySlug === manufacturerSlug || nameSlug === manufacturerSlug;
-  });
-  if (!matchingCompanies.length) return null;
-
-  for (const company of matchingCompanies) {
-    const registryRows = await pool.query(
-      `SELECT "dppId", "passportType"
-       FROM "passportRegistry"
-       WHERE "companyId" = $1
-       ORDER BY "createdAt" DESC`,
-      [company.id]
-    );
-
-    for (const registryRow of registryRows.rows) {
-      const tableName = getTable(registryRow.passportType);
-      try {
-        const params = [company.id, internalAliasId];
-        let versionClause = "";
-        let statusClause = `"releaseStatus" = 'released'`;
-
-        if (Number.isFinite(versionNumber)) {
-          params.push(versionNumber);
-          versionClause = ` AND "versionNumber" = $${params.length}`;
-          statusClause = `"releaseStatus" IN ('released', 'obsolete')`;
-        }
-
-        const row = await pool.query(
-          `SELECT *
-           FROM ${tableName}
-           WHERE "companyId" = $1
-             AND "internalAliasId" = $2
-             AND "deletedAt" IS NULL
-             AND ${statusClause}${versionClause}
-           ORDER BY "versionNumber" DESC, "updatedAt" DESC
-           LIMIT 1`,
-          params
-        );
-        const passport = normalizePassportRow(row.rows[0]);
-        if (!passport) continue;
-
-        const actualModelSlug = slugifyRouteSegment(passport.modelName || passport.internalAliasId, "product");
-        if (actualModelSlug !== modelSlug) continue;
-
-        const stableId = didService.normalizeStableId(passport.lineageId || passport.dppId);
-        const granularity = didService.normalizeGranularity(passport.granularity || "model");
-        const companySlug = didService.normalizeCompanySlug(company.companyName || company.didSlug || `company-${company.id}`);
-        const facilityStableId = getExplicitFacilityStableId(passport);
-
-        const subjectNamespace = didService.normalizePassportTypeSegment(company.companyName || company.didSlug || "passport");
-        return {
-          passportDppId: passport.dppId,
-          passportType: registryRow.passportType,
-          companyId: company.id,
-          productDid: granularity === "item"
-            ? didService.generateItemDid(subjectNamespace, stableId)
-            : granularity === "batch"
-              ? didService.generateBatchDid(subjectNamespace, stableId)
-              : didService.generateModelDid(subjectNamespace, stableId),
-          dppDid: didService.generateDppDid(granularity, stableId),
-          companyDid: didService.generateCompanyDid(companySlug),
-          facilityDid: facilityStableId ? didService.generateFacilityDid(facilityStableId) : null,
-          granularity,
-          canonicalPath: pathname,
-        };
-      } catch {
-        continue;
-      }
-    }
-  }
-
-  return null;
-}
 
 const coerceBulkFieldValue = (fieldDef, rawValue) => {
   if (rawValue === null || rawValue === undefined) return rawValue;
@@ -539,7 +396,7 @@ const coerceBulkFieldValue = (fieldDef, rawValue) => {
 
 const getHistoryFieldDefs = (typeRow) => {
   const baseFields = [
-    { key: "modelName", label: "Model Name", type: "text" },
+    { key: "modelName", label: "Model Name", type: "text", confidentiality: "public" },
     { key: "internalAliasId", label: "Internal Alias ID", type: "text" },
   ];
   const schemaFields = (typeRow?.fieldsJson?.sections || [])
@@ -712,7 +569,6 @@ module.exports = {
   toStoredPassportValue,
   normalizePassportRequestBody,
   normalizeInternalAliasIdValue,
-  collectRequestedInternalAliasIds,
   generateInternalAliasIdValue,
   extractExplicitFacilityId,
   getWritablePassportColumns,
@@ -721,7 +577,6 @@ module.exports = {
   buildCurrentPublicPassportPath,
   buildInactivePublicPassportPath,
   buildPreviewPassportPath,
-  resolvePublicPathToSubjects,
   coerceBulkFieldValue,
   getHistoryFieldDefs,
   formatHistoryFieldValue,

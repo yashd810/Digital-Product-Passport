@@ -4,6 +4,9 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const logger = require("./logger");
+const {
+  buildPublicPassportSnapshot,
+} = require("../shared/passports/public-passport-snapshot");
 
 function toBoolean(value, fallback = false) {
   if (value === undefined || value === null || value === "") return fallback;
@@ -249,7 +252,7 @@ module.exports = function createBackupProviderService({
       providerType: normalizeText(process.env.BACKUP_PROVIDER_TYPE, "ociObjectStorage"),
       displayName: normalizeText(process.env.BACKUP_PROVIDER_DISPLAY_NAME, "OCI Object Storage Backup"),
       objectPrefix: normalizeObjectPrefix(process.env.BACKUP_PROVIDER_OBJECT_PREFIX),
-      publicBaseUrl: normalizeText(process.env.BACKUP_PROVIDER_PUBLIC_BASE_URL || process.env.STORAGE_S3_PUBLIC_BASE_URL, ""),
+      publicBaseUrl: normalizeText(process.env.BACKUP_PROVIDER_PUBLIC_BASE_URL, ""),
       supportsPublicHandover: toBoolean(process.env.BACKUP_PROVIDER_SUPPORTS_PUBLIC_HANDOVER, true),
       configJson: {
         region: normalizeText(process.env.BACKUP_PROVIDER_REGION || process.env.STORAGE_S3_REGION, ""),
@@ -265,31 +268,30 @@ module.exports = function createBackupProviderService({
 
   function mapPublicHandoverRow(row) {
     if (!row) return null;
-    const publicRowData = parseStoredJson(row.publicRowData ?? row.publicRowData, {});
+    const publicRowData = parseStoredJson(row.publicRowData, {});
     return {
       ...row,
-      companyId: row.companyId ?? row.companyId ?? null,
-      passportDppId: row.passportDppId ?? row.passportDppId ?? null,
-      lineageId: row.lineageId ?? row.lineageId ?? null,
-      passportType: row.passportType ?? row.passportType ?? null,
-      internalAliasId: row.internalAliasId ?? row.internalAliasId ?? null,
-      versionNumber: row.versionNumber ?? row.versionNumber ?? null,
-      backupProviderId: row.backupProviderId ?? row.backupProviderId ?? null,
-      backupProviderKey: row.backupProviderKey ?? row.backupProviderKey ?? null,
-      sourceReplicationId: row.sourceReplicationId ?? row.sourceReplicationId ?? null,
-      storageKey: row.storageKey ?? row.storageKey ?? null,
-      publicUrl: row.publicUrl ?? row.publicUrl ?? null,
-      publicCompanyName: row.publicCompanyName ?? row.publicCompanyName ?? null,
-      publicRowData,
+      companyId: row.companyId ?? null,
+      passportDppId: row.passportDppId ?? null,
+      lineageId: row.lineageId ?? null,
+      passportType: row.passportType ?? null,
+      internalAliasId: row.internalAliasId ?? null,
+      versionNumber: row.versionNumber ?? null,
+      backupProviderId: row.backupProviderId ?? null,
+      backupProviderKey: row.backupProviderKey ?? null,
+      sourceReplicationId: row.sourceReplicationId ?? null,
+      storageKey: row.storageKey ?? null,
+      publicUrl: row.publicUrl ?? null,
+      publicCompanyName: row.publicCompanyName ?? null,
       publicRowData: publicRowData,
-      handoverStatus: row.handoverStatus ?? row.handoverStatus ?? null,
-      verificationStatus: row.verificationStatus ?? row.verificationStatus ?? null,
-      activatedBy: row.activatedBy ?? row.activatedBy ?? null,
-      deactivatedBy: row.deactivatedBy ?? row.deactivatedBy ?? null,
-      activatedAt: row.activatedAt ?? row.activatedAt ?? null,
-      deactivatedAt: row.deactivatedAt ?? row.deactivatedAt ?? null,
-      createdAt: row.createdAt ?? row.createdAt ?? null,
-      updatedAt: row.updatedAt ?? row.updatedAt ?? null,
+      handoverStatus: row.handoverStatus ?? null,
+      verificationStatus: row.verificationStatus ?? null,
+      activatedBy: row.activatedBy ?? null,
+      deactivatedBy: row.deactivatedBy ?? null,
+      activatedAt: row.activatedAt ?? null,
+      deactivatedAt: row.deactivatedAt ?? null,
+      createdAt: row.createdAt ?? null,
+      updatedAt: row.updatedAt ?? null,
     };
   }
 
@@ -343,6 +345,7 @@ module.exports = function createBackupProviderService({
     provider
   }) {
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, { companyName });
+    const publicRowData = buildPublicPassportSnapshot(passport, typeDef);
     return {
       backupProvider: {
         providerKey: provider.providerKey,
@@ -368,6 +371,7 @@ module.exports = function createBackupProviderService({
         mandatoryDocumentCount: 0,
         publicDocumentCount: 0,
       },
+      publicRowData,
       passport: canonicalPayload
     };
   }
@@ -387,14 +391,11 @@ module.exports = function createBackupProviderService({
   function buildAttachmentStorageKey({ provider, passport, attachment, fallbackFieldKey = "document" }) {
     const lineageId = normalizeText(passport.lineageId || passport.dppId || "unknown-lineage", "unknown-lineage");
     const versionNumber = Number(passport.versionNumber) || 1;
-    const fieldKey = normalizeStorageSegment(attachment?.fieldKey || attachment?.fieldKey || fallbackFieldKey, "document");
-    const publicId = normalizeStorageSegment(attachment?.publicId || attachment?.publicId || Date.now(), "document");
+    const fieldKey = normalizeStorageSegment(attachment?.fieldKey || fallbackFieldKey, "document");
+    const publicId = normalizeStorageSegment(attachment?.publicId || Date.now(), "document");
     const ext = path.extname(String(
       attachment?.storageKey ||
-      attachment?.storageKey ||
       attachment?.filePath ||
-      attachment?.filePath ||
-      attachment?.fileUrl ||
       attachment?.fileUrl ||
       ""
     )).toLowerCase();
@@ -1495,7 +1496,9 @@ module.exports = function createBackupProviderService({
       if (!company || company.isActive !== false) continue;
 
       const payloadJson = parseStoredJson(replication.payloadJson, {});
-      const publicRowData = payloadJson?.passport && typeof payloadJson.passport === "object" ? payloadJson.passport : null;
+      const publicRowData = payloadJson?.publicRowData && typeof payloadJson.publicRowData === "object"
+        ? payloadJson.publicRowData
+        : null;
       const payloadSource = payloadJson?.source && typeof payloadJson.source === "object" ? payloadJson.source : {};
       if (!publicRowData) continue;
 

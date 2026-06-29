@@ -28,19 +28,26 @@ module.exports = function registerDeleteRoutes(app, deps) {
     await client.query("DELETE FROM \"passportSecurityEvents\" WHERE \"passportDppId\" = $1", [dppId]);
     await client.query("DELETE FROM \"passportEditSessions\" WHERE \"passportDppId\" = $1", [dppId]);
 
-    if (rowId) {
-      return client.query(
+    const deleted = rowId
+      ? await client.query(
         `DELETE FROM ${tableName} WHERE id = $1 AND "releaseStatus" = 'draft' AND "deletedAt" IS NULL RETURNING "dppId"`,
         [rowId]
+      )
+      : await client.query(
+        `DELETE FROM ${tableName}
+         WHERE "dppId" = $1${companyId ? " AND \"companyId\" = $2" : ""} AND "releaseStatus" = 'draft' AND "deletedAt" IS NULL
+         RETURNING "dppId"`,
+        companyId ? [dppId, companyId] : [dppId]
+      );
+
+    if (deleted.rows.length) {
+      await client.query(
+        `DELETE FROM "passportRegistry"
+         WHERE "dppId" = $1${companyId ? " AND \"companyId\" = $2" : ""}`,
+        companyId ? [dppId, companyId] : [dppId]
       );
     }
-
-    return client.query(
-      `DELETE FROM ${tableName}
-       WHERE "dppId" = $1${companyId ? " AND \"companyId\" = $2" : ""} AND "releaseStatus" = 'draft' AND "deletedAt" IS NULL
-       RETURNING "dppId"`,
-      companyId ? [dppId, companyId] : [dppId]
-    );
+    return deleted;
   }
 
   app.delete("/api/companies/:companyId/passports/:dppId", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
@@ -52,9 +59,12 @@ module.exports = function registerDeleteRoutes(app, deps) {
       const tableName = getTable(passportType);
       const existingRes = await pool.query(
         `SELECT * FROM ${tableName}
-         WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
+         WHERE "dppId" = $1
+           AND "companyId" = $2
+           AND "releaseStatus" IN ${editableReleaseStatusesSql}
+           AND "deletedAt" IS NULL
          LIMIT 1`,
-        [dppId]
+        [dppId, companyId]
       );
       if (existingRes.rows.length) {
         const isDraft = existingRes.rows[0].releaseStatus === "draft";
@@ -62,7 +72,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
           const client = await pool.connect();
           try {
             await client.query("BEGIN");
-            const deleted = await hardDeleteDraftPassport(client, { dppId, tableName });
+            const deleted = await hardDeleteDraftPassport(client, { dppId, tableName, companyId });
             await client.query("COMMIT");
             if (!deleted.rows.length) return res.status(404).json({ error: "Passport not found or cannot delete" });
             await logAudit(companyId, req.user.userId, "hardDelete", tableName, dppId, { dppId }, null);
@@ -86,9 +96,12 @@ module.exports = function registerDeleteRoutes(app, deps) {
 
       const result = await pool.query(
         `UPDATE ${tableName} SET "deletedAt" = NOW()
-         WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
+         WHERE "dppId" = $1
+           AND "companyId" = $2
+           AND "releaseStatus" IN ${editableReleaseStatusesSql}
+           AND "deletedAt" IS NULL
          RETURNING "dppId"`,
-        [dppId]
+        [dppId, companyId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Passport not found or cannot delete a released passport" });
       await logAudit(companyId, req.user.userId, "delete", tableName, dppId, { dppId }, null);

@@ -15,8 +15,8 @@ function getManufacturerSegment({ companyName = "", manufacturerName = "", manuf
   return slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
 }
 
-function getModelSegment({ modelName = "", internalAliasId = "", previewId = "" }) {
-  return slugifyRouteSegment(modelName || internalAliasId || previewId, "product");
+function getModelSegment({ modelName = "", routeId = "" }) {
+  return slugifyRouteSegment(modelName || routeId, "product");
 }
 
 export function buildPublicPassportPath({
@@ -25,11 +25,10 @@ export function buildPublicPassportPath({
   manufacturedBy = "",
   modelName = "",
   dppId = "",
-  internalAliasId = "",
 }) {
-  const publicPassportId = String(dppId || "").trim() || String(internalAliasId || "").trim();
+  const publicPassportId = String(dppId || "").trim();
   if (!publicPassportId) return null;
-  return `/dpp/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, internalAliasId: publicPassportId })}/${encodeURIComponent(publicPassportId)}`;
+  return `/dpp/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, routeId: publicPassportId })}/${encodeURIComponent(publicPassportId)}`;
 }
 
 export function buildTechnicalPassportPath({
@@ -38,7 +37,6 @@ export function buildTechnicalPassportPath({
   manufacturedBy = "",
   modelName = "",
   dppId = "",
-  internalAliasId = "",
 }) {
   return buildPublicPassportPath({
     companyName,
@@ -46,7 +44,6 @@ export function buildTechnicalPassportPath({
     manufacturedBy,
     modelName,
     dppId,
-    internalAliasId,
   });
 }
 
@@ -56,12 +53,11 @@ export function buildInactivePassportPath({
   manufacturedBy = "",
   modelName = "",
   dppId = "",
-  internalAliasId = "",
   versionNumber = "",
 }) {
-  const publicPassportId = String(dppId || "").trim() || String(internalAliasId || "").trim();
+  const publicPassportId = String(dppId || "").trim();
   if (!publicPassportId || versionNumber === null || versionNumber === undefined || versionNumber === "") return null;
-  return `/dpp/inactive/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, internalAliasId: publicPassportId })}/${encodeURIComponent(publicPassportId)}/${encodeURIComponent(versionNumber)}`;
+  return `/dpp/inactive/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, routeId: publicPassportId })}/${encodeURIComponent(publicPassportId)}/${encodeURIComponent(versionNumber)}`;
 }
 
 export function buildInactiveTechnicalPassportPath({
@@ -70,7 +66,6 @@ export function buildInactiveTechnicalPassportPath({
   manufacturedBy = "",
   modelName = "",
   dppId = "",
-  internalAliasId = "",
   versionNumber = "",
 }) {
   return buildInactivePassportPath({
@@ -79,7 +74,6 @@ export function buildInactiveTechnicalPassportPath({
     manufacturedBy,
     modelName,
     dppId,
-    internalAliasId,
     versionNumber,
   });
 }
@@ -89,12 +83,11 @@ export function buildPreviewPassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  internalAliasId = "",
   previewId = "",
 }) {
-  const routeKey = internalAliasId || previewId;
+  const routeKey = String(previewId || "").trim();
   if (!routeKey) return null;
-  return `/dpp/preview/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, internalAliasId: routeKey, previewId })}/${encodeURIComponent(routeKey)}`;
+  return `/dpp/preview/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, routeId: routeKey })}/${encodeURIComponent(routeKey)}`;
 }
 
 export function buildPreviewTechnicalPassportPath({
@@ -102,7 +95,6 @@ export function buildPreviewTechnicalPassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  internalAliasId = "",
   previewId = "",
 }) {
   return buildPreviewPassportPath({
@@ -110,7 +102,6 @@ export function buildPreviewTechnicalPassportPath({
     manufacturerName,
     manufacturedBy,
     modelName,
-    internalAliasId,
     previewId,
   });
 }

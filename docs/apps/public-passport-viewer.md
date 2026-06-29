@@ -24,14 +24,19 @@ That means:
 
 ## Main Route Families
 
-- `/p/:internalAliasId`
-- `/p/inactive/:internalAliasId/:versionNumber`
-- `/dpp/:manufacturerSlug/:modelSlug/:internalAliasId`
-- `/dpp/inactive/:manufacturerSlug/:modelSlug/:internalAliasId/:versionNumber`
+- `/p/:dppId`
+- `/p/inactive/:dppId/:versionNumber`
+- `/dpp/:manufacturerSlug/:modelSlug/:dppId`
+- `/dpp/inactive/:manufacturerSlug/:modelSlug/:dppId/:versionNumber`
 
 ## Backend Endpoints It Depends On
 
 Mostly public backend routes from:
 
 - [apps/backend-api/src/http/routes/passport-public.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/passport-public.js:12)
-- [apps/backend-api/src/http/routes/dpp-api.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/dpp-api.js:26)
+- [apps/backend-api/src/modules/passports/register-carrier-security-routes.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/modules/passports/register-carrier-security-routes.js:417)
+- [apps/backend-api/src/bootstrap/support-routes.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/bootstrap/support-routes.js:99)
+
+Public attachments use `/public-files/:publicId`. Restricted file fields receive
+short-lived `/public-files/access/:token` links only after a valid security group
+key authorises that exact DPP and field.

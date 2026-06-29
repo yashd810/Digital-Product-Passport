@@ -19,6 +19,14 @@ function createArchiveHistoryHelpers({
   getPassportVersionsByLineage,
   getCompanyNameMap,
 }) {
+  const publicHistoryExcludedFieldKeys = new Set([
+    "internalAliasId",
+    "companyId",
+    "createdBy",
+    "updatedBy",
+    "deletedAt",
+  ]);
+
   function buildArchiveSnapshotRow(passport) {
     if (!passport || typeof passport !== "object") return null;
     const rowData = { ...passport };
@@ -116,6 +124,8 @@ function createArchiveHistoryHelpers({
     passportType,
     companyId = null,
     publicOnly = false,
+    allowedRestrictedFieldKeys = [],
+    allowedRestrictedPassportDppIds = [],
   }) {
     const typeRes = await pool.query(
       'SELECT "displayName" AS "displayName", "fieldsJson" AS "fieldsJson" FROM "passportTypes" WHERE "typeName" = $1',
@@ -123,6 +133,30 @@ function createArchiveHistoryHelpers({
     );
     const typeRow = typeRes.rows[0] || null;
     const fieldDefs = getHistoryFieldDefs(typeRow);
+    const allowedRestrictedFields = new Set(
+      (Array.isArray(allowedRestrictedFieldKeys) ? allowedRestrictedFieldKeys : [])
+        .map((fieldKey) => String(fieldKey || "").trim())
+        .filter(Boolean)
+    );
+    const unrestrictedPassportScope = allowedRestrictedPassportDppIds === null;
+    const allowedRestrictedPassports = new Set(
+      (Array.isArray(allowedRestrictedPassportDppIds) ? allowedRestrictedPassportDppIds : [])
+        .map((passportDppId) => String(passportDppId || "").trim())
+        .filter(Boolean)
+    );
+    const visibleFieldDefs = publicOnly
+      ? fieldDefs.filter((field) => {
+          const fieldKey = String(field?.key || "");
+          const confidentiality = String(field?.confidentiality || "").trim().toLowerCase();
+          return (
+            !publicHistoryExcludedFieldKeys.has(fieldKey)
+            && (
+              confidentiality === "public"
+              || (confidentiality === "restricted" && allowedRestrictedFields.has(fieldKey))
+            )
+          );
+        })
+      : fieldDefs;
 
     const lineageContext = await getPassportLineageContext({ dppId, passportType, companyId });
     if (!lineageContext?.lineageId) {
@@ -139,7 +173,9 @@ function createArchiveHistoryHelpers({
       companyId,
     });
 
-    const creatorIds = [...new Set(versions.map((row) => row.createdBy).filter(Boolean))];
+    const creatorIds = publicOnly
+      ? []
+      : [...new Set(versions.map((row) => row.createdBy).filter(Boolean))];
     const creatorMap = new Map();
     const companyNameMap = await getCompanyNameMap(versions.map((row) => row.companyId).filter(Boolean));
     if (creatorIds.length) {
@@ -193,7 +229,20 @@ function createArchiveHistoryHelpers({
         if (publicOnly && (!defaultPublic || !isPublic)) return null;
 
         const changedFields = previous
-          ? fieldDefs.flatMap((field) => {
+          ? visibleFieldDefs.flatMap((field) => {
+              const restrictedField =
+                String(field?.confidentiality || "").trim().toLowerCase() === "restricted";
+              if (
+                publicOnly
+                && restrictedField
+                && !unrestrictedPassportScope
+                && (
+                  !allowedRestrictedPassports.has(String(version.dppId || ""))
+                  || !allowedRestrictedPassports.has(String(previous.dppId || ""))
+                )
+              ) {
+                return [];
+              }
               const beforeComparable = comparableHistoryFieldValue(field, previous[field.key]);
               const afterComparable = comparableHistoryFieldValue(field, version[field.key]);
               if (beforeComparable === afterComparable) return [];
@@ -211,7 +260,7 @@ function createArchiveHistoryHelpers({
           releaseStatus: normalizedStatus,
           createdAt: version.createdAt,
           updatedAt: version.updatedAt,
-          createdByName: creatorMap.get(version.createdBy) || null,
+          ...(publicOnly ? {} : { createdByName: creatorMap.get(version.createdBy) || null }),
           isPublic,
           dppId: version.dppId,
           publicPath: buildCurrentPublicPassportPath({
@@ -220,7 +269,6 @@ function createArchiveHistoryHelpers({
             manufacturedBy: version.manufacturedBy,
             modelName: version.modelName,
             dppId: version.dppId,
-            internalAliasId: version.internalAliasId,
           }),
           inactivePath: buildInactivePublicPassportPath({
             companyName: companyNameMap.get(String(version.companyId)) || "",
@@ -228,7 +276,6 @@ function createArchiveHistoryHelpers({
             manufacturedBy: version.manufacturedBy,
             modelName: version.modelName,
             dppId: version.dppId,
-            internalAliasId: version.internalAliasId,
             versionNumber,
           }),
           changedFields,

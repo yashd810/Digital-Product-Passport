@@ -1,5 +1,9 @@
 "use strict";
 
+const {
+  decodePassportAttachmentAccessToken,
+} = require("../shared/repository/repository-file-links");
+
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
   "&": "&amp;",
   "<": "&lt;",
@@ -9,6 +13,10 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => 
 }[char]));
 
 const normalizeHeaderText = (value) => String(value ?? "").replace(/[\r\n]+/g, " ").trim();
+
+function isPublicStorageKey(value) {
+  return /^uploads\/symbols\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(String(value || ""));
+}
 
 function registerSupportRoutes(app, deps) {
   const {
@@ -29,9 +37,9 @@ function registerSupportRoutes(app, deps) {
   } = deps;
 
   if (storageService.isLocal) {
-    app.use("/storage", (req, res, next) => {
+    app.use("/storage", publicReadRateLimit, (req, res, next) => {
       const storageKey = normalizeStorageRequestKey(req.path);
-      if (isPassportStorageKey(storageKey) || storageKey.startsWith("repository-files/")) {
+      if (!isPublicStorageKey(storageKey)) {
         return res.status(404).json({ error: "File not found" });
       }
       next();
@@ -59,10 +67,10 @@ function registerSupportRoutes(app, deps) {
   }
 
   if (!storageService.isLocal && storageService.fetchObject) {
-    app.get(/^\/storage\/(.+)$/, async (req, res) => {
+    app.get(/^\/storage\/(.+)$/, publicReadRateLimit, async (req, res) => {
       const storageKey = normalizeStorageRequestKey(req.params[0]);
       if (!storageKey) return res.status(400).json({ error: "Storage key required" });
-      if (isPassportStorageKey(storageKey) || storageKey.startsWith("repository-files/")) {
+      if (!isPublicStorageKey(storageKey)) {
         return res.status(404).json({ error: "Stored object not found" });
       }
       try {
@@ -92,7 +100,7 @@ function registerSupportRoutes(app, deps) {
     });
   }
 
-  app.get("/public-files/:publicId", publicReadRateLimit, async (req, res) => {
+  async function servePassportAttachment(req, res, { requirePublic = true } = {}) {
     try {
       const { publicId } = req.params;
       if (!/^[a-zA-Z0-9_-]{8,24}$/.test(publicId)) {
@@ -107,36 +115,42 @@ function registerSupportRoutes(app, deps) {
                 "filePath",
                 "storageKey"
          FROM "passportAttachments"
-         WHERE "publicId" = $1`,
-        [publicId]
+         WHERE "publicId" = $1
+           ${req.attachmentAccess
+             ? 'AND "passportDppId" = $2 AND "fieldKey" = $3'
+             : ""}`,
+        req.attachmentAccess
+          ? [publicId, req.attachmentAccess.passportDppId, req.attachmentAccess.fieldKey]
+          : [publicId]
       );
       if (!row.rows.length) return res.status(404).json({ error: "File not found" });
 
       const attachment = row.rows[0];
-      if (!attachment.isPublic) {
+      if (requirePublic && !attachment.isPublic) {
         return res.status(404).json({ error: "File not found" });
       }
 
       res.setHeader("X-Content-Type-Options", "nosniff");
-      res.setHeader("Cache-Control", "public, max-age=300");
+      res.setHeader("Cache-Control", requirePublic ? "public, max-age=300" : "private, max-age=60");
       res.setHeader("Cross-Origin-Resource-Policy", attachment.mimeType === "application/pdf" ? "cross-origin" : "same-site");
 
-      if (storageService.isLocal && attachment.filePath) {
+      if (attachment.filePath) {
         const safePath = path.resolve(attachment.filePath);
         if (safePath !== filesBaseDir && !safePath.startsWith(`${filesBaseDir}${path.sep}`)) {
           return res.status(404).json({ error: "File not found" });
         }
-        if (!fs.existsSync(safePath)) return res.status(404).json({ error: "File not found" });
-        const mimeType = attachment.mimeType || "application/octet-stream";
-        res.setHeader("Content-Type", mimeType);
-        if (mimeType === "application/pdf") {
-          res.setHeader("Content-Disposition", "inline");
-          res.removeHeader("X-Frame-Options");
+        if (fs.existsSync(safePath)) {
+          const mimeType = attachment.mimeType || "application/octet-stream";
+          res.setHeader("Content-Type", mimeType);
+          if (mimeType === "application/pdf") {
+            res.setHeader("Content-Disposition", "inline");
+            res.removeHeader("X-Frame-Options");
+          }
+          return res.sendFile(safePath);
         }
-        return res.sendFile(safePath);
       }
 
-      if (!storageService.isLocal && storageService.fetchObject && isPassportStorageKey(attachment.storageKey)) {
+      if (storageService.fetchObject && isPassportStorageKey(attachment.storageKey)) {
         const objectResponse = await storageService.fetchObject(attachment.storageKey);
         const contentType = objectResponse.headers?.get("content-type") || attachment.mimeType;
         const contentLength = objectResponse.headers?.get("content-length");
@@ -157,6 +171,18 @@ function registerSupportRoutes(app, deps) {
       logger.error({ err: error }, "[public-files] Failed to serve file");
       res.status(500).json({ error: "Failed to serve file" });
     }
+  }
+
+  app.get("/public-files/access/:token", publicReadRateLimit, async (req, res) => {
+    const access = decodePassportAttachmentAccessToken(req.params.token);
+    if (!access) return res.status(404).json({ error: "File not found" });
+    req.params.publicId = access.publicId;
+    req.attachmentAccess = access;
+    return servePassportAttachment(req, res, { requirePublic: false });
+  });
+
+  app.get("/public-files/:publicId", publicReadRateLimit, async (req, res) => {
+    return servePassportAttachment(req, res);
   });
 
   app.post("/api/contact", publicReadRateLimit, async (req, res) => {
@@ -254,5 +280,6 @@ function registerSupportRoutes(app, deps) {
 }
 
 module.exports = {
+  isPublicStorageKey,
   registerSupportRoutes,
 };

@@ -8,7 +8,6 @@ const {
   generateDppRecordId,
   isDppRecordId
 } = require("../../services/dpp-record-id");
-const registerDidRoutes = require("../../modules/dpp-api/register-did-routes");
 const { createRequestResponseHelpers } = require("../../modules/dpp-api/request-response-helpers");
 const { createResolutionHelpers } = require("../../modules/dpp-api/resolution-helpers");
 const registerMutationRoutes = require("../../modules/dpp-api/register-mutation-routes");
@@ -16,29 +15,22 @@ const {
   createComplianceManagedFieldHelpers,
 } = require("../../modules/passports/compliance-managed-fields");
 
-// ─── DPP API ROUTES ───────────────────────────────────────────────────────────
-// All DID paths use companyId + internalAliasId — never the record ID.
-// Conforms to the did:web spec for DID document resolution.
+// ─── COMPANY INTEGRATION DPP MUTATIONS ───────────────────────────────────────
 
 module.exports = function registerDppApiRoutes(app, {
   pool,
-  publicReadRateLimit,
   authenticateToken,
+  requireBearerToken,
+  integrationWriteRateLimit,
   requireEditor,
   getTable,
   normalizePassportRow,
   normalizeInternalAliasIdValue,
   extractExplicitFacilityId,
-  stripRestrictedFieldsForPublicView,
   getCompanyNameMap,
-  resolveReleasedPassportByInternalAliasId,
-  signingService,
-  buildOperationalDppPayload,
   buildCanonicalPassportPayload,
   buildExpandedPassportPayload,
-  buildPassportJsonLdContext,
   didService,
-  dppIdentity, // the dpp-identity-service module
   productIdentifierService,
   archivePassportSnapshot,
   updatePassportRowById,
@@ -70,25 +62,12 @@ module.exports = function registerDppApiRoutes(app, {
   const validGranularities = new Set(["model", "batch", "item"]);
   const mergePatchContentType = "application/merge-patch+json";
   const {
-    getAppUrl,
     applyStandardsResultEnvelope,
-    loadReleasedPassport,
     getRepresentationFromValue,
     buildMutationPassportPayload,
-    buildPassportResponse,
-    dbLookupByCompanyAndProduct,
-    dbLookupByInternalAliasIdOnly,
   } = createRequestResponseHelpers({
-    pool,
-    getTable,
-    normalizeInternalAliasIdValue,
-    stripRestrictedFieldsForPublicView,
-    getCompanyNameMap,
-    resolveReleasedPassportByInternalAliasId,
-    buildOperationalDppPayload,
     buildCanonicalPassportPayload,
     buildExpandedPassportPayload,
-    dppIdentity,
   });
   const {
     parseDppIdentifier,
@@ -103,17 +82,9 @@ module.exports = function registerDppApiRoutes(app, {
     getTable,
     normalizePassportRow,
     getCompanyNameMap,
-    normalizeInternalAliasIdValue,
     productIdentifierService,
     didService,
-    dppIdentity,
     isDppRecordId,
-    loadReleasedPassport,
-    dbLookupByCompanyAndProduct,
-    dbLookupByInternalAliasIdOnly,
-    buildPassportResponse,
-    getRepresentationFromValue,
-    buildPassportJsonLdContext,
   });
 
   app.use("/api/companies/:companySlug/integrations/v1", (req, res, next) => {
@@ -140,10 +111,11 @@ module.exports = function registerDppApiRoutes(app, {
     });
   }
 
-  async function buildStandardsCreateFields({ companyId, passportType, granularity, requestedFields = {} }) {
+  async function buildStandardsCreateFields({ companyId, passportType, typeDef, granularity, requestedFields = {} }) {
     return complianceManagedFieldHelpers.buildComplianceManagedFields({
       companyId,
       passportType,
+      typeDef,
       granularity,
       requestedFields,
       allowDefaultFacility: false,
@@ -176,6 +148,8 @@ module.exports = function registerDppApiRoutes(app, {
     pool,
     logger,
     authenticateToken,
+    requireBearerToken,
+    integrationWriteRateLimit,
     requireEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
@@ -215,11 +189,4 @@ module.exports = function registerDppApiRoutes(app, {
     mergePatchContentType,
   });
 
-  registerDidRoutes(app, {
-    logger,
-    publicReadRateLimit,
-    dbLookupByInternalAliasIdOnly,
-    getAppUrl,
-    dppIdentity,
-  });
 };

@@ -143,7 +143,6 @@ export function usePassportListActions({
           companyName: user?.companyName,
           modelName: passport.modelName,
           dppId: passport.dppId,
-          internalAliasId: passport.internalAliasId,
         });
         if (!passportPath) throw new Error("Passport link is unavailable for this QR code");
 

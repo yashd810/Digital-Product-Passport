@@ -44,50 +44,6 @@ test("unique-passport security groups apply only to selected DPP IDs", () => {
   assert.equal(helpers.apiKeyAppliesToPassport(apiKey, { dppId: "DPP-2", passportType: "battery" }), false);
 });
 
-test("security group sanitizer keeps public data and selected restricted fields only", () => {
-  const passport = {
-    dppId: "DPP-1",
-    passportType: "battery",
-    serialNumber: "SN-1",
-    supplierCost: "42",
-    privateDocument: "hidden.pdf",
-  };
-  const apiKey = {
-    passportType: "battery",
-    scopeType: "passportType",
-    fieldKeys: ["supplierCost"],
-  };
-
-  assert.deepEqual(helpers.sanitizePassportForApiKey(passport, typeDef, apiKey), {
-    dppId: "DPP-1",
-    passportType: "battery",
-    serialNumber: "SN-1",
-    supplierCost: "42",
-  });
-});
-
-test("security group sanitizer hides all restricted fields outside selected passport scope", () => {
-  const passport = {
-    dppId: "DPP-2",
-    passportType: "battery",
-    serialNumber: "SN-2",
-    supplierCost: "42",
-    privateDocument: "hidden.pdf",
-  };
-  const apiKey = {
-    passportType: "battery",
-    scopeType: "passports",
-    passportDppIds: ["DPP-1"],
-    fieldKeys: ["supplierCost", "privateDocument"],
-  };
-
-  assert.deepEqual(helpers.sanitizePassportForApiKey(passport, typeDef, apiKey), {
-    dppId: "DPP-2",
-    passportType: "battery",
-    serialNumber: "SN-2",
-  });
-});
-
 test("security group API key hash matching uses prefix candidates and HMAC verification", () => {
   const rawKey = "dppSg_test_key_123";
   const keyRecord = helpers.buildApiKeyHashRecord(rawKey);

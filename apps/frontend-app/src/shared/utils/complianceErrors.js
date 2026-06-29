@@ -2,16 +2,6 @@ function normalizeList(value) {
   return Array.isArray(value) ? value : [];
 }
 
-const companyDashboardHiddenCodes = new Set([
-  "fieldAccessMissing",
-  "fieldAccessInvalid",
-  "fieldConfidentialityMissing",
-  "fieldConfidentialityInvalid",
-  "fieldUpdateAuthorityMissing",
-  "fieldUpdateAuthorityInvalid",
-  "controlledAccessLayerMissing",
-]);
-
 function dedupeBySignature(items) {
   const seen = new Set();
   return items.filter((item) => {
@@ -30,7 +20,7 @@ function dedupeBySignature(items) {
 
 export function getComplianceBlockingIssues(compliance) {
   return dedupeBySignature(
-    normalizeList(compliance?.blockingIssues).filter((issue) => !companyDashboardHiddenCodes.has(issue?.code))
+    normalizeList(compliance?.blockingIssues)
   );
 }
 
