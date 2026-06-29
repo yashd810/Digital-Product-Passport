@@ -93,6 +93,10 @@ function sha256Base64(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("base64");
 }
 
+function md5Base64(buffer) {
+  return crypto.createHash("md5").update(buffer).digest("base64");
+}
+
 async function streamToBuffer(body) {
   if (!body) return Buffer.alloc(0);
   if (Buffer.isBuffer(body)) return body;
@@ -208,6 +212,7 @@ async function uploadBackup() {
     Key: keys.dumpKey,
     Body: fileBuffer,
     ContentType: "application/octet-stream",
+    ContentMD5: md5Base64(fileBuffer),
     ChecksumSHA256: checksumSha256,
     Metadata: {
       sha256: checksum,
@@ -222,6 +227,7 @@ async function uploadBackup() {
     Key: keys.manifestKey,
     Body: manifestBuffer,
     ContentType: "application/json",
+    ContentMD5: md5Base64(manifestBuffer),
     ChecksumSHA256: sha256Base64(manifestBuffer)
   }));
 
@@ -344,6 +350,7 @@ async function putObjectFile() {
     Key: key,
     Body: fileBuffer,
     ContentType: contentType,
+    ContentMD5: md5Base64(fileBuffer),
     ChecksumSHA256: sha256Base64(fileBuffer),
     Metadata: {
       sha256: checksum,
