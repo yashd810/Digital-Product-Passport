@@ -8,7 +8,7 @@ const {
   PutObjectCommand,
   GetObjectCommand,
   ListObjectsV2Command,
-  DeleteObjectsCommand,
+  DeleteObjectCommand,
   HeadBucketCommand,
   CreateBucketCommand
 } = require("@aws-sdk/client-s3");
@@ -176,10 +176,12 @@ async function pruneOldBackups(client, config, manifests) {
     return { deleted: 0 };
   }
 
-  await client.send(new DeleteObjectsCommand({
-    Bucket: config.bucket,
-    Delete: { Objects: toDelete, Quiet: true }
-  }));
+  for (const item of toDelete) {
+    await client.send(new DeleteObjectCommand({
+      Bucket: config.bucket,
+      Key: item.Key
+    }));
+  }
 
   return { deleted: toDelete.length };
 }
