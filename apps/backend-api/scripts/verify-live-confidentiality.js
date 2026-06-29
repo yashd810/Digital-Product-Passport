@@ -745,7 +745,7 @@ async function run() {
     }
     assert.equal((await fetchJson(`/api/passports/${dppId}/unlock`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", origin: getAllowedMutationOrigin() },
       body: JSON.stringify({ apiKey: rawKey }),
     })).response.status, 404);
 
