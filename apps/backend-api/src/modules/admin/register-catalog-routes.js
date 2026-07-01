@@ -93,6 +93,12 @@ module.exports = function registerCatalogRoutes(app, deps) {
 
     const issues = [];
     const fieldKeys = new Set();
+    const canonicalFieldsByKey = new Map(
+      (moduleDefinition.fieldsJson?.sections || [])
+        .flatMap((section) => section?.fields || [])
+        .filter((field) => field?.key)
+        .map((field) => [field.key, field])
+    );
     for (const section of sections || []) {
       for (const field of section?.fields || []) {
         if (field?.key) fieldKeys.add(field.key);
@@ -102,6 +108,35 @@ module.exports = function registerCatalogRoutes(app, deps) {
             field: field?.key || null,
             message: `Field "${field?.key || "unknown"}" must come from the selected passport module.`,
           });
+        }
+        const canonicalField = canonicalFieldsByKey.get(field?.sourceModuleFieldKey);
+        if (!canonicalField) {
+          issues.push({
+            code: "moduleFieldSourceNotFound",
+            field: field?.key || null,
+            message: `Field "${field?.key || "unknown"}" does not match a field in module "${sourceModule}".`,
+          });
+        } else {
+          for (const metadataKey of [
+            "key",
+            "type",
+            "semanticId",
+            "dataType",
+            "elementIdPath",
+            "objectType",
+            "valueDataType",
+          ]) {
+            if (field?.[metadataKey] !== canonicalField?.[metadataKey]) {
+              issues.push({
+                code: "moduleFieldMetadataMismatch",
+                field: field?.key || null,
+                metadataKey,
+                expected: canonicalField?.[metadataKey] ?? null,
+                actual: field?.[metadataKey] ?? null,
+                message: `Field "${field?.key || "unknown"}" must keep module ${metadataKey} metadata.`,
+              });
+            }
+          }
         }
         if (!field?.semanticId) {
           issues.push({
@@ -132,11 +167,26 @@ module.exports = function registerCatalogRoutes(app, deps) {
         }
         if (field?.type === "table") {
           const columns = Array.isArray(field.tableColumns) ? field.tableColumns : [];
+          const canonicalColumns = Array.isArray(canonicalField?.tableColumns) ? canonicalField.tableColumns : [];
+          const canonicalColumnsByKey = new Map(
+            canonicalColumns
+              .filter((column) => column?.key)
+              .map((column) => [column.key, column])
+          );
           if (!columns.length) {
             issues.push({
               code: "tableColumnsRequired",
               field: field?.key || null,
               message: `Table field "${field?.key || "unknown"}" must define module table columns.`,
+            });
+          }
+          if (canonicalField && columns.length !== canonicalColumns.length) {
+            issues.push({
+              code: "moduleTableColumnCountMismatch",
+              field: field?.key || null,
+              expected: canonicalColumns.length,
+              actual: columns.length,
+              message: `Table field "${field?.key || "unknown"}" must keep all module table columns.`,
             });
           }
           for (const column of columns) {
@@ -147,6 +197,36 @@ module.exports = function registerCatalogRoutes(app, deps) {
                 column: column?.key || null,
                 message: `Table column "${field?.key || "unknown"}.${column?.key || "unknown"}" must come from the selected passport module.`,
               });
+            }
+            const canonicalColumn = canonicalColumnsByKey.get(column?.sourceModuleColumnKey);
+            if (!canonicalColumn) {
+              issues.push({
+                code: "moduleTableColumnSourceNotFound",
+                field: field?.key || null,
+                column: column?.key || null,
+                message: `Table column "${field?.key || "unknown"}.${column?.key || "unknown"}" does not match the selected module.`,
+              });
+            } else {
+              for (const metadataKey of [
+                "key",
+                "semanticId",
+                "dataType",
+                "elementIdPath",
+                "objectType",
+                "valueDataType",
+              ]) {
+                if (column?.[metadataKey] !== canonicalColumn?.[metadataKey]) {
+                  issues.push({
+                    code: "moduleTableColumnMetadataMismatch",
+                    field: field?.key || null,
+                    column: column?.key || null,
+                    metadataKey,
+                    expected: canonicalColumn?.[metadataKey] ?? null,
+                    actual: column?.[metadataKey] ?? null,
+                    message: `Table column "${field?.key || "unknown"}.${column?.key || "unknown"}" must keep module ${metadataKey} metadata.`,
+                  });
+                }
+              }
             }
             if (!column?.semanticId) {
               issues.push({

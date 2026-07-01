@@ -360,6 +360,128 @@ const buildPreviewPassportPath = ({
   return `/dpp/preview/${manufacturerSlug}/${modelSlug}/${encodeURIComponent(routeKey)}`;
 };
 
+const coercePassportScalarValue = (fieldDef, rawValue) => {
+  const dataType = String(fieldDef?.dataType || "").trim().toLowerCase();
+  const fieldLabel = fieldDef?.label || fieldDef?.key || "field";
+  if (rawValue === null || rawValue === undefined || rawValue === "") return rawValue;
+  const objectType = String(fieldDef?.objectType || "").trim();
+  if (objectType === "MultiLanguageDataElement" || objectType === "MultiValuedDataElement") {
+    let structuredValue = rawValue;
+    if (typeof structuredValue === "string") {
+      try {
+        structuredValue = JSON.parse(structuredValue);
+      } catch {
+        const expectedShape = objectType === "MultiLanguageDataElement" ? "language object" : "value array";
+        throw new Error(`Expected ${expectedShape} for ${fieldLabel}`);
+      }
+    }
+    if (objectType === "MultiLanguageDataElement") {
+      if (!isPlainObject(structuredValue)) {
+        throw new Error(`Expected language object for ${fieldLabel}`);
+      }
+      return Object.fromEntries(
+        Object.entries(structuredValue).map(([language, value]) => [
+          language,
+          coercePassportScalarValue({
+            ...fieldDef,
+            label: `${fieldLabel}.${language}`,
+            objectType: "SingleValuedDataElement",
+          }, value),
+        ])
+      );
+    }
+    if (!Array.isArray(structuredValue)) {
+      throw new Error(`Expected value array for ${fieldLabel}`);
+    }
+    return structuredValue.map((value, index) =>
+      coercePassportScalarValue({
+        ...fieldDef,
+        label: `${fieldLabel}[${index}]`,
+        objectType: "SingleValuedDataElement",
+      }, value)
+    );
+  }
+  if (dataType === "decimal") {
+    if (typeof rawValue === "number" && Number.isFinite(rawValue)) return rawValue;
+    if (typeof rawValue === "string" && /^-?\d+(\.\d+)?$/.test(rawValue.trim())) {
+      return Number.parseFloat(rawValue);
+    }
+    throw new Error(`Expected decimal for ${fieldLabel}`);
+  }
+  if (dataType === "integer") {
+    if (Number.isInteger(rawValue)) return rawValue;
+    if (typeof rawValue === "string" && /^-?\d+$/.test(rawValue.trim())) {
+      return Number.parseInt(rawValue, 10);
+    }
+    throw new Error(`Expected integer for ${fieldLabel}`);
+  }
+  if (dataType === "boolean") {
+    if (typeof rawValue === "boolean") return rawValue;
+    if (typeof rawValue === "string") {
+      const normalized = rawValue.trim().toLowerCase();
+      if (["true", "1", "yes"].includes(normalized)) return true;
+      if (["false", "0", "no"].includes(normalized)) return false;
+    }
+    throw new Error(`Expected boolean for ${fieldLabel}`);
+  }
+  if (dataType === "date") {
+    const text = String(rawValue).trim();
+    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(text) ? new Date(`${text}T00:00:00.000Z`) : null;
+    if (parsed && !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === text) return text;
+    throw new Error(`Expected date for ${fieldLabel}`);
+  }
+  if (dataType === "datetime") {
+    const parsed = rawValue instanceof Date ? rawValue : new Date(rawValue);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error(`Expected date-time for ${fieldLabel}`);
+    }
+    const text = rawValue instanceof Date ? parsed.toISOString() : String(rawValue).trim();
+    const dateText = text.slice(0, 10);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(dateText) ? new Date(`${dateText}T00:00:00.000Z`) : null;
+    const hasValidDate = date
+      && !Number.isNaN(date.getTime())
+      && date.toISOString().slice(0, 10) === dateText;
+    if (
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(text)
+      && hasValidDate
+    ) {
+      return parsed.toISOString();
+    }
+    throw new Error(`Expected date-time for ${fieldLabel}`);
+  }
+  if (dataType === "uri") {
+    const text = String(rawValue).trim();
+    if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return text;
+    throw new Error(`Expected URI for ${fieldLabel}`);
+  }
+  if (dataType === "string") {
+    if (Array.isArray(rawValue) || (rawValue && typeof rawValue === "object")) {
+      throw new Error(`Expected string for ${fieldLabel}`);
+    }
+    return String(rawValue);
+  }
+  throw new Error(`Unsupported scalar dataType "${dataType || "missing"}" for ${fieldLabel}`);
+};
+
+const coerceTableColumnValues = (fieldDef, rows) => {
+  const columns = Array.isArray(fieldDef?.tableColumns) ? fieldDef.tableColumns : [];
+  const columnKeys = new Set(columns.map((column) => column?.key).filter(Boolean));
+  return rows.map((row) => {
+    const unknownKeys = Object.keys(row).filter((key) => !columnKeys.has(key));
+    if (unknownKeys.length) {
+      throw new Error(
+        `Unknown table column(s) for ${fieldDef?.label || fieldDef?.key || "table"}: ${unknownKeys.join(", ")}`
+      );
+    }
+    const typedRow = { ...row };
+    for (const column of columns) {
+      if (!column?.key || !Object.prototype.hasOwnProperty.call(typedRow, column.key)) continue;
+      typedRow[column.key] = coercePassportScalarValue(column, typedRow[column.key]);
+    }
+    return typedRow;
+  });
+};
+
 const coerceBulkFieldValue = (fieldDef, rawValue) => {
   if (rawValue === null || rawValue === undefined) return rawValue;
 
@@ -373,22 +495,28 @@ const coerceBulkFieldValue = (fieldDef, rawValue) => {
   if (fieldDef?.type === "table" && typeof rawValue === "string") {
     const trimmed = rawValue.trim();
     if (!trimmed) return rawValue;
+    let parsed;
     try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed) && parsed.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
-        return parsed;
-      }
+      parsed = JSON.parse(trimmed);
     } catch {
-      // Fall through to the explicit table-shape error below.
+      throw new Error(`Expected table rows as a JSON array of objects for ${fieldDef?.label || fieldDef?.key}`);
+    }
+    if (Array.isArray(parsed) && parsed.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
+      return coerceTableColumnValues(fieldDef, parsed);
     }
     throw new Error(`Expected table rows as a JSON array of objects for ${fieldDef?.label || fieldDef?.key}`);
   }
 
   if (fieldDef?.type === "table" && Array.isArray(rawValue)) {
     if (rawValue.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
-      return rawValue;
+      return coerceTableColumnValues(fieldDef, rawValue);
     }
     throw new Error(`Expected table rows as objects for ${fieldDef?.label || fieldDef?.key}`);
+  }
+
+  const dataType = String(fieldDef?.dataType || "").trim().toLowerCase();
+  if (dataType && dataType !== "array") {
+    return coercePassportScalarValue(fieldDef, rawValue);
   }
 
   return rawValue;
@@ -519,14 +647,23 @@ const coerceAssetFieldValue = (fieldDef, rawValue) => {
   if (type === "table") {
     if (Array.isArray(rawValue)) {
       const isRowObjectArray = rawValue.every((row) => row && typeof row === "object" && !Array.isArray(row));
-      return isRowObjectArray
-        ? { ok: true, value: rawValue }
-        : { ok: false, error: `Expected table rows as objects for ${fieldDef?.label || fieldDef?.key}` };
+      if (!isRowObjectArray) {
+        return { ok: false, error: `Expected table rows as objects for ${fieldDef?.label || fieldDef?.key}` };
+      }
+      try {
+        return { ok: true, value: coerceTableColumnValues(fieldDef, rawValue) };
+      } catch (error) {
+        return { ok: false, error: error.message };
+      }
     }
     if (typeof rawValue === "string") {
       const parsed = parseJsonOrFallback(rawValue, null);
       if (Array.isArray(parsed) && parsed.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
-        return { ok: true, value: parsed };
+        try {
+          return { ok: true, value: coerceTableColumnValues(fieldDef, parsed) };
+        } catch (error) {
+          return { ok: false, error: error.message };
+        }
       }
     }
     return { ok: false, error: `Expected table rows as a JSON array of objects for ${fieldDef?.label || fieldDef?.key}` };
@@ -538,6 +675,15 @@ const coerceAssetFieldValue = (fieldDef, rawValue) => {
       return { ok: false, error: `Expected a valid date for ${fieldDef?.label || fieldDef?.key}` };
     }
     return { ok: true, value: date.toISOString().slice(0, 10) };
+  }
+
+  const dataType = String(fieldDef?.dataType || "").trim().toLowerCase();
+  if (dataType && dataType !== "array") {
+    try {
+      return { ok: true, value: coercePassportScalarValue(fieldDef, rawValue) };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
   }
 
   if ((type === "file" || type === "symbol") && typeof rawValue === "object") {
@@ -568,6 +714,7 @@ module.exports = {
   normalizePassportRow,
   toStoredPassportValue,
   normalizePassportRequestBody,
+  coercePassportScalarValue,
   normalizeInternalAliasIdValue,
   generateInternalAliasIdValue,
   extractExplicitFacilityId,

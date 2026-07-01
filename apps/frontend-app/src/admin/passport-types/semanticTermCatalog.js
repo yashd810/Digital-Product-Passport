@@ -125,12 +125,13 @@ export function deriveSemanticTermDataType(term) {
   const jsonType = String(term?.dataType?.jsonType || term?.range?.jsonType || "").trim().toLowerCase();
   const xsdType = String(term?.dataType?.xsdType || term?.range?.curie || term?.range?.iri || "").trim().toLowerCase();
 
+  if (jsonType === "decimal" || (!jsonType && xsdType.includes("decimal"))) return "decimal";
+  if (jsonType === "array") return "array";
   if (jsonType === "string") {
     if (xsdType.includes("anyuri")) return "uri";
     if (xsdType.includes("date")) return "date";
     return "string";
   }
-  if (jsonType === "number") return "number";
   if (jsonType === "integer") return "integer";
   if (jsonType === "boolean") return "boolean";
   if (xsdType.includes("date")) return "date";

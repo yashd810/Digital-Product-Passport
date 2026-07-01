@@ -36,7 +36,7 @@ export function createTableColumn(index = 0, overrides = {}) {
     ...(overrides.elementIdPath ? { elementIdPath: overrides.elementIdPath } : {}),
     ...(overrides.objectType ? { objectType: overrides.objectType } : {}),
     ...(overrides.valueDataType ? { valueDataType: overrides.valueDataType } : {}),
-    ...(overrides.dataType ? { dataType: overrides.dataType } : {}),
+    dataType: overrides.dataType || "string",
     ...(overrides.unit ? { unit: overrides.unit } : {}),
     ...(overrides.canonicalLocked ? { canonicalLocked: true } : {}),
     ...(overrides.sourceModuleKey ? { sourceModuleKey: overrides.sourceModuleKey } : {}),

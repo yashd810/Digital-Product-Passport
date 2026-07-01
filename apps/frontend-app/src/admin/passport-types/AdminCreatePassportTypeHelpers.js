@@ -27,6 +27,9 @@ export function normalizeFieldForSemanticModel(
   };
 
   if (nextField.type === "table") {
+    nextField.dataType = "array";
+    nextField.objectType = nextField.objectType || "DataElementCollection";
+    nextField.valueDataType = "Array";
     nextField.tableColumns = normalizeTableColumns(nextField);
     nextField.tableColumnCount = nextField.tableColumns.length;
   }

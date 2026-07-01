@@ -115,7 +115,7 @@ const sample = {
           fieldType: "text",
           semanticSlug: "performance-score",
           definition: "Declared performance score for the product.",
-          dataType: "number",
+          dataType: "decimal",
           categoryKey: "performance-characteristics",
           categoryLabel: "Performance Characteristics",
           unitKey: "percent",
@@ -129,8 +129,8 @@ const sample = {
 };
 
 const fieldsCsvColumns = [
-  "fieldLabel",
   "sectionLabel",
+  "fieldLabel",
   "fieldType",
   "definition",
   "categoryLabel",
@@ -143,31 +143,102 @@ const fieldsCsvColumns = [
   "tableColumns",
 ];
 
-const fieldTypeOptions = new Set(["text", "textarea", "boolean", "date", "url", "file", "symbol", "table"]);
-const dataTypeOptions = new Set(["string", "number", "integer", "boolean", "date", "datetime", "uri"]);
-const confidentialityOptions = new Set(["public", "restricted"]);
-const objectTypeOptions = new Set([
-  "SingleValuedDataElement",
-  "MultiValuedDataElement",
-  "DataElementCollection",
-  "RelatedResource",
-  "MultiLanguageDataElement",
-]);
-const valueDataTypeOptions = new Set([
-  "String",
-  "Boolean",
-  "Integer",
-  "Decimal",
-  "Date",
-  "DateTime",
-  "URI",
-  "Binary",
-  "Array",
-  "Object",
-]);
+const fieldsCsvColumnLabels = {
+  fieldLabel: "Label",
+  sectionLabel: "Section label",
+  fieldType: "UI type",
+  definition: "Definition",
+  categoryLabel: "Category label",
+  dataType: "Data type",
+  unitLabel: "Unit label",
+  unitSymbol: "Unit symbol",
+  confidentiality: "Confidentiality",
+  objectType: "Schema object",
+  valueDataType: "Schema value",
+  queryable: "queryable",
+  indexed: "indexed",
+  tableColumns: "Table schema",
+};
+
+const fieldsCsvColumnAliases = {
+  fieldLabel: ["Field label", "Field name"],
+  sectionLabel: ["Section"],
+  fieldType: ["Type", "Field type"],
+  dataType: ["JSON type"],
+  objectType: ["Object type", "Schema object type"],
+  valueDataType: ["Value type", "Value data type", "Schema value type"],
+  tableColumns: ["Columns", "Table columns", "Table column JSON"],
+};
+
+const tableColumnCsvPropertyLabels = {
+  columnLabel: "Label",
+  dataType: "Data type",
+  unitLabel: "Unit label",
+  unitSymbol: "Unit symbol",
+  objectType: "Object type",
+  valueDataType: "Value data type",
+  semanticSlug: "Semantic slug",
+  columnKey: "Column key",
+  unitKey: "Unit key",
+};
+
+const tableColumnCsvPropertyAliases = {
+  columnLabel: ["Column label", "Column name"],
+  dataType: ["JSON type"],
+  objectType: ["Schema object", "Schema object type"],
+  valueDataType: ["Schema value", "Schema value type", "Value type"],
+};
+
+const fieldTypeCsvOptions = [
+  { value: "text" },
+  { value: "textarea", aliases: ["multi-line text", "long text"] },
+  { value: "boolean", aliases: ["true false", "yes no"] },
+  { value: "date" },
+  { value: "url", aliases: ["link"] },
+  { value: "file", aliases: ["evidence file"] },
+  { value: "symbol" },
+  { value: "table", aliases: ["collection"] },
+];
+const dataTypeCsvOptions = [
+  { value: "string", aliases: ["text"] },
+  { value: "decimal" },
+  { value: "integer" },
+  { value: "boolean" },
+  { value: "date" },
+  { value: "datetime", aliases: ["date time", "date-time"] },
+  { value: "uri", aliases: ["url", "link"] },
+  { value: "array", aliases: ["list", "collection"] },
+];
+const tableColumnDataTypeCsvOptions = dataTypeCsvOptions.filter((option) => option.value !== "array");
+const confidentialityCsvOptions = [
+  { value: "public" },
+  { value: "restricted" },
+];
+
+const fieldTypeOptions = new Set(fieldTypeCsvOptions.map((option) => option.value));
+const dataTypeOptions = new Set(dataTypeCsvOptions.map((option) => option.value));
+const tableColumnDataTypeOptions = new Set(tableColumnDataTypeCsvOptions.map((option) => option.value));
+const confidentialityOptions = new Set(confidentialityCsvOptions.map((option) => option.value));
+const fixedDataTypeByFieldType = Object.freeze({
+  boolean: "boolean",
+  date: "date",
+  file: "string",
+  symbol: "uri",
+  table: "array",
+  url: "uri",
+});
+
+const fieldTypeCsvAliases = buildCsvOptionAliases(fieldTypeCsvOptions);
+const dataTypeCsvAliases = buildCsvOptionAliases(dataTypeCsvOptions);
+const tableColumnDataTypeCsvAliases = buildCsvOptionAliases(tableColumnDataTypeCsvOptions);
+const confidentialityCsvAliases = buildCsvOptionAliases(confidentialityCsvOptions);
+const fieldsCsvColumnNameAliases = buildCsvColumnAliases(fieldsCsvColumnLabels, fieldsCsvColumnAliases);
+const tableColumnCsvPropertyNameAliases = buildCsvColumnAliases(tableColumnCsvPropertyLabels, tableColumnCsvPropertyAliases);
 
 const draftStorageKey = "passport-module-generator:draft:v1";
 const sessionStorageKey = "passport-module-generator:session:v1";
+const maxFieldsCsvBytes = 2 * 1024 * 1024;
+const maxFieldsCsvRows = 5000;
 let sessionSaveTimer = null;
 
 function setMessage(text, type = "info") {
@@ -343,12 +414,66 @@ function titleCase(value) {
     .join(" ");
 }
 
+function csvOptionKey(value) {
+  return String(value || "")
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function buildCsvOptionAliases(options) {
+  const aliases = new Map();
+  for (const option of options) {
+    for (const value of [option.value, option.label, ...(option.aliases || [])]) {
+      const key = csvOptionKey(value);
+      if (key) aliases.set(key, option.value);
+    }
+  }
+  return aliases;
+}
+
+function buildCsvColumnAliases(labels, extraAliases = {}) {
+  const aliases = new Map();
+  for (const [key, label] of Object.entries(labels)) {
+    for (const value of [key, label, ...(extraAliases[key] || [])]) {
+      const aliasKey = csvOptionKey(value);
+      if (aliasKey) aliases.set(aliasKey, key);
+    }
+  }
+  return aliases;
+}
+
+function normalizeCsvColumnName(value) {
+  return fieldsCsvColumnNameAliases.get(csvOptionKey(value)) || "";
+}
+
+function normalizeCsvTableColumnPropertyName(value) {
+  return tableColumnCsvPropertyNameAliases.get(csvOptionKey(value)) || "";
+}
+
+function describeCsvOptions(options) {
+  return options
+    .map((option) => option.label && option.label !== option.value ? `${option.label} (${option.value})` : option.value)
+    .join(" | ");
+}
+
+function getCsvColumnHeaders() {
+  return fieldsCsvColumns.map((column) => fieldsCsvColumnLabels[column] || column);
+}
+
 function csvEscape(value) {
-  const text = String(value ?? "");
+  const rawText = String(value ?? "");
+  const text = /^[\u0000-\u0020]*[=+\-@]/.test(rawText) ? `'${rawText}` : rawText;
   if (/["\n,]/.test(text)) {
     return `"${text.replace(/"/g, "\"\"")}"`;
   }
   return text;
+}
+
+function restoreCsvFormulaCell(value) {
+  const text = String(value ?? "");
+  return /^'[\u0000-\u0020]*[=+\-@]/.test(text) ? text.slice(1) : text;
 }
 
 function downloadTextFile(fileName, content, contentType = "text/plain;charset=utf-8") {
@@ -369,6 +494,7 @@ function parseCsv(text) {
   let value = "";
   let index = 0;
   let inQuotes = false;
+  let quotedValueClosed = false;
 
   while (index < text.length) {
     const char = text[index];
@@ -382,6 +508,7 @@ function parseCsv(text) {
       }
       if (char === "\"") {
         inQuotes = false;
+        quotedValueClosed = true;
         index += 1;
         continue;
       }
@@ -391,6 +518,9 @@ function parseCsv(text) {
     }
 
     if (char === "\"") {
+      if (value || quotedValueClosed) {
+        throw new Error("CSV contains a quote in an unquoted value.");
+      }
       inQuotes = true;
       index += 1;
       continue;
@@ -399,6 +529,7 @@ function parseCsv(text) {
     if (char === ",") {
       row.push(value);
       value = "";
+      quotedValueClosed = false;
       index += 1;
       continue;
     }
@@ -408,6 +539,7 @@ function parseCsv(text) {
       rows.push(row);
       row = [];
       value = "";
+      quotedValueClosed = false;
       index += 1;
       continue;
     }
@@ -417,24 +549,33 @@ function parseCsv(text) {
       continue;
     }
 
+    if (quotedValueClosed) {
+      throw new Error("CSV contains characters after a closing quote.");
+    }
     value += char;
     index += 1;
   }
 
+  if (inQuotes) throw new Error("CSV contains an unterminated quoted value.");
   row.push(value);
   if (row.length > 1 || row[0]) rows.push(row);
   return rows;
 }
 
-function parseBooleanCell(value) {
+function parseBooleanCell(value, label) {
   const text = String(value || "").trim().toLowerCase();
-  return ["true", "1", "yes", "y"].includes(text);
+  if (!text || ["false", "0", "no", "n"].includes(text)) return false;
+  if (["true", "1", "yes", "y"].includes(text)) return true;
+  throw new Error(`${label} must be true or false.`);
 }
 
-function normalizeCsvOption(value, allowedValues, fallback) {
+function normalizeCsvOption(value, allowedValues, fallback, aliases, label, allowedDescription = "") {
   const text = String(value || "").trim();
   if (!text) return fallback;
-  return allowedValues.has(text) ? text : fallback;
+  if (allowedValues.has(text)) return text;
+  const normalized = aliases?.get(csvOptionKey(text));
+  if (normalized && allowedValues.has(normalized)) return normalized;
+  throw new Error(`${label} must be one of: ${allowedDescription || [...allowedValues].join(", ")}.`);
 }
 
 function parseJsonCell(value, label, fallback) {
@@ -447,6 +588,65 @@ function parseJsonCell(value, label, fallback) {
   }
 }
 
+function isCsvCommentRow(row) {
+  return String(row?.[0] || "").trim().startsWith("#");
+}
+
+function normalizeCsvObjectKeys(input, aliasResolver) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  const normalized = Object.create(null);
+  for (const [key, value] of Object.entries(input)) {
+    normalized[aliasResolver(key) || key] = value;
+  }
+  return normalized;
+}
+
+function csvRowLabel(rowNumber, column) {
+  return `CSV row ${rowNumber} ${fieldsCsvColumnLabels[column] || column}`;
+}
+
+function csvTableColumnLabel(rowNumber, columnIndex, property) {
+  return `CSV row ${rowNumber} tableColumns[${columnIndex}] ${tableColumnCsvPropertyLabels[property] || property}`;
+}
+
+function normalizeCsvTableColumns(tableColumns, rowNumber) {
+  return tableColumns.map((rawColumn, columnIndex) => {
+    const column = normalizeCsvObjectKeys(rawColumn, normalizeCsvTableColumnPropertyName);
+    const editableProperties = new Set(["columnLabel", "dataType", "unitLabel", "unitSymbol"]);
+    const unsupportedProperties = Object.keys(column).filter((property) => !editableProperties.has(property));
+    if (unsupportedProperties.length) {
+      throw new Error(
+        `CSV row ${rowNumber} tableColumns[${columnIndex}] contains unsupported properties: ${unsupportedProperties.join(", ")}.`
+      );
+    }
+    const dataType = normalizeCsvOption(
+      column.dataType,
+      tableColumnDataTypeOptions,
+      "string",
+      tableColumnDataTypeCsvAliases,
+      csvTableColumnLabel(rowNumber, columnIndex, "dataType"),
+      describeCsvOptions(tableColumnDataTypeCsvOptions)
+    );
+    return {
+      columnLabel: String(column.columnLabel || "").trim(),
+      dataType,
+      unitLabel: String(column.unitLabel || "").trim(),
+      unitSymbol: String(column.unitSymbol || "").trim(),
+      objectType: "SingleValuedDataElement",
+      valueDataType: valueDataTypeFromDataType(dataType),
+    };
+  });
+}
+
+function serializeEditableTableColumns(columns = []) {
+  return JSON.stringify(columns.map((column) => ({
+    [tableColumnCsvPropertyLabels.columnLabel]: column.columnLabel || "",
+    [tableColumnCsvPropertyLabels.dataType]: column.dataType || "string",
+    [tableColumnCsvPropertyLabels.unitLabel]: column.unitLabel || "",
+    [tableColumnCsvPropertyLabels.unitSymbol]: column.unitSymbol || "",
+  })));
+}
+
 function getFieldsCsvRowsFromSpec(spec = readSpec()) {
   return (spec.sections || []).flatMap((section) =>
     (section.fields || []).map((field) => ({
@@ -455,81 +655,142 @@ function getFieldsCsvRowsFromSpec(spec = readSpec()) {
       fieldType: field.fieldType || "text",
       definition: field.definition || "",
       categoryLabel: field.categoryLabel || "",
-      dataType: field.dataType || "string",
+      dataType: field.dataType || defaultDataTypeForFieldType(field.fieldType || "text"),
       unitLabel: field.unitLabel || "",
       unitSymbol: field.unitSymbol || "",
       confidentiality: field.confidentiality || "public",
       queryable: field.queryable ? "true" : "false",
       indexed: field.indexed ? "true" : "false",
-      tableColumns: field.fieldType === "table" ? JSON.stringify(field.tableColumns || []) : "",
+      tableColumns: field.fieldType === "table" ? serializeEditableTableColumns(field.tableColumns || []) : "",
     }))
   );
 }
 
 function buildFieldsCsvContent(rows = []) {
   const lines = [
-    fieldsCsvColumns.join(","),
+    getCsvColumnHeaders().join(","),
     ...rows.map((row) => fieldsCsvColumns.map((column) => csvEscape(row[column] || "")).join(",")),
   ];
   return `${lines.join("\n")}\n`;
 }
 
 function readFieldsCsvRows(text) {
+  if (new Blob([String(text || "")]).size > maxFieldsCsvBytes) {
+    throw new Error("CSV file is too large. Maximum size is 2 MB.");
+  }
   const rows = parseCsv(text);
   if (!rows.length) throw new Error("CSV file is empty.");
+  if (rows.length > maxFieldsCsvRows + 1) {
+    throw new Error(`CSV contains too many rows. Maximum field rows: ${maxFieldsCsvRows}.`);
+  }
 
-  const header = rows[0].map((cell) => String(cell || "").trim());
+  const headerIndex = rows.findIndex((row) => {
+    if (isCsvCommentRow(row)) return false;
+    const cells = row.map((cell) => normalizeCsvColumnName(cell));
+    return cells.includes("fieldLabel") && cells.includes("sectionLabel");
+  });
+  if (headerIndex === -1) {
+    throw new Error("CSV is missing the field header row. Download the template and fill that format only.");
+  }
+
+  const rawHeader = rows[headerIndex].map((cell) => String(cell || "").trim());
+  const header = rawHeader.map((cell) => normalizeCsvColumnName(cell));
   for (const column of ["fieldLabel", "sectionLabel"]) {
     if (!header.includes(column)) {
-      throw new Error(`CSV is missing required column "${column}". Download the template and fill that format only.`);
+      throw new Error(`CSV is missing required column "${fieldsCsvColumnLabels[column]}". Download the template and fill that format only.`);
     }
   }
 
-  const unsupported = header.filter((column) => column && !fieldsCsvColumns.includes(column));
+  const unsupported = rawHeader.filter((column, index) => column && !header[index]);
   if (unsupported.length) {
     throw new Error(`CSV contains unsupported columns: ${unsupported.join(", ")}. Use the fixed local-tool template only.`);
+  }
+  const duplicates = header.filter((column, index) => column && header.indexOf(column) !== index);
+  if (duplicates.length) {
+    const duplicateLabels = [...new Set(duplicates)].map((column) => fieldsCsvColumnLabels[column] || column);
+    throw new Error(`CSV contains duplicate columns after name matching: ${duplicateLabels.join(", ")}.`);
   }
 
   const parsedRows = [];
   let skippedRowCount = 0;
 
-  for (const [rowIndex, row] of rows.slice(1).entries()) {
+  for (let rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex += 1) {
+    const row = rows[rowIndex];
+    const rowNumber = rowIndex + 1;
+    if (isCsvCommentRow(row)) continue;
     if (!row.some((cell) => String(cell || "").trim())) continue;
 
-      const entry = Object.fromEntries(header.map((column, columnIndex) => [column, String(row[columnIndex] || "").trim()]));
-      const fieldLabel = entry.fieldLabel || "";
-      const sectionLabel = entry.sectionLabel || "";
-      if (!fieldLabel || !sectionLabel) {
-        skippedRowCount += 1;
-        continue;
-      }
-      const fieldType = normalizeCsvOption(entry.fieldType, fieldTypeOptions, "text");
-      const dataType = normalizeCsvOption(entry.dataType, dataTypeOptions, defaultDataTypeForFieldType(fieldType));
-      const tableColumnsSource = entry.tableColumns || "";
-      const tableColumns = fieldType === "table"
-        ? parseJsonCell(tableColumnsSource, `CSV row ${rowIndex + 2} tableColumns`, [])
-        : [];
+    const entry = Object.fromEntries(header.map((column, columnIndex) => [
+      column,
+      restoreCsvFormulaCell(row[columnIndex]).trim(),
+    ]));
+    const fieldLabel = entry.fieldLabel || "";
+    const sectionLabel = entry.sectionLabel || "";
+    if (!fieldLabel || !sectionLabel) {
+      skippedRowCount += 1;
+      continue;
+    }
+    const fieldType = normalizeCsvOption(
+      entry.fieldType,
+      fieldTypeOptions,
+      "text",
+      fieldTypeCsvAliases,
+      csvRowLabel(rowNumber, "fieldType"),
+      describeCsvOptions(fieldTypeCsvOptions)
+    );
+    const dataType = normalizeCsvOption(
+      entry.dataType,
+      dataTypeOptions,
+      defaultDataTypeForFieldType(fieldType),
+      dataTypeCsvAliases,
+      csvRowLabel(rowNumber, "dataType"),
+      describeCsvOptions(dataTypeCsvOptions)
+    );
+    if (fieldType === "table" && dataType !== "array") {
+      throw new Error(`CSV row ${rowNumber} Data type must be "array" when UI type is "table".`);
+    }
+    if (fieldType !== "table" && dataType === "array") {
+      throw new Error(`CSV row ${rowNumber} Data type "array" requires UI type "table".`);
+    }
+    const fixedDataType = fixedDataTypeByFieldType[fieldType];
+    if (fixedDataType && dataType !== fixedDataType) {
+      throw new Error(
+        `CSV row ${rowNumber} UI type "${fieldType}" requires Data type "${fixedDataType}".`
+      );
+    }
+    const tableColumnsSource = entry.tableColumns || "";
+    let tableColumns = fieldType === "table"
+      ? parseJsonCell(tableColumnsSource, `CSV row ${rowNumber} tableColumns`, [])
+      : [];
 
-      if (fieldType === "table" && !Array.isArray(tableColumns)) {
-        throw new Error(`CSV row ${rowIndex + 2} tableColumns must be a JSON array.`);
-      }
+    if (fieldType === "table" && !Array.isArray(tableColumns)) {
+      throw new Error(`CSV row ${rowNumber} tableColumns must be a JSON array.`);
+    }
+    tableColumns = normalizeCsvTableColumns(tableColumns, rowNumber);
 
-      parsedRows.push({
-        sectionLabel,
-        field: {
-          fieldLabel,
-          fieldType,
-          definition: entry.definition || "",
-          categoryLabel: entry.categoryLabel || "",
-          dataType,
-          unitLabel: entry.unitLabel || "",
-          unitSymbol: entry.unitSymbol || "",
-          confidentiality: normalizeCsvOption(entry.confidentiality, confidentialityOptions, "public"),
-          queryable: parseBooleanCell(entry.queryable),
-          indexed: parseBooleanCell(entry.indexed),
-          tableColumns,
-        },
-      });
+    parsedRows.push({
+      sectionLabel,
+      field: {
+        fieldLabel,
+        fieldType,
+        definition: entry.definition || "",
+        categoryLabel: entry.categoryLabel || "",
+        dataType,
+        unitLabel: entry.unitLabel || "",
+        unitSymbol: entry.unitSymbol || "",
+        confidentiality: normalizeCsvOption(
+          entry.confidentiality,
+          confidentialityOptions,
+          "public",
+          confidentialityCsvAliases,
+          csvRowLabel(rowNumber, "confidentiality"),
+          describeCsvOptions(confidentialityCsvOptions)
+        ),
+        queryable: parseBooleanCell(entry.queryable, csvRowLabel(rowNumber, "queryable")),
+        indexed: parseBooleanCell(entry.indexed, csvRowLabel(rowNumber, "indexed")),
+        tableColumns,
+      },
+    });
   }
 
   return {
@@ -642,9 +903,10 @@ function canonicalKeyFromSemanticSlug(value) {
     .join("");
 }
 
-function valueDataTypeFromJsonType(dataType) {
+function valueDataTypeFromDataType(dataType) {
+  if (dataType === "array") return "Array";
   if (dataType === "integer") return "Integer";
-  if (dataType === "number") return "Decimal";
+  if (dataType === "decimal") return "Decimal";
   if (dataType === "boolean") return "Boolean";
   if (dataType === "date") return "Date";
   if (dataType === "datetime") return "DateTime";
@@ -653,10 +915,7 @@ function valueDataTypeFromJsonType(dataType) {
 }
 
 function defaultDataTypeForFieldType(fieldType) {
-  if (fieldType === "boolean") return "boolean";
-  if (fieldType === "date") return "date";
-  if (fieldType === "url" || fieldType === "symbol") return "uri";
-  return "string";
+  return fixedDataTypeByFieldType[fieldType] || "string";
 }
 
 function defaultObjectTypeForFieldType(fieldType) {
@@ -671,7 +930,7 @@ function defaultValueDataTypeForField(fieldType, dataType) {
   if (fieldType === "url" || fieldType === "symbol") return "URI";
   if (fieldType === "date") return "Date";
   if (fieldType === "boolean") return "Boolean";
-  return valueDataTypeFromJsonType(dataType);
+  return valueDataTypeFromDataType(dataType);
 }
 
 function setupModuleAutoFill() {
@@ -906,12 +1165,14 @@ function syncCompositionRoleColumns() {
   const tableKey = $("#compositionFieldKey")?.value || "";
   const tableField = getTableFieldsFromDom().find((field) => field.fieldKey === tableKey);
   const columns = tableField?.tableColumns || [];
-  const options = columns.map((column) => ({
+  const toOption = (column) => ({
     value: column.columnKey,
     label: column.columnLabel || column.columnKey,
-  }));
-  setSelectOptions($("#compositionLabelColumnKey"), options, "Select label column");
-  setSelectOptions($("#compositionValueColumnKey"), options, "Select data column");
+  });
+  const labelOptions = columns.filter((column) => column.dataType === "string").map(toOption);
+  const valueOptions = columns.filter((column) => ["decimal", "integer"].includes(column.dataType)).map(toOption);
+  setSelectOptions($("#compositionLabelColumnKey"), labelOptions, "Select text label column");
+  setSelectOptions($("#compositionValueColumnKey"), valueOptions, "Select numeric data column");
 }
 
 function syncRoleOptions() {
@@ -1014,7 +1275,7 @@ function addTableColumn(row, data = {}) {
   const valueDataTypeSelect = $("[data-column='valueDataType']", node);
   dataTypeSelect?.addEventListener("change", () => {
     if (valueDataTypeSelect && !valueDataTypeSelect.dataset.manual) {
-      valueDataTypeSelect.value = valueDataTypeFromJsonType(dataTypeSelect.value);
+      valueDataTypeSelect.value = valueDataTypeFromDataType(dataTypeSelect.value);
     }
   });
   valueDataTypeSelect?.addEventListener("change", () => {
@@ -1093,8 +1354,18 @@ function addField(sectionNode, data = {}) {
   const addColumnButton = $("[data-add-column]", node);
   if (typeSelect.value === "checkbox") typeSelect.value = "boolean";
   const syncFieldDataType = () => {
-    if (dataTypeSelect && !dataTypeSelect.dataset.manual) {
+    if (!dataTypeSelect) return;
+    const fixedDataType = fixedDataTypeByFieldType[typeSelect.value];
+    if (fixedDataType) {
+      dataTypeSelect.value = fixedDataType;
+      dataTypeSelect.dataset.manual = "";
+      dataTypeSelect.disabled = true;
+      return;
+    }
+    dataTypeSelect.disabled = false;
+    if (!dataTypeSelect.dataset.manual || dataTypeSelect.value === "array") {
       dataTypeSelect.value = defaultDataTypeForFieldType(typeSelect.value);
+      dataTypeSelect.dataset.manual = "";
     }
   };
   const syncFieldSchemaMetadata = () => {
@@ -1109,7 +1380,7 @@ function addField(sectionNode, data = {}) {
   if (data.objectType) objectTypeSelect.dataset.manual = "true";
   if (data.valueDataType) valueDataTypeSelect.dataset.manual = "true";
   const defaultDataType = defaultDataTypeForFieldType(typeSelect.value);
-  if (data.dataType && data.dataType !== defaultDataType && typeSelect.value !== "text" && typeSelect.value !== "textarea") {
+  if (data.dataType && data.dataType !== defaultDataType) {
     dataTypeSelect.dataset.manual = "true";
   }
   syncFieldSchemaMetadata();
@@ -1315,7 +1586,7 @@ function downloadFieldsCsvTemplate() {
       fieldType: "table",
       definition: "Lists the component materials used in the product.",
       categoryLabel: "Material Information",
-      dataType: "string",
+      dataType: "array",
       unitLabel: "",
       unitSymbol: "",
       confidentiality: "public",
@@ -1323,20 +1594,16 @@ function downloadFieldsCsvTemplate() {
       indexed: "false",
       tableColumns: JSON.stringify([
         {
-          columnLabel: "Material Name",
-          dataType: "string",
-          unitLabel: "",
-          unitSymbol: "",
-          objectType: "SingleValuedDataElement",
-          valueDataType: "String",
+          "Label": "Material Name",
+          "Data type": "string",
+          "Unit label": "",
+          "Unit symbol": "",
         },
         {
-          columnLabel: "Percentage",
-          dataType: "number",
-          unitLabel: "Percent",
-          unitSymbol: "%",
-          objectType: "SingleValuedDataElement",
-          valueDataType: "Decimal",
+          "Label": "Percentage",
+          "Data type": "decimal",
+          "Unit label": "Percent",
+          "Unit symbol": "%",
         },
       ]),
     },
@@ -1359,6 +1626,9 @@ async function importFieldsCsvFile(file) {
   if (!file) return;
   clearMessage();
   try {
+    if (file.size > maxFieldsCsvBytes) {
+      throw new Error("CSV file is too large. Maximum size is 2 MB.");
+    }
     const text = await file.text();
     const { rows, skippedRowCount } = readFieldsCsvRows(text);
     const nextSpec = readSpec();

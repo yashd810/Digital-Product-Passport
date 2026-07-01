@@ -43,6 +43,7 @@ function updateEditablePassportUseCase(deps) {
     buildComplianceManagedFields,
     archivePassportSnapshot,
     updatePassportRowById,
+    coerceBulkFieldValue = (_fieldDefinition, value) => value,
     logAudit,
     getActorIdentifier,
     normalizePassportRow = (row) => row,
@@ -232,6 +233,11 @@ function updateEditablePassportUseCase(deps) {
     fields.economicOperatorId = complianceManagedFields.economicOperatorId;
     fields.economicOperatorIdentifierScheme = complianceManagedFields.economicOperatorIdentifierScheme;
     fields.facilityId = complianceManagedFields.facilityId;
+    const schemaFieldsByKey = new Map((typeSchema.schemaFields || []).map((field) => [field.key, field]));
+    for (const [key, value] of Object.entries(fields)) {
+      const fieldDefinition = schemaFieldsByKey.get(key);
+      if (fieldDefinition) fields[key] = coerceBulkFieldValue(fieldDefinition, value);
+    }
 
     await archivePassportSnapshot({
       passport: current.rows[0],

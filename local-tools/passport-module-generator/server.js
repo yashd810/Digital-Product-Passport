@@ -9,6 +9,15 @@ const port = Number.parseInt(process.env.PORT || "5055", 10);
 const appDir = __dirname;
 const repoRoot = path.resolve(appDir, "../..");
 const maxBodyBytes = 2 * 1024 * 1024;
+const allowedApiOrigins = new Set([
+  `http://127.0.0.1:${port}`,
+  `http://localhost:${port}`,
+]);
+const staticSecurityHeaders = {
+  "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+};
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -38,6 +47,8 @@ function sendJson(res, status, data) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(body),
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
   });
   res.end(body);
 }
@@ -46,6 +57,7 @@ function sendText(res, status, body, type = "text/plain; charset=utf-8") {
   res.writeHead(status, {
     "Content-Type": type,
     "Content-Length": Buffer.byteLength(body),
+    "X-Content-Type-Options": "nosniff",
   });
   res.end(body);
 }
@@ -53,17 +65,22 @@ function sendText(res, status, body, type = "text/plain; charset=utf-8") {
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let total = 0;
+    let rejected = false;
     const chunks = [];
     req.on("data", (chunk) => {
+      if (rejected) return;
       total += chunk.length;
       if (total > maxBodyBytes) {
-        reject(new Error("Request body is too large"));
-        req.destroy();
+        rejected = true;
+        const error = new Error("Request body is too large");
+        error.statusCode = 413;
+        reject(error);
         return;
       }
       chunks.push(chunk);
     });
     req.on("end", () => {
+      if (rejected) return;
       const raw = Buffer.concat(chunks).toString("utf8");
       if (!raw) return resolve({});
       try {
@@ -76,16 +93,42 @@ function readBody(req) {
   });
 }
 
+function isPathInside(basePath, candidatePath) {
+  const relativePath = path.relative(basePath, candidatePath);
+  return relativePath !== ""
+    && !relativePath.startsWith(`..${path.sep}`)
+    && relativePath !== ".."
+    && !path.isAbsolute(relativePath);
+}
+
 function serveStatic(req, res, pathname) {
   const fileName = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const filePath = path.resolve(appDir, fileName);
-  if (!filePath.startsWith(appDir) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+  if (!isPathInside(appDir, filePath) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     sendText(res, 404, "Not found");
     return;
   }
   const ext = path.extname(filePath);
-  res.writeHead(200, { "Content-Type": mime[ext] || "application/octet-stream" });
+  res.writeHead(200, {
+    "Content-Type": mime[ext] || "application/octet-stream",
+    ...staticSecurityHeaders,
+  });
   fs.createReadStream(filePath).pipe(res);
+}
+
+function validateApiPostRequest(req) {
+  const origin = clean(req.headers.origin);
+  if (origin && !allowedApiOrigins.has(origin)) {
+    const error = new Error("Cross-origin API requests are not allowed");
+    error.statusCode = 403;
+    throw error;
+  }
+  const contentType = clean(req.headers["content-type"]).split(";")[0].toLowerCase();
+  if (contentType !== "application/json") {
+    const error = new Error("API POST requests require Content-Type: application/json");
+    error.statusCode = 415;
+    throw error;
+  }
 }
 
 function clean(value) {
@@ -137,19 +180,34 @@ function normalizeTableColumns(columns = [], fieldLabel = "Table") {
     const semanticSlug = kebabCase(column.semanticSlug || columnLabel || column.columnKey || column.key || `column-${index + 1}`);
     const columnKey = canonicalKeyFromSemanticSlug(semanticSlug, column.columnKey || column.key || columnLabel || `column${index + 1}`);
     const unitKey = clean(column.unitKey || column.unit || "none").toLowerCase() || "none";
+    const dataType = normalizeDataType(column.dataType, supportedTableColumnDataTypes);
+    const objectType = normalizeObjectType(
+      column.objectType || "SingleValuedDataElement",
+      `${fieldLabel} column "${columnLabel}"`
+    );
+    const expectedValueDataType = defaultValueDataTypeForField("text", dataType);
+    const valueDataType = normalizeValueDataType(
+      column.valueDataType || expectedValueDataType,
+      `${fieldLabel} column "${columnLabel}"`
+    );
+    if (objectType !== "SingleValuedDataElement") {
+      throw new Error(`${fieldLabel} column "${columnLabel}" objectType must be "SingleValuedDataElement".`);
+    }
+    if (valueDataType !== expectedValueDataType) {
+      throw new Error(
+        `${fieldLabel} column "${columnLabel}" dataType "${dataType}" requires valueDataType "${expectedValueDataType}".`
+      );
+    }
     return {
       columnKey,
       columnLabel,
       semanticSlug,
-      dataType: normalizeJsonType(column.dataType),
+      dataType,
       unitKey,
       unitLabel: clean(column.unitLabel) || (unitKey === "none" ? "None" : titleCase(unitKey)),
       unitSymbol: unitKey === "none" ? "" : clean(column.unitSymbol || unitKey),
-      objectType: normalizeObjectType(column.objectType || "SingleValuedDataElement", `${fieldLabel} column "${columnLabel}"`),
-      valueDataType: normalizeValueDataType(
-        column.valueDataType || defaultValueDataTypeForField("text", normalizeJsonType(column.dataType)),
-        `${fieldLabel} column "${columnLabel}"`
-      ),
+      objectType,
+      valueDataType,
     };
   }).filter((column) => column.columnKey);
 
@@ -221,31 +279,32 @@ function normalizeVersion(value) {
   return kebabCase(version) || "v1";
 }
 
-function normalizeJsonType(value) {
+const supportedDataTypes = new Set(["string", "decimal", "integer", "boolean", "date", "datetime", "uri", "array"]);
+const supportedTableColumnDataTypes = new Set([...supportedDataTypes].filter((dataType) => dataType !== "array"));
+
+function normalizeDataType(value, allowedDataTypes = supportedDataTypes) {
   const type = clean(value || "string").toLowerCase();
-  if (["number", "decimal", "float"].includes(type)) return "number";
-  if (["integer", "int"].includes(type)) return "integer";
-  if (["boolean", "bool"].includes(type)) return "boolean";
-  if (type === "date") return "date";
-  if (["datetime", "date-time"].includes(type)) return "datetime";
-  if (["uri", "url"].includes(type)) return "uri";
-  return "string";
+  if (!allowedDataTypes.has(type)) {
+    throw new Error(`Data type "${type}" must be one of: ${[...allowedDataTypes].join(", ")}.`);
+  }
+  return type;
 }
 
-function normalizeFieldType(value, jsonType) {
-  const fieldType = clean(value || (jsonType === "boolean" ? "boolean" : "text"));
+function normalizeFieldType(value, dataType) {
+  const fieldType = clean(value || (dataType === "boolean" ? "boolean" : "text"));
   if (fieldType === "checkbox") return "boolean";
   return fieldType;
 }
 
 function dataTypeFor(value) {
-  const jsonType = normalizeJsonType(value);
-  if (jsonType === "number") return { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" };
-  if (jsonType === "integer") return { format: "Integer", jsonType: "integer", xsdType: "xsd:integer" };
-  if (jsonType === "boolean") return { format: "Boolean", jsonType: "boolean", xsdType: "xsd:boolean" };
-  if (jsonType === "date") return { format: "Date", jsonType: "string", xsdType: "xsd:date" };
-  if (jsonType === "datetime") return { format: "DateTime", jsonType: "string", xsdType: "xsd:dateTime" };
-  if (jsonType === "uri") return { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" };
+  const dataType = normalizeDataType(value);
+  if (dataType === "array") return { format: "Array", jsonType: "array", items: { jsonType: "object" } };
+  if (dataType === "decimal") return { format: "Decimal", jsonType: "decimal", xsdType: "xsd:decimal" };
+  if (dataType === "integer") return { format: "Integer", jsonType: "integer", xsdType: "xsd:integer" };
+  if (dataType === "boolean") return { format: "Boolean", jsonType: "boolean", xsdType: "xsd:boolean" };
+  if (dataType === "date") return { format: "Date", jsonType: "string", xsdType: "xsd:date" };
+  if (dataType === "datetime") return { format: "DateTime", jsonType: "string", xsdType: "xsd:dateTime" };
+  if (dataType === "uri") return { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" };
   return { format: "String", jsonType: "string", xsdType: "xsd:string" };
 }
 
@@ -255,13 +314,33 @@ function defaultObjectTypeForField(fieldType) {
   return "SingleValuedDataElement";
 }
 
-function defaultValueDataTypeForField(fieldType, jsonType) {
+function defaultValueDataTypeForField(fieldType, dataType) {
   if (fieldType === "table") return "Array";
   if (fieldType === "file") return "Binary";
   if (fieldType === "url" || fieldType === "symbol") return "URI";
   if (fieldType === "date") return "Date";
   if (fieldType === "boolean") return "Boolean";
-  return dataTypeFor(jsonType).format.replace("/URL", "");
+  return dataTypeFor(dataType).format.replace("/URL", "");
+}
+
+function validateFieldDataType(fieldType, dataType, fieldLabel) {
+  if (fieldType === "table" && dataType !== "array") {
+    throw new Error(`${fieldLabel} table fields must use dataType "array".`);
+  }
+  if (fieldType !== "table" && dataType === "array") {
+    throw new Error(`${fieldLabel} dataType "array" requires fieldType "table".`);
+  }
+  const requiredDataTypeByFieldType = {
+    boolean: "boolean",
+    date: "date",
+    file: "string",
+    symbol: "uri",
+    url: "uri",
+  };
+  const requiredDataType = requiredDataTypeByFieldType[fieldType];
+  if (requiredDataType && dataType !== requiredDataType) {
+    throw new Error(`${fieldLabel} fieldType "${fieldType}" requires dataType "${requiredDataType}".`);
+  }
 }
 
 function inferPresentation(field) {
@@ -271,7 +350,7 @@ function inferPresentation(field) {
   if (field.fieldType === "url") return "link";
   if (field.fieldType === "textarea") return "narrative";
   if (field.fieldType === "boolean" || field.dataType === "boolean") return "badge";
-  if (field.dataType === "number" || field.dataType === "integer") return "liveMetric";
+  if (field.dataType === "decimal" || field.dataType === "integer") return "liveMetric";
   return "data";
 }
 
@@ -322,6 +401,28 @@ function jsValue(value) {
   return JSON.stringify(value);
 }
 
+function normalizeBaseUrl(value) {
+  const rawUrl = clean(value || "https://www.claros-dpp.online").replace(/\/+$/, "");
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error("Base URL must be a valid absolute URL.");
+  }
+  const isLocalHttp = parsed.protocol === "http:"
+    && ["127.0.0.1", "localhost"].includes(parsed.hostname);
+  if (parsed.protocol !== "https:" && !isLocalHttp) {
+    throw new Error("Base URL must use HTTPS, except for localhost development.");
+  }
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new Error("Base URL must not include credentials, a query, or a fragment.");
+  }
+  if (parsed.pathname !== "/" && parsed.pathname !== "") {
+    throw new Error("Base URL must use the site root without a path.");
+  }
+  return rawUrl;
+}
+
 function validateSpec(input) {
   const module = input.module || {};
   const roles = input.roles || {};
@@ -360,7 +461,7 @@ function validateSpec(input) {
   const systemHeaderFieldKeys = systemHeaderFieldMappings
     .filter((entry) => entry.sourceType === "field")
     .map((entry) => entry.fieldKey);
-  const baseUrl = clean(module.baseUrl || "https://www.claros-dpp.online").replace(/\/+$/, "");
+  const baseUrl = normalizeBaseUrl(module.baseUrl);
   const dictionaryName = clean(module.dictionaryName) || `${titleCase(family)} Dictionary`;
   const dictionaryDescription = clean(module.dictionaryDescription)
     || `Internal ${family} passport dictionary used for Digital Product Passport implementations.`;
@@ -396,8 +497,9 @@ function validateSpec(input) {
       const categoryLabel = clean(field.categoryLabel) || titleCase(categoryKey);
       const unitKey = clean(field.unitKey || field.unit || "none").toLowerCase() || "none";
       const unitSymbol = unitKey === "none" ? "n.a." : clean(field.unitSymbol || field.unitDisplay || unitKey);
-      const jsonType = normalizeJsonType(field.dataType);
-      const fieldType = normalizeFieldType(field.fieldType || field.type, jsonType);
+      const dataType = normalizeDataType(field.dataType);
+      const fieldType = normalizeFieldType(field.fieldType || field.type, dataType);
+      validateFieldDataType(fieldType, dataType, resolvedFieldLabel);
       const normalized = {
         fieldKey,
         fieldLabel: resolvedFieldLabel,
@@ -405,7 +507,7 @@ function validateSpec(input) {
         semanticSlug,
         definition: clean(field.definition) || `${resolvedFieldLabel} for the ${productCategory} passport.`,
         specRef: clean(field.specRef),
-        dataType: jsonType,
+        dataType,
         categoryKey,
         categoryLabel,
         categoryDescription: clean(field.categoryDescription) || `${categoryLabel} attributes.`,
@@ -430,6 +532,9 @@ function validateSpec(input) {
   })).filter((section) => section.key && section.fields.length);
 
   if (!sections.length) throw new Error("At least one section with one field is required");
+  const sectionKeys = sections.map((section) => section.key);
+  const duplicateSection = sectionKeys.find((key, index) => sectionKeys.indexOf(key) !== index);
+  if (duplicateSection) throw new Error(`Duplicate section key: ${duplicateSection}`);
 
   const fieldKeys = sections.flatMap((section) => section.fields.map((field) => field.fieldKey));
   const duplicateField = fieldKeys.find((key, index) => fieldKeys.indexOf(key) !== index);
@@ -478,6 +583,18 @@ function validateSpec(input) {
       field.valueDataType || valueDataTypes[field.fieldKey] || defaultValueDataTypeForField(field.fieldType, field.dataType),
       `Field "${field.fieldKey}"`
     );
+    const expectedValueDataType = defaultValueDataTypeForField(field.fieldType, field.dataType);
+    if (field.valueDataType !== expectedValueDataType) {
+      throw new Error(
+        `Field "${field.fieldKey}" dataType "${field.dataType}" requires valueDataType "${expectedValueDataType}".`
+      );
+    }
+    if (field.fieldType === "table" && field.objectType !== "DataElementCollection") {
+      throw new Error(`Field "${field.fieldKey}" table fields require objectType "DataElementCollection".`);
+    }
+    if (field.fieldType === "table" && field.valueDataType !== "Array") {
+      throw new Error(`Field "${field.fieldKey}" table fields require valueDataType "Array".`);
+    }
     for (const column of field.tableColumns || []) {
       column.elementIdPath = `${field.fieldKey}.${column.columnKey}`;
     }
@@ -497,6 +614,14 @@ function validateSpec(input) {
     const columnKeys = new Set((field.tableColumns || []).map((column) => column.columnKey));
     if (!columnKeys.has(compositionLabelColumnKey) || !columnKeys.has(compositionValueColumnKey)) {
       throw new Error("Composition chart columns must exist on the selected table field.");
+    }
+    const labelColumn = field.tableColumns.find((column) => column.columnKey === compositionLabelColumnKey);
+    const valueColumn = field.tableColumns.find((column) => column.columnKey === compositionValueColumnKey);
+    if (labelColumn.dataType !== "string") {
+      throw new Error("Composition chart label column must use dataType \"string\".");
+    }
+    if (!["decimal", "integer"].includes(valueColumn.dataType)) {
+      throw new Error("Composition chart data column must use dataType \"decimal\" or \"integer\".");
     }
     field.composition = true;
     field.compositionLabelColumnKey = compositionLabelColumnKey;
@@ -554,7 +679,7 @@ function buildTerms(spec) {
   let number = 0;
   return spec.sections.flatMap((section) => section.fields.flatMap((field) => {
     const domainClassKey = pascalCase(field.categoryKey || field.categoryLabel);
-    const toTerm = ({ specRef, slug, label, definition, internalKey, dataType, unitKey }) => {
+    const toTerm = ({ specRef, slug, label, definition, internalKey, dataType, semanticDataType, unitKey }) => {
       number += 1;
       return {
         specRef: specRef || `${prefix}-${String(number).padStart(3, "0")}`,
@@ -563,7 +688,7 @@ function buildTerms(spec) {
         definition,
         category: field.categoryKey,
         internalKey,
-        dataType: dataTypeFor(dataType),
+        dataType: semanticDataType || dataTypeFor(dataType),
         domain: {
           iri: `${semanticBase(spec)}/classes/${domainClassKey}`,
           curie: `${classPrefix}:${domainClassKey}`,
@@ -573,6 +698,20 @@ function buildTerms(spec) {
       };
     };
 
+    const fieldDataType = dataTypeFor(field.dataType);
+    if (field.fieldType === "table") {
+      fieldDataType.items = {
+        jsonType: "object",
+        properties: Object.fromEntries((field.tableColumns || []).map((column) => [
+          column.columnKey,
+          {
+            semanticId: `${semanticBase(spec)}/terms/${column.semanticSlug}`,
+            dataType: dataTypeFor(column.dataType),
+          },
+        ])),
+      };
+    }
+
     const terms = [toTerm({
       specRef: field.specRef,
       slug: field.semanticSlug,
@@ -580,6 +719,7 @@ function buildTerms(spec) {
       definition: field.definition,
       internalKey: field.fieldKey,
       dataType: field.dataType,
+      semanticDataType: fieldDataType,
       unitKey: field.unitKey,
     })];
 
@@ -636,7 +776,11 @@ function buildContext(spec, terms) {
   for (const term of terms) {
     const type = xsdContextType(term.dataType.xsdType);
     const compactId = `${spec.module.family}:${term.slug}`;
-    context[term.internalKey] = type ? { "@id": compactId, "@type": type } : compactId;
+    if (term.dataType.jsonType === "array") {
+      context[term.internalKey] = { "@id": compactId, "@container": "@set" };
+    } else {
+      context[term.internalKey] = type ? { "@id": compactId, "@type": type } : compactId;
+    }
   }
 
   return { "@context": context };
@@ -772,8 +916,8 @@ function buildModuleJs(spec) {
           elementIdPath: column.elementIdPath,
           objectType: column.objectType,
           valueDataType: column.valueDataType,
+          dataType: column.dataType,
           ...(column.unitKey !== "none" ? { unit: column.unitSymbol || column.unitKey } : {}),
-          ...(column.dataType !== "string" ? { dataType: column.dataType } : {}),
         }));
         if (field.composition) args.composition = true;
         if (field.compositionLabelColumnKey) args.compositionLabelColumnKey = field.compositionLabelColumnKey;
@@ -855,8 +999,8 @@ function field({
         elementIdPath: column.elementIdPath,
         objectType: column.objectType,
         valueDataType: column.valueDataType,
+        dataType: column.dataType,
         ...(column.unit ? { unit: column.unit } : {}),
-        ...(column.dataType ? { dataType: column.dataType } : {}),
       })),
       ...(composition ? { composition: true } : {}),
       ...(compositionLabelColumnKey ? { compositionLabelColumnKey } : {}),
@@ -936,7 +1080,7 @@ function buildArtifacts(input) {
 
 function safeRepoPath(relativePath) {
   const fullPath = path.resolve(repoRoot, relativePath);
-  if (!fullPath.startsWith(repoRoot)) {
+  if (!isPathInside(repoRoot, fullPath)) {
     throw new Error(`Refusing to write outside repo: ${relativePath}`);
   }
   return fullPath;
@@ -967,6 +1111,7 @@ async function writeArtifacts(input) {
 
 async function handleApi(req, res, pathname) {
   try {
+    if (req.method === "POST") validateApiPostRequest(req);
     if (req.method === "GET" && pathname === "/api/status") {
       sendJson(res, 200, { repoRoot: repoRoot, port: port });
       return;
@@ -996,12 +1141,16 @@ async function handleApi(req, res, pathname) {
 }
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (url.pathname.startsWith("/api/")) {
-    handleApi(req, res, url.pathname);
-    return;
+  try {
+    const url = new URL(req.url || "/", "http://127.0.0.1");
+    if (url.pathname.startsWith("/api/")) {
+      handleApi(req, res, url.pathname);
+      return;
+    }
+    serveStatic(req, res, url.pathname);
+  } catch {
+    sendJson(res, 400, { error: "Request URL is invalid" });
   }
-  serveStatic(req, res, url.pathname);
 });
 
 if (require.main === module) {

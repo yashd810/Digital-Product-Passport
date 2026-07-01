@@ -564,6 +564,9 @@ function AdminCreatePassportType() {
           }
           // Switching TO table: preserve explicit module columns only.
           if (canonicalPatch.type === "table" && f.type !== "table") {
+            updated.dataType = "array";
+            updated.objectType = updated.objectType || "DataElementCollection";
+            updated.valueDataType = "Array";
             updated.tableColumns = normalizeTableColumns(updated);
             updated.tableColumnCount = updated.tableColumns.length;
           }
@@ -573,6 +576,9 @@ function AdminCreatePassportType() {
             delete updated.tableColumns;
             delete updated.compositionLabelColumnKey;
             delete updated.compositionValueColumnKey;
+            if (updated.dataType === "array") delete updated.dataType;
+            if (updated.valueDataType === "Array") delete updated.valueDataType;
+            if (updated.objectType === "DataElementCollection") delete updated.objectType;
           }
           return updated;
         }),
@@ -920,12 +926,17 @@ function AdminCreatePassportType() {
       .flatMap(s => s.fields.map(field => ({ section: s, field })))
       .find(({ field }) => {
         if (field.type !== "table" || !field.composition) return false;
-        const columnKeys = new Set(normalizeTableColumns(field).map(column => column.key));
+        const columns = normalizeTableColumns(field);
+        const columnKeys = new Set(columns.map(column => column.key));
+        const labelColumn = columns.find(column => column.key === field.compositionLabelColumnKey);
+        const valueColumn = columns.find(column => column.key === field.compositionValueColumnKey);
         return !field.compositionLabelColumnKey ||
           !field.compositionValueColumnKey ||
           field.compositionLabelColumnKey === field.compositionValueColumnKey ||
           !columnKeys.has(field.compositionLabelColumnKey) ||
-          !columnKeys.has(field.compositionValueColumnKey);
+          !columnKeys.has(field.compositionValueColumnKey) ||
+          labelColumn?.dataType !== "string" ||
+          !["decimal", "integer"].includes(valueColumn?.dataType);
       });
     if (invalidCompositionField) {
       setInvalidFields([invalidCompositionField.field.localId]);
@@ -1281,12 +1292,23 @@ function AdminCreatePassportType() {
                       );
                       const semanticSearchValue = getSemanticSearchDisplayValue(field, semanticTermCatalog);
                       const tableColumnsForField = field.type === "table" ? normalizeTableColumns(field) : [];
-                      const compositionColumnOptions = [
+                      const compositionLabelColumnOptions = [
                         { value: "", label: "Select column" },
-                        ...tableColumnsForField.map((column) => ({
+                        ...tableColumnsForField
+                          .filter((column) => column.dataType === "string")
+                          .map((column) => ({
+                            value: column.key,
+                            label: `${column.label || column.key} (${column.key})`,
+                          })),
+                      ];
+                      const compositionValueColumnOptions = [
+                        { value: "", label: "Select column" },
+                        ...tableColumnsForField
+                          .filter((column) => ["decimal", "integer"].includes(column.dataType))
+                          .map((column) => ({
                           value: column.key,
                           label: `${column.label || column.key} (${column.key})`,
-                        })),
+                          })),
                       ];
                       const hasTableCompositionConfig = field.type === "table" && !!field.composition;
                       const hasDistinctCompositionColumns = Boolean(
@@ -1473,7 +1495,7 @@ function AdminCreatePassportType() {
                                   <AdminSelectMenu
                                     value={field.compositionLabelColumnKey || ""}
                                     onChange={(nextValue) => updateField(section.localId, field.localId, { compositionLabelColumnKey: nextValue })}
-                                    options={compositionColumnOptions}
+                                    options={compositionLabelColumnOptions}
                                     className="acpt-select acpt-select-inline"
                                     triggerClassName="acpt-type-select acpt-type-select-sm acpt-select-trigger acpt-select-trigger-sm"
                                     menuClassName="acpt-select-menu acpt-select-menu-compact"
@@ -1487,7 +1509,7 @@ function AdminCreatePassportType() {
                                   <AdminSelectMenu
                                     value={field.compositionValueColumnKey || ""}
                                     onChange={(nextValue) => updateField(section.localId, field.localId, { compositionValueColumnKey: nextValue })}
-                                    options={compositionColumnOptions}
+                                    options={compositionValueColumnOptions}
                                     className="acpt-select acpt-select-inline"
                                     triggerClassName="acpt-type-select acpt-type-select-sm acpt-select-trigger acpt-select-trigger-sm"
                                     menuClassName="acpt-select-menu acpt-select-menu-compact"
@@ -1544,22 +1566,30 @@ function AdminCreatePassportType() {
                             <span className="acpt-meta-sub-label">Data Type</span>
                             <AdminSelectMenu
                               value={field.dataType || ""}
-                              onChange={(nextValue) => updateField(section.localId, field.localId, { dataType: nextValue })}
+                              onChange={(nextValue) => updateField(
+                                section.localId,
+                                field.localId,
+                                nextValue === "array"
+                                  ? { dataType: "array", type: "table" }
+                                  : { dataType: nextValue }
+                              )}
                               options={[
                                 { value: "", label: "Auto-detect" },
                                 { value: "string", label: "Text (string)" },
-                                { value: "number", label: "Number (decimal)" },
+                                { value: "decimal", label: "Decimal" },
                                 { value: "integer", label: "Integer" },
                                 { value: "date", label: "Date" },
+                                { value: "datetime", label: "Date and time" },
                                 { value: "boolean", label: "Boolean" },
                                 { value: "uri", label: "URI / Link" },
+                                { value: "array", label: "Array (table rows)" },
                               ]}
                               className="acpt-select acpt-select-inline"
                               triggerClassName="acpt-type-select acpt-type-select-sm acpt-select-trigger acpt-select-trigger-sm"
                               menuClassName="acpt-select-menu acpt-select-menu-compact"
                               optionClassName="acpt-select-option"
                               ariaLabel="Data type"
-                              disabled={!!field.canonicalLocked}
+                              disabled={!!field.canonicalLocked || field.type === "table"}
                             />
                           </div>
                           <div className="acpt-meta-field-group acpt-meta-field-group-full">
@@ -1642,7 +1672,7 @@ function AdminCreatePassportType() {
                                 semanticTermCatalog,
                                 column._semanticSearch || "",
                                 column.semanticId || ""
-                              );
+                              ).filter((entry) => deriveSemanticTermDataType(entry) !== "array");
                               const columnSemanticSearchValue = getSemanticSearchDisplayValue(column, semanticTermCatalog);
                               return (
                                 <div key={`${field.localId}-column-${ci}`} className="acpt-table-column-config">
@@ -1683,9 +1713,10 @@ function AdminCreatePassportType() {
                                         options={[
                                           { value: "", label: "Auto-detect" },
                                           { value: "string", label: "Text (string)" },
-                                          { value: "number", label: "Number (decimal)" },
+                                          { value: "decimal", label: "Decimal" },
                                           { value: "integer", label: "Integer" },
                                           { value: "date", label: "Date" },
+                                          { value: "datetime", label: "Date and time" },
                                           { value: "boolean", label: "Boolean" },
                                           { value: "uri", label: "URI / Link" },
                                         ]}

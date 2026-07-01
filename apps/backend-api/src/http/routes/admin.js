@@ -5,6 +5,7 @@ const registerCompanyRoutes = require("../../modules/admin/register-company-rout
 const registerSuperAdminRoutes = require("../../modules/admin/register-super-admin-routes");
 const registerUserAccessRoutes = require("../../modules/admin/register-user-access-routes");
 const { systemPassportFields } = require("../../shared/passports/passport-helpers");
+const { getPassportFieldDataTypeError } = require("../../shared/passports/passport-field-data-types");
 const {
   normalizeSystemPassportHeader,
   validateSystemPassportHeader,
@@ -178,6 +179,8 @@ module.exports = function registerAdminRoutes(app, {
         if (!["text", "textarea", "boolean", "file", "table", "url", "date", "symbol"].includes(field.type)) {
           return `Invalid field type: ${field.type}`;
         }
+        const dataTypeError = getPassportFieldDataTypeError(field);
+        if (dataTypeError) return dataTypeError;
       }
     }
     return null;

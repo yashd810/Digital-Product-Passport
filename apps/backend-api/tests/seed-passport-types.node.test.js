@@ -114,6 +114,7 @@ function createExampleProductModule() {
           key: "modelIdentifier",
           label: "Model Identifier",
           type: "text",
+          dataType: "string",
           semanticId: "https://example.test/dictionary/example-product/v1/terms/model-identifier",
           elementIdPath: "deviceIdentity.modelIdentifier",
           objectType: "SingleValuedDataElement",

@@ -77,6 +77,7 @@ test("passport module generator derives field and table column keys from semanti
     {
       fieldLabel: "Materials",
       fieldType: "table",
+      dataType: "array",
       semanticSlug: "material-composition",
       definition: "Component materials.",
       categoryLabel: "Material Information",
@@ -89,7 +90,7 @@ test("passport module generator derives field and table column keys from semanti
         {
           columnLabel: "Mass",
           semanticSlug: "mass-percent",
-          dataType: "number",
+          dataType: "decimal",
           unitLabel: "Percent",
           unitSymbol: "%",
         },

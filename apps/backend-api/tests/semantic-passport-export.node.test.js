@@ -34,6 +34,7 @@ function createRegistryWithCustomDictionary() {
       label: "Energy rating",
       definition: "Energy performance rating for the product.",
       iri: "https://example.test/dictionary/custom-product/v3/terms/energy-rating",
+      dataType: "string",
     },
   ]);
   writeJson(path.join(modelDir, "context.jsonld"), {
@@ -61,7 +62,14 @@ test("semantic export does not infer a dictionary from product category names", 
       sections: [
         {
           fields: [
-            { key: "sampleMass", semanticId: null },
+            {
+              key: "sampleMass",
+              type: "text",
+              dataType: "decimal",
+              objectType: "SingleValuedDataElement",
+              valueDataType: "Decimal",
+              semanticId: null,
+            },
           ],
         },
       ],
@@ -97,6 +105,10 @@ test("semantic export supports arbitrary registered semantic models without cate
           fields: [
             {
               key: "energyRating",
+              type: "text",
+              dataType: "string",
+              objectType: "SingleValuedDataElement",
+              valueDataType: "String",
               semanticId: "https://example.test/dictionary/custom-product/v3/terms/energy-rating",
             },
           ],

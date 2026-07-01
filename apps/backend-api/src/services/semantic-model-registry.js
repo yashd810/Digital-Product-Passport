@@ -7,15 +7,16 @@ const defaultResourcesDir = path.join(__dirname, "../../resources/semantics");
 
 const dataTypePresets = {
   string: { format: "String", jsonType: "string", xsdType: "xsd:string" },
-  decimal: { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" },
-  number: { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" },
+  decimal: { format: "Decimal", jsonType: "decimal", xsdType: "xsd:decimal" },
   integer: { format: "Integer", jsonType: "integer", xsdType: "xsd:integer" },
   boolean: { format: "Boolean", jsonType: "boolean", xsdType: "xsd:boolean" },
   date: { format: "Date", jsonType: "string", xsdType: "xsd:date" },
   datetime: { format: "DateTime", jsonType: "string", xsdType: "xsd:dateTime" },
   uri: { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" },
   url: { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" },
+  array: { format: "Array", jsonType: "array", items: { jsonType: "object" } },
 };
+const supportedSemanticJsonTypes = new Set(["string", "decimal", "integer", "boolean", "array", "object"]);
 
 function loadJsonIfExists(filePath, defaultValue) {
   if (!fs.existsSync(filePath)) return defaultValue;
@@ -34,6 +35,21 @@ function isPlainObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function normalizeSemanticJsonType(jsonType, xsdType = "") {
+  const normalized = normalizePathSegment(jsonType);
+  const normalizedXsdType = normalizePathSegment(xsdType);
+  if (normalized && !supportedSemanticJsonTypes.has(normalized)) {
+    throw new Error(`Unsupported semantic jsonType "${normalized}".`);
+  }
+  if (/(?:^|[:#/])decimal$/.test(normalizedXsdType)) {
+    if (normalized && normalized !== "decimal") {
+      throw new Error(`Semantic xsd:decimal terms must use jsonType "decimal", not "${normalized}".`);
+    }
+    return "decimal";
+  }
+  return normalized;
+}
+
 function compactObject(value) {
   return Object.fromEntries(
     Object.entries(value).filter(([, entryValue]) =>
@@ -47,10 +63,32 @@ function normalizeDataType(dataType) {
   if (!dataType) return null;
   if (typeof dataType === "string") {
     const preset = dataTypePresets[normalizePathSegment(dataType)];
-    return preset ? { ...preset } : { format: dataType, jsonType: "string", xsdType: "xsd:string" };
+    if (!preset) {
+      throw new Error(`Unsupported semantic data type "${dataType}".`);
+    }
+    return { ...preset };
   }
-  if (isPlainObject(dataType)) return { ...dataType };
+  if (isPlainObject(dataType)) {
+    const normalized = { ...dataType };
+    const jsonType = normalizeSemanticJsonType(normalized.jsonType, normalized.xsdType);
+    if (jsonType) normalized.jsonType = jsonType;
+    if (jsonType === "array" && !isPlainObject(normalized.items)) {
+      normalized.items = { jsonType: "object" };
+    }
+    return normalized;
+  }
   return dataType;
+}
+
+function normalizeRange(range, dataType = null) {
+  if (!isPlainObject(range)) return range;
+  const normalized = { ...range };
+  const jsonType = normalizeSemanticJsonType(
+    normalized.jsonType || dataType?.jsonType,
+    normalized.curie || normalized.iri || dataType?.xsdType
+  );
+  if (jsonType) normalized.jsonType = jsonType;
+  return normalized;
 }
 
 function createLookupByKey(items = []) {
@@ -119,7 +157,7 @@ function normalizeTermsSource(termsSource, { manifest, basePath, categories, uni
       delete domain.broaderClass;
     }
     const dataType = normalizeDataType(term.dataType);
-    const range = term.range || term.semanticBinding?.range || rangeFromDataType(dataType);
+    const range = normalizeRange(term.range || term.semanticBinding?.range, dataType) || rangeFromDataType(dataType);
     const unit = term.unit || "none";
     const unitRecord = unitsByKey.get(String(unit));
     const unitDisplay = term.unitDisplay !== undefined

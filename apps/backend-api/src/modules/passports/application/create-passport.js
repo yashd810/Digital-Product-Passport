@@ -39,6 +39,7 @@ function createDraftPassportUseCase(deps) {
     getWritablePassportColumns,
     joinQuotedSqlIdentifiers,
     toStoredPassportValue,
+    coerceBulkFieldValue = (_fieldDefinition, value) => value,
     extractCarrierAuthenticityMutation,
     applyCarrierAuthenticityMutation,
     getCompanyNameMap,
@@ -145,7 +146,14 @@ function createDraftPassportUseCase(deps) {
     });
 
     const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key) || builtInEditableFields.has(key));
-    const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
+    const schemaFieldsByKey = new Map((typeSchema.schemaFields || []).map((field) => [field.key, field]));
+    const processedFields = Object.fromEntries(dataFields.map((key) => {
+      const fieldDefinition = schemaFieldsByKey.get(key);
+      const typedValue = fieldDefinition
+        ? coerceBulkFieldValue(fieldDefinition, fields[key])
+        : fields[key];
+      return [key, toStoredPassportValue(typedValue)];
+    }));
     const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
       ...item,
       carrierAuthenticity,

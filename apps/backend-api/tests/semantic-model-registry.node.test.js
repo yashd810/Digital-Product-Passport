@@ -340,9 +340,10 @@ test("semantic registry expands compact term sources", () => {
     assert.equal(energyRating.categoryLabel, "Performance");
 
     assert.equal(powerConsumption.iri, "https://example.test/dictionary/custom-product/v4/terms/power-consumption");
-    assert.deepEqual(powerConsumption.dataType, { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" });
+    assert.deepEqual(powerConsumption.dataType, { format: "Decimal", jsonType: "decimal", xsdType: "xsd:decimal" });
     assert.equal(powerConsumption.range.iri, "http://www.w3.org/2001/XMLSchema#decimal");
     assert.equal(powerConsumption.range.curie, "xsd:decimal");
+    assert.equal(powerConsumption.range.jsonType, "decimal");
     assert.equal(powerConsumption.unitDisplay, "kWh/year");
   } finally {
     fs.rmSync(resourcesDir, { recursive: true, force: true });

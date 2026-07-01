@@ -1,6 +1,8 @@
 "use strict";
 
 const createSemanticModelRegistry = require("./semantic-model-registry");
+const { getPassportFieldDataTypeError } = require("../shared/passports/passport-field-data-types");
+const { coercePassportScalarValue } = require("../shared/passports/passport-helpers");
 
 const dppContext = {
   "@version": 1.1,
@@ -57,6 +59,74 @@ function getTypeName(typeDef) {
   return readTypeValue(typeDef, "typeName") || "";
 }
 
+function coerceSchemaValue(value, dataType, label = "value", objectType = "") {
+  return coercePassportScalarValue({ dataType, label, objectType }, value);
+}
+
+function coerceTableValue(value, field) {
+  let rows = value;
+  if (typeof rows === "string") {
+    try {
+      rows = JSON.parse(rows);
+    } catch {
+      throw new Error(`Expected JSON array for ${field?.label || field?.key || "table"}`);
+    }
+  }
+  if (!Array.isArray(rows)) throw new Error(`Expected array for ${field?.label || field?.key || "table"}`);
+  const columns = Array.isArray(field?.tableColumns) ? field.tableColumns : [];
+  const columnKeys = new Set(columns.map((column) => column?.key).filter(Boolean));
+  return rows.map((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      throw new Error(`Expected row object for ${field?.label || field?.key || "table"}`);
+    }
+    const unknownKeys = Object.keys(row).filter((key) => !columnKeys.has(key));
+    if (unknownKeys.length) {
+      throw new Error(
+        `Unknown table column(s) for ${field?.label || field?.key || "table"}: ${unknownKeys.join(", ")}`
+      );
+    }
+    const typedRow = { ...row };
+    for (const column of columns) {
+      if (!column?.key || !Object.prototype.hasOwnProperty.call(typedRow, column.key)) continue;
+      typedRow[column.key] = coerceSchemaValue(
+        typedRow[column.key],
+        column.dataType,
+        `${field?.label || field?.key || "table"}.${column.label || column.key}`,
+        column.objectType
+      );
+    }
+    return typedRow;
+  });
+}
+
+function coercePassportSchemaValues(passport, typeDef) {
+  const typedPassport = {
+    ...(passport || {}),
+    ...(passport?.fields && typeof passport.fields === "object" && !Array.isArray(passport.fields)
+      ? { fields: { ...passport.fields } }
+      : {}),
+  };
+  const schemaFields = (getFieldsJson(typeDef).sections || [])
+    .flatMap((section) => section?.fields || []);
+
+  for (const field of schemaFields) {
+    if (!field?.key) continue;
+    const schemaError = getPassportFieldDataTypeError(field, { requireExplicit: true });
+    if (schemaError) throw new Error(schemaError);
+    const hasNestedValue = Object.prototype.hasOwnProperty.call(typedPassport.fields || {}, field.key);
+    const hasTopLevelValue = Object.prototype.hasOwnProperty.call(typedPassport, field.key);
+    if (!hasNestedValue && !hasTopLevelValue) continue;
+    const rawValue = hasNestedValue ? typedPassport.fields[field.key] : typedPassport[field.key];
+    const typedValue = field.type === "table" || field.dataType === "array"
+      ? coerceTableValue(rawValue, field)
+      : coerceSchemaValue(rawValue, field.dataType, field.label || field.key, field.objectType);
+    if (hasNestedValue) typedPassport.fields[field.key] = typedValue;
+    if (hasTopLevelValue) typedPassport[field.key] = typedValue;
+  }
+
+  return typedPassport;
+}
+
 function createSemanticPassportExportService({
   semanticModelRegistry = createSemanticModelRegistry(),
 } = {}) {
@@ -86,15 +156,20 @@ function createSemanticPassportExportService({
     if (!model) return inlineContext;
 
     const knownContext = model.context?.["@context"] || {};
-    const addField = (fieldKey, semanticId = null) => {
+    const addField = (fieldKey, semanticId = null, dataType = "") => {
       if (!fieldKey || knownContext[fieldKey]) return;
       const termIri = resolveDictionaryTermIri(model, fieldKey, semanticId);
-      if (termIri) inlineContext[fieldKey] = { "@id": termIri };
+      if (termIri) {
+        inlineContext[fieldKey] = {
+          "@id": termIri,
+          ...(dataType === "array" ? { "@container": "@set" } : {}),
+        };
+      }
     };
 
     for (const section of (getFieldsJson(typeDef).sections || [])) {
       for (const field of (section.fields || [])) {
-        addField(field.key, field.semanticId);
+        addField(field.key, field.semanticId, field.dataType);
         if (field?.type === "table") {
           for (const column of (field.tableColumns || [])) {
             addField(column?.key, column?.semanticId);
@@ -114,11 +189,12 @@ function createSemanticPassportExportService({
     return inlineContext;
   }
 
-  function sanitizePassport(passport, passportType) {
+  function sanitizePassport(passport, passportType, typeDef = null) {
     const clean = { "@type": "DigitalProductPassport" };
-    const resolvedPassportType = passport?.passportType || passportType || null;
+    const typedPassport = coercePassportSchemaValues(passport, typeDef);
+    const resolvedPassportType = typedPassport?.passportType || passportType || null;
 
-    for (const [key, value] of Object.entries(passport || {})) {
+    for (const [key, value] of Object.entries(typedPassport || {})) {
       if (value === undefined) continue;
       if (key === "_semanticIds") continue;
       clean[key] = value;
@@ -162,7 +238,7 @@ function createSemanticPassportExportService({
 
     const typeDef = options.typeDef || null;
     const resolvedType = String(passportType || passports[0]?.passportType || getTypeName(typeDef) || "").trim();
-    const graph = passports.map((passport) => sanitizePassport(passport, resolvedType));
+    const graph = passports.map((passport) => sanitizePassport(passport, resolvedType, typeDef));
     const model = resolveSemanticModel({ passportType: resolvedType, typeDef, options });
     const contexts = [dppContext];
 

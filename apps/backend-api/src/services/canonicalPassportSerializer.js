@@ -4,6 +4,7 @@ const { buildCarrierAuthenticityResponseFields } = require("../shared/passports/
 const createSemanticModelRegistry = require("./semantic-model-registry");
 const { buildCanonicalIdentityBundle } = require("../shared/identifiers/canonical-identity-bundle");
 const { getPassportFieldValue } = require("../shared/passports/passport-helpers");
+const { getPassportFieldDataTypeError } = require("../shared/passports/passport-field-data-types");
 
 function createCanonicalPassportSerializer({
   didService,
@@ -92,6 +93,7 @@ function createCanonicalPassportSerializer({
 
   function parseBoolean(value) {
     if (typeof value === "boolean") return value;
+    if (typeof value !== "string") return value;
     const normalized = normalizeText(value).toLowerCase();
     if (["true", "1", "yes"].includes(normalized)) return true;
     if (["false", "0", "no"].includes(normalized)) return false;
@@ -100,12 +102,13 @@ function createCanonicalPassportSerializer({
 
   function parseNumeric(value, integerOnly = false) {
     if (typeof value === "number" && Number.isFinite(value)) {
-      return integerOnly ? Math.trunc(value) : value;
+      return value;
     }
     if (typeof value !== "string") return value;
     const trimmed = value.trim();
     if (!trimmed) return value;
-    if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return value;
+    const numericPattern = integerOnly ? /^-?\d+$/ : /^-?\d+(\.\d+)?$/;
+    if (!numericPattern.test(trimmed)) return value;
     const parsed = integerOnly ? Number.parseInt(trimmed, 10) : Number.parseFloat(trimmed);
     return Number.isFinite(parsed) ? parsed : value;
   }
@@ -147,7 +150,9 @@ function createCanonicalPassportSerializer({
       return rawValue;
     }
 
-    if (fieldDef?.dataType === "number") return parseNumeric(rawValue, false);
+    if (normalizeText(fieldDef?.dataType).toLowerCase() === "decimal") {
+      return parseNumeric(rawValue, false);
+    }
     if (fieldDef?.dataType === "integer") return parseNumeric(rawValue, true);
 
     if (looksLikeJson(rawValue)) {
@@ -364,10 +369,21 @@ function createCanonicalPassportSerializer({
     const jsonType = normalizeText(term?.dataType?.jsonType).toLowerCase();
     const xsdType = normalizeText(term?.dataType?.xsdType).toLowerCase();
 
+    if (jsonType === "array") {
+      return parseArrayValue(value);
+    }
+    if (jsonType === "object" && typeof value === "string" && looksLikeJson(value)) {
+      try {
+        const parsed = JSON.parse(value);
+        return isPlainObject(parsed) ? parsed : value;
+      } catch {
+        return value;
+      }
+    }
     if (jsonType === "boolean" || xsdType.endsWith(":boolean")) {
       return parseBoolean(value);
     }
-    if (jsonType === "number" || xsdType.endsWith(":decimal")) {
+    if (jsonType === "decimal" || xsdType.endsWith(":decimal")) {
       return parseNumeric(value, false);
     }
     if (jsonType === "integer" || xsdType.endsWith(":integer") || xsdType.endsWith(":int")) {
@@ -402,7 +418,7 @@ function createCanonicalPassportSerializer({
       return normalizeText(value);
     }
     if (jsonType === "string" || xsdType.endsWith(":string")) {
-      return typeof value === "string" ? value : String(value);
+      return typeof value === "object" ? value : (typeof value === "string" ? value : String(value));
     }
 
     return value;
@@ -410,7 +426,6 @@ function createCanonicalPassportSerializer({
 
   function buildSemanticValidationIssues(value, term, fieldDef, key, options = {}) {
     if (!term || isBlankValue(value)) return [];
-    if (fieldDef?.type === "table") return [];
 
     const issues = [];
     const jsonType = normalizeText(term?.dataType?.jsonType).toLowerCase();
@@ -446,13 +461,21 @@ function createCanonicalPassportSerializer({
 
     const isMultiLanguageFieldValue = (isExplicitMultiLanguageField(fieldDef) || isMultiLanguageValue(value)) && isPlainObject(value);
 
-    if (jsonType === "boolean" || xsdType.endsWith(":boolean")) {
+    if (jsonType === "array") {
+      if (!Array.isArray(value)) {
+        pushIssue("semanticTypeMismatch", `Expected array value for "${key}".`);
+      }
+    } else if (jsonType === "object") {
+      if (!isPlainObject(value)) {
+        pushIssue("semanticTypeMismatch", `Expected object value for "${key}".`);
+      }
+    } else if (jsonType === "boolean" || xsdType.endsWith(":boolean")) {
       if (typeof value !== "boolean") {
         pushIssue("semanticTypeMismatch", `Expected boolean value for "${key}".`);
       }
-    } else if (jsonType === "number" || xsdType.endsWith(":decimal")) {
+    } else if (jsonType === "decimal" || xsdType.endsWith(":decimal")) {
       if (typeof value !== "number" || !Number.isFinite(value)) {
-        pushIssue("semanticTypeMismatch", `Expected decimal number value for "${key}".`);
+        pushIssue("semanticTypeMismatch", `Expected decimal value for "${key}".`);
       }
     } else if (jsonType === "integer" || xsdType.endsWith(":integer") || xsdType.endsWith(":int")) {
       if (!Number.isInteger(value)) {
@@ -641,9 +664,9 @@ function createCanonicalPassportSerializer({
       if (!Number.isInteger(value)) {
         pushIssue("fieldTypeMismatch", `Expected integer value for "${key}".`);
       }
-    } else if (!skipTypeValidation && (normalizedDataType === "number" || normalizedDataType === "decimal")) {
+    } else if (!skipTypeValidation && normalizedDataType === "decimal") {
       if (typeof value !== "number" || !Number.isFinite(value)) {
-        pushIssue("fieldTypeMismatch", `Expected decimal number value for "${key}".`);
+        pushIssue("fieldTypeMismatch", `Expected decimal value for "${key}".`);
       }
     } else if (!skipTypeValidation && (normalizedDataType === "date" || normalizedFieldType === "date")) {
       if (typeof value !== "string" || !isDateLike(value)) {
@@ -684,6 +707,17 @@ function createCanonicalPassportSerializer({
     return issues;
   }
 
+  function buildFieldDefinitionValidationIssues(fieldDef, key, options = {}) {
+    const dataTypeError = getPassportFieldDataTypeError(fieldDef, { requireExplicit: true });
+    if (!dataTypeError) return [];
+    return [{
+      key,
+      code: "fieldSchemaDataTypeInvalid",
+      message: dataTypeError,
+      dictionaryReference: resolveDictionaryReference(fieldDef, key, options.semanticModel),
+    }];
+  }
+
   function summarizeValidationIssues(issues = []) {
     const countsByCode = {};
     for (const issue of issues) {
@@ -704,7 +738,9 @@ function createCanonicalPassportSerializer({
 
     if (semanticJsonType === "boolean" || semanticXsdType.endsWith(":boolean")) return "Boolean";
     if (semanticJsonType === "integer" || semanticXsdType.endsWith(":integer") || semanticXsdType.endsWith(":int")) return "Integer";
-    if (semanticJsonType === "number" || semanticXsdType.endsWith(":decimal")) return "Decimal";
+    if (semanticJsonType === "decimal" || semanticXsdType.endsWith(":decimal")) return "Decimal";
+    if (semanticJsonType === "array") return "Array";
+    if (semanticJsonType === "object") return "Object";
     if (semanticXsdType.endsWith(":datetime")) return "DateTime";
     if (semanticXsdType.endsWith(":date")) return "Date";
     if (semanticXsdType.endsWith(":gyearmonth")) return "YearMonth";
@@ -755,6 +791,80 @@ function createCanonicalPassportSerializer({
     return fieldDef.tableColumns
       .map(normalizeTableColumnDefinition)
       .filter(Boolean);
+  }
+
+  function coerceTableRows(value, fieldDef, semanticModel = null) {
+    if (!Array.isArray(value)) return value;
+    const columns = getTableColumnDefinitions(fieldDef);
+    return value.map((row) => {
+      if (!isPlainObject(row)) return row;
+      const typedRow = { ...row };
+      columns
+        .filter((column) => Object.prototype.hasOwnProperty.call(row, column.key))
+        .forEach((column) => {
+          const columnTerm = resolveSemanticTerm(column, column.key, semanticModel);
+          typedRow[column.key] = coerceValueToSemanticType(
+            coerceTypedFieldValue(column, row[column.key]),
+            columnTerm
+          );
+        });
+      return typedRow;
+    });
+  }
+
+  function coerceCanonicalFieldValue(fieldDef, rawValue, semanticTerm = null, semanticModel = null) {
+    const fieldValue = coerceTypedFieldValue(fieldDef, rawValue);
+    const structuredValue = fieldDef?.type === "table"
+      ? coerceTableRows(fieldValue, fieldDef, semanticModel)
+      : fieldValue;
+    return coerceValueToSemanticType(structuredValue, semanticTerm);
+  }
+
+  function buildTableCellValidationIssues(value, fieldDef, key, semanticModel = null) {
+    if (fieldDef?.type !== "table" || !Array.isArray(value)) return [];
+    const columns = getTableColumnDefinitions(fieldDef);
+    const columnKeys = new Set(columns.map((column) => column.key));
+    const issues = [];
+
+    value.forEach((row, rowIndex) => {
+      if (!isPlainObject(row)) return;
+      const unknownKeys = Object.keys(row).filter((columnKey) => !columnKeys.has(columnKey));
+      if (unknownKeys.length) {
+        issues.push({
+          key: `${key}[${rowIndex}]`,
+          code: "fieldTableColumnUnknown",
+          message: `Table "${key}" row ${rowIndex + 1} contains unknown column(s): ${unknownKeys.join(", ")}.`,
+          dictionaryReference: resolveDictionaryReference(fieldDef, key, semanticModel),
+          unknownColumns: unknownKeys,
+        });
+      }
+      columns.forEach((column) => {
+        const cellValue = row[column.key];
+        if (isBlankValue(cellValue)) return;
+        const columnKey = `${key}[${rowIndex}].${column.key}`;
+        const semanticTerm = resolveSemanticTerm(column, column.key, semanticModel);
+        if (semanticModel && !semanticTerm) {
+          issues.push({
+            key: columnKey,
+            code: "semanticTermNotFound",
+            message: `Table column "${column.key}" is not mapped to a term in semantic model "${semanticModel.semanticModelKey}".`,
+            dictionaryReference: resolveDictionaryReference(column, column.key, semanticModel),
+          });
+          return;
+        }
+        issues.push(
+          ...buildSemanticValidationIssues(cellValue, semanticTerm, column, columnKey, {
+            semanticModel,
+          }),
+          ...buildSchemaValidationIssues(cellValue, column, columnKey, {
+            skipTypeValidation: Boolean(semanticTerm),
+            semanticModel,
+          })
+        );
+      });
+    });
+
+    return issues;
   }
 
   function buildTableRowElement(row, rowIndex, fieldDef, semanticModel = null) {
@@ -858,6 +968,13 @@ function createCanonicalPassportSerializer({
     const fields = {};
     const validationIssues = [];
     for (const fieldDef of schemaFields) {
+      const definitionIssues = buildFieldDefinitionValidationIssues(fieldDef, fieldDef.key, {
+        semanticModel,
+      });
+      if (definitionIssues.length) {
+        validationIssues.push(...definitionIssues);
+        continue;
+      }
       const semanticTerm = resolveSemanticTerm(fieldDef, fieldDef.key, semanticModel);
       if (semanticModel && !semanticTerm) {
         validationIssues.push({
@@ -877,9 +994,11 @@ function createCanonicalPassportSerializer({
           dictionaryReference: resolveDictionaryReference(fieldDef, fieldDef.key, semanticModel),
         });
       }
-      const typedValue = coerceValueToSemanticType(
-        coerceTypedFieldValue(fieldDef, rawValue),
-        semanticTerm
+      const typedValue = coerceCanonicalFieldValue(
+        fieldDef,
+        rawValue,
+        semanticTerm,
+        semanticModel
       );
       if (typedValue === null) continue;
       const issues = [
@@ -890,6 +1009,7 @@ function createCanonicalPassportSerializer({
           skipTypeValidation: Boolean(semanticTerm),
           semanticModel,
         }),
+        ...buildTableCellValidationIssues(typedValue, fieldDef, fieldDef.key, semanticModel),
       ];
       if (issues.length) {
         validationIssues.push(...issues);
@@ -989,19 +1109,13 @@ function createCanonicalPassportSerializer({
     const passportType = String(passport?.passportType || getTypeName(typeDef) || options.passportType || "passport").trim().toLowerCase() || "passport";
     const semanticModel = resolveSemanticModel(typeDef, passportType, options);
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, options);
+    const canonicalFields = canonicalPayload.fields || {};
     const elements = getSchemaFieldDefinitions(typeDef)
       .map((fieldDef) => ({
         fieldDef,
-        value: (() => {
-          const rawValue = getPassportFieldValue(passport, fieldDef.key);
-          if (isBlankValue(rawValue)) return undefined;
-          const semanticTerm = resolveSemanticTerm(fieldDef, fieldDef.key, semanticModel);
-          const typedValue = coerceValueToSemanticType(
-            coerceTypedFieldValue(fieldDef, rawValue),
-            semanticTerm
-          );
-          return typedValue === null ? undefined : typedValue;
-        })(),
+        value: Object.prototype.hasOwnProperty.call(canonicalFields, fieldDef.key)
+          ? canonicalFields[fieldDef.key]
+          : undefined,
       }))
       .filter(({ value }) => value !== undefined && value !== null)
       .map(({ fieldDef, value }) => buildExpandedDataElement({

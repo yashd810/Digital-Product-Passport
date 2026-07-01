@@ -6,6 +6,7 @@ import {
 } from "../admin/passport-types/builderHelpers";
 import {
   buildSemanticModelOptions,
+  deriveSemanticTermDataType,
   formatSemanticModelLabel,
   getSemanticModelOption,
 } from "../admin/passport-types/semanticTermCatalog";
@@ -51,6 +52,15 @@ describe("frontend modularity helpers", () => {
       key: "externalFutureDictionaryV3",
       registered: false,
     });
+  });
+
+  test("semantic terms preserve canonical decimal and array data types", () => {
+    expect(deriveSemanticTermDataType({
+      dataType: { format: "Decimal", jsonType: "decimal", xsdType: "xsd:decimal" },
+    })).toBe("decimal");
+    expect(deriveSemanticTermDataType({
+      dataType: { format: "Array", jsonType: "array", items: { jsonType: "object" } },
+    })).toBe("array");
   });
 
   test("passport lists use module business identifier from explicit module metadata", () => {
@@ -103,12 +113,13 @@ describe("frontend modularity helpers", () => {
     })).toBe("/dpp/preview/example-company/dppid-preview-1/dppId-preview-1");
   });
 
-  test("semantic JSON-LD export includes the selected model context", () => {
+  test("semantic JSON-LD export includes model context and typed array rows", () => {
     const exported = buildPassportJsonLdExport([
       {
         dppId: "dpp-sensor-001",
         passportType: "equipmentPassportV3",
         serialNumber: "SN-001",
+        materialComposition: [{ materialName: "Steel", percentage: "62.5" }],
       },
     ], "equipmentPassportV3", {
       semanticModel: {
@@ -116,6 +127,34 @@ describe("frontend modularity helpers", () => {
         contextUrl: "https://www.claros-dpp.online/dictionary/equipment/v3/context.jsonld",
         family: "equipment",
         version: "v3",
+      },
+      typeDef: {
+        fieldsJson: {
+          sections: [{
+            fields: [{
+              key: "materialComposition",
+              type: "table",
+              dataType: "array",
+              objectType: "DataElementCollection",
+              valueDataType: "Array",
+              semanticId: "https://example.test/terms/material-composition",
+              tableColumns: [
+                {
+                  key: "materialName",
+                  dataType: "string",
+                  objectType: "SingleValuedDataElement",
+                  valueDataType: "String",
+                },
+                {
+                  key: "percentage",
+                  dataType: "decimal",
+                  objectType: "SingleValuedDataElement",
+                  valueDataType: "Decimal",
+                },
+              ],
+            }],
+          }],
+        },
       },
     });
 
@@ -128,6 +167,13 @@ describe("frontend modularity helpers", () => {
     expect(exported["@graph"][0]).toMatchObject({
       passportType: "equipmentPassportV3",
       serialNumber: "SN-001",
+      materialComposition: [{ materialName: "Steel", percentage: 62.5 }],
+    });
+    expect(exported["@context"]).toContainEqual({
+      materialComposition: {
+        "@id": "https://example.test/terms/material-composition",
+        "@container": "@set",
+      },
     });
   });
 

@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { normalizeSystemPassportHeader, validateSystemPassportHeader } = require("../services/passport-header-fields");
 const { canonicalKeyFromSemanticId } = require("../shared/passports/canonical-field-keys");
+const { getPassportFieldDataTypeError } = require("../shared/passports/passport-field-data-types");
 
 const defaultModulesDir = __dirname;
 
@@ -38,38 +39,60 @@ function normalizePassportPolicy(policyDefinition = null, moduleDefinition = {})
 }
 
 function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null) {
-  return sections.map((section) => ({
-    ...section,
-    sourceModuleKey,
-    fields: (section.fields || []).map((field) => {
-      const canonicalFieldKey = canonicalKeyFromSemanticId(field.semanticId);
-      if (canonicalFieldKey && field.key !== canonicalFieldKey) {
-        throw new Error(`Passport module field "${field.key || "unknown"}" must use canonical semantic key "${canonicalFieldKey}".`);
-      }
-      const nextField = {
-        ...field,
-        canonicalLocked: true,
-        sourceModuleKey,
-        sourceModuleFieldKey: field.key,
-      };
-      if (field.type === "table" && Array.isArray(field.tableColumns)) {
-        nextField.tableColumns = field.tableColumns.map((column) => ({
-          ...column,
+  const seenSectionKeys = new Set();
+  const seenFieldKeys = new Set();
+  return sections.map((section) => {
+    if (!section?.key) {
+      throw new Error(`Passport module "${sourceModuleKey || "unknown"}" contains a section without a key.`);
+    }
+    if (seenSectionKeys.has(section.key)) {
+      throw new Error(`Passport module "${sourceModuleKey || "unknown"}" contains duplicate section key "${section.key}".`);
+    }
+    seenSectionKeys.add(section.key);
+    return {
+      ...section,
+      sourceModuleKey,
+      fields: (section.fields || []).map((field) => {
+        if (!field?.key) {
+          throw new Error(`Passport module "${sourceModuleKey || "unknown"}" contains a field without a key.`);
+        }
+        if (seenFieldKeys.has(field.key)) {
+          throw new Error(`Passport module "${sourceModuleKey || "unknown"}" contains duplicate field key "${field.key}".`);
+        }
+        seenFieldKeys.add(field.key);
+        const dataTypeError = getPassportFieldDataTypeError(field, { requireExplicit: true });
+        if (dataTypeError) {
+          throw new Error(`Passport module "${sourceModuleKey || "unknown"}": ${dataTypeError}`);
+        }
+        const canonicalFieldKey = canonicalKeyFromSemanticId(field.semanticId);
+        if (canonicalFieldKey && field.key !== canonicalFieldKey) {
+          throw new Error(`Passport module field "${field.key || "unknown"}" must use canonical semantic key "${canonicalFieldKey}".`);
+        }
+        const nextField = {
+          ...field,
           canonicalLocked: true,
           sourceModuleKey,
-          sourceModuleColumnKey: column.key,
-        })).map((column) => {
-          const canonicalColumnKey = canonicalKeyFromSemanticId(column.semanticId);
-          if (canonicalColumnKey && column.key !== canonicalColumnKey) {
-            throw new Error(`Passport module table column "${field.key || "unknown"}.${column.key || "unknown"}" must use canonical semantic key "${canonicalColumnKey}".`);
-          }
-          return column;
-        });
-        nextField.tableColumnCount = nextField.tableColumns.length;
-      }
-      return nextField;
-    }),
-  }));
+          sourceModuleFieldKey: field.key,
+        };
+        if (field.type === "table" && Array.isArray(field.tableColumns)) {
+          nextField.tableColumns = field.tableColumns.map((column) => ({
+            ...column,
+            canonicalLocked: true,
+            sourceModuleKey,
+            sourceModuleColumnKey: column.key,
+          })).map((column) => {
+            const canonicalColumnKey = canonicalKeyFromSemanticId(column.semanticId);
+            if (canonicalColumnKey && column.key !== canonicalColumnKey) {
+              throw new Error(`Passport module table column "${field.key || "unknown"}.${column.key || "unknown"}" must use canonical semantic key "${canonicalColumnKey}".`);
+            }
+            return column;
+          });
+          nextField.tableColumnCount = nextField.tableColumns.length;
+        }
+        return nextField;
+      }),
+    };
+  });
 }
 
 function normalizeModuleDefinition(moduleDefinition = {}) {

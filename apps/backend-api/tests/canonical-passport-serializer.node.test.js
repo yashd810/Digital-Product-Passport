@@ -41,6 +41,7 @@ function createExampleProductTypeDef() {
             key: "deviceMaterial",
             label: "Device Material",
             type: "text",
+            dataType: "string",
             semanticId: "https://www.claros-dpp.online/dictionary/example-product/v1/terms/device-material",
             objectType: "SingleValuedDataElement",
             valueDataType: "String",
@@ -49,6 +50,7 @@ function createExampleProductTypeDef() {
             key: "sterilizationCycles",
             label: "Sterilization Cycles",
             type: "text",
+            dataType: "integer",
             semanticId: "https://www.claros-dpp.online/dictionary/example-product/v1/terms/sterilization-cycles",
             objectType: "SingleValuedDataElement",
             valueDataType: "Integer",
@@ -90,7 +92,7 @@ test("canonical serializer resolves terms from explicit semantic field metadata"
   });
 
   assert.equal(canonical.fields.deviceMaterial, "Surgical steel");
-  assert.equal(canonical.fields.sterilizationCycles, "12");
+  assert.equal(canonical.fields.sterilizationCycles, 12);
   assert.deepEqual(canonical.extensions.platform.validationIssues || [], []);
 
   const expanded = serializer.buildExpandedPassportPayload(passport, typeDef, {
@@ -108,5 +110,5 @@ test("canonical serializer resolves terms from explicit semantic field metadata"
     "https://www.claros-dpp.online/dictionary/example-product/v1/terms/sterilization-cycles"
   );
   assert.equal(cyclesElement.valueDataType, "Integer");
-  assert.equal(cyclesElement.value, "12");
+  assert.equal(cyclesElement.value, 12);
 });
