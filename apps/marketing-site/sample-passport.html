@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Static public passport viewer demo with dummy data and the same UI structure as the live ClarosDPP passport viewer." />
+  <meta name="robots" content="noindex, follow" />
+  <meta name="author" content="ClarosDPP" />
+  <meta name="theme-color" content="#f5f8fb" />
+  <link rel="canonical" href="https://claros-dpp.online/sample-passport.html" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='DM Sans,sans-serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
+  <title>Sample Passport Demo - ClarosDPP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="styles.css?v=20260529-format11" />
+</head>
+<body class="page-body sample-page">
+  <div class="passport-portal">
+    <nav class="nav" aria-label="Passport sections">
+      <div class="nav-inner">
+        <a class="brand" href="#portal-top" aria-label="Back to passport top">
+          <div class="logo">
+            <img src="assets/sample-brand-mark.svg" alt="" aria-hidden="true" />
+          </div>
+          <div>
+            <strong>NovaLoop Industries</strong>
+            <span>Public DPP · static sample</span>
+          </div>
+        </a>
+        <div class="nav-links" role="tablist" aria-label="Viewer pages">
+          <button type="button" class="active" data-page="overview" role="tab" aria-selected="true">Overview</button>
+          <button type="button" data-page="header" role="tab" aria-selected="false">Header</button>
+          <button type="button" data-page="data" role="tab" aria-selected="false">Data</button>
+          <button type="button" data-page="trustPage" role="tab" aria-selected="false">Trust</button>
+          <button type="button" data-page="documents" role="tab" aria-selected="false">Documents</button>
+        </div>
+      </div>
+    </nav>
+
+    <header class="hero" id="portal-top">
+      <div class="hero-main">
+        <div>
+          <div class="kicker">Configurable product passport</div>
+          <h2 class="section-title">NovaLoop Circular Product 72</h2>
+          <div class="hero-badge-row">
+            <span class="badge ok">Released sample</span>
+            <span class="badge">Static dummy data</span>
+            <span class="badge neutral">Public viewer match</span>
+          </div>
+          <p class="hero-note">
+            This demo mirrors the public passport viewer UI and uses static dummy data only, so prospects can explore the
+            same structure without touching a backend or customer record.
+          </p>
+          <div class="hero-cards" aria-label="Key passport facts">
+            <div class="hero-card">
+              <span>Manufacturer</span>
+              <strong>NovaLoop Industries</strong>
+            </div>
+            <div class="hero-card">
+              <span>Serial number</span>
+              <strong>NL-72-0048</strong>
+            </div>
+            <div class="hero-card">
+              <span>Status</span>
+              <strong>Released sample passport</strong>
+            </div>
+            <div class="hero-card">
+              <span>Last update</span>
+              <strong>27 May 2026</strong>
+            </div>
+          </div>
+        </div>
+
+        <aside class="side-panel" aria-label="Product image and QR access">
+          <div class="product-photo has-img">
+            <img src="assets/sample-brand-mark.svg" alt="NovaLoop logo mark" />
+          </div>
+          <div class="qr-row">
+            <div class="qr" aria-label="Passport QR code">
+              <img src="assets/sample-passport-qr.svg" alt="QR code for the sample passport page" />
+            </div>
+            <div class="scan-copy">
+              <strong>Scan to open public URL</strong>
+              <div class="viewer-domain-indicator viewer-domain-indicator-trusted compact">
+                <span class="viewer-domain-indicator-label">Verified viewer host · demo only</span>
+                <strong class="viewer-domain-indicator-host">claros-dpp.online</strong>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </header>
+
+    <main>
+      <section class="page active" id="overview" role="tabpanel">
+        <div class="grid2 overview-only-layout">
+          <article class="card">
+            <h2>Product overview</h2>
+            <div class="energy-art has-img">
+              <img src="assets/pack.png" alt="Pack image for the sample passport" class="overview-product-image" />
+            </div>
+            <div class="overview-meta">
+              <div class="mini">
+                <span>Model</span>
+                <strong>NVL-CIRC-72</strong>
+              </div>
+              <div class="mini">
+                <span>Configuration</span>
+                <strong>Model 72</strong>
+              </div>
+              <div class="mini">
+                <span>Category</span>
+                <strong>Configured regulated product</strong>
+              </div>
+            </div>
+
+            <div class="overview-symbols">
+              <div class="overview-symbols-head">
+                <h3>Labels &amp; symbols</h3>
+                <span>3 fields</span>
+              </div>
+              <div class="symbol-list">
+                <div class="symbol-item">
+                  <div>
+                    <span>Separate Collection Symbol</span>
+                    <img src="assets/bin.svg" alt="Separate collection symbol" class="overview-symbol-image" />
+                  </div>
+                </div>
+                <div class="symbol-item">
+                  <div>
+                    <span>QR label</span>
+                    <strong>Scan-ready public entry</strong>
+                    <img src="assets/sample-passport-qr.svg" alt="Sample passport QR code" class="overview-symbol-image" />
+                  </div>
+                </div>
+                <div class="symbol-item">
+                  <div>
+                    <span>Passport type</span>
+                    <strong>Product passport sample</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <section class="verification-panel" aria-label="Verification">
+              <div class="verification-panel-head">
+                <span class="badge ok">Verification</span>
+                <h3>Static passport preview is signed for demo use.</h3>
+                <p>The sample follows the same viewer structure as the live public passport, but every value below is dummy data.</p>
+              </div>
+              <div class="verification-grid">
+                <div class="verification-card">
+                  <span>Issuer</span>
+                  <strong>Claros demo signer</strong>
+                </div>
+                <div class="verification-card">
+                  <span>Integrity</span>
+                  <strong>Verified for visual demo</strong>
+                </div>
+                <div class="verification-card">
+                  <span>Carrier</span>
+                  <strong>Trusted HTTPS viewer</strong>
+                </div>
+                <div class="verification-card">
+                  <span>Bundle</span>
+                  <strong>Static reference only</strong>
+                </div>
+              </div>
+            </section>
+          </article>
+
+          <article class="card">
+            <h2>Lifecycle snapshot</h2>
+            <div class="timeline">
+              <div class="event">
+                <div class="date">2026-01-08</div>
+                <div>
+                  <strong>Manufactured</strong>
+                  <span>Produced by NovaLoop Industries for demo release.</span>
+                </div>
+              </div>
+              <div class="event">
+                <div class="date">2026-02-14</div>
+                <div>
+                  <strong>Quality review</strong>
+                  <span>Compliance pack, labels, and traceability fields were checked.</span>
+                </div>
+              </div>
+              <div class="event">
+                <div class="date">2026-03-01</div>
+                <div>
+                  <strong>Public passport published</strong>
+                  <span>The public QR was generated for a customer-facing demo journey.</span>
+                </div>
+              </div>
+              <div class="event">
+                <div class="date">2026-05-27</div>
+                <div>
+                  <strong>Static sample refreshed</strong>
+                  <span>The demo content was updated to mirror the public viewer layout.</span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="header" role="tabpanel" hidden>
+        <div class="page-head">
+          <div>
+            <span class="badge">Separate header tab</span>
+            <h2>DPP header</h2>
+            <p>This identity and schema context is shown in the same card format as the live public passport viewer.</p>
+          </div>
+        </div>
+        <div class="header-grid">
+          <div class="header-field">
+            <span>Passport ID</span>
+            <strong>DPP-DEMO-72-ALPHA</strong>
+          </div>
+          <div class="header-field">
+            <span>Passport type</span>
+            <strong>Product passport sample</strong>
+          </div>
+          <div class="header-field">
+            <span>Release status</span>
+            <strong>Released sample</strong>
+          </div>
+          <div class="header-field">
+            <span>Access mode</span>
+            <strong>Public demo</strong>
+          </div>
+          <div class="header-field">
+            <span>Data owner</span>
+            <strong>NovaLoop Industries</strong>
+          </div>
+          <div class="header-field">
+            <span>Market region</span>
+            <strong>EU / EEA</strong>
+          </div>
+          <div class="header-field">
+            <span>Language</span>
+            <strong>English</strong>
+          </div>
+          <div class="header-field">
+            <span>Last published</span>
+            <strong>27 May 2026</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="data" role="tabpanel" hidden>
+        <div class="page-head">
+          <div>
+            <span class="badge">Structured data</span>
+            <h2>Data</h2>
+            <p>Static sections and rows follow the same expandable-card pattern as the public viewer.</p>
+          </div>
+        </div>
+        <div class="category-stack">
+          <details class="category" open>
+            <summary>
+              <div class="cat-title">
+                <span class="cat-index">01</span>
+                <div>
+                  <h3>Core identity</h3>
+                </div>
+              </div>
+              <div class="cat-meta">
+                <span class="badge neutral">4 fields</span>
+                <span class="chevron" aria-hidden="true"></span>
+              </div>
+            </summary>
+            <ul class="field-list">
+              <li class="field-row">
+                <span class="field-key">Model name</span>
+                <div class="field-value">NVL-CIRC-72</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Product name</span>
+                <div class="field-value">NovaLoop Circular Product 72</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Product serial number</span>
+                <div class="field-value">NL-72-0048</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Manufacture date</span>
+                <div class="field-value">08 Jan 2026</div>
+              </li>
+            </ul>
+          </details>
+
+          <details class="category">
+            <summary>
+              <div class="cat-title">
+                <span class="cat-index">02</span>
+                <div>
+                  <h3>Materials and composition</h3>
+                </div>
+              </div>
+              <div class="cat-meta">
+                <span class="badge neutral">4 fields</span>
+                <span class="chevron" aria-hidden="true"></span>
+              </div>
+            </summary>
+            <ul class="field-list">
+              <li class="field-row">
+                <span class="field-key">Material profile</span>
+                <div class="field-value">Configured material declaration</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Recycled aluminum</span>
+                <div class="field-value">28.4%</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Traceability coverage</span>
+                <div class="field-value">Tier 2 mapped</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Composition evidence</span>
+                <div class="field-value">Static declarations attached for demo review</div>
+              </li>
+            </ul>
+          </details>
+
+          <details class="category">
+            <summary>
+              <div class="cat-title">
+                <span class="cat-index">03</span>
+                <div>
+                  <h3>Compliance and serviceability</h3>
+                </div>
+              </div>
+              <div class="cat-meta">
+                <span class="badge neutral">4 fields</span>
+                <span class="chevron" aria-hidden="true"></span>
+              </div>
+            </summary>
+            <ul class="field-list">
+              <li class="field-row">
+                <span class="field-key">Applicable framework</span>
+                <div class="field-value">ESPR-aligned DPP readiness</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Compliance status</span>
+                <div class="field-value">Demo pass</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Service guide availability</span>
+                <div class="field-value">Public summary available</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Passport revision</span>
+                <div class="field-value">v1.3</div>
+              </li>
+            </ul>
+          </details>
+        </div>
+      </section>
+
+      <section class="page" id="trustPage" role="tabpanel" hidden>
+        <div class="page-head">
+          <div>
+            <span class="badge ok">Verifier credentials</span>
+            <h2>Trust identity</h2>
+            <p>These cards match the public viewer's trust page layout but use static dummy values for the sample passport.</p>
+          </div>
+        </div>
+        <section class="trust-panel">
+          <div class="verification-inline-note">
+            <strong>DPP integrity: Verified demo build</strong>
+            <span>Signer: Claros demo signer</span>
+          </div>
+          <div class="trust-grid">
+            <div class="trust-card">
+              <span>Trusted viewer host</span>
+              <strong>claros-dpp.online</strong>
+            </div>
+            <div class="trust-card">
+              <span>Carrier protection</span>
+              <strong>Verified HTTPS viewer</strong>
+            </div>
+            <div class="trust-card">
+              <span>Counterfeit risk</span>
+              <strong>Low</strong>
+            </div>
+            <div class="trust-card">
+              <span>Protected verification</span>
+              <strong>Demo certificate ID 9F7A-22C1</strong>
+            </div>
+            <div class="trust-card">
+              <span>Print specification</span>
+              <strong>Static QR label v1.2</strong>
+            </div>
+            <div class="trust-card">
+              <span>Security note</span>
+              <strong>Trust only the verified viewer domain</strong>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="page" id="documents" role="tabpanel" hidden>
+        <div class="page-head">
+          <div>
+            <span class="badge">Linked resources</span>
+            <h2>Documents</h2>
+            <p>Static artifacts are presented in the same document-card grid as the live public passport viewer.</p>
+          </div>
+        </div>
+        <div class="document-grid">
+          <article class="doc-card">
+            <div class="doc-icon">PDF</div>
+            <div>
+              <h3>Compliance declaration</h3>
+              <p>Dummy declaration of conformity for the sample passport release.</p>
+            </div>
+            <span class="badge neutral">Static</span>
+          </article>
+          <article class="doc-card">
+            <div class="doc-icon">CSV</div>
+            <div>
+              <h3>Materials export</h3>
+              <p>Illustrative composition and sourcing export for the sample product.</p>
+            </div>
+            <span class="badge neutral">Static</span>
+          </article>
+          <article class="doc-card">
+            <div class="doc-icon">QR</div>
+            <div>
+              <h3>Label artwork</h3>
+              <p>QR label artwork and carrier layout used for the demo presentation.</p>
+            </div>
+            <span class="badge neutral">Static</span>
+          </article>
+          <article class="doc-card">
+            <div class="doc-icon">DOC</div>
+            <div>
+              <h3>Service guide</h3>
+              <p>Public summary of repair, reuse, and end-of-life handling guidance.</p>
+            </div>
+            <span class="badge neutral">Static</span>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <span>NovaLoop Industries · Configurable product passport</span>
+        <span>Public passport viewer</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const portal = document.querySelector(".passport-portal");
+      if (!portal) return;
+
+      const tabs = Array.from(portal.querySelectorAll("[data-page]"));
+      const pages = Array.from(portal.querySelectorAll(".page"));
+
+      const activate = (pageId, updateHash = true) => {
+        tabs.forEach((tab) => {
+          const isActive = tab.dataset.page === pageId;
+          tab.classList.toggle("active", isActive);
+          tab.setAttribute("aria-selected", isActive ? "true" : "false");
+        });
+
+        pages.forEach((page) => {
+          const isActive = page.id === pageId;
+          page.classList.toggle("active", isActive);
+          page.hidden = !isActive;
+        });
+
+        if (updateHash) {
+          history.replaceState(null, "", `#${pageId}`);
+        }
+      };
+
+      tabs.forEach((tab) => {
+        tab.addEventListener("click", () => activate(tab.dataset.page));
+      });
+
+      const initialPage = tabs.some((tab) => tab.dataset.page === location.hash.slice(1))
+        ? location.hash.slice(1)
+        : "overview";
+      activate(initialPage, false);
+
+      window.addEventListener("hashchange", () => {
+        const nextPage = tabs.some((tab) => tab.dataset.page === location.hash.slice(1))
+          ? location.hash.slice(1)
+          : "overview";
+        activate(nextPage, false);
+      });
+    })();
+  </script>
+</body>
+</html>

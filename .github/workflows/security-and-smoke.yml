@@ -1,0 +1,223 @@
+name: Security And Smoke
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan the current source tree for committed secrets
+        run: >-
+          docker run --rm
+          -v "$PWD:/repo:ro"
+          zricethezav/gitleaks:v8.30.1
+          detect --source=/repo --no-git --redact --config=/repo/.gitleaks.toml
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/backend-api/package-lock.json
+      - run: npm ci
+      - run: npm run check:syntax
+      - run: npm run check:style
+      - run: npm run check:boundaries
+      - run: npm test
+      - run: npm audit --omit=dev --audit-level=moderate
+
+  repository-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check repository secret hygiene
+        run: node scripts/check-repository-secrets.js
+      - name: Check committed diff whitespace
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --check "${{ github.event.pull_request.base.sha }}...HEAD"
+          else
+            git diff-tree --check --no-commit-id --root -r HEAD
+          fi
+
+  backend-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: dpp_system
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dpp_system"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: apps/backend-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/backend-api/package-lock.json
+      - run: npm ci
+      - name: Boot backend and hit health endpoint
+        env:
+          NODE_ENV: development
+          PORT: 3001
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_NAME: dpp_system
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          JWT_SECRET: ci-smoke-secret
+          PEPPER_V1: ci-smoke-pepper
+          SERVER_URL: http://127.0.0.1:3001
+          APP_URL: http://127.0.0.1:3000
+          PUBLIC_APP_URL: http://127.0.0.1:3000
+          DID_WEB_DOMAIN: www.example.test
+        run: |
+          node src/server.js > /tmp/backend-smoke.log 2>&1 &
+          backend_pid=$!
+          cleanup() {
+            kill "$backend_pid" >/dev/null 2>&1 || true
+            wait "$backend_pid" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3001/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/backend-smoke.log
+          exit 1
+
+  compose-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create safe compose env for CI
+        run: |
+          cat > docker/.env <<'EOF'
+          NODE_ENV=development
+          DB_NAME=dpp_system
+          DB_USER=postgres
+          DB_PASSWORD=postgres
+          JWT_SECRET=ci-compose-secret
+          PEPPER_V1=ci-compose-pepper
+          SERVER_URL=http://localhost:3001
+          APP_URL=http://localhost:3000
+          VITE_API_URL=http://localhost:3001
+          VITE_PUBLIC_VIEWER_URL=http://localhost:3004
+          ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3004
+          EOF
+      - run: docker compose -f docker/docker-compose.yml --env-file docker/.env config -q
+      - run: DPP_ENV_FILE=../infra/oracle/oci.env.example docker compose -f docker/docker-compose.prod.yml --env-file infra/oracle/oci.env.example config -q
+      - run: DPP_ENV_FILE=../infra/oracle/oci.env.example docker compose -f docker/docker-compose.prod.backend.yml --env-file infra/oracle/oci.env.example config -q
+      - run: docker compose -f docker/docker-compose.prod.frontend.yml --env-file infra/oracle/oci.env.example config -q
+      - run: sh infra/oracle/check-edge-policy-config.sh
+
+  ops-and-local-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check local generator syntax
+        run: |
+          node --check local-tools/passport-module-generator/server.js
+          node --check local-tools/passport-module-generator/app.js
+      - name: Check deployment shell scripts
+        run: |
+          bash -n infra/oracle/bootstrap.sh
+          bash -n infra/oracle/check-edge-policy-config.sh
+          bash -n infra/oracle/check-edge-tls.sh
+          bash -n infra/oracle/check-live-edge.sh
+          bash -n infra/oracle/db-backup.sh
+          bash -n infra/oracle/deploy-prod.sh
+          bash -n infra/oracle/install-db-backup-jobs.sh
+          bash -n scripts/deploy/deploy-to-oci.sh
+          bash -n scripts/restart-local-stack.sh
+          bash -n scripts/troubleshoot-oci.sh
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/frontend-app/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:contrast
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=moderate
+
+  public-viewer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/public-passport-viewer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/public-passport-viewer/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=moderate
+
+  container-builds:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            dockerfile: apps/backend-api/Dockerfile
+          - name: frontend
+            dockerfile: apps/frontend-app/Dockerfile
+          - name: public-viewer
+            dockerfile: apps/public-passport-viewer/Dockerfile
+          - name: marketing
+            dockerfile: apps/marketing-site/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.name }} production image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

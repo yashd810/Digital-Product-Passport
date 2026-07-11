@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly DPP PostgreSQL backup timer
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+Persistent=true
+Unit=dpp-db-backup.service
+
+[Install]
+WantedBy=timers.target

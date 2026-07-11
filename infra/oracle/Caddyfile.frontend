@@ -1,0 +1,51 @@
+{
+	servers :443 {
+		protocols h1 h2 h3
+	}
+}
+
+(production_tls_policy) {
+	tls {
+		protocols tls1.2 tls1.3
+	}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+	}
+}
+
+claros-dpp.online, www.claros-dpp.online {
+	import production_tls_policy
+	import security_headers
+	@dictionaryArtifacts {
+		path_regexp ^/dictionary/[^/]+/[^/]+/(context\.jsonld|catalog\.jsonld|manifest\.json|categories|units|terms(?:/.*)?)$
+	}
+	reverse_proxy @dictionaryArtifacts https://api.claros-dpp.online {
+		header_up Host api.claros-dpp.online
+	}
+	reverse_proxy 127.0.0.1:8080
+}
+
+app.claros-dpp.online {
+	import production_tls_policy
+	import security_headers
+	reverse_proxy 127.0.0.1:3000
+}
+
+viewer.claros-dpp.online {
+	import production_tls_policy
+	import security_headers
+	reverse_proxy 127.0.0.1:3004
+}
+
+assets.claros-dpp.online {
+	import production_tls_policy
+	import security_headers
+	reverse_proxy 127.0.0.1:3003
+}

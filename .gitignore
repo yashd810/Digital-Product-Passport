@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+apps/*/node_modules/
+
+# Build output
+dist/
+build/
+apps/*/dist/
+
+# Environment files — contain secrets, never commit these
+.env
+.env.*
+*.env
+*.env.*
+**/.env
+**/.env.*
+docker/.env
+docker/.env.*
+config/.env
+config/.env.*
+apps/*/.env
+apps/*/.env.*
+!.env.example
+!.env.sample
+!.env.template
+!**/.env.example
+!**/.env.sample
+!**/.env.template
+!*.env.example
+!*.env.sample
+!*.env.template
+
+# Vite cache
+node_modules/.vite/
+node_modules/.cache/
+.vite/
+
+# User-uploaded files (runtime data, not source code)
+storage/local-storage/
+.docker-data/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / local tools
+.vscode/
+.idea/
+.claude/
+
+# Local-only passport module generator
+local-tools/passport-module-generator/

@@ -1,0 +1,74 @@
+/* ============================================
+   PASSPORT VIEWER TABLE STYLES — theme aware
+   ============================================ */
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -48px;
+  z-index: 10000;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0b1826;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 10px 30px rgba(11, 24, 38, 0.24);
+  transition: top 0.16s ease;
+}
+
+.skip-link:focus {
+  top: 16px;
+}
+
+/* QR Code Display */
+.qrcode-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qrcode-display img {
+  max-width: 180px;
+  max-height: 180px;
+  border: 2px solid var(--border);
+  padding: 10px;
+  background-color: #ffffff;
+  border-radius: 8px;
+}
+
+/* Theme toggle button in dashboard header */
+.theme-toggle-header-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--mint);
+  border: 1px solid rgba(13, 181, 176, 0.22);
+  border-radius: 12px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 8px 10px;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font);
+  line-height: 1;
+}
+
+[data-theme="light"] .theme-toggle-header-btn {
+  background: rgba(255, 255, 255, 0.96);
+  color: #143244;
+  border-color: rgba(23, 48, 74, 0.16);
+  box-shadow: 0 8px 20px rgba(16, 36, 58, 0.08);
+}
+
+.theme-toggle-header-btn:hover {
+  background: rgba(13, 181, 176, 0.16);
+  border-color: rgba(13, 181, 176, 0.34);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+[data-theme="light"] .theme-toggle-header-btn:hover {
+  background: #ffffff;
+  color: #0d6f74;
+  border-color: rgba(13, 181, 176, 0.36);
+}

@@ -1,0 +1,58 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Digital Product Passport Multi-Tenant System",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "db:migrate": "node scripts/migrate-db.js",
+    "check:passport-storage": "node scripts/check-passport-storage.js",
+    "verify:live-confidentiality": "node scripts/verify-live-confidentiality.js",
+    "check:boundaries": "node scripts/check-module-boundaries.js",
+    "check:syntax": "node scripts/check-syntax.js",
+    "check:style": "node scripts/check-js-style.js",
+    "lint": "npm run check:syntax && npm run check:style && npm run check:boundaries",
+    "format:check": "npm run check:style",
+    "test:semantics": "node --test tests/semantic-model-registry.node.test.js",
+    "test:passport-modules": "node --test tests/passport-type-modules.node.test.js",
+    "test:passport-seed": "node --test tests/seed-passport-types.node.test.js",
+    "test:semantic-export": "node --test tests/semantic-passport-export.node.test.js",
+    "test:did-service-generic": "node --test tests/did-service-generic.node.test.js",
+    "test:passport-policy": "node --test tests/passport-policy-required-fields.node.test.js",
+    "test:compliance-managed-fields": "node --test tests/compliance-managed-fields.node.test.js",
+    "test:canonical-serializer": "node --test tests/canonical-passport-serializer.node.test.js",
+    "test:dpp-patch-managed-fields": "node --test tests/dpp-patch-managed-fields.node.test.js",
+    "test:passport-update-managed-fields": "node --test tests/passport-update-managed-fields.node.test.js",
+    "test:passport-bulk-patch-guardrails": "node --test tests/passport-bulk-patch-guardrails.node.test.js",
+    "test:passport-import-field-guardrails": "node --test tests/passport-import-field-guardrails.node.test.js",
+    "bootstrap:passport-modules": "node scripts/bootstrap-passport-modules.js",
+    "bootstrap:super-admin": "node scripts/bootstrap-super-admin.js",
+    "seed:passport-types": "node scripts/seed-passport-types.js",
+    "repair:passport-storage": "node scripts/check-passport-storage.js --repair",
+    "dev": "nodemon src/server.js",
+    "test": "node --test tests/*.node.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1085.0",
+    "argon2": "^0.44.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.2.0",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "nodemailer": "^9.0.3",
+    "pg": "^8.22.0",
+    "pino": "^10.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

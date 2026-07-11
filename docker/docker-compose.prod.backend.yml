@@ -1,0 +1,77 @@
+services:
+  backend-api:
+    build:
+      context: ..
+      dockerfile: apps/backend-api/Dockerfile
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-3001}:3001"
+    env_file:
+      - path: ${DPP_ENV_FILE:-/etc/dpp/dpp.env}
+        required: true
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: "${DB_HOST:-postgres}"
+      DB_PORT: "${DB_PORT:-5432}"
+      LOCAL_STORAGE_DIR: /data
+      FILES_DIR: /data/passport-files
+      REPO_DIR: /data/repository-files
+      UPLOADS_DIR: /data/uploads
+    volumes:
+      - localStorageData:/data
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      backend-storage-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  backend-storage-init:
+    image: alpine:3.22
+    command:
+      - sh
+      - -c
+      - >
+        install -d -o 1000 -g 1000 -m 0755
+        /data/passport-files
+        /data/repository-files
+        /data/uploads
+        /data/uploads/symbols
+    volumes:
+      - localStorageData:/data
+    restart: "no"
+
+  postgres:
+    image: postgres:18-alpine
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    env_file:
+      - path: ${DPP_ENV_FILE:-/etc/dpp/dpp.env}
+        required: true
+    environment:
+      POSTGRES_DB: "${DB_NAME:?DB_NAME is required}"
+      POSTGRES_USER: "${DB_USER:?DB_USER is required}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - postgresData:/var/lib/postgresql
+    restart: unless-stopped
+
+volumes:
+  localStorageData:
+    name: "${LOCAL_STORAGE_VOLUME_NAME:-dppLocalStorageData}"
+    external: true
+  postgresData:
+    name: "${POSTGRES_VOLUME_NAME:-dppPostgresData}"
+    external: true

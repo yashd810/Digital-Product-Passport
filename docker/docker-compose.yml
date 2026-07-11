@@ -1,0 +1,112 @@
+services:
+  frontend-app:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run start -- --host 0.0.0.0 --port 3000"
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      VITE_API_URL: "${VITE_API_URL:-http://localhost:3001}"
+      VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:-http://localhost:3004}"
+      CHOKIDAR_USEPOLLING: "${CHOKIDAR_USEPOLLING:-true}"
+    volumes:
+      - ../apps/frontend-app:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend-api
+
+  public-passport-viewer:
+    image: node:22-alpine
+    working_dir: /workspace/apps/public-passport-viewer
+    command: sh -c "npm install && npm run start -- --host 0.0.0.0 --port 3004"
+    ports:
+      - "${PUBLIC_VIEWER_PORT:-3004}:3004"
+    environment:
+      VITE_API_URL: "${VITE_API_URL:-http://localhost:3001}"
+      VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:-http://localhost:3004}"
+      CHOKIDAR_USEPOLLING: "${CHOKIDAR_USEPOLLING:-true}"
+    volumes:
+      - ..:/workspace
+      - public_viewer_node_modules:/workspace/apps/public-passport-viewer/node_modules
+    depends_on:
+      - backend-api
+
+  backend-api:
+    build:
+      context: ..
+      dockerfile: apps/backend-api/Dockerfile
+    working_dir: /app
+    command: node src/server.js
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      SERVER_URL: "${SERVER_URL:-http://localhost:3001}"
+      APP_URL: "${APP_URL:-http://localhost:3000}"
+      LOCAL_STORAGE_DIR: /data
+      FILES_DIR: /data/passport-files
+      REPO_DIR: /data/repository-files
+      UPLOADS_DIR: /data/uploads
+      EMAIL_STYLES_PATH: /tmp/email-styles.css
+    volumes:
+      - ../apps/backend-api:/app
+      - ../apps/frontend-app/src/shared/styles/email-styles.css:/tmp/email-styles.css:ro
+      - backend_node_modules:/app/node_modules
+      - ../.docker-data/local-storage:/data
+    depends_on:
+      backend-storage-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  backend-storage-init:
+    image: alpine:3.22
+    command:
+      - sh
+      - -c
+      - >
+        install -d -o 1000 -g 1000 -m 0755
+        /data/passport-files
+        /data/repository-files
+        /data/uploads
+        /data/uploads/symbols
+    volumes:
+      - ../.docker-data/local-storage:/data
+
+  marketing-site:
+    image: nginx:1.27-alpine
+    ports:
+      - "${MARKETING_PORT:-8080}:80"
+    volumes:
+      - ../apps/marketing-site:/usr/share/nginx/html:ro
+
+  postgres:
+    image: postgres:18-alpine
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: "${DB_NAME:-dppSystem}"
+      POSTGRES_USER: "${DB_USER:-postgres}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-postgres}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - ../.docker-data/postgres:/var/lib/postgresql
+
+volumes:
+  frontend_node_modules:
+    name: "${FRONTEND_NODE_MODULES_VOLUME_NAME:-docker_frontend_node_modules}"
+  backend_node_modules:
+    name: "${BACKEND_NODE_MODULES_VOLUME_NAME:-docker_backend_node_modules}"
+  public_viewer_node_modules:
+    name: "${PUBLIC_VIEWER_NODE_MODULES_VOLUME_NAME:-docker_public_viewer_node_modules}"

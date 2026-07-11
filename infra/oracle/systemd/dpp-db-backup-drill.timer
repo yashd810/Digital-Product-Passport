@@ -1,0 +1,11 @@
+[Unit]
+Description=Quarterly DPP PostgreSQL backup restore drill timer
+
+[Timer]
+OnCalendar=*-01,04,07,10-01 04:30:00 UTC
+Persistent=true
+RandomizedDelaySec=6h
+Unit=dpp-db-backup-drill.service
+
+[Install]
+WantedBy=timers.target

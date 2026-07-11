@@ -1,0 +1,330 @@
+import QRCode from "qrcode";
+import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { buildPublicPassportPath } from "../../passports/utils/passportRoutes";
+import { buildPublicViewerUrl } from "../../passports/utils/publicViewerUrl";
+
+const api = import.meta.env.VITE_API_URL || "";
+const publicViewerUrl = import.meta.env.VITE_PUBLIC_VIEWER_URL || "";
+const defaultErrorCorrectionLevel = "H";
+const defaultQuietZoneModules = 4;
+const defaultQrWidthPx = 300;
+const minModuleMm = 0.25;
+const dppGraphicalMarking = "IEC_61406_TRIANGLE";
+const marketingContactUrl = "https://www.claros-dpp.online/contact.html";
+
+function shouldRenderIec61406Marker(granularity = "item") {
+  return String(granularity || "item").trim().toLowerCase() !== "model";
+}
+
+export function getMarketingContactUrl() {
+  return marketingContactUrl;
+}
+
+export const renderPassportQrToCanvas = async (canvas, {
+  url,
+  width = defaultQrWidthPx,
+  margin = defaultQuietZoneModules,
+  color = {},
+  version,
+  errorCorrectionLevel = defaultErrorCorrectionLevel,
+} = {}) => {
+  if (!canvas || !url) return null;
+  await QRCode.toCanvas(canvas, url, {
+    errorCorrectionLevel,
+    margin,
+    width,
+    color,
+    version: Number.isInteger(version) ? version : undefined,
+  });
+  return canvas;
+};
+
+export function buildQrPrintSpecification({
+  url,
+  dppId,
+  granularity = "item",
+  widthPx = defaultQrWidthPx,
+  quietZoneModules = defaultQuietZoneModules,
+  errorCorrectionLevel = defaultErrorCorrectionLevel,
+  version = null,
+} = {}) {
+  if (!url) return null;
+
+  const qrModel = QRCode.create(url, {
+    errorCorrectionLevel,
+    margin: quietZoneModules,
+    version: Number.isInteger(version) ? version : undefined,
+  });
+
+  const moduleCount = qrModel?.modules?.size || 0;
+  const totalModules = moduleCount + (quietZoneModules * 2);
+  const modulePixels = moduleCount > 0 ? widthPx / totalModules : 0;
+  const recommendedMinWidthMm = Number((totalModules * minModuleMm).toFixed(2));
+  const minimumRecommendedWidthPx = Math.ceil(totalModules * 4);
+  const qualityChecks = [
+    {
+      key: "quietZone",
+      passed: quietZoneModules >= 4,
+      value: quietZoneModules,
+      requirement: ">= 4 modules",
+    },
+    {
+      key: "modulePixelSize",
+      passed: modulePixels >= 4,
+      value: Number(modulePixels.toFixed(2)),
+      requirement: ">= 4 px per module",
+    },
+    {
+      key: "printWidth",
+      passed: widthPx >= minimumRecommendedWidthPx,
+      value: widthPx,
+      requirement: `>= ${minimumRecommendedWidthPx}px source image`,
+    },
+  ];
+
+  let trustedViewerHost = "";
+  let trustedViewerOrigin = "";
+  try {
+    const resolved = new URL(publicViewerUrl || url, window?.location?.origin || "http://localhost");
+    trustedViewerOrigin = resolved.origin;
+    trustedViewerHost = resolved.host;
+  } catch (error) {
+    console.warn("Failed to resolve trusted viewer URL for QR metadata", error);
+  }
+
+  return {
+    symbology: "QR_CODE_MODEL_2",
+    version: qrModel?.version || "auto",
+    errorCorrectionLevel,
+    quietZoneModules,
+    sourceImageWidthPx: widthPx,
+    moduleCount,
+    modulePixelSize: Number(modulePixels.toFixed(2)),
+    minimumRecommendedPrintWidthMm: recommendedMinWidthMm,
+    hriText: dppId || "",
+    dppGraphicalMarking: shouldRenderIec61406Marker(granularity) ? dppGraphicalMarking : null,
+    printAsset: {
+      format: "PNG",
+      colorMode: "monochrome",
+      recommendedDpi: 300,
+      minimumModuleSizeMm: minModuleMm,
+    },
+    labelLayout: {
+      orientation: "portrait",
+      title: "Digital Product Passport",
+      subtitle: trustedViewerHost || "Trusted public viewer",
+      hriPlacement: "belowQr",
+    },
+    trustedViewerOrigin,
+    trustedViewerHost,
+    qualityChecks,
+  };
+}
+
+export async function renderPassportQrLabelToCanvas(canvas, {
+  url,
+  dppId,
+  granularity = "item",
+  title = "Digital Product Passport",
+  width = defaultQrWidthPx,
+  margin = defaultQuietZoneModules,
+} = {}) {
+  if (!canvas || !url) return null;
+  const qrCanvas = document.createElement("canvas");
+  await renderPassportQrToCanvas(qrCanvas, { url, granularity, width, margin });
+
+  const labelPadding = 24;
+  const footerHeight = 76;
+  canvas.width = qrCanvas.width + (labelPadding * 2);
+  canvas.height = qrCanvas.height + footerHeight + (labelPadding * 2);
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(qrCanvas, labelPadding, labelPadding);
+
+  context.fillStyle = "#0b1826";
+  context.font = "700 20px Georgia, serif";
+  context.fillText(title, labelPadding, qrCanvas.height + 42);
+  context.font = "600 14px ui-monospace, SFMono-Regular, Menlo, monospace";
+  context.fillStyle = "#26435d";
+  context.fillText(dppId || "", labelPadding, qrCanvas.height + 64);
+
+  const trustedHost = buildQrPrintSpecification({ url, dppId, granularity, width, quietZoneModules: margin })?.trustedViewerHost;
+  if (trustedHost) {
+    context.textAlign = "right";
+    context.fillStyle = "#0b1826";
+    context.font = "700 12px ui-sans-serif, system-ui, sans-serif";
+    context.fillText(trustedHost, canvas.width - labelPadding, qrCanvas.height + 64);
+    context.textAlign = "left";
+  }
+
+  return canvas;
+}
+
+export const generateQRCodeBundle = async ({
+  dppId = "",
+  companyName = "",
+  modelName = "",
+  manufacturerName = "",
+  manufacturedBy = "",
+  granularity = "item",
+} = {}) => {
+  const passportPath = buildPublicPassportPath({
+    companyName,
+    manufacturerName,
+    manufacturedBy,
+    modelName,
+    dppId,
+  });
+  if (!passportPath) return null;
+  const passportLink = buildPublicViewerUrl(passportPath);
+  const canvas = document.createElement("canvas");
+  await renderPassportQrToCanvas(canvas, {
+    url: passportLink,
+    granularity,
+    width: defaultQrWidthPx,
+    margin: defaultQuietZoneModules,
+    errorCorrectionLevel: defaultErrorCorrectionLevel,
+    color: {
+      dark: "#0b1826",
+      light: "#ffffff",
+    },
+  });
+
+  const qrPrintSpecification = buildQrPrintSpecification({
+    url: passportLink,
+    dppId,
+    granularity,
+    widthPx: defaultQrWidthPx,
+    quietZoneModules: defaultQuietZoneModules,
+    errorCorrectionLevel: defaultErrorCorrectionLevel,
+  });
+
+  const safetyWarnings = [
+    `Only trust this code when it opens on ${qrPrintSpecification?.trustedViewerHost || "the verified public viewer host"}.`,
+    "Public DPP pages should not ask for passwords, payment details, or software downloads.",
+    "If the domain or page design looks suspicious, stop and report the carrier.",
+  ];
+
+  return {
+    qrCodeDataUrl: canvas.toDataURL("image/png", 0.95),
+    publicUrl: passportLink,
+    carrierAuthenticity: {
+      carrierSecurityStatus: "trustedPublicEntry",
+      carrierAuthenticationMethod: "verifiedHttpsViewer",
+      trustedViewerOrigin: qrPrintSpecification?.trustedViewerOrigin || null,
+      trustedViewerHost: qrPrintSpecification?.trustedViewerHost || null,
+      counterfeitRiskLevel: String(granularity || "item").toLowerCase() === "item" ? "high" : "medium",
+      antiCounterfeitInstructions: [
+        "Compare the viewer domain with the trusted host printed on the label.",
+        "Use the DPP signature or certificate details when the carrier says protected verification is available.",
+        "Report the label if the QR code redirects away from the trusted viewer.",
+      ],
+      safetyWarnings,
+      qrPrintSpecification,
+      dataCarrierPlacementRules: {
+        carrierPlacement: String(granularity || "item").toLowerCase() === "model" ? "packagingOrDocumentation" : "productOrPrimaryPackaging",
+        hriPlacement: "belowQr",
+        quietZonePolicy: "Keep the clear area around the QR code at or above 4 modules on all sides.",
+        durabilityPolicy: "Verify the printed carrier against the expected product lifecycle environment before release.",
+        scannerTestPolicy: "Test with representative phone and industrial scanners under expected lighting, distance, and angle conditions.",
+      },
+    },
+  };
+}
+
+/**
+ * Generate QR code image from the canonical public passport path.
+ * Consumer-facing QR codes must always encode the HTTPS public URL, never raw DID strings.
+ * Print guidance: use error correction level H, a 4-module quiet zone, and keep the
+ * physical X-dimension at or above 0.25 mm when rendered in print workflows.
+ * Returns base64 encoded PNG data URL.
+ */
+export const generateQRCode = async ({ dppId = "", companyName = "", modelName = "", manufacturerName = "", manufacturedBy = "", granularity = "item" }) => {
+  try {
+    const bundle = await generateQRCodeBundle({
+      dppId,
+      companyName,
+      modelName,
+      manufacturerName,
+      manufacturedBy,
+      granularity,
+    });
+    return bundle?.qrCodeDataUrl || null;
+  } catch (error) {
+    return null;
+  }
+};
+
+/**
+ * Save the canonical public passport URL to database.
+ * passportType is required so the server knows which table to update.
+ */
+export const saveQRCodeToDatabase = async (companyId, dppId, qrCodeUrl, passportType, options = {}) => {
+  try {
+    if (!companyId || !qrCodeUrl) return null;
+    const response = await fetchWithAuth(`${api}/api/companies/${encodeURIComponent(companyId)}/passports/${encodeURIComponent(dppId)}/qrcode`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ qrCode: qrCodeUrl, passportType, ...options }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Server returned ${response.status}: ${text}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    return null;
+  }
+};
+
+/**
+ * Fetch QR code from database.
+ */
+export const fetchQRCodeFromDatabase = async (dppId) => {
+  try {
+    const response = await fetchWithAuth(`${api}/api/public/passports/${encodeURIComponent(dppId)}/qrcode`);
+
+    if (!response.ok) {
+      if (response.status === 404) return null; // not yet generated — that's fine
+      throw new Error(`Server returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.qrCode;
+  } catch (error) {
+    return null;
+  }
+};
+
+export const fetchQRCodeRecordFromDatabase = async (dppId) => {
+  try {
+    const response = await fetchWithAuth(`${api}/api/public/passports/${encodeURIComponent(dppId)}/qrcode`);
+
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error(`Server returned ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    return null;
+  }
+};
+
+export default {
+  buildQrPrintSpecification,
+  generateQRCode,
+  generateQRCodeBundle,
+  saveQRCodeToDatabase,
+  fetchQRCodeFromDatabase,
+  fetchQRCodeRecordFromDatabase,
+  renderPassportQrLabelToCanvas,
+  renderPassportQrToCanvas,
+};

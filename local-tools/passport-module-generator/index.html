@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Passport Module Generator</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b8793'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='sans-serif' font-size='24' font-weight='700' fill='white'%3EDP%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>Passport Module Generator</h1>
+          <p>Local-only helper for generating backend passport module and dictionary files.</p>
+        </div>
+        <div class="topbar-side">
+          <div class="topbar-actions">
+            <button type="button" id="saveDraft">Save draft</button>
+            <button type="button" id="loadDraft">Load draft</button>
+            <button type="button" id="restoreSession">Restore session</button>
+            <button type="button" id="clearAll">Clear Module Info</button>
+          </div>
+          <div class="status" id="status">Checking server...</div>
+        </div>
+      </header>
+
+      <div class="workspace">
+        <aside class="workspace-nav" aria-label="Generator steps">
+          <button type="button" class="workspace-step active" data-step-target="module">
+            <span>1</span>
+            <strong>Module Info</strong>
+            <small>Identity and dictionary base</small>
+          </button>
+          <button type="button" class="workspace-step" data-step-target="fields">
+            <span>2</span>
+            <strong>Sections & Fields</strong>
+            <small id="fieldsStepMeta">0 sections, 0 fields</small>
+          </button>
+          <button type="button" class="workspace-step" data-step-target="graph">
+            <span>3</span>
+            <strong>Semantic Graph</strong>
+            <small>Classes, ranges, cardinality</small>
+          </button>
+          <button type="button" class="workspace-step" data-step-target="viewer">
+            <span>4</span>
+            <strong>Viewer Layout</strong>
+            <small>Cards, timeline, header</small>
+          </button>
+          <button type="button" class="workspace-step" data-step-target="defaults">
+            <span>5</span>
+            <strong>Managed Defaults</strong>
+            <small>Policy defaults</small>
+          </button>
+          <button type="button" class="workspace-step" data-step-target="generate">
+            <span>6</span>
+            <strong>Generate</strong>
+            <small>Preview and write files</small>
+          </button>
+        </aside>
+
+        <div class="workspace-main">
+      <section class="panel tool-step active" data-step="module">
+        <div class="panel-head">
+          <div>
+            <h2>1. Module Info</h2>
+            <p>These values become the module identity, semantic dictionary path, and passport policy.</p>
+          </div>
+          <button type="button" id="loadSample">Load sample</button>
+        </div>
+        <div class="grid">
+          <label>Family
+            <input id="family" value="example-product" placeholder="example-product">
+          </label>
+          <label>Version
+            <input id="version" value="v1" placeholder="v1">
+          </label>
+          <label>Display name
+            <input id="displayName" value="Example Product Passport v1" placeholder="Example Product Passport v1">
+          </label>
+          <label>Product icon
+            <input id="productIcon" value="EL" maxlength="4" placeholder="EL">
+          </label>
+          <label>Base URL
+            <input id="baseUrl" value="https://www.claros-dpp.online" placeholder="https://www.claros-dpp.online">
+          </label>
+          <label class="span2">Dictionary description
+            <input id="dictionaryDescription" value="Starter dictionary for a new Digital Product Passport module." placeholder="Short dictionary description">
+          </label>
+        <details class="auto-group span4">
+          <summary>Auto-filled fields</summary>
+          <div class="auto-group-grid">
+              <label>Module key
+                <input id="moduleKey" value="example-product:v1" placeholder="example-product:v1">
+              </label>
+              <label>Type name
+                <input id="typeName" value="exampleProductPassportV1" placeholder="exampleProductPassportV1">
+              </label>
+              <label>Product category
+                <input id="productCategory" value="Example Product" placeholder="Example Product">
+              </label>
+              <label>Semantic model key
+                <input id="semanticModelKey" value="exampleProductDictionaryV1" placeholder="exampleProductDictionaryV1">
+              </label>
+              <label>Passport policy key
+                <input id="passportPolicyKey" value="exampleProductDppV1" placeholder="exampleProductDppV1">
+              </label>
+              <label class="span2">Dictionary name
+                <input id="dictionaryName" value="Example Product Dictionary" placeholder="Example Product Dictionary">
+              </label>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="panel tool-step" data-step="fields">
+        <div class="panel-head">
+          <div>
+            <h2>2. Sections And Fields</h2>
+            <p>Add fields once. The generator uses them for both the module file and dictionary artifacts.</p>
+          </div>
+          <div class="actions">
+            <input type="file" id="fieldsCsvInput" accept=".csv,text/csv" hidden>
+            <button type="button" id="downloadFieldsCsvTemplate">Download CSV template</button>
+            <button type="button" id="exportFieldsCsv">Export current CSV</button>
+            <button type="button" id="importFieldsCsv">Import CSV</button>
+          </div>
+        </div>
+        <p class="helper-copy">CSV headers match the editable fields below, and auto-filled metadata is omitted. Dropdown imports accept displayed names or stored values. UI type: text, textarea, boolean, date, datetime, url, file, symbol, table. Data type: string, decimal, integer, boolean, date, datetime, uri, array. Date-time rows are normalized to the datetime UI type. File fields use URI semantics. Table fields use array; their individual columns use scalar data types. Confidentiality: public or restricted.</p>
+        <div class="fields-studio">
+          <aside class="fields-explorer" aria-label="Sections and fields navigator">
+            <div class="fields-explorer-head">
+              <div>
+                <span class="graph-kicker">Form navigator</span>
+                <h3>Sections, fields and columns</h3>
+              </div>
+              <span id="fieldsExplorerCount" class="fields-explorer-count">0 items</span>
+            </div>
+            <label class="fields-search">Find anything
+              <input id="fieldsExplorerSearch" type="search" placeholder="Search 100+ fields">
+            </label>
+            <div class="fields-quick-actions">
+              <button type="button" id="addSection" title="Insert after the selected section">+ Section</button>
+              <button type="button" id="addSubsection" title="Add inside the selected section">+ Subsection</button>
+              <button type="button" id="addFieldToSelection" title="Insert after the selected field">+ Field</button>
+            </div>
+            <nav id="fieldsExplorerList" class="fields-explorer-list" aria-label="Sections, fields and table columns"></nav>
+            <p id="fieldsExplorerEmpty" class="fields-explorer-empty hidden">No sections or fields match this search.</p>
+          </aside>
+
+          <section class="fields-editor" aria-label="Selected section or field">
+            <div class="fields-editor-context">
+              <div>
+                <span class="graph-kicker">Now editing</span>
+                <h3 id="fieldsEditorTitle">Select a section or field</h3>
+                <p id="fieldsEditorMeta">Sections &amp; Fields</p>
+              </div>
+              <button type="button" id="fieldsBackToParent" class="hidden">Back to parent</button>
+            </div>
+            <div id="sections"></div>
+            <div id="fieldsEditorEmpty" class="fields-editor-empty hidden">
+              <strong>Add your first section</strong>
+              <p>Sections organise passport fields. Table fields can also contain reusable column schemas.</p>
+              <button type="button" id="addFirstSection">Add section</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel tool-step" data-step="graph">
+        <div class="panel-head">
+          <div>
+            <h2>3. Semantic Class Graph</h2>
+            <p>Define reusable classes, class-to-class properties, controlled enums, explicit IRIs, and SHACL cardinalities.</p>
+          </div>
+          <div class="actions">
+            <button type="button" id="buildGraphFirstLayer">Build first layer</button>
+            <input type="file" id="semanticGraphCsvInput" accept=".csv,text/csv" hidden>
+            <button type="button" id="downloadSemanticGraphCsvTemplate">Download graph CSV</button>
+            <button type="button" id="exportSemanticGraphCsv">Export graph CSV</button>
+            <button type="button" id="importSemanticGraphCsv">Import graph CSV</button>
+          </div>
+        </div>
+        <p class="helper-copy">The semantic class graph is required. Build the first layer once, then refine it without removed properties being recreated. Clear Semantic Graph only when you intentionally want to unlock and rebuild that first layer. Linked entries that remain in the graph keep their metadata synchronized when Part 2 changes. Linked scalar fields can use their Part 2 datatype or override it with a controlled enum without becoming custom properties. Choose “Custom” only for concepts that are not represented by module sections or fields. RDFS domain and range come from the owning class and selected range; SHACL min/max counts enforce cardinality.</p>
+        <div id="semanticGraphWorkspace" class="semantic-graph-workspace">
+          <div class="graph-studio">
+            <aside class="graph-explorer" aria-label="Semantic graph navigator">
+              <div class="graph-explorer-head">
+                <div>
+                  <span class="graph-kicker">Graph navigator</span>
+                  <h3>Classes, fields and enums</h3>
+                </div>
+                <span id="graphExplorerCount" class="graph-explorer-count">0 items</span>
+              </div>
+              <label class="graph-search">Find anything
+                <input id="graphExplorerSearch" type="search" placeholder="Search 100+ graph items">
+              </label>
+              <div class="graph-quick-actions">
+                <button type="button" id="addRootProperty">+ Root field</button>
+                <button type="button" id="addGraphClass">+ Class</button>
+                <button type="button" id="addGraphEnum">+ Enum</button>
+              </div>
+              <nav id="graphExplorerList" class="graph-explorer-list" aria-label="Graph items"></nav>
+              <p id="graphExplorerEmpty" class="graph-explorer-empty hidden">No graph items match this search.</p>
+            </aside>
+
+            <section class="graph-editor" aria-label="Selected semantic graph item">
+              <div class="graph-editor-context">
+                <div>
+                  <span class="graph-kicker">Now editing</span>
+                  <h3 id="graphEditorTitle">Digital Product Passport root</h3>
+                  <p id="graphEditorMeta">Root class</p>
+                </div>
+                <button type="button" id="graphBackToParent" class="hidden">Back to parent</button>
+              </div>
+
+          <article class="graph-root-card">
+            <div class="graph-card-head">
+              <div>
+                <span class="graph-kicker">Root class</span>
+                <h3>Digital Product Passport root</h3>
+              </div>
+            </div>
+            <div class="graph-class-grid">
+              <label>Class label <input id="rootClassLabel" placeholder="Digital Battery Passport"></label>
+              <label class="span3">Definition <input id="rootClassDefinition" placeholder="Root class for this passport semantic model."></label>
+            </div>
+            <details class="auto-group graph-auto-group">
+              <summary>Auto-filled identifiers</summary>
+              <div class="auto-group-grid">
+                <label>Class key <input id="rootClassKey" placeholder="digitalBatteryPassport"></label>
+                <label class="span3">Class IRI <input id="rootClassSemanticId" placeholder="https://example.com/dictionary/family/v1/classes/DigitalBatteryPassport"></label>
+              </div>
+            </details>
+            <div id="rootGraphProperties" class="graph-property-list"></div>
+          </article>
+
+          <div id="graphClasses" class="graph-class-list"></div>
+          <div id="graphEnums" class="graph-enum-list"></div>
+              <div id="graphEditorEmpty" class="graph-editor-empty hidden">
+                <strong>Select an item from the graph navigator</strong>
+                <p>Only one item is shown here at a time, so large schemas stay manageable.</p>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel tool-step" data-step="viewer">
+        <div class="panel-head">
+          <div>
+            <h2>4. Viewer Layout And Metadata</h2>
+            <p>Decide where important fields appear in the viewer, then keep the schema metadata explicit for export.</p>
+          </div>
+        </div>
+        <div class="role-grid">
+          <article class="role-card">
+            <h3>Identity</h3>
+            <label>Product identifier field
+              <select id="businessIdentifierField">
+                <option value="">Select product identifier</option>
+              </select>
+            </label>
+          </article>
+
+          <article class="role-card">
+            <h3>Composition pie chart</h3>
+            <p>Charts are created only from an explicit table and explicit columns.</p>
+            <label>Table field
+              <select id="compositionFieldKey">
+                <option value="">No composition chart</option>
+              </select>
+            </label>
+            <div class="role-inline">
+              <label>Label column
+                <select id="compositionLabelColumnKey">
+                  <option value="">Select label column</option>
+                </select>
+              </label>
+              <label>Data column (%)
+                <select id="compositionValueColumnKey">
+                  <option value="">Select data column</option>
+                </select>
+              </label>
+            </div>
+          </article>
+
+          <article class="role-card role-card-wide">
+            <h3>Viewer field placement</h3>
+            <p>Assign fields directly to the overview cards and lifecycle points you want to display.</p>
+            <div id="presentationFields" class="presentation-list placement-slot-layout"></div>
+          </article>
+
+          <article class="role-card role-card-wide">
+            <h3>Passport Header</h3>
+            <p>Choose which module field should fill each editable header slot. DID values are always generated and maintained by the platform.</p>
+            <div id="systemHeaderFields" class="presentation-list system-header-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel tool-step" data-step="defaults">
+        <div class="panel-head">
+          <div>
+            <h2>5. Managed Defaults</h2>
+            <p>Configure policy defaults that are actively used by generated passport types.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <label>Default carrier policy key
+            <input id="defaultCarrierPolicyKey" value="webPublicEntryV1" placeholder="webPublicEntryV1">
+          </label>
+          <p class="span3">Generated modules include the passport policy key and content specification IDs.</p>
+        </div>
+      </section>
+
+      <section class="panel tool-step" data-step="generate">
+        <div class="panel-head">
+          <div>
+            <h2>6. Generate</h2>
+            <p>Preview the package, then download it for manual review and installation.</p>
+          </div>
+          <div class="actions">
+            <button type="button" id="preview">Preview</button>
+            <button type="button" id="downloadGeneratedFiles" class="primary">Download all files (.zip)</button>
+          </div>
+        </div>
+        <p class="helper-copy">This tool never writes into the repository. Download creates one ZIP with every generated <code>.js</code>, <code>.json</code>, and <code>.jsonld</code> file in its intended repository folder path. Review the archive, then copy or extract it manually when you are ready.</p>
+        <div id="message" class="message hidden"></div>
+        <div class="preview-layout">
+          <aside>
+            <h3>Files</h3>
+            <div id="fileList" class="file-list"></div>
+          </aside>
+          <pre id="previewOutput">Preview output appears here.</pre>
+        </div>
+      </section>
+        </div>
+      </div>
+    </main>
+
+    <template id="sectionTemplate">
+      <article class="section-card">
+        <div class="section-head">
+          <label>Section label <input data-section-label placeholder="Product Identity"></label>
+          <div class="section-actions">
+            <span class="section-count" data-section-count>0 fields</span>
+            <span class="filter-count hidden" data-filter-count></span>
+            <button type="button" data-toggle-section>Collapse</button>
+            <button type="button" data-toggle-details>Show details</button>
+            <button type="button" data-add-field>Add field</button>
+            <button type="button" data-add-subsection>Add subsection</button>
+            <button type="button" data-remove-section>Remove</button>
+          </div>
+        </div>
+        <details class="auto-group section-auto-group">
+          <summary>Auto-filled fields</summary>
+          <div class="auto-group-grid">
+            <label>Section key <input data-section-key placeholder="productIdentity"></label>
+          </div>
+        </details>
+        <div class="field-grid-wrap">
+          <div class="field-grid-header" aria-hidden="true">
+            <span>Label</span>
+            <span>Type</span>
+            <span>Definition</span>
+            <span>Data type</span>
+            <span>Unit</span>
+            <span>Symbol</span>
+            <span>Confidentiality</span>
+            <span>Actions</span>
+            <span>More</span>
+            <span>Remove</span>
+          </div>
+          <div class="field-grid-filters" aria-label="Field column filters">
+            <label><span>Filter label</span><input data-field-filter="fieldLabel" placeholder="Search label"></label>
+            <label><span>Filter type</span>
+              <select data-field-filter="fieldType">
+                <option value="">All</option>
+                <option value="text">text</option>
+                <option value="textarea">textarea</option>
+                <option value="boolean">boolean</option>
+                <option value="date">date</option>
+                <option value="datetime">datetime</option>
+                <option value="url">url</option>
+                <option value="file">file</option>
+                <option value="symbol">symbol</option>
+                <option value="table">table</option>
+              </select>
+            </label>
+            <label><span>Filter definition</span><input data-field-filter="definition" placeholder="Search definition"></label>
+            <label><span>Filter data type</span>
+              <select data-field-filter="dataType">
+                <option value="">All</option>
+                <option value="string">string</option>
+                <option value="decimal">decimal</option>
+                <option value="integer">integer</option>
+                <option value="boolean">boolean</option>
+                <option value="date">date</option>
+                <option value="datetime">datetime</option>
+                <option value="uri">uri</option>
+                <option value="array">array</option>
+              </select>
+            </label>
+            <label><span>Filter unit</span><input data-field-filter="unitLabel" placeholder="Search unit"></label>
+            <label><span>Filter symbol</span><input data-field-filter="unitSymbol" placeholder="Search symbol"></label>
+            <label><span>Filter confidentiality</span>
+              <select data-field-filter="confidentiality">
+                <option value="">All</option>
+                <option value="public">public</option>
+                <option value="restricted">restricted</option>
+              </select>
+            </label>
+            <button type="button" class="clear-filters" data-clear-filters>Clear</button>
+            <label><span>Filter more metadata</span><input data-field-filter="advanced" placeholder="Search key/slug/schema"></label>
+            <span class="field-filter-spacer" aria-hidden="true"></span>
+          </div>
+          <div data-fields class="field-grid-body"></div>
+        </div>
+        <div class="child-sections" data-child-sections></div>
+      </article>
+    </template>
+
+    <template id="fieldTemplate">
+      <div class="field-row">
+        <label class="field-cell field-cell-label"><span>Label</span><input data-field="fieldLabel" placeholder="Manufacturer Name"></label>
+        <label class="field-cell field-cell-type"><span>UI type</span>
+          <select data-field="fieldType">
+            <option value="text">text</option>
+            <option value="textarea">textarea</option>
+            <option value="boolean">boolean</option>
+            <option value="date">date</option>
+            <option value="datetime">datetime</option>
+            <option value="url">url</option>
+            <option value="file">file</option>
+            <option value="symbol">symbol</option>
+            <option value="table">table</option>
+          </select>
+        </label>
+        <label class="field-cell field-cell-definition"><span>Definition</span><input data-field="definition" placeholder="Short semantic definition"></label>
+        <label class="field-cell field-cell-data-type"><span>Data type</span>
+          <select data-field="dataType">
+            <option value="string">string</option>
+            <option value="decimal">decimal</option>
+            <option value="integer">integer</option>
+            <option value="boolean">boolean</option>
+            <option value="date">date</option>
+            <option value="datetime">datetime</option>
+            <option value="uri">uri</option>
+            <option value="array">array</option>
+          </select>
+        </label>
+        <label class="field-cell field-cell-unit"><span>Unit label</span><input data-field="unitLabel" placeholder="Kilogram"></label>
+        <label class="field-cell field-cell-symbol"><span>Unit symbol</span><input data-field="unitSymbol" placeholder="kg"></label>
+        <label class="field-cell field-cell-confidentiality"><span>Confidentiality</span>
+          <select data-field="confidentiality">
+            <option value="public">public</option>
+            <option value="restricted">restricted</option>
+          </select>
+        </label>
+        <div class="field-actions">
+          <label class="check"><input type="checkbox" data-field="queryable"> queryable</label>
+          <label class="check"><input type="checkbox" data-field="indexed"> indexed</label>
+        </div>
+        <div class="field-cell field-cell-more">
+          <details class="auto-group field-more-group">
+            <summary>Auto-filled</summary>
+            <div class="auto-group-grid">
+              <label>Schema object
+                <select data-field="objectType">
+                  <option value="SingleValuedDataElement">Single value</option>
+                  <option value="MultiValuedDataElement">Multiple values</option>
+                  <option value="DataElementCollection">Collection/table</option>
+                  <option value="RelatedResource">Linked resource</option>
+                  <option value="MultiLanguageDataElement">Multi-language text</option>
+                </select>
+              </label>
+              <label>Schema value
+                <select data-field="valueDataType">
+                  <option value="String">String</option>
+                  <option value="Boolean">Boolean</option>
+                  <option value="Integer">Integer</option>
+                  <option value="Decimal">Decimal</option>
+                  <option value="Date">Date</option>
+                  <option value="DateTime">DateTime</option>
+                  <option value="URI">URI</option>
+                  <option value="Binary">Binary</option>
+                  <option value="Array">Array</option>
+                  <option value="Object">Object</option>
+                </select>
+              </label>
+              <input type="hidden" data-field="fieldKey">
+              <label>Semantic slug <input data-field="semanticSlug" placeholder="manufacturer-name"></label>
+              <label>Unit key <input data-field="unitKey" value="none" placeholder="none"></label>
+            </div>
+          </details>
+        </div>
+        <div class="field-remove-actions">
+          <button type="button" data-remove-field>Remove field</button>
+        </div>
+        <div class="table-config hidden" data-table-config>
+          <div class="table-config-head">
+            <div>
+              <strong>Table schema</strong>
+            </div>
+            <button type="button" data-add-column>Add column</button>
+          </div>
+          <div class="table-columns-wrap">
+            <div class="table-columns-header" aria-hidden="true">
+              <span>Label</span>
+              <span>Data type</span>
+              <span>Unit</span>
+              <span>Symbol</span>
+              <span>Actions</span>
+            </div>
+            <div class="table-columns" data-table-columns></div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template id="tableColumnTemplate">
+      <div class="table-column-card">
+        <div class="table-column-grid">
+          <label class="table-column-cell table-column-cell-label">Label
+            <input data-column="columnLabel" placeholder="CAS Number">
+          </label>
+          <label>Data type
+            <select data-column="dataType">
+              <option value="string">string</option>
+              <option value="decimal">decimal</option>
+              <option value="integer">integer</option>
+              <option value="boolean">boolean</option>
+              <option value="date">date</option>
+              <option value="datetime">datetime</option>
+              <option value="uri">uri</option>
+            </select>
+          </label>
+          <label>Unit label <input data-column="unitLabel" placeholder="Percent"></label>
+          <label>Unit symbol <input data-column="unitSymbol" placeholder="%"></label>
+          <div class="table-column-actions">
+            <button type="button" data-remove-column>Remove</button>
+          </div>
+        </div>
+        <details class="auto-group table-column-more">
+          <summary>Auto-filled</summary>
+          <div class="auto-group-grid">
+            <input type="hidden" data-column="columnKey">
+            <label>Semantic slug <input data-column="semanticSlug" placeholder="cas-number"></label>
+            <label>Unit key <input data-column="unitKey" value="none" placeholder="none"></label>
+            <label>Object type
+              <input data-column="objectType" readonly>
+            </label>
+            <label>Value data type
+              <input data-column="valueDataType" readonly>
+            </label>
+          </div>
+        </details>
+      </div>
+    </template>
+
+    <template id="graphClassTemplate">
+      <article class="graph-class-card">
+        <div class="graph-card-head">
+          <div>
+            <span class="graph-kicker">Semantic class</span>
+            <h3 data-graph-class-title>New class</h3>
+          </div>
+          <div class="actions">
+            <button type="button" data-add-graph-property title="Insert after the selected property in this class">Add property</button>
+            <button type="button" data-remove-graph-class>Remove class</button>
+          </div>
+        </div>
+        <div class="graph-class-grid">
+          <label class="span4">Build class from
+            <select data-graph-class-source>
+              <option value="">Custom class</option>
+            </select>
+          </label>
+          <label>Class label <input data-graph-class="label" placeholder="Battery Material"></label>
+          <label class="span3">Definition <input data-graph-class="definition" placeholder="A material used in the battery."></label>
+        </div>
+        <details class="auto-group graph-auto-group">
+          <summary>Auto-filled identifiers</summary>
+          <div class="auto-group-grid">
+            <label>Class key <input data-graph-class="key" placeholder="batteryMaterial"></label>
+            <label class="span3">Class IRI <input data-graph-class="semanticId" placeholder="https://example.com/.../classes/BatteryMaterial"></label>
+          </div>
+        </details>
+        <div data-graph-properties class="graph-property-list"></div>
+      </article>
+    </template>
+
+    <template id="graphPropertyTemplate">
+      <article class="graph-property-card">
+        <div class="graph-property-head">
+          <strong data-graph-property-title>New property</strong>
+          <button type="button" data-remove-graph-property>Remove</button>
+        </div>
+        <div class="graph-property-grid">
+          <label class="span2">Build property from
+            <select data-graph-property-source>
+              <option value="">Custom property</option>
+            </select>
+          </label>
+          <label class="span2 hidden" data-graph-enum-override-wrap>Field value semantics
+            <select data-graph-enum-override>
+              <option value="">Use field datatype</option>
+            </select>
+          </label>
+          <label>Property label <input data-graph-property="label" placeholder="Battery materials"></label>
+          <label>Range kind
+            <select data-graph-property="rangeKind">
+              <option value="scalar">Scalar datatype</option>
+              <option value="class">Semantic class</option>
+              <option value="enum">Controlled enum</option>
+            </select>
+          </label>
+          <label data-scalar-range>Data type
+            <select data-graph-property="dataType">
+              <option value="string">string</option>
+              <option value="decimal">decimal</option>
+              <option value="integer">integer</option>
+              <option value="boolean">boolean</option>
+              <option value="date">date</option>
+              <option value="datetime">datetime</option>
+              <option value="uri">uri</option>
+            </select>
+          </label>
+          <label data-class-range class="hidden">Range class
+            <select data-graph-property="rangeClassKey"><option value="">Select class</option></select>
+          </label>
+          <label data-enum-range class="hidden">Range enum
+            <select data-graph-property="rangeEnumKey"><option value="">Select enum</option></select>
+          </label>
+          <label data-relationship-range class="hidden">Relationship
+            <select data-graph-property="relationshipType">
+              <option value="composition">Composition (embedded)</option>
+              <option value="reference">Reference (IRI)</option>
+            </select>
+          </label>
+          <label>Minimum count <input type="number" min="0" step="1" data-graph-property="minCount" value="0"></label>
+          <label>Maximum count <input data-graph-property="maxCount" value="1" placeholder="1 or n"></label>
+          <label>Unit <input data-graph-property="unit" placeholder="kg, %, none"></label>
+          <input type="hidden" data-graph-property="uiType">
+          <label class="span4">Definition <input data-graph-property="definition" placeholder="Relationship or literal property definition."></label>
+        </div>
+        <details class="auto-group graph-auto-group">
+          <summary>Auto-filled identifiers</summary>
+          <div class="auto-group-grid">
+            <label>Property key <input data-graph-property="key" placeholder="batteryMaterials"></label>
+            <label class="span3">Property IRI <input data-graph-property="semanticId" placeholder="https://example.com/.../terms/battery-materials"></label>
+            <label class="span4">Resolved range IRI <input data-resolved-range-iri readonly aria-readonly="true"></label>
+          </div>
+        </details>
+      </article>
+    </template>
+
+    <template id="graphEnumTemplate">
+      <article class="graph-enum-card">
+        <div class="graph-card-head">
+          <div>
+            <span class="graph-kicker">Controlled enum</span>
+            <h3 data-graph-enum-title>New enum</h3>
+          </div>
+          <div class="actions">
+            <button type="button" data-add-enum-value>Add value</button>
+            <button type="button" data-remove-graph-enum>Remove enum</button>
+          </div>
+        </div>
+        <div class="graph-class-grid">
+          <label>Enum label <input data-graph-enum="label" placeholder="Hazardous Substance Class"></label>
+          <label class="span3">Definition <input data-graph-enum="definition" placeholder="Controlled classification values."></label>
+        </div>
+        <details class="auto-group graph-auto-group">
+          <summary>Auto-filled identifiers</summary>
+          <div class="auto-group-grid">
+            <label>Enum key <input data-graph-enum="key" placeholder="hazardousSubstanceClass"></label>
+            <label class="span3">Enum IRI <input data-graph-enum="semanticId" placeholder="https://example.com/.../enums/HazardousSubstanceClass"></label>
+          </div>
+        </details>
+        <div data-enum-values class="graph-enum-values"></div>
+      </article>
+    </template>
+
+    <template id="graphEnumValueTemplate">
+      <div class="graph-enum-value">
+        <label>Value label <input data-enum-value="label" placeholder="Acute Toxicity"></label>
+        <button type="button" data-remove-enum-value>Remove</button>
+        <details class="auto-group graph-auto-group">
+          <summary>Auto-filled identifiers</summary>
+          <div class="auto-group-grid">
+            <label>Value key <input data-enum-value="key" placeholder="acuteToxicity"></label>
+            <label class="span3">Value IRI <input data-enum-value="semanticId" placeholder="https://example.com/.../enums/.../acute-toxicity"></label>
+          </div>
+        </details>
+      </div>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

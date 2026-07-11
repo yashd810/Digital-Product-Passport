@@ -1,0 +1,669 @@
+openapi: 3.1.0
+info:
+  title: Claros DPP Public and Integration API
+  version: "2026-06-28"
+  license:
+    name: ISC
+    identifier: ISC
+  description: >
+    Current external API surface for Digital Product Passports. Public reads use
+    `/api/public/passports/{dppId}` and return public fields by default. Selected
+    restricted fields are returned only when a valid security group API key is
+    supplied in `X-API-Key` or `X-Security-Group-Key`. Company automation writes
+    use the company-name slug integration namespace and require a Bearer token.
+servers:
+  - url: https://www.claros-dpp.online
+    description: Production
+tags:
+  - name: Public read
+    description: Anonymous public-safe passport and company data.
+  - name: Public files
+    description: Public attachments and temporary capability links returned by authorised passport reads.
+  - name: Public verification
+    description: Anonymous signature and signing-key verification metadata.
+  - name: Integration write
+    description: Bearer-authenticated company automation mutations.
+security: []
+paths:
+  /api/public/passports/{dppId}:
+    get:
+      operationId: getPublicPassport
+      tags: [Public read]
+      summary: Read a public-safe passport by DPP ID
+      description: >
+        Returns public passport fields without authentication. When a valid
+        security group key is supplied, the response also includes only the
+        restricted fields selected for that key and only when the key applies to
+        this passport type or selected passport.
+      parameters:
+        - $ref: '#/components/parameters/DppIdPath'
+        - $ref: '#/components/parameters/VersionQuery'
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [semantic]
+          description: Request JSON-LD output.
+        - name: representation
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [compressed, full]
+          description: Select compressed or expanded passport representation.
+        - $ref: '#/components/parameters/SecurityGroupKeyHeader'
+        - $ref: '#/components/parameters/AlternateSecurityGroupKeyHeader'
+      responses:
+        '200':
+          description: Public-safe passport payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicPassportPayload'
+            application/ld+json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Invalid or revoked security group key.
+        '403':
+          description: Security group key is not valid for this company, type, or passport.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/public/passports/{dppId}/history:
+    get:
+      operationId: getPublicPassportHistory
+      tags: [Public read]
+      summary: Read public passport version history
+      description: >
+        Returns changes to public fields. A valid security group key also
+        returns changes to the restricted fields selected for that group.
+      parameters:
+        - $ref: '#/components/parameters/DppIdPath'
+        - $ref: '#/components/parameters/SecurityGroupKeyHeader'
+        - $ref: '#/components/parameters/AlternateSecurityGroupKeyHeader'
+      responses:
+        '200':
+          description: Public version history.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          description: Invalid or revoked security group key.
+        '403':
+          description: Security group key is not valid for this company, type, or passport.
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/public/passports/{dppId}/dynamic-values:
+    get:
+      operationId: getPublicDynamicValues
+      tags: [Public read]
+      summary: Read current dynamic field values
+      description: >
+        Returns public dynamic fields for a released or obsolete passport.
+        A valid security group key also returns selected restricted dynamic
+        fields covered by that key.
+      parameters:
+        - $ref: '#/components/parameters/DppIdPath'
+        - $ref: '#/components/parameters/SecurityGroupKeyHeader'
+        - $ref: '#/components/parameters/AlternateSecurityGroupKeyHeader'
+      responses:
+        '200':
+          description: Latest allowed dynamic values keyed by canonical field key.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [values]
+                properties:
+                  values:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        value: {}
+                        updatedAt:
+                          type: string
+                          format: date-time
+        '401':
+          description: Invalid or revoked security group key.
+        '403':
+          description: Security group key is not valid for this company, type, or passport.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/public/passports/{dppId}/dynamic-values/{fieldKey}/history:
+    get:
+      operationId: getPublicDynamicValueHistory
+      tags: [Public read]
+      summary: Read dynamic field history
+      description: >
+        Returns history for a public dynamic field. Restricted dynamic history
+        requires a security group key that explicitly includes the field.
+      parameters:
+        - $ref: '#/components/parameters/DppIdPath'
+        - name: fieldKey
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2000
+            default: 500
+        - $ref: '#/components/parameters/SecurityGroupKeyHeader'
+        - $ref: '#/components/parameters/AlternateSecurityGroupKeyHeader'
+      responses:
+        '200':
+          description: Ordered dynamic field history.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [history]
+                properties:
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        value: {}
+                        updatedAt:
+                          type: string
+                          format: date-time
+        '401':
+          description: Invalid or revoked security group key.
+        '403':
+          description: The field is restricted or the key does not cover it.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/public/passports/{dppId}/qrcode:
+    get:
+      operationId: getPublicPassportQrCode
+      tags: [Public read]
+      summary: Read QR and carrier authenticity metadata
+      parameters:
+        - $ref: '#/components/parameters/DppIdPath'
+      responses:
+        '200':
+          description: QR code and carrier authenticity metadata for a released or obsolete passport.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/public/passports/{dppId}/signature:
+    get:
+      operationId: getPublicPassportSignature
+      tags: [Public verification]
+      summary: Verify the released passport signature
+      description: >
+        Returns public verification metadata only. The stored credential payload
+        is not exposed here because it may contain non-public signed fields.
+      parameters:
+        - $ref: '#/components/parameters/DppIdPath'
+        - $ref: '#/components/parameters/VersionQuery'
+      responses:
+        '200':
+          description: Signature verification status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignatureVerification'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/public/passports/{dppId}/verification-bundle:
+    get:
+      operationId: getPublicVerificationBundle
+      tags: [Public verification]
+      summary: Read public verification summary and proof metadata
+      parameters:
+        - $ref: '#/components/parameters/DppIdPath'
+        - $ref: '#/components/parameters/VersionQuery'
+      responses:
+        '200':
+          description: Public verification bundle.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/public/signing-key:
+    get:
+      operationId: getPublicSigningKey
+      tags: [Public verification]
+      summary: Read the active public signing key
+      responses:
+        '200':
+          description: Active public signing key metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/public/companies/{companySlug}/profile:
+    get:
+      operationId: getPublicCompanyProfile
+      tags: [Public read]
+      summary: Read a public company profile by company slug
+      parameters:
+        - name: companySlug
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Lowercase hyphenated company name or DID slug.
+      responses:
+        '200':
+          description: Public company profile.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  companyName:
+                    type: string
+                  companyLogo:
+                    type: [string, 'null']
+                  didSlug:
+                    type: [string, 'null']
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public-files/{publicId}:
+    get:
+      operationId: getPublicPassportAttachment
+      tags: [Public files]
+      summary: Read an attachment belonging to an explicitly public passport field
+      parameters:
+        - name: publicId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]{8,24}$'
+      responses:
+        '200':
+          description: Attachment bytes.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public-files/access/{token}:
+    get:
+      operationId: getAuthorisedPassportAttachment
+      tags: [Public files]
+      summary: Read an attachment through an expiring DPP-and-field-bound capability URL
+      description: >
+        Clients receive this URL in an authorised passport response. The token
+        is generated by the server and must not be constructed by clients.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 16
+      responses:
+        '200':
+          description: Attachment bytes.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/companies/{companySlug}/integrations/v1/passports:
+    post:
+      operationId: createIntegrationPassport
+      tags: [Integration write]
+      summary: Create an editable passport draft for a company
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CompanySlugPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PassportCreateRequest'
+      responses:
+        '201':
+          description: Created DPP draft.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Identifier or lifecycle conflict.
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/companies/{companySlug}/integrations/v1/passports/{dppId}:
+    patch:
+      operationId: updateIntegrationPassport
+      tags: [Integration write]
+      summary: Update an editable passport by DPP ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CompanySlugPath'
+        - $ref: '#/components/parameters/DppIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PassportMutationRequest'
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/PassportMutationRequest'
+      responses:
+        '200':
+          description: Updated passport.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Editable passport conflict.
+        '415':
+          description: Unsupported patch media type.
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteIntegrationPassport
+      tags: [Integration write]
+      summary: Delete an editable passport draft or in-revision row
+      description: Released passports must use the archive endpoint.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CompanySlugPath'
+        - $ref: '#/components/parameters/DppIdPath'
+      responses:
+        '200':
+          description: Deleted editable passport.
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Released passport must be archived instead.
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/companies/{companySlug}/integrations/v1/passports/{dppId}/archive:
+    post:
+      operationId: archiveIntegrationPassport
+      tags: [Integration write]
+      summary: Archive a released passport lineage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CompanySlugPath'
+        - $ref: '#/components/parameters/DppIdPath'
+      responses:
+        '200':
+          description: Archived passport lineage.
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/companies/{companySlug}/integrations/v1/passports/{dppId}/dynamic-values:
+    post:
+      operationId: appendIntegrationDynamicValues
+      tags: [Integration write]
+      summary: Push current dynamic field values for a passport
+      description: Only fields configured as dynamic on this passport type are accepted.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CompanySlugPath'
+        - $ref: '#/components/parameters/DppIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Dynamic values accepted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CompanySlugPath:
+      name: companySlug
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Lowercase hyphenated company name, for example `acme-batteries`.
+    DppIdPath:
+      name: dppId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Canonical DPP ID.
+    VersionQuery:
+      name: version
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+      description: Public version number for archived or inactive snapshots.
+    SecurityGroupKeyHeader:
+      name: X-API-Key
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Security group key for selected restricted fields.
+    AlternateSecurityGroupKeyHeader:
+      name: X-Security-Group-Key
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Alternate header for a security group key.
+  schemas:
+    PublicPassportPayload:
+      type: object
+      additionalProperties: true
+      properties:
+        dppId:
+          type: string
+        passportType:
+          type: string
+        fields:
+          type: object
+          additionalProperties: true
+        viewerSchema:
+          type: object
+          additionalProperties: true
+        companyProfile:
+          type: object
+          additionalProperties: true
+        restrictedAccess:
+          type: object
+          properties:
+            unlocked:
+              type: boolean
+            fieldKeys:
+              type: array
+              items:
+                type: string
+            securityGroup:
+              type: object
+              properties:
+                name:
+                  type: [string, 'null']
+                scopeType:
+                  type: string
+                  enum: [passportType, passports]
+    PassportMutationRequest:
+      type: object
+      additionalProperties: true
+      description: >
+        Passport schema fields are sent directly as top-level camelCase
+        properties using their canonical semantic field keys.
+      properties:
+        productIdentifier:
+          type: string
+          description: External product identifier. The internal alias field name is not part of this API.
+        uniqueProductIdentifier:
+          type: string
+        granularity:
+          type: string
+          enum: [model, batch, item]
+        modelName:
+          type: string
+    PassportCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PassportMutationRequest'
+        - type: object
+          required: [passportType, productIdentifier]
+          properties:
+            passportType:
+              type: string
+    SignatureVerification:
+      type: object
+      additionalProperties: true
+      properties:
+        status:
+          type: string
+        signedAt:
+          type: string
+          format: date-time
+        keyId:
+          type: string
+        dataHash:
+          type: string
+        algorithm:
+          type: string
+  responses:
+    BadRequest:
+      description: Invalid request.
+    Unauthorised:
+      description: Missing or invalid Bearer token.
+    Forbidden:
+      description: Authenticated caller is not allowed to perform this action.
+    NotFound:
+      description: Resource not found.
+    RateLimited:
+      description: Too many requests.
+    InternalError:
+      description: Internal server error.

@@ -1,0 +1,17 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Synthetic fixtures and verification probes"
+paths = [
+  '''(^|/)apps/backend-api/tests/''',
+  '''(^|/)apps/backend-api/scripts/verify-live-confidentiality\.js$''',
+  '''(^|/)apps/frontend-app/src/test/''',
+]
+
+[[allowlists]]
+description = "Documented environment placeholders"
+paths = [
+  '''(^|/)docker/\.env\.prod\.example$''',
+  '''(^|/)infra/oracle/oci\.env\.example$''',
+]

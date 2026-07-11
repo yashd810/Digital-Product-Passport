@@ -1,0 +1,1891 @@
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
+import {
+  confidentialityLevels,
+  fieldTypes,
+  iconPresets,
+  transLangs,
+  buildProductCategoryOptions,
+  buildSectionsFromCSV,
+  downloadTemplate,
+  newField,
+  newSection,
+  normalizeSystemPassportHeader,
+  parseCSV,
+  rekeySection,
+  resolveSystemHeaderEntries,
+  toSlug,
+} from "./builderHelpers";
+import {
+  buildSemanticModelOptions,
+  deriveSemanticTermDataType,
+  deriveSemanticTermUnit,
+  getFilteredSemanticTermCatalog,
+  getSemanticModelOption,
+  getSemanticSearchDisplayValue,
+  normalizeSemanticModelKey,
+  normalizeSemanticTermCatalog,
+  resolveSelectedSemanticMatch,
+  resolveSemanticTermDefinitionByInput,
+} from "./semanticTermCatalog";
+import {
+  normalizeTableColumns,
+  serializeTableColumns,
+  tableColumnKeyFromLabel,
+} from "../../shared/passports/tableSchemaUtils";
+import {
+  canonicalFieldKeyFromSemanticId,
+  normalizeFieldForSemanticModel,
+  rekeyModuleSection,
+  syncSectionsWithSemanticModel,
+  unlockModuleSection,
+} from "./AdminCreatePassportTypeHelpers";
+import AdminSelectMenu from "../components/AdminSelectMenu";
+import { TypeIdentityCard } from "./TypeIdentityCard";
+import "../styles/AdminDashboard.css";
+
+const api = import.meta.env.VITE_API_URL || "";
+
+function getSectionChildren(section = {}) {
+  if (Array.isArray(section.sections)) return section.sections;
+  if (Array.isArray(section.groups)) return section.groups;
+  return [];
+}
+
+function withSectionChildren(section, children) {
+  const nextSection = { ...section };
+  delete nextSection.groups;
+  if (children.length) {
+    nextSection.sections = children;
+  } else {
+    delete nextSection.sections;
+  }
+  return nextSection;
+}
+
+function mapSectionTree(sections = [], mapper) {
+  return sections.map((section) => {
+    const mappedChildren = mapSectionTree(getSectionChildren(section), mapper);
+    return mapper(withSectionChildren(section, mappedChildren));
+  });
+}
+
+function mapSectionById(sections = [], sectionId, mapper) {
+  return mapSectionTree(sections, (section) =>
+    section.localId === sectionId ? mapper(section) : section
+  );
+}
+
+function flattenSectionTree(sections = []) {
+  return sections.flatMap((section) => [
+    section,
+    ...flattenSectionTree(getSectionChildren(section)),
+  ]);
+}
+
+function flattenSectionTreeEntries(sections = [], depth = 0) {
+  return sections.flatMap((section) => [
+    { section, depth },
+    ...flattenSectionTreeEntries(getSectionChildren(section), depth + 1),
+  ]);
+}
+
+function flattenEditableFields(sections = []) {
+  return flattenSectionTree(sections).flatMap((section) =>
+    (section.fields || []).map((field) => ({ section, field }))
+  );
+}
+
+function countSectionFields(section = {}) {
+  return (section.fields || []).length
+    + getSectionChildren(section).reduce((count, child) => count + countSectionFields(child), 0);
+}
+
+function rekeyEditableSection(section = {}) {
+  return rekeySection(withSectionChildren({
+    ...section,
+    localId: Math.random().toString(36).slice(2),
+    labelI18n: section.labelI18n || {},
+    fields: (section.fields || []).map((field) => ({
+      ...field,
+      localId: Math.random().toString(36).slice(2),
+      labelI18n: field.labelI18n || {},
+    })),
+  }, getSectionChildren(section).map(rekeyEditableSection)));
+}
+
+function AdminCreatePassportType() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // ── Meta fields ────────────────────────────────────────────
+  const [displayName,    setDisplayName]    = useState("");
+  const [productCategory,       setProductCategory]       = useState("");
+  const [productIcon,   setProductIcon]   = useState("📋");
+  const [semanticModelKey, setSemanticModelKey] = useState("");
+  const [typeName,       setTypeName]       = useState("");
+  const [typeNameManual, setTypeNameManual] = useState(false);
+  const [sourceModuleKey, setSourceModuleKey] = useState("");
+  const cloneSourceTypeName = useRef(null); // tracks original typeName when cloning
+
+  // ── Edit mode (patch existing type metadata) ───────────────
+  const initialEditData = useRef(location.state?.editData || null);
+  const editMode = !!initialEditData.current;
+  const editTypeId = initialEditData.current?.id || null;
+
+  // ── Section builder ────────────────────────────────────────
+  const [sections, setSections] = useState([newSection("General")]);
+  const [systemHeader, setSystemHeader] = useState(() => normalizeSystemPassportHeader());
+
+  // ── UI state ───────────────────────────────────────────────
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState("");
+  const [success,  setSuccess]  = useState("");
+  const [csvError, setCsvError] = useState("");
+  const [invalidFields, setInvalidFields] = useState([]);  // section/field IDs with errors
+  const [semanticModels, setSemanticModels] = useState([]);
+  const [passportModules, setPassportModules] = useState([]);
+  const [semanticTermCatalog, setSemanticTermCatalog] = useState([]);
+  const [semanticTermsLoading, setSemanticTermsLoading] = useState(false);
+  const [semanticTermsError, setSemanticTermsError] = useState("");
+
+  const hasInvalid = (id) => invalidFields.includes(id);
+  const semanticModelOptions = buildSemanticModelOptions(semanticModels, semanticModelKey);
+  const selectedSemanticModelOption = getSemanticModelOption(semanticModelOptions, semanticModelKey);
+  const hasSelectedSemanticModel = Boolean(normalizeSemanticModelKey(semanticModelKey));
+
+  // ── Draft / save progress (create mode only, not edit/clone) ──────────────
+  const draftApi = `${api}/api/admin/passport-type-draft`;
+  const draftEnabled = !editMode && !location.state?.cloneData;
+  const resumeDraftRequested = Boolean(location.state?.resumeDraft);
+  const [draftSaved,  setDraftSaved]  = useState(false); // brief "saved" flash
+  const autoSaveTimer = useRef(null);
+  const errorAlertRef = useRef(null);
+  const successAlertRef = useRef(null);
+
+  useEffect(() => {
+    if (!error || !errorAlertRef.current) return;
+    errorAlertRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [error]);
+
+  useEffect(() => {
+    if (!success || !successAlertRef.current) return;
+    successAlertRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [success]);
+
+  useEffect(() => {
+    Promise.all([
+      fetchWithAuth(`${api}/api/semantic-models`, {
+        headers: authHeaders(),
+      }),
+      fetchWithAuth(`${api}/api/admin/passport-type-modules`, {
+        headers: authHeaders(),
+      }),
+    ])
+      .then(async ([modelsResponse, modulesResponse]) => {
+        const models = modelsResponse.ok ? await modelsResponse.json() : [];
+        const modules = modulesResponse.ok ? await modulesResponse.json() : [];
+        setSemanticModels(Array.isArray(models) ? models : []);
+        setPassportModules(Array.isArray(modules) ? modules : []);
+      })
+      .catch(() => {
+        setSemanticModels([]);
+        setPassportModules([]);
+      });
+  }, []);
+
+  useEffect(() => {
+    const modelKey = normalizeSemanticModelKey(semanticModelKey);
+    if (!modelKey) {
+      setSemanticTermCatalog([]);
+      setSemanticTermsError("");
+      setSemanticTermsLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    setSemanticTermsLoading(true);
+    setSemanticTermsError("");
+
+    fetchWithAuth(`${api}/api/semantic-models/${encodeURIComponent(modelKey)}/terms`, {
+      headers: authHeaders(),
+    })
+      .then(async (response) => {
+        if (response.ok) return response.json();
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to load semantic dictionary terms");
+      })
+      .then((terms) => {
+        if (!active) return;
+        setSemanticTermCatalog(normalizeSemanticTermCatalog(terms));
+      })
+      .catch((err) => {
+        if (!active) return;
+        setSemanticTermCatalog([]);
+        setSemanticTermsError(err.message || "Failed to load semantic dictionary terms");
+      })
+      .finally(() => {
+        if (active) setSemanticTermsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [semanticModelKey]);
+
+  const buildSubmissionPayload = () => {
+    const fieldKeyToId = new Map();
+    const cleanField = (f) => {
+      const normalizedField = normalizeFieldForSemanticModel(f, semanticModelKey);
+      fieldKeyToId.set(normalizedField.key, f.localId);
+      const base = {
+        key: normalizedField.key,
+        label: normalizedField.label,
+        type: normalizedField.type,
+        confidentiality: confidentialityLevels.some((level) => level.value === normalizedField.confidentiality)
+          ? normalizedField.confidentiality
+          : "public",
+      };
+      const fi18n = Object.fromEntries(
+        Object.entries(normalizedField.labelI18n || {}).filter(([, v]) => v?.trim())
+      );
+      if (Object.keys(fi18n).length > 0) base.labelI18n = fi18n;
+      if (normalizedField.required) base.required = true;
+      if (normalizedField.displayRole) base.displayRole = normalizedField.displayRole;
+      if (normalizedField.summaryRole) base.summaryRole = normalizedField.summaryRole;
+      if (normalizedField.lifecycleRole) base.lifecycleRole = normalizedField.lifecycleRole;
+      if (normalizedField.presentation) base.presentation = normalizedField.presentation;
+      if (normalizedField.elementIdPath) base.elementIdPath = normalizedField.elementIdPath;
+      if (normalizedField.objectType) base.objectType = normalizedField.objectType;
+      if (normalizedField.valueDataType) base.valueDataType = normalizedField.valueDataType;
+      if (normalizedField.canonicalLocked) base.canonicalLocked = true;
+      if (normalizedField.sourceModuleKey) base.sourceModuleKey = normalizedField.sourceModuleKey;
+      if (normalizedField.sourceModuleFieldKey) base.sourceModuleFieldKey = normalizedField.sourceModuleFieldKey;
+      if (normalizedField.type === "table") {
+        const tableColumns = serializeTableColumns(normalizedField);
+        base.tableColumnCount = tableColumns.length;
+        base.tableColumns = tableColumns;
+      }
+      if (normalizedField.dynamic) base.dynamic = true;
+      if (normalizedField.composition) {
+        base.composition = true;
+        if (normalizedField.type === "table") {
+          if (normalizedField.compositionLabelColumnKey) {
+            base.compositionLabelColumnKey = normalizedField.compositionLabelColumnKey;
+          }
+          if (normalizedField.compositionValueColumnKey) {
+            base.compositionValueColumnKey = normalizedField.compositionValueColumnKey;
+          }
+        }
+      }
+      if (normalizedField.semanticId) base.semanticId = normalizedField.semanticId;
+      if (normalizedField.unit) base.unit = normalizedField.unit;
+      if (normalizedField.dataType) base.dataType = normalizedField.dataType;
+      for (const metadataKey of [
+        "itemDataType",
+        "domainClassKey",
+        "domainClassIri",
+        "rangeKind",
+        "rangeClassKey",
+        "rangeEnumKey",
+        "rangeIri",
+        "relationshipType",
+        "minCount",
+        "maxCount",
+        "allowedValues",
+        "enumValues",
+        "structured",
+        "storageType",
+      ]) {
+        if (normalizedField[metadataKey] !== undefined) {
+          base[metadataKey] = normalizedField[metadataKey];
+        }
+      }
+      return base;
+    };
+    const cleanSection = (sec) => {
+      const cleanSec = {
+        key: sec.key,
+        label: sec.label,
+        fields: (sec.fields || []).map(cleanField),
+      };
+      const si18n = Object.fromEntries(
+        Object.entries(sec.labelI18n || {}).filter(([, v]) => v?.trim())
+      );
+      if (Object.keys(si18n).length > 0) cleanSec.labelI18n = si18n;
+      const childSections = getSectionChildren(sec).map(cleanSection);
+      if (childSections.length) cleanSec.sections = childSections;
+      return cleanSec;
+    };
+    const cleanSections = sections.map(cleanSection);
+
+    return {
+      fieldKeyToId,
+      cleanSections,
+      payload: {
+        typeName,
+        displayName,
+        productCategory,
+        productIcon,
+        semanticModelKey: normalizeSemanticModelKey(semanticModelKey) || null,
+        sourceModule: sourceModuleKey || null,
+        identity: selectedPassportModule?.fieldsJson?.identity || null,
+        semanticGraph: selectedPassportModule?.fieldsJson?.semanticGraph || null,
+        systemHeader: normalizeSystemPassportHeader(systemHeader),
+        sections: cleanSections,
+      },
+    };
+  };
+
+  const applyDraft = (draft) => {
+    const nextProductCategory = draft.productCategory || "";
+    const nextSemanticModelKey = normalizeSemanticModelKey(draft.semanticModelKey || "");
+    setDisplayName(draft.displayName || "");
+    setProductCategory(nextProductCategory);
+    setProductIcon(draft.productIcon || "📋");
+    setSemanticModelKey(nextSemanticModelKey);
+    setSourceModuleKey(draft.sourceModuleKey || draft.sourceModule || "");
+    setTypeName(draft.typeName || "");
+    setTypeNameManual(draft.typeNameManual || false);
+    const restored = (draft.sections || []).map(rekeyEditableSection);
+    setSystemHeader(normalizeSystemPassportHeader(draft.systemHeader));
+    if (restored.length > 0) setSections(syncSectionsWithSemanticModel(restored, nextSemanticModelKey));
+  };
+
+  // Load draft only when the user explicitly chooses to continue it
+  useEffect(() => {
+    if (!draftEnabled || !resumeDraftRequested) return;
+    fetchWithAuth(draftApi, { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(row => { if (row?.draftJson) applyDraft(row.draftJson); })
+      .catch((error) => console.warn("Ignored async error", error));
+  }, [draftEnabled, resumeDraftRequested]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-save draft 1.5s after any change (create mode only)
+  useEffect(() => {
+    if (!draftEnabled) return;
+    const hasContent = displayName.trim() || sections.some(s => s.label || countSectionFields(s) > 0);
+    if (!hasContent || !productCategory.trim()) return;
+    clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      fetchWithAuth(draftApi, {
+        method: "PUT",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ draftJson: { displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader } }),
+      }).catch((error) => console.warn("Ignored async error", error));
+    }, 1500);
+    return () => clearTimeout(autoSaveTimer.current);
+  }, [draftEnabled, displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveDraft = () => {
+    if (!draftEnabled) return;
+    if (!productCategory.trim()) {
+      setError("Select a product category before saving a draft.");
+      setInvalidFields(["productCategory"]);
+      return;
+    }
+    setError("");
+    fetchWithAuth(draftApi, {
+      method: "PUT",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ draftJson: { displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader } }),
+    })
+      .then(r => r.ok ? (
+        setSuccess("Draft saved successfully!"),
+        setDraftSaved(true),
+        setTimeout(() => setDraftSaved(false), 2000)
+      ) : null)
+      .catch((error) => console.warn("Ignored async error", error));
+  };
+
+  const handleCSVImport = (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";  // reset so same file can be re-selected
+    if (!file) return;
+    if (!file.name.endsWith(".csv")) { setCsvError("Please select a .csv file."); return; }
+    setCsvError("");
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const rows = parseCSV(ev.target.result);
+        if (rows.length === 0) { setCsvError("No valid rows found in CSV."); return; }
+        const parsed = buildSectionsFromCSV(rows);
+        if (parsed.length === 0) { setCsvError("Could not build sections from CSV."); return; }
+        setSections(syncSectionsWithSemanticModel(parsed, semanticModelKey));
+      } catch {
+        setCsvError("Failed to parse CSV. Check the file format.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Fetch product categories from API
+  const [productCategoryOptions, setProductCategoryOptions] = useState([]);
+  useEffect(() => {
+    Promise.all([
+      fetchWithAuth(`${api}/api/admin/product-categories`, { headers: authHeaders() }),
+      fetchWithAuth(`${api}/api/admin/passport-types`, { headers: authHeaders() }),
+    ])
+      .then(async ([categoryResponse, typeResponse]) => {
+        const savedCategories = categoryResponse.ok ? await categoryResponse.json() : [];
+        const passportTypes = typeResponse.ok ? await typeResponse.json() : [];
+        setProductCategoryOptions(buildProductCategoryOptions({ savedCategories, passportTypes }));
+      })
+      .catch(() => setProductCategoryOptions([]));
+  }, []);
+
+  // Pre-fill from edit data if navigated with state — read once from navigation state at mount
+  useEffect(() => {
+    const ed = initialEditData.current;
+    if (!ed) return;
+    setDisplayName(ed.displayName || "");
+    const nextProductCategory = ed.productCategory || "";
+    setProductCategory(nextProductCategory);
+    setProductIcon(ed.productIcon || "📋");
+    const nextSemanticModelKey = normalizeSemanticModelKey(ed.semanticModelKey || "");
+    setSemanticModelKey(nextSemanticModelKey);
+    setSourceModuleKey(ed.fieldsJson?.sourceModule || "");
+    setTypeName(ed.typeName || "");
+    setTypeNameManual(true); // lock typeName, it cannot change
+    const editSections = (ed.fieldsJson?.sections || []).map(rekeyEditableSection);
+    setSystemHeader(normalizeSystemPassportHeader(ed.fieldsJson?.systemHeader));
+    if (editSections.length > 0) setSections(syncSectionsWithSemanticModel(editSections, nextSemanticModelKey));
+  }, []); // runs once
+
+  // Pre-fill from clone data if navigated with state — read once from navigation state at mount
+  const initialCloneData = useRef(location.state?.cloneData || null);
+  useEffect(() => {
+    const cd = initialCloneData.current;
+    if (!cd) return;
+    cloneSourceTypeName.current = cd.typeName;
+    setDisplayName(`Clone of ${cd.displayName || cd.typeName}`);
+    const nextProductCategory = cd.productCategory || "";
+    setProductCategory(nextProductCategory);
+    setProductIcon(cd.productIcon || "📋");
+    const nextSemanticModelKey = normalizeSemanticModelKey(cd.semanticModelKey || "");
+    setSemanticModelKey(nextSemanticModelKey);
+    setSourceModuleKey(cd.fieldsJson?.sourceModule || "");
+    const clonedSections = (cd.fieldsJson?.sections || []).map(rekeyEditableSection);
+    setSystemHeader(normalizeSystemPassportHeader(cd.fieldsJson?.systemHeader));
+    if (clonedSections.length > 0) setSections(syncSectionsWithSemanticModel(clonedSections, nextSemanticModelKey));
+  }, []); // runs once — initial clone data captured in ref above
+
+  // Auto-generate typeName from displayName unless user has manually overridden it
+  useEffect(() => {
+    if (!typeNameManual) {
+      setTypeName(toSlug(displayName));
+    }
+  }, [displayName, typeNameManual]);
+
+  useEffect(() => {
+    if (!normalizeSemanticModelKey(semanticModelKey)) {
+      setSections((currentSections) => syncSectionsWithSemanticModel(currentSections, semanticModelKey));
+    }
+  }, [semanticModelKey]);
+
+  const handleSemanticModelSelection = (nextModelKey) => {
+    if (sourceModuleKey) {
+      setError("Semantic model is controlled by the selected passport module.");
+      return;
+    }
+    const normalizedNextModelKey = normalizeSemanticModelKey(nextModelKey);
+    const normalizedCurrentModelKey = normalizeSemanticModelKey(semanticModelKey);
+    setSemanticModelKey(normalizedNextModelKey);
+    setError("");
+    setInvalidFields([]);
+    if (normalizedNextModelKey !== normalizedCurrentModelKey) {
+      setSections((currentSections) => syncSectionsWithSemanticModel(
+        currentSections,
+        normalizedNextModelKey,
+        { clearSemanticId: true }
+      ));
+    }
+  };
+
+  const applyPassportModule = (moduleKey) => {
+    const selectedModule = passportModules.find((moduleTemplate) => moduleTemplate.moduleKey === moduleKey);
+    setSourceModuleKey(moduleKey || "");
+    if (!moduleKey) {
+      setSections((currentSections) => currentSections.map(unlockModuleSection));
+      setSystemHeader(normalizeSystemPassportHeader());
+      setError("");
+      return;
+    }
+    if (!selectedModule) return;
+
+    const nextSemanticModelKey = normalizeSemanticModelKey(selectedModule.semanticModelKey || "");
+    setDisplayName(selectedModule.displayName || "");
+    setProductCategory(selectedModule.productCategory || "");
+    setProductIcon(selectedModule.productIcon || "📋");
+    setSemanticModelKey(nextSemanticModelKey);
+    setSystemHeader(normalizeSystemPassportHeader(selectedModule.fieldsJson?.systemHeader));
+    const moduleSections = (selectedModule.fieldsJson?.sections || [])
+      .map((section) => rekeyModuleSection(section, selectedModule.moduleKey));
+    setSections(moduleSections.length ? moduleSections : [newSection("General")]);
+    setError("");
+    setInvalidFields([]);
+  };
+
+  const getCanonicalSchemaIssues = (cleanSections = []) => {
+    if (!sourceModuleKey) {
+      return [{ fieldId: "sourceModule", message: "Select a passport module source before creating a passport type." }];
+    }
+    const issues = [];
+    flattenEditableFields(cleanSections).forEach(({ field }) => {
+        if (!field.canonicalLocked || field.sourceModuleKey !== sourceModuleKey || !field.sourceModuleFieldKey) {
+          issues.push({
+            fieldId: field.localId,
+            message: `Field "${field.label || field.key}" must come from the selected passport module.`,
+          });
+        }
+        if (!field.semanticId) {
+          issues.push({
+            fieldId: field.localId,
+            message: `Field "${field.label || field.key}" needs explicit module semantics.`,
+          });
+        }
+        if (field.type === "table") {
+          const columns = normalizeTableColumns(field);
+          if (!columns.length) {
+            issues.push({
+              fieldId: field.localId,
+              message: `Table field "${field.label || field.key}" needs module-defined columns.`,
+            });
+          }
+          columns.forEach((column) => {
+            if (!column.canonicalLocked || column.sourceModuleKey !== sourceModuleKey || !column.sourceModuleColumnKey || !column.semanticId) {
+              issues.push({
+                fieldId: field.localId,
+                message: `Table column "${column.label || column.key}" in "${field.label || field.key}" needs locked module semantics.`,
+              });
+            }
+          });
+        }
+    });
+    return issues;
+  };
+
+  // ── Section helpers ────────────────────────────────────────
+  const addSection = () =>
+    setSections(s => [...s, newSection("")]);
+
+  const removeSection = (id) =>
+    setSections(s => mapSectionTree(s, (sec) =>
+      withSectionChildren(sec, getSectionChildren(sec).filter((child) => child.localId !== id))
+    ).filter(sec => sec.localId !== id));
+
+  const updateSection = (id, patch) =>
+    setSections(s => mapSectionById(s, id, (sec) => {
+      if (sec.localId !== id) return sec;
+      const updated = { ...sec, ...patch };
+      if ("label" in patch && !sec._keyManual) {
+        updated.key = toSlug(patch.label);
+      }
+      return updated;
+    }));
+
+  const setSectionKeyManual = (id) =>
+    setSections(s => mapSectionById(s, id, (sec) => ({ ...sec, _keyManual: true })));
+
+  // ── Field helpers ──────────────────────────────────────────
+  const addField = (sectionId) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => ({
+      ...sec,
+      fields: [...(sec.fields || []), newField("")],
+    })));
+
+  const removeField = (sectionId, fieldId) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => ({
+      ...sec,
+      fields: (sec.fields || []).filter(f => f.localId !== fieldId),
+    })));
+
+  const updateField = (sectionId, fieldId, patch) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      return {
+        ...sec,
+        fields: (sec.fields || []).map(f => {
+          if (f.localId !== fieldId) return f;
+          const canonicalPatch = f.canonicalLocked
+            ? Object.fromEntries(Object.entries(patch).filter(([key]) =>
+              !["key", "type", "semanticId", "unit", "dataType", "composition", "compositionLabelColumnKey", "compositionValueColumnKey"].includes(key)
+            ))
+            : patch;
+          let updated = { ...f, ...canonicalPatch };
+          const shouldNormalizeSemantic = !f.canonicalLocked && (
+            "label" in canonicalPatch ||
+            "key" in canonicalPatch ||
+            "_keyManual" in canonicalPatch
+          );
+
+          if (shouldNormalizeSemantic) {
+            updated = normalizeFieldForSemanticModel(updated, semanticModelKey);
+          }
+
+          if (!f.canonicalLocked && "label" in canonicalPatch && !updated._keyManual) {
+            updated.key = canonicalFieldKeyFromSemanticId(updated.semanticId, canonicalPatch.label || "");
+          }
+
+          if (!f.canonicalLocked && "label" in canonicalPatch && !canonicalPatch.label) {
+            delete updated.semanticId;
+            delete updated.semanticMode;
+          }
+          if (canonicalPatch.composition === false) {
+            delete updated.compositionLabelColumnKey;
+            delete updated.compositionValueColumnKey;
+          }
+          // Switching TO table: preserve explicit module columns only.
+          if (canonicalPatch.type === "table" && f.type !== "table") {
+            updated.dataType = "array";
+            updated.objectType = updated.objectType || "DataElementCollection";
+            updated.valueDataType = "Array";
+            updated.tableColumns = normalizeTableColumns(updated);
+            updated.tableColumnCount = updated.tableColumns.length;
+          }
+          // Switching AWAY from table: clear config
+          if ("type" in canonicalPatch && canonicalPatch.type !== "table") {
+            delete updated.tableColumnCount;
+            delete updated.tableColumns;
+            delete updated.compositionLabelColumnKey;
+            delete updated.compositionValueColumnKey;
+            if (updated.dataType === "array") delete updated.dataType;
+            if (updated.valueDataType === "Array") delete updated.valueDataType;
+            if (updated.objectType === "DataElementCollection") delete updated.objectType;
+          }
+          return updated;
+        }),
+      };
+    }));
+
+  const setFieldKeyManual = (sectionId, fieldId) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      return {
+        ...sec,
+        fields: (sec.fields || []).map(f => {
+          if (f.localId !== fieldId) return f;
+          return normalizeFieldForSemanticModel({ ...f, _keyManual: true }, semanticModelKey);
+        }),
+      };
+    }));
+
+  const applyManualSemanticSelection = (sectionId, fieldId, selectionValue) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      return {
+        ...sec,
+        fields: (sec.fields || []).map(f => {
+          if (f.localId !== fieldId) return f;
+          const selected = resolveSemanticTermDefinitionByInput(semanticTermCatalog, selectionValue);
+          if (!selected) {
+            return {
+              ...f,
+              _semanticSearch: selectionValue,
+            };
+          }
+          return {
+            ...f,
+            key: canonicalFieldKeyFromSemanticId(selected.semanticId, selected.key || f.key || f.label),
+            semanticId: selected.semanticId,
+            unit: deriveSemanticTermUnit(selected),
+            dataType: deriveSemanticTermDataType(selected),
+            _semanticOpen: false,
+            _semanticSearch: `${selected.key} - ${selected.label}`,
+          };
+        }),
+      };
+    }));
+
+  const updateSemanticSearchInput = (sectionId, fieldId, value) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      return {
+        ...sec,
+        fields: (sec.fields || []).map(f => {
+          if (f.localId !== fieldId) return f;
+          const nextValue = String(value || "");
+          if (!nextValue.trim()) {
+            return {
+              ...f,
+              semanticId: undefined,
+              _semanticSearch: "",
+              _semanticOpen: true,
+            };
+          }
+          return {
+            ...f,
+            semanticId: undefined,
+            _semanticSearch: nextValue,
+            _semanticOpen: true,
+          };
+        }),
+      };
+    }));
+
+  const setSemanticPickerOpen = (sectionId, fieldId, isOpen) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      return {
+        ...sec,
+        fields: (sec.fields || []).map(f =>
+          f.localId === fieldId ? { ...f, _semanticOpen: isOpen } : f
+        ),
+      };
+    }));
+
+  const clearManualSemanticSelection = (sectionId, fieldId) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      return {
+        ...sec,
+        fields: (sec.fields || []).map(f => {
+          if (f.localId !== fieldId) return f;
+          const normalized = normalizeFieldForSemanticModel({
+            ...f,
+            semanticId: undefined,
+            _semanticSearch: "",
+          }, semanticModelKey);
+          return normalized;
+        }),
+      };
+    }));
+
+  const updateTableColumn = (sectionId, fieldId, columnIndex, patch) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      return {
+        ...sec,
+        fields: (sec.fields || []).map(f => {
+          if (f.localId !== fieldId) return f;
+          let keyReplacement = null;
+          const columns = normalizeTableColumns(f).map((column, index) => {
+            if (index !== columnIndex) return column;
+            const canonicalPatch = column.canonicalLocked || f.canonicalLocked
+              ? Object.fromEntries(Object.entries(patch).filter(([key]) =>
+                !["key", "semanticId", "unit", "dataType"].includes(key)
+              ))
+              : patch;
+            const nextColumn = { ...column, ...canonicalPatch };
+            if (!column.canonicalLocked && !f.canonicalLocked && "label" in canonicalPatch && !column._keyManual && !("key" in canonicalPatch)) {
+              nextColumn.key = canonicalFieldKeyFromSemanticId(nextColumn.semanticId, canonicalPatch.label || `column${index + 1}`);
+            }
+            if ("key" in canonicalPatch) {
+              nextColumn.key = tableColumnKeyFromLabel(canonicalPatch.key, `column${index + 1}`);
+              nextColumn._keyManual = true;
+            }
+            if (nextColumn.key !== column.key) {
+              keyReplacement = { from: column.key, to: nextColumn.key };
+            }
+            return nextColumn;
+          });
+          const nextField = {
+            ...f,
+            tableColumns: columns,
+            tableColumnCount: columns.length,
+          };
+          if (keyReplacement) {
+            if (nextField.compositionLabelColumnKey === keyReplacement.from) {
+              nextField.compositionLabelColumnKey = keyReplacement.to;
+            }
+            if (nextField.compositionValueColumnKey === keyReplacement.from) {
+              nextField.compositionValueColumnKey = keyReplacement.to;
+            }
+          }
+          return nextField;
+        }),
+      };
+    }));
+
+  const applyManualTableColumnSemanticSelection = (sectionId, fieldId, columnIndex, selectionValue) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      return {
+        ...sec,
+        fields: (sec.fields || []).map(f => {
+          if (f.localId !== fieldId) return f;
+          const selected = resolveSemanticTermDefinitionByInput(semanticTermCatalog, selectionValue);
+          const columns = normalizeTableColumns(f).map((column, index) => {
+            if (index !== columnIndex) return column;
+            if (!selected) {
+              return {
+                ...column,
+                _semanticSearch: selectionValue,
+              };
+            }
+            const nextKey = canonicalFieldKeyFromSemanticId(selected.semanticId, selected.key || column.key || column.label);
+            return {
+              ...column,
+              key: nextKey,
+              semanticId: selected.semanticId,
+              unit: deriveSemanticTermUnit(selected),
+              dataType: deriveSemanticTermDataType(selected),
+              _semanticOpen: false,
+              _semanticSearch: `${selected.key} - ${selected.label}`,
+            };
+          });
+          const currentColumn = normalizeTableColumns(f)[columnIndex];
+          const nextColumn = columns[columnIndex];
+          const nextField = { ...f, tableColumns: columns, tableColumnCount: columns.length };
+          if (currentColumn?.key && nextColumn?.key && currentColumn.key !== nextColumn.key) {
+            if (nextField.compositionLabelColumnKey === currentColumn.key) {
+              nextField.compositionLabelColumnKey = nextColumn.key;
+            }
+            if (nextField.compositionValueColumnKey === currentColumn.key) {
+              nextField.compositionValueColumnKey = nextColumn.key;
+            }
+          }
+          return nextField;
+        }),
+      };
+    }));
+
+  const updateTableColumnSemanticSearchInput = (sectionId, fieldId, columnIndex, value) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      return {
+        ...sec,
+        fields: (sec.fields || []).map(f => {
+          if (f.localId !== fieldId) return f;
+          const nextValue = String(value || "");
+          const columns = normalizeTableColumns(f).map((column, index) => {
+            if (index !== columnIndex) return column;
+            if (!nextValue.trim()) {
+              return {
+                ...column,
+                semanticId: undefined,
+                _semanticSearch: "",
+                _semanticOpen: true,
+              };
+            }
+            return {
+              ...column,
+              semanticId: undefined,
+              _semanticSearch: nextValue,
+              _semanticOpen: true,
+            };
+          });
+          return { ...f, tableColumns: columns, tableColumnCount: columns.length };
+        }),
+      };
+    }));
+
+  const setTableColumnSemanticPickerOpen = (sectionId, fieldId, columnIndex, isOpen) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      return {
+        ...sec,
+        fields: (sec.fields || []).map(f => {
+          if (f.localId !== fieldId) return f;
+          const columns = normalizeTableColumns(f).map((column, index) =>
+            index === columnIndex ? { ...column, _semanticOpen: isOpen } : column
+          );
+          return { ...f, tableColumns: columns, tableColumnCount: columns.length };
+        }),
+      };
+    }));
+
+  const clearManualTableColumnSemanticSelection = (sectionId, fieldId, columnIndex) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      return {
+        ...sec,
+        fields: (sec.fields || []).map(f => {
+          if (f.localId !== fieldId) return f;
+          const columns = normalizeTableColumns(f).map((column, index) => {
+            if (index !== columnIndex) return column;
+            const nextColumn = {
+              ...column,
+              semanticId: undefined,
+              _semanticSearch: "",
+            };
+            delete nextColumn.semanticId;
+            return nextColumn;
+          });
+          return { ...f, tableColumns: columns, tableColumnCount: columns.length };
+        }),
+      };
+    }));
+
+  const moveFieldWithinSection = (sectionId, fieldId, direction) =>
+    setSections(s => mapSectionById(s, sectionId, (sec) => {
+      const fields = sec.fields || [];
+      const index = fields.findIndex(f => f.localId === fieldId);
+      if (index < 0) return sec;
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= fields.length) return sec;
+      const nextFields = [...fields];
+      [nextFields[index], nextFields[targetIndex]] = [nextFields[targetIndex], nextFields[index]];
+      return { ...sec, fields: nextFields };
+    }));
+
+  const moveFieldToSection = (sourceSectionId, targetSectionId, fieldId) =>
+    setSections(currentSections => {
+      if (!targetSectionId || sourceSectionId === targetSectionId) return currentSections;
+
+      let fieldToMove = null;
+      const nextSections = mapSectionById(currentSections, sourceSectionId, (sec) => {
+        const fields = sec.fields || [];
+        fieldToMove = fields.find(f => f.localId === fieldId) || null;
+        if (!fieldToMove) return sec;
+        return { ...sec, fields: fields.filter(f => f.localId !== fieldId) };
+      });
+
+      if (!fieldToMove) return currentSections;
+
+      return mapSectionById(nextSections, targetSectionId, (sec) => ({
+        ...sec,
+        fields: [...(sec.fields || []), fieldToMove],
+      }));
+    });
+
+  // ── Submit ─────────────────────────────────────────────────
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setInvalidFields([]);
+
+    if (!displayName.trim()) {
+      setInvalidFields(["displayName"]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError("Display name is required.");
+    }
+    if (!productCategory.trim()) {
+      setInvalidFields(["productCategory"]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError("Product category is required.");
+    }
+    if (!editMode) {
+      if (!typeName.trim()) {
+        setInvalidFields(["typeName"]);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return setError("Type name is required.");
+      }
+      if (!/^[a-z][A-Za-z0-9]{1,99}$/.test(typeName)) {
+        setInvalidFields(["typeName"]);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return setError("Type name must be camelCase letters/numbers, 2-100 chars, starting with a lowercase letter.");
+      }
+    }
+
+    const { fieldKeyToId, cleanSections, payload } = buildSubmissionPayload();
+
+    const canonicalSchemaIssues = getCanonicalSchemaIssues(sections);
+    if (canonicalSchemaIssues.length) {
+      setInvalidFields(canonicalSchemaIssues.map((issue) => issue.fieldId).filter(Boolean));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError(canonicalSchemaIssues[0].message);
+    }
+
+    const cleanSectionList = flattenSectionTree(cleanSections);
+    const editableSectionList = flattenSectionTree(sections);
+    const invalidSection = editableSectionList.find(s => !s.key || !s.label);
+    if (invalidSection) {
+      setInvalidFields([invalidSection.localId]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError("All sections must have a key and a name.");
+    }
+
+    const invalidField = flattenEditableFields(sections)
+      .find(({ field }) => !field.key || !field.label);
+    if (invalidField) {
+      setInvalidFields([invalidField.field.localId]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError("All fields must have a key and a name.");
+    }
+
+    const invalidCompositionField = flattenEditableFields(sections)
+      .find(({ field }) => {
+        if (field.type !== "table" || !field.composition) return false;
+        const columns = normalizeTableColumns(field);
+        const columnKeys = new Set(columns.map(column => column.key));
+        const labelColumn = columns.find(column => column.key === field.compositionLabelColumnKey);
+        const valueColumn = columns.find(column => column.key === field.compositionValueColumnKey);
+        return !field.compositionLabelColumnKey ||
+          !field.compositionValueColumnKey ||
+          field.compositionLabelColumnKey === field.compositionValueColumnKey ||
+          !columnKeys.has(field.compositionLabelColumnKey) ||
+          !columnKeys.has(field.compositionValueColumnKey) ||
+          labelColumn?.dataType !== "string" ||
+          !["decimal", "integer"].includes(valueColumn?.dataType);
+      });
+    if (invalidCompositionField) {
+      setInvalidFields([invalidCompositionField.field.localId]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError(`Choose two different composition columns for "${invalidCompositionField.field.label || "this table field"}".`);
+    }
+
+    const emptySection = editableSectionList.find(s => (s.fields || []).length === 0 && getSectionChildren(s).length === 0);
+    if (emptySection) {
+      setInvalidFields([emptySection.localId]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError("Each section must have at least one field.");
+    }
+
+    // Check for duplicate keys within sections
+    const allFieldKeys = cleanSectionList.flatMap(s => (s.fields || []).map(f => f.key));
+    const dupes = allFieldKeys.filter((k, i) => allFieldKeys.indexOf(k) !== i);
+    if (dupes.length > 0) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError(`Duplicate field keys found: ${[...new Set(dupes)].join(", ")}. Each field key must be unique across all sections.`);
+    }
+
+    // Clone guard: typeName must differ from the original
+    if (cloneSourceTypeName.current && typeName === cloneSourceTypeName.current) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError(`Type name "${typeName}" is the same as the original. Change the display name or type name to save as a new type.`);
+    }
+
+    try {
+      setSaving(true);
+      const url    = editMode
+        ? `${api}/api/admin/passport-types/${editTypeId}`
+        : `${api}/api/admin/passport-types`;
+      const method = editMode ? "PATCH" : "POST";
+      const r = await fetchWithAuth(url, {
+        method,
+        headers: authHeaders({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify(payload),
+      });
+
+      const data = await r.json();
+      if (!r.ok) {
+        if (Array.isArray(data.fields) && data.fields.length > 0) {
+          const invalidIds = data.fields
+            .map((item) => fieldKeyToId.get(item.field))
+            .filter(Boolean);
+          if (invalidIds.length) setInvalidFields(invalidIds);
+          const details = data.fields
+            .map((item) => item.message || item.field || item.reservedField)
+            .join(" ");
+          throw new Error(`${data.error || "Passport type validation failed."} ${details}`.trim());
+        }
+        throw new Error(data.error || data.detail || (editMode ? "Failed to update passport type" : "Failed to create passport type"));
+      }
+
+      setSuccess(`${editMode ? "Passport type updated successfully!" : "Passport type created successfully!"}`);
+      if (draftEnabled) fetchWithAuth(draftApi, { method: "DELETE", headers: authHeaders() }).catch((error) => console.warn("Ignored async error", error));
+      setError("");
+      setInvalidFields([]);
+      if (!editMode) {
+        setDisplayName("");
+          setProductCategory("");
+          setProductIcon("📋");
+          setSemanticModelKey("");
+          setSourceModuleKey("");
+        setTypeName("");
+        setTypeNameManual(false);
+        setSystemHeader(normalizeSystemPassportHeader());
+        setSections([newSection("General")]);
+      }
+    } catch (e) {
+      setError(e.message);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectedPassportModule = passportModules.find((moduleTemplate) => moduleTemplate.moduleKey === sourceModuleKey) || null;
+  const systemHeaderEntries = resolveSystemHeaderEntries(sections, systemHeader);
+  const sectionEditorEntries = flattenSectionTreeEntries(sections);
+  const sectionMoveOptions = flattenSectionTree(sections).map((sec) => ({
+    value: sec.localId,
+    label: sec.label?.trim() || "Untitled section",
+  }));
+  const passportModuleOptions = passportModules.map((moduleTemplate) => ({
+      value: moduleTemplate.moduleKey,
+      label: `${moduleTemplate.displayName || moduleTemplate.moduleKey} (${moduleTemplate.moduleKey})`,
+    }));
+
+  return (
+    <div className="acpt-page">
+      <div className="acpt-header">
+        <button className="back-btn" onClick={() => navigate("/admin/passport-types")}>
+          ← Back
+        </button>
+        <div>
+          <h2>{editMode ? "✏️ Edit Passport Type Metadata" : "📋 Create New Passport Type"}</h2>
+          <p className="acpt-header-note">
+            {editMode
+              ? "Update display name, flags (dynamic/composition), and confidentiality settings. The type name and DB schema cannot change."
+              : "Once created and in use, a type cannot be edited. Create a new type for any changes."}
+          </p>
+        </div>
+      </div>
+
+      {editMode && (
+        <div className="alert admin-alert-draft-success">
+          ✏️ Editing metadata for: <strong>{initialEditData.current?.displayName}</strong> — the type name is locked and cannot change.
+        </div>
+      )}
+      {location.state?.cloneData && (
+        <div className="alert admin-alert-draft-info">
+          🔁 Cloning from: <strong>{location.state.cloneData.displayName}</strong> — change the display name and/or type name before saving.
+        </div>
+      )}
+      {success && <div ref={successAlertRef} className="alert alert-success admin-alert-bottom admin-alert-compact">{success}</div>}
+      {error && <div ref={errorAlertRef} className="alert alert-error admin-alert-bottom admin-alert-compact">{error}</div>}
+      <form onSubmit={handleSubmit} className="acpt-form">
+
+        {/* ── Meta card ── */}
+        <TypeIdentityCard
+          displayName={displayName}
+          setDisplayName={setDisplayName}
+          productCategory={productCategory}
+          setProductCategory={setProductCategory}
+          productIcon={productIcon}
+          setProductIcon={setProductIcon}
+          semanticModelKey={semanticModelKey}
+          setSemanticModelKey={handleSemanticModelSelection}
+          semanticModelOptions={semanticModelOptions}
+          productCategoryOptions={productCategoryOptions}
+          typeName={typeName}
+          setTypeName={setTypeName}
+          setTypeNameManual={setTypeNameManual}
+          editMode={editMode}
+          hasInvalid={hasInvalid}
+          setError={setError}
+          setInvalidFields={setInvalidFields}
+          iconPresets={iconPresets}
+          semanticModelLocked={!!sourceModuleKey}
+        />
+
+        {!editMode && (
+          <div className="acpt-card acpt-module-source-card">
+            <div className="acpt-builder-header">
+              <div>
+                <h3 className="acpt-card-title">Passport Module Source</h3>
+                <p className="acpt-builder-hint">
+                  Use a code-defined module as the canonical field library, then trim fields and decide required or optional for this passport type.
+                </p>
+              </div>
+              {selectedPassportModule && (
+                <span className="acpt-system-header-lock">Canonical fields locked</span>
+              )}
+            </div>
+            <div className="acpt-module-source-grid">
+              <div className="acpt-meta-field-group">
+                <span className="acpt-meta-sub-label">Passport module</span>
+                <AdminSelectMenu
+                  value={sourceModuleKey}
+                  onChange={applyPassportModule}
+                  options={passportModuleOptions}
+                  placeholder="Select a passport module"
+                  className="acpt-select acpt-select-inline"
+                  triggerClassName="acpt-type-select acpt-select-trigger"
+                  menuClassName="acpt-select-menu"
+                  optionClassName="acpt-select-option"
+                  ariaLabel="Passport module source"
+                />
+              </div>
+              <div className="acpt-module-source-summary">
+                {selectedPassportModule ? (
+                  <>
+                    <strong>{selectedPassportModule.fieldCount || 0} canonical fields</strong>
+                    <span>{selectedPassportModule.sectionCount || 0} sections from {selectedPassportModule.moduleKey}</span>
+                    <span>Semantic model: {getSemanticModelOption(semanticModelOptions, selectedPassportModule.semanticModelKey).label}</span>
+                  </>
+                ) : (
+                  <>
+                    <strong>Module source required</strong>
+                    <span>Select a module to load the canonical fields and semantics required for interoperable exports.</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="acpt-card acpt-system-header-card">
+          <div className="acpt-builder-header">
+            <div>
+              <h3 className="acpt-card-title">Passport Header</h3>
+              <p className="acpt-builder-hint">
+                Header rows use explicit module mappings. Real fields keep their own semantics, and managed values stay internal to the app.
+              </p>
+            </div>
+            <span className="acpt-system-header-lock">Module-defined header</span>
+          </div>
+
+          <div className="acpt-section-name-row acpt-system-header-section-row">
+            <input
+              type="text"
+              value={systemHeader.section.label}
+              className="acpt-section-name-input"
+              placeholder="Passport Header"
+              disabled
+            />
+            <div className="acpt-section-key-row">
+              <span className="acpt-key-label">key:</span>
+              <input
+                type="text"
+                value={systemHeader.section.key}
+                className="acpt-key-input acpt-mono"
+                disabled
+              />
+            </div>
+          </div>
+
+          <div className="acpt-system-header-grid">
+            {systemHeaderEntries.map((entry) => (
+              <div key={`${entry.sourceType}:${entry.managedKey || entry.fieldKey || entry.slotKey}`} className="acpt-system-header-field">
+                <div className="acpt-system-header-label-row">
+                  <input
+                    type="text"
+                    value={entry.label}
+                    className="acpt-input acpt-field-label-input"
+                    disabled
+                  />
+                </div>
+                <div className="acpt-system-header-meta">
+                  <code>{entry.sourceType === "managed" ? entry.slotKey : entry.fieldKey}</code>
+                  <span>{entry.semanticId || "No semantic ID"}</span>
+                  <span>{entry.sourceType === "managed" ? "Managed value" : (entry.type || "No type")}</span>
+                  <strong>{entry.required ? "Required" : "Optional"}</strong>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Field Builder ── */}
+        <div className="acpt-card">
+          <div className="acpt-builder-header">
+            <div>
+              <h3 className="acpt-card-title">Field Builder</h3>
+              <p className="acpt-builder-hint">
+                Organise fields into sections. Sections become tabs in the passport viewer.
+              </p>
+            </div>
+            <div className="acpt-csv-actions">
+              <button type="button" className="acpt-csv-template-btn" onClick={downloadTemplate}
+                title="Download a sample CSV to use as a starting point">
+                ⬇ Template CSV
+              </button>
+              <label className="acpt-csv-import-btn" title="Import fields from a CSV file">
+                📥 Import CSV
+                <input type="file" accept=".csv" className="admin-hidden-input" onChange={handleCSVImport} />
+              </label>
+            </div>
+          </div>
+          {csvError && (
+            <div className="alert alert-error admin-alert-inline-wide">{csvError}</div>
+          )}
+          <div className="acpt-csv-hint">
+            CSV format supports <strong>Field Label</strong>, <strong>Section</strong>, <strong>Type</strong>,
+            and <strong>Confidentiality</strong>. Importing replaces the current field builder.
+          </div>
+
+          {sectionEditorEntries.map(({ section, depth }, si) => (
+            <div key={section.localId} className={`acpt-section${depth ? " acpt-section-nested" : ""}`}>
+              <div className="acpt-section-head">
+                <button
+                  type="button"
+                  className={`acpt-collapse-btn${section._collapsed ? " collapsed" : ""}`}
+                  onClick={() => updateSection(section.localId, { _collapsed: !section._collapsed })}
+                  title={section._collapsed ? "Expand section" : "Collapse section"}
+                >
+                  ▾
+                </button>
+                <div className="acpt-section-meta">
+                  <span className="acpt-section-num">{depth ? "Subsection" : "Section"} {si + 1} {section._collapsed && section.fields.length > 0 && <span className="acpt-section-field-count">· {section.fields.length} field{section.fields.length !== 1 ? "s" : ""}</span>}</span>
+                  <div className="acpt-section-name-row">
+                    <input
+                      type="text"
+                      value={section.label}
+                      onChange={e => { updateSection(section.localId, { label: e.target.value }); setError(""); setInvalidFields([]); }}
+                      placeholder="Section name, e.g. General"
+                      className={`acpt-section-name-input${hasInvalid(section.localId) ? " acpt-input-error" : ""}`}
+                    />
+                    <div className="acpt-section-key-row">
+                      <span className="acpt-key-label">key:</span>
+                      <input
+                        type="text"
+                        value={section.key}
+                        onChange={e => { updateSection(section.localId, { key: e.target.value }); setSectionKeyManual(section.localId); }}
+                        className="acpt-key-input acpt-mono"
+                        placeholder="sectionKey"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className={`acpt-i18n-toggle${section._i18nOpen ? " open" : ""}`}
+                      onClick={() => updateSection(section.localId, { _i18nOpen: !section._i18nOpen })}
+                      title="Add translations for this section name"
+                    >
+                      🌐
+                    </button>
+                  </div>
+                  <div className="acpt-section-submodel-row">
+                    <span className="acpt-meta-sub-label">🧩 Semantic Mapping</span>
+                    <span className="acpt-semantic-hint">
+                      {hasSelectedSemanticModel
+                        ? `Selected model: ${selectedSemanticModelOption.label}. Choose field terms from this model's dictionary.`
+                        : "Select a semantic model above to enable model-specific dictionary mapping for this passport type."}
+                    </span>
+                  </div>
+                  {section._i18nOpen && (
+                    <div className="acpt-i18n-panel">
+                      {transLangs.map(l => (
+                        <div key={l.code} className="acpt-i18n-row">
+                          <span className="acpt-i18n-flag">{l.flag} {l.name}</span>
+                          <input
+                            type="text"
+                            value={(section.labelI18n || {})[l.code] || ""}
+                            onChange={e => updateSection(section.localId, {
+                              labelI18n: { ...(section.labelI18n || {}), [l.code]: e.target.value },
+                            })}
+                            placeholder={`"${section.label || "Section"}" in ${l.name}`}
+                            className="acpt-i18n-input"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {sectionEditorEntries.length > 1 && (
+                  <button type="button" className="acpt-remove-btn"
+                    onClick={() => removeSection(section.localId)} title="Remove section">✕</button>
+                )}
+              </div>
+
+              {/* Fields */}
+              {!section._collapsed && <div className="acpt-fields">
+                {section.fields.length === 0 && (
+                  <div className="acpt-fields-empty">No fields yet — add one below</div>
+                )}
+                {section.fields.map((field, fi) => (
+                  <div key={field.localId} className="acpt-field-wrap">
+                    {(() => {
+                      const selectedSemanticMatch = resolveSelectedSemanticMatch(field, semanticTermCatalog);
+                      const semanticSearchOptions = getFilteredSemanticTermCatalog(
+                        semanticTermCatalog,
+                        field._semanticSearch || "",
+                        field.semanticId || ""
+                      );
+                      const semanticSearchValue = getSemanticSearchDisplayValue(field, semanticTermCatalog);
+                      const tableColumnsForField = field.type === "table" ? normalizeTableColumns(field) : [];
+                      const compositionLabelColumnOptions = [
+                        { value: "", label: "Select column" },
+                        ...tableColumnsForField
+                          .filter((column) => column.dataType === "string")
+                          .map((column) => ({
+                            value: column.key,
+                            label: `${column.label || column.key} (${column.key})`,
+                          })),
+                      ];
+                      const compositionValueColumnOptions = [
+                        { value: "", label: "Select column" },
+                        ...tableColumnsForField
+                          .filter((column) => ["decimal", "integer"].includes(column.dataType))
+                          .map((column) => ({
+                          value: column.key,
+                          label: `${column.label || column.key} (${column.key})`,
+                          })),
+                      ];
+                      const hasTableCompositionConfig = field.type === "table" && !!field.composition;
+                      const hasDistinctCompositionColumns = Boolean(
+                        field.compositionLabelColumnKey &&
+                        field.compositionValueColumnKey &&
+                        field.compositionLabelColumnKey !== field.compositionValueColumnKey
+                      );
+                      return (
+                        <>
+                    <div className="acpt-field-row">
+                      <span className="acpt-field-num">{fi + 1}</span>
+
+                      <div className="acpt-field-inputs">
+                        <input
+                          type="text"
+                          value={field.label}
+                          onChange={e => { updateField(section.localId, field.localId, { label: e.target.value }); setError(""); setInvalidFields([]); }}
+                          placeholder="Field label, e.g. Manufacturer"
+                          className={`acpt-input acpt-field-label-input${hasInvalid(field.localId) ? " acpt-input-error" : ""}`}
+                        />
+                        {field.canonicalLocked && (
+                          <div className="acpt-canonical-note">
+                            <span>Canonical module field</span>
+                            <code>{field.sourceModuleKey}:{field.sourceModuleFieldKey || field.key}</code>
+                          </div>
+                        )}
+                        {field._i18nOpen && (
+                          <div className="acpt-i18n-panel acpt-i18n-panel-field">
+                            {transLangs.map(l => (
+                              <div key={l.code} className="acpt-i18n-row">
+                                <span className="acpt-i18n-flag">{l.flag} {l.name}</span>
+                                <input
+                                  type="text"
+                                  value={(field.labelI18n || {})[l.code] || ""}
+                                  onChange={e => updateField(section.localId, field.localId, {
+                                    labelI18n: { ...(field.labelI18n || {}), [l.code]: e.target.value },
+                                  })}
+                                  placeholder={`"${field.label || "Field"}" in ${l.name}`}
+                                  className="acpt-i18n-input"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        className={`acpt-i18n-toggle${field._i18nOpen ? " open" : ""}`}
+                        onClick={() => updateField(section.localId, field.localId, { _i18nOpen: !field._i18nOpen })}
+                        title="Add translations for this field label"
+                      >
+                        🌐
+                      </button>
+
+                      <AdminSelectMenu
+                        value={field.type}
+                        onChange={(nextValue) => updateField(section.localId, field.localId, { type: nextValue })}
+                        options={fieldTypes.map((typeOption) => ({
+                          value: typeOption.value,
+                          label: typeOption.label,
+                        }))}
+                        className="acpt-select acpt-select-inline"
+                        triggerClassName="acpt-type-select acpt-select-trigger acpt-select-trigger-sm"
+                        menuClassName="acpt-select-menu acpt-select-menu-compact"
+                        optionClassName="acpt-select-option"
+                        ariaLabel="Field type"
+                        disabled={!!field.canonicalLocked}
+                      />
+
+                      <div className="acpt-field-actions">
+                        <button
+                          type="button"
+                          className="acpt-move-btn"
+                          onClick={() => { moveFieldWithinSection(section.localId, field.localId, "up"); setError(""); setInvalidFields([]); }}
+                          title="Move field up"
+                          disabled={fi === 0}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="acpt-move-btn"
+                          onClick={() => { moveFieldWithinSection(section.localId, field.localId, "down"); setError(""); setInvalidFields([]); }}
+                          title="Move field down"
+                          disabled={fi === section.fields.length - 1}
+                        >
+                          ↓
+                        </button>
+                        <AdminSelectMenu
+                          value={section.localId}
+                          onChange={(targetSectionId) => {
+                            if (targetSectionId !== section.localId) {
+                              moveFieldToSection(section.localId, targetSectionId, field.localId);
+                              setError("");
+                              setInvalidFields([]);
+                            }
+                          }}
+                          options={[
+                            { value: section.localId, label: "Move section" },
+                            ...sectionMoveOptions,
+                          ]}
+                          triggerLabel="Move section"
+                          className="acpt-select acpt-select-inline"
+                          triggerClassName="acpt-move-select acpt-select-trigger acpt-select-trigger-sm"
+                          menuClassName="acpt-select-menu acpt-select-menu-compact"
+                          optionClassName="acpt-select-option"
+                          title="Move field to another section"
+                          disabled={sectionMoveOptions.length < 2}
+                          ariaLabel="Move field to another section"
+                        />
+                      </div>
+
+                      <button type="button" className="acpt-remove-btn"
+                        onClick={() => removeField(section.localId, field.localId)} title="Remove field">✕</button>
+                    </div>
+
+                      <div className="acpt-field-top-row acpt-field-options-grid">
+                        <div className="acpt-field-governance-stack">
+                          <div className="acpt-field-confidentiality">
+                            <label className="acpt-confidentiality-control">
+                              <span>🛡️ Confidentiality:</span>
+                              <AdminSelectMenu
+                                value={field.confidentiality || "public"}
+                                onChange={(nextValue) => updateField(section.localId, field.localId, { confidentiality: nextValue })}
+                                options={confidentialityLevels.map((level) => ({
+                                  value: level.value,
+                                  label: level.label,
+                                }))}
+                                className="acpt-select acpt-select-inline"
+                                triggerClassName="acpt-governance-select acpt-select-trigger acpt-select-trigger-sm"
+                                menuClassName="acpt-select-menu acpt-select-menu-compact"
+                                optionClassName="acpt-select-option"
+                                ariaLabel="Confidentiality"
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                      <div className="acpt-field-side-options">
+                        <div className="acpt-field-required">
+                          <label className="acpt-required-toggle">
+                            <input
+                              type="checkbox"
+                              checked={!!field.required}
+                              onChange={e => updateField(section.localId, field.localId, { required: e.target.checked })}
+                            />
+                            <span className="acpt-required-label">
+                              Required in this passport type
+                            </span>
+                          </label>
+                        </div>
+
+                        {/* Composition toggle */}
+                        <div className="acpt-field-composition">
+                          <label className="acpt-composition-toggle">
+                            <input
+                              type="checkbox"
+                              checked={!!field.composition}
+                              disabled={!!field.canonicalLocked}
+                              onChange={e => updateField(section.localId, field.localId, {
+                                composition: e.target.checked,
+                                ...(e.target.checked ? {} : {
+                                  compositionLabelColumnKey: undefined,
+                                  compositionValueColumnKey: undefined,
+                                }),
+                              })}
+                            />
+                            <span className="acpt-composition-label">
+                              Composition (pie chart)
+                            </span>
+                          </label>
+                          {hasTableCompositionConfig && (
+                            <div className="acpt-composition-column-config">
+                              <span className="acpt-composition-hint">
+                                Choose the exact table columns for the pie chart. The label column should be text; the data column should contain numeric percentages.
+                              </span>
+                              <div className="acpt-composition-column-row">
+                                <div className="acpt-composition-column-select">
+                                  <span className="acpt-meta-sub-label">Label column</span>
+                                  <AdminSelectMenu
+                                    value={field.compositionLabelColumnKey || ""}
+                                    onChange={(nextValue) => updateField(section.localId, field.localId, { compositionLabelColumnKey: nextValue })}
+                                    options={compositionLabelColumnOptions}
+                                    className="acpt-select acpt-select-inline"
+                                    triggerClassName="acpt-type-select acpt-type-select-sm acpt-select-trigger acpt-select-trigger-sm"
+                                    menuClassName="acpt-select-menu acpt-select-menu-compact"
+                                    optionClassName="acpt-select-option"
+                                    ariaLabel="Composition label column"
+                                    disabled={!!field.canonicalLocked}
+                                  />
+                                </div>
+                                <div className="acpt-composition-column-select">
+                                  <span className="acpt-meta-sub-label">Data column (%)</span>
+                                  <AdminSelectMenu
+                                    value={field.compositionValueColumnKey || ""}
+                                    onChange={(nextValue) => updateField(section.localId, field.localId, { compositionValueColumnKey: nextValue })}
+                                    options={compositionValueColumnOptions}
+                                    className="acpt-select acpt-select-inline"
+                                    triggerClassName="acpt-type-select acpt-type-select-sm acpt-select-trigger acpt-select-trigger-sm"
+                                    menuClassName="acpt-select-menu acpt-select-menu-compact"
+                                    optionClassName="acpt-select-option"
+                                    ariaLabel="Composition data column"
+                                    disabled={!!field.canonicalLocked}
+                                  />
+                                </div>
+                              </div>
+                              {!hasDistinctCompositionColumns && (
+                                <span className="acpt-composition-warning">
+                                  Select two different columns before this table can render a pie chart.
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Dynamic (live data) toggle */}
+                        <div className="acpt-field-dynamic">
+                          <label className="acpt-dynamic-toggle">
+                            <input
+                              type="checkbox"
+                              checked={!!field.dynamic}
+                              disabled={!!field.canonicalLocked}
+                              onChange={e => updateField(section.localId, field.localId, { dynamic: e.target.checked })}
+                            />
+                            <span className="acpt-dynamic-label">
+                              Dynamic (live data)
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="acpt-field-semantic-row">
+                      <div className="acpt-field-semantic">
+                        <div className="acpt-semantic-label">
+                          🔬 Semantic Metadata
+                        </div>
+                        <div className="acpt-meta-fields-row">
+                          <div className="acpt-meta-field-group">
+                            <span className="acpt-meta-sub-label">Unit</span>
+                            <input
+                              type="text"
+                              value={field.unit || ""}
+                              onChange={e => updateField(section.localId, field.localId, { unit: e.target.value })}
+                              placeholder="kg CO₂-eq, %, kWh…"
+                              className="acpt-input acpt-input-small"
+                              disabled={!!field.canonicalLocked}
+                            />
+                          </div>
+                          <div className="acpt-meta-field-group">
+                            <span className="acpt-meta-sub-label">Data Type</span>
+                            <AdminSelectMenu
+                              value={field.dataType || ""}
+                              onChange={(nextValue) => updateField(
+                                section.localId,
+                                field.localId,
+                                nextValue === "array"
+                                  ? { dataType: "array", type: "table" }
+                                  : { dataType: nextValue }
+                              )}
+                              options={[
+                                { value: "", label: "Auto-detect" },
+                                { value: "string", label: "Text (string)" },
+                                { value: "decimal", label: "Decimal" },
+                                { value: "integer", label: "Integer" },
+                                { value: "date", label: "Date" },
+                                { value: "datetime", label: "Date and time" },
+                                { value: "boolean", label: "Boolean" },
+                                { value: "uri", label: "URI / Link" },
+                                { value: "object", label: "Semantic object" },
+                                { value: "array", label: "Array (structured/repeated)" },
+                              ]}
+                              className="acpt-select acpt-select-inline"
+                              triggerClassName="acpt-type-select acpt-type-select-sm acpt-select-trigger acpt-select-trigger-sm"
+                              menuClassName="acpt-select-menu acpt-select-menu-compact"
+                              optionClassName="acpt-select-option"
+                              ariaLabel="Data type"
+                              disabled={!!field.canonicalLocked || field.type === "table"}
+                            />
+                          </div>
+                          <div className="acpt-meta-field-group acpt-meta-field-group-full">
+                            <span className="acpt-meta-sub-label">Semantic Term</span>
+                            <div className="acpt-semantic-picker">
+                              <input
+                                type="text"
+                                value={semanticSearchValue}
+                                onFocus={() => setSemanticPickerOpen(section.localId, field.localId, true)}
+                                onBlur={() => window.setTimeout(() => setSemanticPickerOpen(section.localId, field.localId, false), 120)}
+                                onChange={e => updateSemanticSearchInput(section.localId, field.localId, e.target.value)}
+                                placeholder={hasSelectedSemanticModel ? `Search ${selectedSemanticModelOption.label} terms` : "Select a semantic model first"}
+                                disabled={!!field.canonicalLocked || !hasSelectedSemanticModel || semanticTermsLoading}
+                                className="acpt-input acpt-input-small acpt-semantic-search"
+                              />
+                              {field._semanticOpen && hasSelectedSemanticModel && (
+                                <div className="acpt-semantic-results">
+                                  <button
+                                    type="button"
+                                    className={`acpt-semantic-option${!selectedSemanticMatch ? " selected" : ""}`}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      clearManualSemanticSelection(section.localId, field.localId);
+                                    }}
+                                  >
+                                    <span className="acpt-semantic-option-title">No semantic term selected</span>
+                                  </button>
+                                  {semanticSearchOptions.map((entry) => (
+                                    <button
+                                      key={entry.semanticId}
+                                      type="button"
+                                      className={`acpt-semantic-option${field.semanticId === entry.semanticId ? " selected" : ""}`}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        applyManualSemanticSelection(section.localId, field.localId, entry.semanticId);
+                                      }}
+                                    >
+                                      <span className="acpt-semantic-option-title">{entry.key} - {entry.label}</span>
+                                      <span className="acpt-semantic-option-meta">{entry.semanticId}</span>
+                                    </button>
+                                  ))}
+                                  {!semanticTermsLoading && semanticSearchOptions.length === 0 && (
+                                    <div className="acpt-semantic-option acpt-semantic-option-empty">
+                                      <span className="acpt-semantic-option-title">No matching terms found</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {hasSelectedSemanticModel && (
+                          <div className="acpt-semantic-hint" style={{ marginTop: 6 }}>
+                            {semanticTermsLoading && "Loading dictionary terms..."}
+                            {!semanticTermsLoading && semanticTermsError && semanticTermsError}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {field.type === "table" && (() => {
+                      const tableColumns = normalizeTableColumns(field);
+                      return (
+                        <div className="acpt-table-config">
+                          <div className="acpt-table-dims">
+                            <label>Fixed columns</label>
+                            <input
+                              type="number" min="1" max="10"
+                              value={tableColumns.length}
+                              readOnly
+                              className="acpt-table-num-input"
+                              disabled
+                            />
+                          </div>
+                          <div className="acpt-table-colnames">
+                            <span className="acpt-table-colnames-label">Column schema:</span>
+                            {tableColumns.map((column, ci) => {
+                              const selectedColumnSemanticMatch = resolveSelectedSemanticMatch(column, semanticTermCatalog);
+                              const columnSemanticSearchOptions = getFilteredSemanticTermCatalog(
+                                semanticTermCatalog,
+                                column._semanticSearch || "",
+                                column.semanticId || ""
+                              ).filter((entry) => deriveSemanticTermDataType(entry) !== "array");
+                              const columnSemanticSearchValue = getSemanticSearchDisplayValue(column, semanticTermCatalog);
+                              return (
+                                <div key={`${field.localId}-column-${ci}`} className="acpt-table-column-config">
+                                  <div className="acpt-table-column-main-row">
+                                    <input
+                                      type="text"
+                                      value={column.label}
+                                      placeholder={`Column ${ci + 1}`}
+                                      className="acpt-table-col-input"
+                                      onChange={e => updateTableColumn(section.localId, field.localId, ci, { label: e.target.value })}
+                                    />
+                                    <input
+                                      type="text"
+                                      value={column.key}
+                                      placeholder={`column${ci + 1}`}
+                                      className="acpt-table-col-input acpt-mono"
+                                      onChange={e => updateTableColumn(section.localId, field.localId, ci, { key: e.target.value })}
+                                      disabled={!!field.canonicalLocked || !!column.canonicalLocked}
+                                    />
+                                  </div>
+                                  <div className="acpt-meta-fields-row">
+                                    <div className="acpt-meta-field-group">
+                                      <span className="acpt-meta-sub-label">Unit</span>
+                                      <input
+                                        type="text"
+                                        value={column.unit || ""}
+                                        onChange={e => updateTableColumn(section.localId, field.localId, ci, { unit: e.target.value })}
+                                        placeholder="%, kg, kWh"
+                                        className="acpt-input acpt-input-small"
+                                        disabled={!!field.canonicalLocked || !!column.canonicalLocked}
+                                      />
+                                    </div>
+                                    <div className="acpt-meta-field-group">
+                                      <span className="acpt-meta-sub-label">Data Type</span>
+                                      <AdminSelectMenu
+                                        value={column.dataType || ""}
+                                        onChange={(nextValue) => updateTableColumn(section.localId, field.localId, ci, { dataType: nextValue })}
+                                        options={[
+                                          { value: "", label: "Auto-detect" },
+                                          { value: "string", label: "Text (string)" },
+                                          { value: "decimal", label: "Decimal" },
+                                          { value: "integer", label: "Integer" },
+                                          { value: "date", label: "Date" },
+                                          { value: "datetime", label: "Date and time" },
+                                          { value: "boolean", label: "Boolean" },
+                                          { value: "uri", label: "URI / Link" },
+                                        ]}
+                                        className="acpt-select acpt-select-inline"
+                                        triggerClassName="acpt-type-select acpt-type-select-sm acpt-select-trigger acpt-select-trigger-sm"
+                                        menuClassName="acpt-select-menu acpt-select-menu-compact"
+                                        optionClassName="acpt-select-option"
+                                        ariaLabel="Column data type"
+                                        disabled={!!field.canonicalLocked || !!column.canonicalLocked}
+                                      />
+                                    </div>
+                                    <div className="acpt-meta-field-group acpt-meta-field-group-full">
+                                      <span className="acpt-meta-sub-label">Column Semantic Term</span>
+                                      <div className="acpt-semantic-picker">
+                                        <input
+                                          type="text"
+                                          value={columnSemanticSearchValue}
+                                          onFocus={() => setTableColumnSemanticPickerOpen(section.localId, field.localId, ci, true)}
+                                          onBlur={() => window.setTimeout(() => setTableColumnSemanticPickerOpen(section.localId, field.localId, ci, false), 120)}
+                                          onChange={e => updateTableColumnSemanticSearchInput(section.localId, field.localId, ci, e.target.value)}
+                                          placeholder={hasSelectedSemanticModel ? `Search ${selectedSemanticModelOption.label} terms` : "Select a semantic model first"}
+                                          disabled={!!field.canonicalLocked || !!column.canonicalLocked || !hasSelectedSemanticModel || semanticTermsLoading}
+                                          className="acpt-input acpt-input-small acpt-semantic-search"
+                                        />
+                                        {column._semanticOpen && hasSelectedSemanticModel && (
+                                          <div className="acpt-semantic-results">
+                                            <button
+                                              type="button"
+                                              className={`acpt-semantic-option${!selectedColumnSemanticMatch ? " selected" : ""}`}
+                                              onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                clearManualTableColumnSemanticSelection(section.localId, field.localId, ci);
+                                              }}
+                                            >
+                                              <span className="acpt-semantic-option-title">No semantic term selected</span>
+                                            </button>
+                                            {columnSemanticSearchOptions.map((entry) => (
+                                              <button
+                                                key={entry.semanticId}
+                                                type="button"
+                                                className={`acpt-semantic-option${column.semanticId === entry.semanticId ? " selected" : ""}`}
+                                                onMouseDown={(e) => {
+                                                  e.preventDefault();
+                                                  applyManualTableColumnSemanticSelection(section.localId, field.localId, ci, entry.semanticId);
+                                                }}
+                                              >
+                                                <span className="acpt-semantic-option-title">{entry.key} - {entry.label}</span>
+                                                <span className="acpt-semantic-option-meta">{entry.semanticId}</span>
+                                              </button>
+                                            ))}
+                                            {!semanticTermsLoading && columnSemanticSearchOptions.length === 0 && (
+                                              <div className="acpt-semantic-option acpt-semantic-option-empty">
+                                                <span className="acpt-semantic-option-title">No matching terms found</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                        </>
+                      );
+                    })()}
+                  </div>
+                ))}
+
+                <button type="button" className="acpt-add-field-btn"
+                  onClick={() => addField(section.localId)}>
+                  + Add Field
+                </button>
+              </div>}
+            </div>
+          ))}
+
+          <button type="button" className="acpt-add-section-btn" onClick={addSection}>
+            + Add Section
+          </button>
+        </div>
+
+        {/* ── Actions ── */}
+        <div className="acpt-actions">
+          <button type="button" className="cancel-btn"
+            onClick={() => navigate("/admin/passport-types")} disabled={saving}>
+            Cancel
+          </button>
+          {draftEnabled && (
+            <button type="button" className="acpt-save-draft-btn" onClick={saveDraft} disabled={saving}>
+              {draftSaved ? "✓ Draft Saved" : "Save Draft"}
+            </button>
+          )}
+          <button type="submit" className="submit-btn" disabled={saving}>
+            {saving ? (editMode ? "Saving…" : "Creating…") : (editMode ? "Save Changes" : "Create Passport Type")}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export default AdminCreatePassportType;

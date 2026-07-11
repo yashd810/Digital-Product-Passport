@@ -1,0 +1,294 @@
+/* ─── EMAIL TEMPLATE STYLES ──────────────────────────────────────────────────
+   Shared CSS for all transactional emails sent by the application.
+   The palette is intentionally light so every mail feels crisp and readable.
+
+   Sections:
+     1. Base
+     2. DPP app emails   (brandedEmail wrapper — OTP, password reset,
+                          invitations, review requests)
+     3. Contact form emails  (notification to admin, confirmation to enquirer)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+
+/* ─── 1. BASE ────────────────────────────────────────────────────────────── */
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #eef3f4;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #1f2933;
+}
+
+a { color: #0f8a85; }
+
+/* Shared header */
+.hdr {
+  background: linear-gradient(135deg, #ffffff 0%, #f5faf9 100%);
+  padding: 30px 40px;
+  text-align: center;
+  border-bottom: 1px solid #d7e4e2;
+}
+
+.hdr-title {
+  color: #102124;
+  font-size: 21px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.hdr-sub {
+  color: #61727a;
+  font-size: 13px;
+  margin: 6px 0 0;
+}
+
+/* Shared body */
+.body {
+  background: #ffffff;
+  padding: 32px 40px;
+}
+
+.body p {
+  font-size: 14px;
+  color: #30424a;
+  line-height: 1.75;
+  margin: 0 0 16px;
+}
+
+.body strong { color: #102124; }
+
+
+/* ─── 2. DPP APP EMAILS (server.js — brandedEmail) ──────────────────────── */
+
+/* Outer wrapper */
+.wrapper {
+  max-width: 640px;
+  margin: 36px auto;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #d7e4e2;
+  background: #ffffff;
+  box-shadow: 0 14px 42px rgba(16, 33, 36, .08);
+}
+
+/* Header overrides for branded layout */
+.wrapper .hdr {
+  padding: 34px 40px;
+  border-bottom-color: #d7e4e2;
+}
+
+.hdr-logo {
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+
+/* Info box (invitation / review emails) */
+.info-box {
+  background: #f6fbfa;
+  border: 1px solid #d6e8e6;
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin: 20px 0;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5eceb;
+  font-size: 13px;
+}
+
+.info-row:last-child { border-bottom: none; }
+
+.info-label {
+  color: #0f8a85;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: .6px;
+}
+
+.info-value {
+  color: #102124;
+  font-weight: 600;
+}
+
+/* CTA button */
+.cta-wrap {
+  text-align: center;
+  margin: 28px 0;
+}
+
+.cta-btn {
+  display: inline-block;
+  background: linear-gradient(135deg, #12b8ad 0%, #0f8a85 100%);
+  color: #ffffff !important;
+  text-decoration: none;
+  padding: 14px 36px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  box-shadow: 0 10px 24px rgba(15, 138, 133, .18);
+}
+
+/* Footer */
+.footer {
+  background: #f6fbfa;
+  padding: 20px 40px;
+  text-align: center;
+  border-top: 1px solid #d7e4e2;
+}
+
+.footer p {
+  font-size: 12px;
+  color: #61727a;
+  margin: 4px 0;
+}
+
+
+/* ─── 3. CONTACT FORM EMAILS (contact-server.js) ─────────────────────────── */
+
+/* Outer wrapper */
+.wrap {
+  max-width: 620px;
+  margin: 32px auto;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #d7e4e2;
+  background: #ffffff;
+  box-shadow: 0 12px 34px rgba(16, 33, 36, .07);
+}
+
+/* Header tag (e.g. product/platform eyebrow label) */
+.hdr-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: #0f8a85;
+  margin-bottom: 7px;
+}
+
+/* Notification email — submission details table */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0;
+  border: 1px solid #dbe7e5;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.tbl td {
+  padding: 10px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid #e8eeed;
+}
+
+.tbl tr:last-child td { border-bottom: none; }
+
+.tlbl {
+  color: #0f8a85;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  font-size: 11px;
+  width: 36%;
+  white-space: nowrap;
+  background: #f6fbfa;
+}
+
+.tval {
+  color: #102124;
+  font-weight: 500;
+}
+
+/* Message block */
+.msg-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #0f8a85;
+  margin-bottom: 8px;
+}
+
+.msg-box {
+  background: #f6fbfa;
+  border: 1px solid #d6e8e6;
+  border-radius: 10px;
+  padding: 16px;
+  font-size: 13px;
+  color: #30424a;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Reply CTA */
+.cta {
+  text-align: center;
+  margin: 28px 0 8px;
+}
+
+.cta a {
+  display: inline-block;
+  background: linear-gradient(135deg, #12b8ad 0%, #0f8a85 100%);
+  color: #ffffff !important;
+  text-decoration: none;
+  padding: 13px 30px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(15, 138, 133, .16);
+}
+
+/* Confirmation email — next-steps list */
+.body h2 {
+  color: #102124;
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 14px;
+}
+
+.steps {
+  padding: 0;
+  margin: 18px 0;
+}
+
+.steps li {
+  font-size: 13px;
+  color: #30424a;
+  padding: 9px 0;
+  border-bottom: 1px solid #e8eeed;
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.steps li:last-child { border-bottom: none; }
+
+.tick {
+  color: #0f8a85;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Shared footer for contact emails */
+.foot {
+  background: #f6fbfa;
+  padding: 16px 40px;
+  text-align: center;
+  border-top: 1px solid #d7e4e2;
+}
+
+.foot p {
+  font-size: 11px;
+  color: #61727a;
+  margin: 3px 0;
+}

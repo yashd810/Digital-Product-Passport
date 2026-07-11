@@ -1,0 +1,1010 @@
+import {
+  assetManagementApiTable,
+  assetManagementTermsTable,
+  apiGettingStartedFlows,
+  companyWriteApiTable,
+  dictionaryApiTable,
+  governanceSecurityApiTable,
+  publicAndLiveApiTable,
+  readExportApiTable,
+  securityKeyTable,
+} from "./manualData";
+import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../passports/utils/passportRoutes";
+import { buildDashboardPath } from "../user/dashboard/utils/dashboardRoutes";
+import { buildPreview, getPassportTypeLabel, prettifyName } from "./manualSectionHelpers";
+
+export function buildUserSections({ user, companyId, passportTypes }) {
+  const firstType = passportTypes[0];
+  const firstTypeLabel = getPassportTypeLabel(firstType) || "your first granted passport type";
+  const availableTypes = passportTypes.map(getPassportTypeLabel);
+  const createRoute = firstType ? `/create/${encodeURIComponent(firstType.typeName)}` : "";
+  const csvRoute = firstType ? `/csv-import/${encodeURIComponent(firstType.typeName)}` : "";
+  const dashboardPath = (subpath = "") => buildDashboardPath({
+    companyName: user?.companyName,
+    companyId,
+    subpath,
+  });
+  const listRoute = firstType ? dashboardPath(`passports/${encodeURIComponent(firstType.typeName)}`) : dashboardPath("my-passports");
+
+  return [
+    {
+      id: "workspace-basics",
+      icon: "🧭",
+      category: "Foundations",
+      audience: "All company users",
+      title: "Navigate the workspace with confidence",
+      summary: "Use the left sidebar as your home base. The dashboard groups work into analytics, passports, collaboration, settings, and audit tools so you can move from creation to release without leaving the workspace.",
+      simpleGuide: {
+        title: "In simple words",
+        intro: "If you are new, use the dashboard in this order instead of trying to learn everything at once:",
+        items: [
+          "Start on Overview to see what needs attention today.",
+          "Go to Passports when you want to create, edit, release, or export product records.",
+          "Use Notifications and Messages when you need to respond to people or workflow events.",
+          "Open profile, company, repository, or security pages only when you need account or company setup work.",
+        ],
+      },
+      facts: [
+        { label: "Best first stop", value: "Overview for activity, totals, and analytics snapshots" },
+        { label: "Role-aware access", value: user?.role === "viewer" ? "You are currently read-only for passport content." : `${prettifyName(user?.role)} users can work directly in passport flows.` },
+        { label: "Current company", value: user?.companyName || (companyId ? `Company ${companyId}` : "Company assigned after login") },
+        { label: "Granted passport types", value: availableTypes.length ? availableTypes.join(", ") : "Passport types appear here after company access is granted" },
+      ],
+      journeys: [
+        {
+          title: "Start your day",
+          items: [
+            "Open Overview to review totals, recent activity, and exported analytics if you need a snapshot report.",
+            "Check Notifications for approvals, review requests, and system updates that need your attention.",
+          ],
+        },
+        {
+          title: "Use the sidebar intentionally",
+          items: [
+            "Analytics contains Overview, My Passports, Workflow, and the product-category passport navigation tree.",
+            "Account contains your profile, security, company profile, repository, templates, and team tools depending on your role.",
+            "Audit contains Notifications and Audit Logs so operational history is always separate from creation work.",
+          ],
+        },
+        {
+          title: "Know how roles change the experience",
+          items: [
+            "Viewers can review passports and company content but cannot create or edit passport records.",
+            "Editors can create passports, release directly or submit to workflow, manage templates, and invite viewers.",
+            "Company admins can do all editor tasks plus team management, company branding, and security group management.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Overview", route: dashboardPath("overview"), description: "See KPI cards, activity, and analytics export." },
+        { label: "Open Notifications", route: dashboardPath("notifications"), description: "Review unread system and workflow events." },
+      ],
+      previews: [
+        buildPreview(
+          "user-overview",
+          "Dashboard overview snapshot",
+          dashboardPath("overview"),
+          "This page is the operational landing zone for totals, recent activity, and exported analytics."
+        ),
+      ],
+      tips: [
+        "Use the theme toggle in the top bar if you need better contrast while reviewing long passport forms.",
+        "The language switcher in the sidebar changes the dashboard language without moving you away from your current page.",
+      ],
+    },
+    {
+      id: "create-passports",
+      icon: "🛠️",
+      category: "Creation",
+      audience: "Editors and company admins",
+      title: "Create passports from one hub",
+      summary: "All passport creation starts from a single hub: the Create Passport page, reachable with the green button at the top of the sidebar. Pick a type, pick a method, and the hub guides you the rest of the way for single records, template-driven work, and bulk import/update flows.",
+      simpleGuide: {
+        title: "Quick way to choose",
+        intro: "Most teams can pick the right path with one simple question:",
+        items: [
+          "Creating one passport by hand? Use Fill the form.",
+          "Reusing the same model often? Use Create from template.",
+          "Need many drafts first? Use Bulk create.",
+          "Already have the data in a file? Use CSV or JSON import.",
+        ],
+      },
+      facts: [
+        { label: "Entry point", value: "The green '+ Create Passport' button at the top of the sidebar, or /dashboard/create directly." },
+        { label: "Step 1", value: "Select the passport type you want to create for." },
+        { label: "Step 2", value: "Choose the creation method that matches your situation." },
+        { label: "Viewer limitation", value: "Viewer accounts cannot access the create hub or any creation routes." },
+      ],
+      journeys: [
+        {
+          title: "Method 1 - Fill the form (one at a time)",
+          items: [
+            "Choose 'Fill the form' in the hub to open the structured dynamic form for the selected type.",
+            "Complete fields section by section. Text, URL, date, boolean, table, file, and symbol fields all render according to the type schema.",
+            "The form auto-saves while you work and tracks the edit session so teammates know when you are inside.",
+            "Best for: individual passports where you want full control and can see every field.",
+          ],
+        },
+        {
+          title: "Method 2  -  Create from a template (single)",
+          items: [
+            "Choose 'Create from a template' to see all templates saved for the selected type.",
+            "Select a template  -  model data fields are pre-filled and locked. Only unit-level fields need your input.",
+            "This is the fastest single-passport path for companies that create the same product model repeatedly.",
+            "Best for: one passport for a model that already has a template, like a specific product variant.",
+          ],
+        },
+        {
+          title: "Method 3  -  Bulk create (empty drafts)",
+          items: [
+            "Choose 'Bulk create (empty drafts)' and enter the number of passports you need (up to 500).",
+            "All drafts are created immediately with auto-generated names. They can be renamed and filled later.",
+            "After bulk create, open the relevant passport list or My Passports, use Export to download the drafts as CSV or JSON, then re-import through the update flow once you have unit-level data ready.",
+            "Best for: when you need to generate serial numbers or unit IDs for a batch before data is available.",
+          ],
+        },
+        {
+          title: "Method 4  -  Bulk create from a template",
+          items: [
+            "In the hub, choose 'Create from a template', pick a template, then choose 'Bulk create from template'.",
+            "This combines template pre-fill with bulk quantity  -  all passports are created pre-filled with model data.",
+            "Immediately after creation, open the passport list and use Export for CSV or JSON, add unit-level fields externally, then re-import through the update flow.",
+            "Best for: manufacturing or logistics teams generating a full product batch for a specific model.",
+          ],
+        },
+        {
+          title: "Method 5  -  Import from CSV or JSON",
+          items: [
+            "Choose 'Import from CSV' to go directly to the import guide for the selected type.",
+            "Download the template CSV, fill in one column per passport, then upload to create all records at once.",
+            "Choose 'Import / update via JSON or CSV' when you already have draft DPP IDs and want to update existing records: any row with a DPP ID patches the matching draft, rows without DPP IDs create new ones.",
+            "Best for: teams with data already in spreadsheets or ERP exports, or when updating a previously bulk-created batch.",
+          ],
+        },
+        {
+          title: "Recommended workflow for large batches",
+          items: [
+            "Go to Templates and create a template for the model. Mark shared fields (e.g. manufacturer, product category) as model data.",
+            "In the Create Hub, choose that template and bulk create the quantity you need  -  all pre-filled with model data.",
+            "Open the passport list for that type or My Passports and export the newly created drafts as CSV or JSON.",
+            "Open the file in Excel or Sheets, fill in the unit-specific columns (serial number, manufacture date, etc.).",
+            "Upload through 'Import / update via JSON or CSV' in Update mode  -  each row with a DPP ID updates the matching draft, while rows without DPP IDs can create new drafts.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Create Hub", route: dashboardPath("create"), description: "The single entry point for all creation methods." },
+        { label: "Open Templates", route: dashboardPath("templates"), description: "Manage reusable model templates for single and bulk creation." },
+        { label: "Open CSV Import Guide", route: csvRoute || dashboardPath("my-passports"), description: "Detailed import/update guide for the first available type." },
+      ],
+      previews: [
+        buildPreview(
+          "user-create-hub",
+          "Create Passport hub",
+          dashboardPath("create"),
+          "Pick a type and a method. The hub adapts based on your selection  -  template picker, bulk modal, and instructions are all inline."
+        ),
+        buildPreview(
+          "user-create-form",
+          "Direct create form",
+          createRoute,
+          "The dynamic form opened directly when 'Fill the form' is chosen in the hub.",
+          createRoute ? "" : "Create-form previews need at least one granted passport type."
+        ),
+        buildPreview(
+          "user-csv-guide",
+          "CSV and JSON import / update guide",
+          csvRoute,
+          "Three tabs: create new passports, update existing by CSV, update existing by JSON.",
+          csvRoute ? "" : "CSV guide previews need at least one granted passport type."
+        ),
+      ],
+      tips: [
+        "For any repeating product model, always create a template first. It saves time on every subsequent creation.",
+        "The most reliable large-batch pattern is create drafts first, export from the passport list, fill unit-specific data externally, then re-import in update mode.",
+        "If your data is already in an ERP or spreadsheet, CSV import keeps column names consistent from day one.",
+      ],
+      warnings: [
+        "Create, edit, and release actions are restricted by role. If the Create button is missing from the sidebar, your account may be set to Viewer.",
+        "Bulk-created drafts do not auto-fill unit-level data. Always follow up with a CSV/JSON import or manual editing.",
+      ],
+    },
+    {
+      id: "passport-lifecycle",
+      icon: "📦",
+      category: "Passports",
+      audience: "Editors and company admins",
+      title: "Manage records, versions, exports, and release status",
+      summary: "Passport lists are more than simple tables. They are operational workbenches for filtering, comparing, exporting, printing labels, pushing device data, and moving records through draft, workflow, release, and revision cycles.",
+      simpleGuide: {
+        title: "Simple lifecycle view",
+        intro: "A passport normally moves through a small set of stages:",
+        items: [
+          "Draft means the record is still being prepared.",
+          "Workflow means it is waiting for review or approval.",
+          "Released means it is the live version people should rely on.",
+          "In Revision means a newer editable version is being prepared after release.",
+        ],
+      },
+      facts: [
+        { label: "List tools", value: "Search, sort, per-column filters, pagination, selection mode, pinned records, and completeness bars" },
+        { label: "Row actions", value: "Edit, Release, Revise, Clone, Update History, Device Integration, JSON-LD export, and Copy link" },
+        { label: "Bulk tools", value: "Selection mode, QR label export, bulk export modal, bulk edit, bulk revise, archive, and delete" },
+        { label: "Export formats", value: "Bulk CSV export, bulk JSON-LD export, QR label export, and public-link sharing" },
+        { label: "Revision logic", value: "Released passports can move into In Revision individually or through bulk revise, then be released as newer versions." },
+      ],
+      journeys: [
+        {
+          title: "Use the list like an operations board",
+          items: [
+            "Search across records, combine filters, and sort by the columns that matter to your team.",
+            "Pin critical passports so they stay at the top of the table while other records continue to move underneath them.",
+            "Use selection mode when you want to export only a chosen subset or print QR labels for a specific batch.",
+          ],
+        },
+        {
+          title: "Bulk export the right scope",
+          items: [
+            "Use the Export button in the list header to open the bulk export modal.",
+            "Choose whether to export Selected passports, All released passports across all filtered pages, or only the current page.",
+            "Choose CSV when the next step is spreadsheet work, or JSON-LD when another system or re-import pipeline needs structured semantic passport data.",
+            "Use filters first if you want the 'All (All Pages)' scope to represent a very specific subset.",
+          ],
+        },
+        {
+          title: "Bulk revise released passports",
+          items: [
+            "Use Bulk Revise from the list header when you need to create a new editable version for many released passports at once.",
+            "Choose the scope, optionally narrow by passport type, then define one or more field changes that should be applied to every targeted passport.",
+            "Add a revision note if you want context recorded, and optionally auto-submit every created revision into workflow with reviewer and approver assignments.",
+            "Download the results CSV after the batch finishes so you have a record of revised, skipped, and failed passports.",
+          ],
+        },
+        {
+          title: "Bulk edit and update draft data",
+          items: [
+            "Use Bulk Edit from selection mode when you want to update many editable passports in one go.",
+            "Choose direct form entry when every selected passport should receive the same field changes.",
+            "Use the CSV or JSON upload tabs in Bulk Edit when each selected passport needs different values.",
+            "Draft and In Revision records remain editable directly in the form, with auto-save and live edit-session presence shown to teammates.",
+          ],
+        },
+        {
+          title: "Understand each row action",
+          items: [
+            "Edit is available for draft and in revision records so you can continue authoring before final release.",
+            "Release publishes the current version immediately or opens the workflow path if reviewer/approver assignments are used.",
+            "Revise creates the next editable version for an already released passport.",
+            "Clone creates a new passport based on the current record so teams do not need to re-enter repeated information.",
+            "Update History opens the combined timeline and comparison page so changes between releases are easy to review.",
+            "Export JSON-LD generates the passport with the selected semantic model's IDs and contexts for interoperable exchange.",
+          ],
+        },
+        {
+          title: "Work with QR and public access",
+          items: [
+            "Print QR labels for selected passports with size and image-format controls.",
+            "Copy the passport link when you want to share the public viewer directly.",
+            "Use the public link together with a security group API key only when selected restricted data should be intentionally revealed to an allowed recipient.",
+          ],
+        },
+        {
+          title: "Handle dynamic device data",
+          items: [
+            "Open Device Integration from a row when the passport includes dynamic fields.",
+            "Copy or regenerate the device API key there and provide it to the physical device or integration service.",
+            "Use manual override values in the same modal when the live data must be corrected without waiting for a new device push.",
+          ],
+        },
+      ],
+      table: {
+        title: "Release statuses at a glance",
+        columns: ["Status", "What it means in the UI", "Typical next actions"],
+        rows: [
+          ["Draft", "Initial editable state for newly created passports.", "Edit, CSV update, clone, submit to workflow, release, or delete."],
+          ["In review", "The record is inside reviewer/approver workflow.", "Review, approve, reject, or remove workflow depending on permissions."],
+          ["Released", "Current version is published and available through the public viewer and signing flow.", "Revise, export JSON-LD, copy link, inspect signature, track scans."],
+          ["In Revision", "A released passport has been reopened for the next version.", "Edit the next version, compare against the previous release, release again."],
+        ],
+      },
+      links: [
+        { label: "Open My Passports", route: dashboardPath("my-passports"), description: "See records assigned to or created by you." },
+        { label: "Open Workflow", route: dashboardPath("workflow/inprogress"), description: "Monitor approvals and backlog items." },
+      ],
+      previews: [
+        buildPreview(
+          "user-lifecycle-list",
+          "Interactive passport table",
+          listRoute,
+          "Use filters, row menus, selection mode, and completeness indicators here.",
+          firstType ? "" : "A table preview appears once your company has at least one granted passport type."
+        ),
+      ],
+      tips: [
+        "If you expect repeated external updates, pair JSON-LD export and Device Integration so structured consumers and live-value consumers each get the right channel.",
+      ],
+    },
+    {
+      id: "templates-and-draft-data",
+      icon: "🧩",
+      category: "Templates",
+      audience: "Editors and company admins",
+      title: "Reuse template structures instead of rebuilding from scratch",
+      summary: "Templates are the fastest way to standardize recurring product families. They let your team prefill values once, decide which fields are model data, and then create or bulk-create passports without starting from an empty form every time.",
+      facts: [
+        { label: "Best for", value: "Repeated model families, standard baseline values, and faster draft generation" },
+        { label: "Template outputs", value: "Single create and bulk create with model data pre-filled" },
+        { label: "Update paths", value: "CSV and JSON imports can update template-generated drafts after creation" },
+        { label: "Model data", value: "Fields marked as model data stay fixed when the template is reused" },
+      ],
+      journeys: [
+        {
+          title: "Build a solid template",
+          items: [
+            "Choose the passport type first, then give the template a descriptive name and summary.",
+            "Populate the values that should appear in every passport generated from that template.",
+            "Mark the fields that count as model-level data so your team can distinguish between shared baseline values and unit-specific values.",
+          ],
+        },
+        {
+          title: "Use templates operationally",
+          items: [
+            "Create a single passport when you only need one record with that baseline.",
+            "Bulk create when the same structure should be stamped into many new draft passports.",
+            "After template-based creation, switch to the passport list when external contributors need CSV or JSON exports for finishing unit-level details.",
+          ],
+        },
+        {
+          title: "Bring updated data back in",
+          items: [
+            "Use CSV import when the external update naturally fits spreadsheet workflows.",
+            "Use JSON import when another system already emits structured payloads for draft enrichment.",
+            "Keep template descriptions clear so teammates know which template is safe to reuse and which one is only for a special project.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Templates", route: dashboardPath("templates"), description: "Create, edit, delete, export, and import template-driven draft content." },
+      ],
+      previews: [
+        buildPreview(
+          "user-templates",
+          "Templates workspace",
+          dashboardPath("templates"),
+          "Use this page for template CRUD, model-data setup, and template-driven create flows."
+        ),
+      ],
+      tips: [
+        "Name templates by product family or revision program so the right one is obvious when multiple teams share the same company workspace.",
+      ],
+    },
+    {
+      id: "workflow-and-approvals",
+      icon: "✅",
+      category: "Approvals",
+      audience: "Editors, reviewers, approvers, and company admins",
+      title: "Run release approvals through workflow instead of side channels",
+      summary: "Workflow turns release into a visible, trackable process. It lets teams assign a reviewer, assign an approver, capture comments, keep backlog queues clean, and maintain history without relying on email chains or external trackers.",
+      simpleGuide: {
+        title: "Simple workflow view",
+        intro: "Use workflow when a passport should be checked before it becomes the live version.",
+        items: [
+          "Submit the passport when another person should review it.",
+          "Approve it when the record is ready to go live.",
+          "Reject it with comments when the author needs to fix something.",
+          "Check History later if you need to understand who approved what.",
+        ],
+      },
+      facts: [
+        { label: "Tabs", value: "In Progress, My Backlog, and History" },
+        { label: "Release options", value: "Direct release, reviewer only, approver only, or reviewer plus approver" },
+        { label: "Feedback capture", value: "Reviewer and approver comments are stored with status timestamps" },
+        { label: "Notification tie-in", value: "Workflow activity also appears in notifications so people know when they need to act" },
+      ],
+      journeys: [
+        {
+          title: "Submit for review or release directly",
+          items: [
+            "From a passport, choose Release and then decide whether the record should go straight to released status or route through assigned people.",
+            "If both reviewer and approver are left empty, the release can happen immediately.",
+            "If default reviewer or approver values are configured in My Profile, they help prefill the release workflow faster.",
+          ],
+        },
+        {
+          title: "Process backlog items",
+          items: [
+            "Use My Backlog to find passports waiting specifically for your review or approval action.",
+            "Approve when the record is ready, or reject with comments so the author knows exactly what to fix.",
+            "Use History when you need to audit how a record reached its current state or who approved the last release.",
+          ],
+        },
+        {
+          title: "Keep the queue clean",
+          items: [
+            "Remove workflow when a submission should be cancelled and handled another way.",
+            "Use notifications alongside workflow so urgent approvals do not stay buried in the table view.",
+            "Encourage reviewers to leave comments even on approval when later audits will need release rationale.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Workflow", route: dashboardPath("workflow/inprogress"), description: "Work through backlog, history, and in-progress approvals." },
+        { label: "Open Notifications", route: dashboardPath("notifications"), description: "Review action prompts tied to workflow events." },
+      ],
+      previews: [
+        buildPreview(
+          "user-workflow",
+          "Workflow dashboard",
+          dashboardPath("workflow/inprogress"),
+          "This is where release approvals, backlog items, and history stay visible."
+        ),
+        buildPreview(
+          "user-notifications",
+          "Notifications feed",
+          dashboardPath("notifications"),
+          "Notifications help reviewers and authors stay aligned on release activity."
+        ),
+      ],
+      tips: [
+        "Set default reviewer and approver choices in My Profile when the same approval chain is used for most releases.",
+      ],
+    },
+    {
+      id: "repository-and-assets",
+      icon: "🗂️",
+      category: "Content",
+      audience: "Editors and company admins",
+      title: "Store files and symbols once, then reuse them everywhere",
+      summary: "The repository and symbol library turn repeated attachments into reusable company assets. This keeps forms cleaner, reduces duplicate uploads, and makes file and symbol fields much easier to maintain across many passports.",
+      simpleGuide: {
+        title: "What belongs here",
+        intro: "Use the repository as your shared company library.",
+        items: [
+          "Put PDFs and reference files here when multiple passports may need them.",
+          "Put symbols here when authors should reuse the same approved icons or visual marks.",
+          "Keep names and folders clear so teammates can find assets without asking around.",
+          "If a file will only be used once, it may not need to become a shared repository asset.",
+        ],
+      },
+      facts: [
+        { label: "Repository tabs", value: "Files and Symbols" },
+        { label: "File support", value: "Folders, PDF uploads, rename, delete, breadcrumbs, preview/open, and download" },
+        { label: "Symbol support", value: "Image upload, preview, category-style organization, and delete" },
+        { label: "Used by", value: "Passport form file fields and symbol fields" },
+      ],
+      journeys: [
+        {
+          title: "Organize files for form authors",
+          items: [
+            "Create folders that match product families, compliance packs, or documentation ownership.",
+            "Upload PDFs that should be selectable from file fields in the passport form.",
+            "Rename and delete carefully so the library stays understandable for teammates who were not part of the original upload.",
+          ],
+        },
+        {
+          title: "Build the symbol library",
+          items: [
+            "Upload recurring icons, marks, or product symbols into the Symbols tab.",
+            "Use symbol fields in passport forms when the type needs a visual marker rather than text alone.",
+            "Preview symbols before selection so authors avoid uploading near-duplicate assets.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Repository", route: dashboardPath("repository"), description: "Manage folders, PDFs, and reusable symbols." },
+      ],
+      previews: [
+        buildPreview(
+          "user-repository",
+          "Repository and symbols",
+          dashboardPath("repository"),
+          "Files and symbols added here become reusable content inside passport forms."
+        ),
+      ],
+      tips: [
+        "Create a small naming convention for PDFs and symbols so authors can search visually instead of opening each file one by one.",
+      ],
+    },
+    {
+      id: "semantic-dictionary",
+      icon: "🔖",
+      category: "Dictionary",
+      audience: "Company users working with semantic passport types or JSON-LD exports",
+      title: "Use semantic dictionaries to check terms, units, confidentiality, and semantic IDs",
+      summary: "The dashboard includes a dictionary browser for each semantic model available through the company's passport-type access. Use it to search terms, open detail pages, check canonical IRIs, see expected units and data formats, and understand which application field keys map to each dictionary element.",
+      simpleGuide: {
+        title: "What the dictionary is for",
+        intro: "Think of the dictionary as the official meaning behind passport fields.",
+        items: [
+          "Use it when a field label is understandable but the exact meaning is still unclear.",
+          "Use it before imports or JSON-LD exports when units or term mapping matter.",
+          "Use it with external partners when they need the official term or identifier.",
+          "If an export looks strange, check the dictionary before assuming the data is wrong.",
+        ],
+      },
+      facts: [
+        { label: "Dashboard route", value: dashboardPath("dictionary/:family/:version") },
+        { label: "Public route", value: "/dictionary/:family/:version" },
+        { label: "Visibility rule", value: "Your dashboard shows dictionaries only for semantic models used by passport types your company can access" },
+        { label: "Term detail", value: "Each term has a slug page plus a raw JSON endpoint" },
+        { label: "Best use", value: "Validate field meaning before exporting JSON-LD or discussing semantic passport data with partners" },
+      ],
+      journeys: [
+        {
+          title: "Find the right term before exporting",
+          items: [
+            "Open the dictionary available for the passport type from the dashboard sidebar.",
+            "If your company has access to multiple passport types with different semantic models, each matching dictionary can appear separately.",
+            "Search by label, definition, slug, or known application field key.",
+            "Open the term detail page to confirm data format, JSON type, XSD type, unit, confidentiality, static/dynamic status, internal key, element ID, and regulation references.",
+            "Use the dictionary reference URL when another system needs the canonical linked-data identifier.",
+          ],
+        },
+        {
+          title: "Use it with passport authoring",
+          items: [
+            "Compare form field names with dictionary field keys so exports keep consistent semantics.",
+            "Check unit expectations before bulk imports or Asset Management updates so numeric values do not drift from the dictionary.",
+            "Use public dictionary links when external partners need term definitions without dashboard access.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open available dictionaries", route: dashboardPath("dictionary"), description: "Search the dictionaries exposed by the passport types your company can access." },
+      ],
+      table: dictionaryApiTable,
+      tips: [
+        "When a JSON-LD export looks surprising, check the selected dictionary's term field keys and expected unit first. The dictionary is the shared vocabulary behind those exports.",
+      ],
+    },
+    {
+      id: "branding-and-keys",
+      icon: "🔐",
+      category: "Security",
+      audience: "Company admins primarily, with session and optional bearer-token access available to logged-in users",
+      title: "Understand security, tokens, API keys, and who should use each one",
+      summary: "The product uses separate credentials for separate purposes: browser sessions are for dashboard work, company Bearer tokens are for authenticated integration writes, and security group API keys are only for selected restricted fields on public reads. Asset Management uses the same company session or Bearer authentication as the dashboard APIs.",
+      simpleGuide: {
+        title: "Which credential should I use?",
+        intro: "Most users only need one of these most of the time:",
+        items: [
+          "Use your normal browser login for everyday dashboard work.",
+          "Use a bearer token only when you are testing protected APIs or running scripts.",
+          "Use security group API keys for outside systems that should read approved company passport fields.",
+          "Use security group API keys when restricted public fields must be unlocked intentionally.",
+        ],
+      },
+      facts: [
+        { label: "Company branding", value: "Managed in Company Profile with public viewer, introduction, and single consumer-route presentation controls" },
+        { label: "Browser session", value: "Created by login and sent automatically by the dashboard through cookie credentials" },
+        { label: "Bearer token", value: "Optional token from Dashboard > Security or /api/users/me/token for protected API testing/scripts" },
+        { label: "Security group API keys", value: "Created and revoked in Dashboard > Security for restricted public unlocking and scoped read-only external access" },
+        { label: "Integration controls", value: "Company Bearer tokens handle writes; security group keys handle selected restricted reads" },
+      ],
+      journeys: [
+        {
+          title: "Brand the public experience",
+          items: [
+            "Use Company Profile to update the company logo, introduction text, viewer variant, consumer variant, and public page headline settings.",
+            "Adjust colors, gradients, and website links so the public viewer feels company-specific without requiring frontend code changes.",
+            "Use the preview card in Company Profile to sanity-check the public visual direction before saving.",
+          ],
+        },
+        {
+          title: "Understand dashboard session and optional bearer tokens",
+          items: [
+            "Log in through the app as normal. Under the hood, the backend uses `POST /api/auth/login`.",
+            "If your account has two-factor authentication enabled, the backend returns a short-lived `preAuthToken`. You then complete `POST /api/auth/verify-otp` with the email code.",
+            "After login, the backend sets the session cookie. The dashboard then calls protected APIs with `credentials: include`, so normal users do not paste tokens into the UI.",
+            "If you are already signed in and need a bearer token for testing or integration work, the Security page uses `POST /api/users/me/token` to issue one that can be sent as `Authorization: Bearer <token>`.",
+          ],
+        },
+        {
+          title: "Generate and manage security groups for outside readers",
+          items: [
+            "Open Security from the dashboard sidebar. Only company admins can create or revoke security groups.",
+            "Create a named security group for each external integration so revocation stays targeted.",
+            "Copy the key immediately after creation because the full value is shown only once.",
+            "Use it only with `/api/public/passports/:dppId` endpoints and send it in the `X-API-Key` header.",
+            "If an external partner such as a regulator, customer, or auditor only needs read access, this is the right credential. There is no separate special 'EU Commission API key' route in the backend today.",
+          ],
+        },
+        {
+          title: "Use Bearer tokens and security group keys correctly",
+          items: [
+            "Use a company Bearer token for create, patch, archive, delete, or dynamic-value operations under `/api/companies/:companySlug/integrations/v1/passports`.",
+            "Rotate the company service token if the integration endpoint has been shared too broadly or a device is replaced.",
+            "Use the security group API key in the public viewer unlock flow when selected restricted fields must be revealed to an allowed audience.",
+            "Use the normal company session or Bearer token for Passport Data Management; its write routes still enforce company and editor permissions.",
+          ],
+        },
+      ],
+      table: securityKeyTable,
+      links: [
+        { label: "Open Security", route: dashboardPath("security"), description: "Manage optional bearer tokens and security groups in one place." },
+        { label: "Open Company Profile", route: dashboardPath("company-profile"), description: "Update branding, introduction copy, and public experience settings." },
+        { label: "Open My Profile", route: dashboardPath("profile"), description: "Manage password, 2FA, workflow defaults, and profile details." },
+      ],
+      previews: [
+        buildPreview(
+          "user-security",
+          "Security",
+          dashboardPath("security"),
+          "Optional bearer tokens and restricted-field security groups live together on this page."
+        ),
+        buildPreview(
+          "user-company-profile",
+          "Company profile",
+          dashboardPath("company-profile"),
+          "Branding, introduction content, and public experience settings live on this page."
+        ),
+        buildPreview(
+          "user-profile",
+          "My profile",
+          dashboardPath("profile"),
+          "Use this page for password changes, 2FA, workflow defaults, and account details."
+        ),
+      ],
+      warnings: [
+        "Do not share broad credentials when someone only needs a public link or a narrowly scoped security group API key.",
+        "Do not hand bearer tokens to external read-only partners. Use security group API keys for that case.",
+      ],
+    },
+    {
+      id: "operator-did-and-restricted-access",
+      icon: "🪪",
+      category: "Trust",
+      audience: "Company admins, editors preparing compliant DPPs, and operators supporting restricted-data access",
+      title: "Understand economic-operator identity, DIDs, facilities, and restricted data",
+      summary: "DPP workflows rely on more than a local product ID. The platform can carry economic-operator identifiers, product/DPP DID identifiers, model/batch/item granularity, facility identifiers, and scoped security group keys so public and restricted data stay distinct.",
+      facts: [
+        { label: "Economic operator", value: "Stored on the company and copied into authenticated user identity and standards payloads when configured" },
+        { label: "Granularity", value: "DPPs can be model, batch, or item level depending on company policy and passport data" },
+        { label: "Facilities", value: "Managed company facility identifiers can be attached to DPPs and exposed through facility DID documents" },
+        { label: "Restricted access", value: "Security groups can cover all passports of one type or only selected passports, with an explicit restricted-field list" },
+      ],
+      journeys: [
+        {
+          title: "Know which identifier is which",
+          items: [
+            "`dppId` is the internal passport record identifier used by dashboard rows and most company APIs.",
+            "`internalAliasId` is the local passport ID used internally for routing, uniqueness, and draft creation.",
+            "`uniqueProductIdentifier` is the global product identifier DID, and it should be derived from the real serial/business identifier when one exists.",
+            "`granularity` says whether the DPP represents a model, batch, or item. Released granularity changes use a linked successor flow instead of silent in-place mutation.",
+          ],
+        },
+        {
+          title: "How DID documents are used",
+          items: [
+            "The platform DID lives at `/.well-known/did.json`.",
+            "Company DID documents use `/did/company/:slug/did.json`.",
+            "Product subject DID documents use `/did/:passportType/model/:stableId/did.json`, `/did/:passportType/batch/:stableId/did.json`, or `/did/:passportType/item/:stableId/did.json`.",
+            "DPP record DID documents use `/did/dpp/:granularity/:stableId/did.json`, and facility DID documents use `/did/facility/:stableId/did.json`.",
+            "The universal `/resolve?did=...` endpoint redirects browsers to the public passport where possible and API clients to the DID document URL.",
+          ],
+        },
+        {
+          title: "How restricted access is different from public access",
+          items: [
+            "Public fields are visible through public passport routes with no login.",
+            "Restricted public-view fields can be unlocked with a security group API key for the configured passport type or selected passports.",
+            "Each key exposes only the restricted fields selected when the security group was created.",
+            "Standard and emergency API-key revocation stop restricted access immediately.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Company Profile", route: dashboardPath("company-profile"), description: "Review company identity and public presentation settings." },
+        { label: "Open My Passports", route: dashboardPath("my-passports"), description: "Find DPP IDs, public links, versions, and passport actions." },
+      ],
+      table: governanceSecurityApiTable,
+      tips: [
+        "For regulated integrations, collect the economic-operator identifier scheme, facility identifiers, and intended granularity before bulk creation begins.",
+        "Use separate named security groups for each outside reader or integration so access can be revoked independently.",
+      ],
+    },
+    {
+      id: "asset-management-tool",
+      icon: "📋",
+      category: "Operations",
+      audience: "Editors and company admins using high-volume update flows",
+      title: "Use Asset Management for safe bulk updates on existing passports",
+      summary: "Asset Management is a separate operational layer for editing many already existing passports at once. It is best when you need to stage updates from CSV, JSON, or an ERP/API source, check the result before writing anything, and then push or schedule the changes in a controlled way.",
+      facts: [
+        { label: "Best use case", value: "Bulk updates on existing passports, especially when rows already have dppId or internalAliasId" },
+        { label: "Launch path", value: "Open from the company dashboard. The tool authenticates automatically from the dashboard launch." },
+        { label: "Matching rule", value: "dppId is safest. internalAliasId works as the fallback local passport ID match key for ERP and spreadsheet updates." },
+        { label: "Safety rule", value: "Unknown columns are rejected. Nothing changes until Push to Backend is used." },
+      ],
+      journeys: [
+        {
+          title: "Understand what the tool is for",
+          items: [
+            "Asset Management is not a second passport builder. It is a bulk-update surface for passports that already exist in your backend.",
+            "If you need to create brand new passports from scratch, the normal Create Passport hub is still the better starting point.",
+            "If you already have many passports and just need to change fields such as mass, capacity, or model data at scale, Asset Management is usually much faster.",
+          ],
+        },
+        {
+          title: "Bring data in",
+          items: [
+            "Use JSON Paste when another system already gives you a ready array of objects or a `{ records: [...] }` payload.",
+            "Use CSV Import when your team works in Excel or Google Sheets.",
+            "Use ERP / API Feed when the data lives in another system and can be fetched over HTTP.",
+            "The selected passport type loads current company passports automatically, so you start from real data instead of an empty page.",
+          ],
+        },
+        {
+          title: "Work in the Asset Grid",
+          items: [
+            "The grid behaves like a simple spreadsheet. Row and Passport DPP ID stay visible while you scroll.",
+            "Use Create Passport Row when you want to stage a new row manually before previewing it.",
+            "Use Export CSV to create a safe base file. Filtered columns export still keeps `dppId` and `internalAliasId` so the file can be matched on import.",
+            "Keep `dppId` whenever possible. If your incoming data does not have `dppId`, make sure `internalAliasId` is present and stable.",
+          ],
+        },
+        {
+          title: "Preview first, then push or schedule",
+          items: [
+            "Select Validate & Build JSON to run a dry check. This creates the generated JSON package but does not change passports yet.",
+            "Read Validation Details carefully. Rows are marked ready, skipped, or failed so you can see exactly what will happen.",
+            "Use Push to Backend only when the preview looks right.",
+            "Use Save Scheduled Job when the same source should run automatically later. Scheduled runs fetch later on the server and then push the results into your backend.",
+          ],
+        },
+      ],
+      table: assetManagementTermsTable,
+      tips: [
+        "If your ERP does not store dppId, map a stable ERP field to `internalAliasId` so the tool can find the right passport.",
+        "Export a template first when non-technical users need to edit a spreadsheet safely.",
+      ],
+      warnings: [
+        "Asset Management writes into the same backend passport records used by the main dashboard. Treat it as a production update tool.",
+        "Rows without dppId and without internalAliasId cannot be matched to an existing passport.",
+      ],
+    },
+    {
+      id: "api-processes",
+      icon: "🔌",
+      category: "API",
+      audience: "Company admins, editors, and non-technical users preparing integrations",
+      title: "Understand the API process step by step before calling any endpoint",
+      summary: "If you are not from an IT background, think of the API as a structured door into the same product you see in the dashboard. The key questions are always the same: who is calling, what credential do they use, what data do they send, and what should happen next. This section explains those flows in plain language first so the endpoint tables later feel much easier to use.",
+      facts: [
+        { label: "Human users", value: "Use dashboard session cookies after login; bearer tokens are optional for scripts/tests" },
+        { label: "External read-only systems", value: "Use security group API keys with /api/public/passports/:dppId" },
+        { label: "Devices and sensors", value: "Use the company integration Bearer token" },
+        { label: "Public viewers", value: "Usually need no authentication unless restricted fields must be unlocked" },
+      ],
+      flowCards: apiGettingStartedFlows,
+      tips: [
+        "Start by deciding whether the caller is a person, an outside read-only partner, a live device, or the Asset Management tool. That choice decides the right credential.",
+      ],
+      warnings: [
+        "The safest integrations are the ones that use the smallest permission needed. Read-only partners should not receive dashboard sessions or bearer tokens.",
+      ],
+    },
+    {
+      id: "api-company-write",
+      icon: "🧱",
+      category: "API",
+      audience: "Company admins and editors performing protected write operations",
+      title: "Use the company write APIs for create, update, release, revise, and bulk handling",
+      summary: "These are the main protected endpoints for changing passport data from scripts, tools, or controlled internal integrations. Every endpoint in this section needs a browser session or bearer token plus company access, and most of them also require an editor or company-admin role.",
+      facts: [
+        { label: "Dashboard auth", value: "Session cookie sent automatically by fetchWithAuth" },
+        { label: "Script auth", value: "Authorization: Bearer <token> when you intentionally issue a token" },
+        { label: "Company scope", value: "The :companyId in the URL must match the company the token is allowed to access" },
+        { label: "Bulk limit", value: "The bulk create, bulk fetch, bulk patch, delete, and upsert endpoints cap requests at 500 rows" },
+        { label: "Schema rule", value: "Unknown passport field keys are rejected instead of silently stored" },
+      ],
+      journeys: [
+        {
+          title: "Simple create or update pattern",
+          items: [
+            "For one new record, send `passportType` plus the normal field keys to `POST /api/companies/:companyId/passports`.",
+            "For one existing editable record, send the same fields to `PATCH /api/companies/:companyId/passports/:dppId` and include `passportType` in the body.",
+            "For many existing editable records, use `PATCH /api/companies/:companyId/passports` and give each row a `dppId` or `internalAliasId` so the backend can match it safely.",
+          ],
+        },
+        {
+          title: "Use upsert when you do not know in advance which rows already exist",
+          items: [
+            "Use `POST /api/companies/:companyId/passports/upsert-json` when you already have a JSON array.",
+            "Use `POST /api/companies/:companyId/passports/upsert-csv` when the source is a spreadsheet and you want the backend to create or update row by row.",
+            "In both cases, rows with a matching editable passport are updated. Rows without a match can create a new passport when `internalAliasId` is present.",
+          ],
+        },
+      ],
+      table: companyWriteApiTable,
+      warnings: [
+        "Released passports are not normal editable rows. Use revise first if you need a new editable version.",
+        "internalAliasId must stay unique. The backend blocks duplicates.",
+      ],
+    },
+    {
+      id: "api-read-and-export",
+      icon: "📤",
+      category: "API",
+      audience: "Company users and integration teams that need controlled reads or exports",
+      title: "Read, compare, and export passport data with the company APIs",
+      summary: "Not every integration is a write integration. Many teams simply need to read what already exists, fetch many passports by known IDs, export CSV or JSON, inspect version history, . These endpoints stay inside the normal company security boundary and therefore use dashboard session or bearer authentication.",
+      facts: [
+        { label: "Read auth", value: "Session cookie or bearer token with company access" },
+        { label: "Best use case", value: "Internal tools, controlled exports, compare/history pages, and support diagnostics" },
+        { label: "Export formats", value: "CSV and JSON-LD from the draft export endpoint" },
+        { label: "Matching helper", value: "bulk-fetch lets you ask for many passports by dppId or internalAliasId in one request" },
+      ],
+      table: readExportApiTable,
+      tips: [
+        "Use the export endpoint when non-technical teams need a file. Use the list and bulk-fetch endpoints when another application needs structured data directly.",
+      ],
+    },
+    {
+      id: "api-public-live-and-readonly",
+      icon: "🌐",
+      category: "API",
+      audience: "External readers, public-view implementers, and live-data integrations",
+      title: "Use the public, external read-only, verification, and live-data endpoints correctly",
+      summary: "This group covers the endpoints that people outside the normal dashboard may use. Some are fully public, some use security group API keys, and automation writes use Bearer tokens. The important point is that each route is designed for a narrow purpose instead of broad admin access.",
+      facts: [
+        { label: "Read-only external partner path", value: "/api/public/passports/:dppId with a security group X-API-Key" },
+        { label: "Public passport path", value: "/api/public/passports/:dppId without login" },
+        { label: "Restricted-field path", value: "GET /api/public/passports/:dppId with X-API-Key" },
+        { label: "Live-value write path", value: "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values with Bearer token" },
+      ],
+      journeys: [
+        {
+          title: "Choose the right external path",
+          items: [
+            "Use `/api/public/passports/:dppId` when an outside organization needs a company-approved read-only API with its own revocable security group key.",
+            "Use `/api/public/passports/:dppId` without a key when you simply need the public passport view that a QR code or public link would show.",
+            "Add `X-API-Key` only when the viewer should see selected restricted fields and has the correct security group API key.",
+            "Use the Bearer-token dynamic-value endpoint when the problem is live measurements rather than normal passport authoring.",
+          ],
+        },
+      ],
+      table: publicAndLiveApiTable,
+      warnings: [
+        "Public viewer access and API-key access are not the same thing. A public link does not grant company-wide API access.",
+      ],
+    },
+    {
+      id: "api-asset-management",
+      icon: "⚙️",
+      category: "API",
+      audience: "Teams automating Asset Management or documenting it for operators",
+      title: "Asset Management APIs, scheduling, and security rules",
+      summary: "Asset Management uses company-scoped Passport Data Management routes with the same session or Bearer authentication as the dashboard. It supports source fetch, preview, push, saved jobs, and recent run history as a controlled staging service in front of normal passport writes.",
+      facts: [
+        { label: "Authentication", value: "Dashboard session cookie or Authorization: Bearer <token>" },
+        { label: "Route base", value: "/api/companies/:companyId/passport-data-management" },
+        { label: "Preview behavior", value: "Preview is a dry run. Push is the write action." },
+        { label: "Schedule behavior", value: "Scheduled jobs run later on the server and can fetch from an external ERP or API source first" },
+      ],
+      table: assetManagementApiTable,
+      tips: [
+        "If you only need normal create or update APIs, use the company passport endpoints. Use Asset Management when the workflow is specifically staging, previewing, and batch-pushing changes.",
+      ],
+      warnings: [
+        "Asset Management is not direct database access. It still goes through the backend and its validation rules.",
+        "Read routes require company access; source, preview, push, and job mutations additionally require editor permissions.",
+      ],
+    },
+    {
+      id: "team-and-governance",
+      icon: "👥",
+      category: "Collaboration",
+      audience: "Editors, company admins, and auditors",
+      title: "Invite people, coordinate work, and keep an audit trail",
+      summary: "Team management, notifications, and audit logs work together. Use them to onboard teammates, keep role boundaries clear, and retain a reliable change history for compliance or operations follow-up.",
+      facts: [
+        { label: "Team roles", value: "Admin, Editor, and Viewer" },
+        { label: "Invite rules", value: "Admins can invite all company roles; Editors can invite viewers" },
+        { label: "Audit tools", value: "Audit log filters by user, action, and date range with CSV export" },
+        { label: "Notifications", value: "Track workflow and system updates inside the app" },
+      ],
+      journeys: [
+        {
+          title: "Manage the team",
+          items: [
+            "Invite a teammate from Manage Team and choose the role if your account has admin permissions.",
+            "Use the role legend on the page to understand exactly what Admin, Editor, and Viewer can do.",
+            "Change roles or deactivate users when responsibilities shift or access should be removed.",
+            "Use session revocation when a teammate's existing browser sessions should be invalidated immediately after a role or access change.",
+          ],
+        },
+        {
+          title: "Use audit logs when you need proof",
+          items: [
+            "Filter audit logs by user, action type, or date range when investigating a change.",
+            "Expand the old and new value views to see what was updated, not just that an update happened.",
+            "Export audit logs when a compliance or governance review needs a portable record.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Manage Team", route: dashboardPath("team"), description: "Invite, role-manage, and deactivate users." },
+        { label: "Open Notifications", route: dashboardPath("notifications"), description: "Review workflow and system updates." },
+        { label: "Open Audit Logs", route: dashboardPath("audit-logs"), description: "Filter and export change history." },
+      ],
+      previews: [
+        buildPreview(
+          "user-team",
+          "Team management screen",
+          dashboardPath("team"),
+          "This page handles invites, role changes, and member deactivation."
+        ),
+        buildPreview(
+          "user-audit",
+          "Audit logs view",
+          dashboardPath("audit-logs"),
+          "Use this for filtered change tracking and CSV exports."
+        ),
+      ],
+      tips: [
+        "Use role changes instead of shared accounts so the audit trail stays attributable to the correct person.",
+      ],
+    },
+    {
+      id: "public-viewer-and-sharing",
+      icon: "🌍",
+      category: "Sharing",
+      audience: "Editors, company admins, and anyone preparing external access",
+      title: "Know what the public viewer and consumer experience can do",
+      summary: "Released passports become much more than rows in a table. Their public viewer can show introduction content, translations, charts, signatures, PDF previews, restricted-field unlocking, scan indicators, carrier authenticity evidence, suspicious-carrier reporting, and printable output for external audiences.",
+      facts: [
+        { label: "Public entry points", value: "Copied link or QR code into the public `/p/:dppId` route" },
+        { label: "Viewer features", value: "Introduction tabs, translated sections, charts, composition visuals, PDF previews, QR display, print, signature badges, scan badges, and carrier authenticity indicators" },
+        { label: "Restricted access", value: "Restricted fields stay hidden until unlocked with a matching security group API key" },
+        { label: "Sharing options", value: "Public link, QR labels, print PDF, JSON-LD export, CSV exports, and analytics PDF exports" },
+      ],
+      journeys: [
+        {
+          title: "Prepare a passport for external viewing",
+          items: [
+            "Release the passport so the public route becomes available.",
+            "Use Company Profile introduction and branding settings to improve the context external viewers see first.",
+            "Copy the passport link or print QR labels when the record needs to travel with the physical product.",
+          ],
+        },
+        {
+          title: "Understand what viewers can see",
+          items: [
+            "Public fields are visible immediately in the public passport viewer.",
+            "Restricted fields are intentionally hidden until someone enters a valid security group API key.",
+            "Dynamic fields can render history charts and live-value visualizations when the type uses those field settings.",
+            "Carrier authenticity metadata can show trusted viewer host, QR print specifications, signed carrier payload status, verification evidence, and anti-counterfeit instructions.",
+            "Public viewers can report a suspicious QR code or label; company users can later inspect those security events.",
+          ],
+        },
+        {
+          title: "Export the right artifact",
+          items: [
+            "Use QR label export for packaging or physical tagging workflows.",
+            "Use data-carrier verification evidence when QR print quality, placement, durability, or scan checks need to be recorded.",
+            "Use JSON-LD export when another system needs structured semantic passport content.",
+            "Use CSV exports when teams need spreadsheet-based reporting or downstream batch handling.",
+          ],
+        },
+        {
+          title: "Understand the W3C DID and Verifiable Credential layer",
+          items: [
+            "When a passport is released, the platform stores a cryptographic signature for that exact released version.",
+            "The public verification endpoints can also expose a Verifiable Credential style payload, which is a standard W3C way to package claims plus proof.",
+            "The DID document at `/.well-known/did.json` publishes verification details that outside systems can use to check that a released passport really came from this platform.",
+            "In simple terms: the visible passport data, the stored signature, the Verifiable Credential payload, and the DID document all work together to help verifiers confirm authenticity and detect tampering.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Company Profile", route: dashboardPath("company-profile"), description: "Set the public introduction and public-view styling." },
+        { label: "Open My Passports", route: dashboardPath("my-passports"), description: "Use row actions to copy links, export, and print QR labels." },
+      ],
+      tips: [
+        "Treat the public viewer as the final external presentation layer. Company introduction text and release quality matter as much as raw field completeness.",
+        "Users do not need to manually manage DIDs or Verifiable Credentials in normal workflow. They are there to support external trust and verification.",
+      ],
+    },
+  ];
+}

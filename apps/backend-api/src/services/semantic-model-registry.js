@@ -1,0 +1,405 @@
+"use strict";
+
+const fs = require("fs");
+const path = require("path");
+const {
+  defaultPackagesDir,
+  discoverPassportModulePackages,
+} = require("./passport-module-registry");
+const {
+  flattenSchemaFieldsFromSections,
+} = require("../shared/passports/passport-helpers");
+
+const dataTypePresets = {
+  string: { format: "String", jsonType: "string", xsdType: "xsd:string" },
+  decimal: { format: "Decimal", jsonType: "decimal", xsdType: "xsd:decimal" },
+  integer: { format: "Integer", jsonType: "integer", xsdType: "xsd:integer" },
+  boolean: { format: "Boolean", jsonType: "boolean", xsdType: "xsd:boolean" },
+  date: { format: "Date", jsonType: "string", xsdType: "xsd:date" },
+  datetime: { format: "DateTime", jsonType: "string", xsdType: "xsd:dateTime" },
+  uri: { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" },
+  url: { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" },
+  array: { format: "Array", jsonType: "array", items: { jsonType: "object" } },
+};
+const supportedSemanticJsonTypes = new Set(["string", "decimal", "integer", "boolean", "array", "object"]);
+
+function loadJsonIfExists(filePath, defaultValue) {
+  if (!fs.existsSync(filePath)) return defaultValue;
+  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function normalizeKey(value) {
+  return String(value || "").trim();
+}
+
+function normalizePathSegment(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeSemanticJsonType(jsonType, xsdType = "") {
+  const normalized = normalizePathSegment(jsonType);
+  const normalizedXsdType = normalizePathSegment(xsdType);
+  if (normalized && !supportedSemanticJsonTypes.has(normalized)) {
+    throw new Error(`Unsupported semantic jsonType "${normalized}".`);
+  }
+  if (/(?:^|[:#/])decimal$/.test(normalizedXsdType)) {
+    if (normalized && normalized !== "decimal") {
+      throw new Error(`Semantic xsd:decimal terms must use jsonType "decimal", not "${normalized}".`);
+    }
+    return "decimal";
+  }
+  return normalized;
+}
+
+function compactObject(value) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entryValue]) =>
+      entryValue !== undefined
+      && (!Array.isArray(entryValue) || entryValue.length > 0)
+    )
+  );
+}
+
+function normalizeDataType(dataType) {
+  if (!dataType) return null;
+  if (typeof dataType === "string") {
+    const preset = dataTypePresets[normalizePathSegment(dataType)];
+    if (!preset) {
+      throw new Error(`Unsupported semantic data type "${dataType}".`);
+    }
+    return { ...preset };
+  }
+  if (isPlainObject(dataType)) {
+    const normalized = { ...dataType };
+    const jsonType = normalizeSemanticJsonType(normalized.jsonType, normalized.xsdType);
+    if (jsonType) normalized.jsonType = jsonType;
+    if (jsonType === "array" && !isPlainObject(normalized.items)) {
+      normalized.items = { jsonType: "object" };
+    }
+    return normalized;
+  }
+  return dataType;
+}
+
+function normalizeRange(range, dataType = null) {
+  if (!isPlainObject(range)) return range;
+  const normalized = { ...range };
+  const jsonType = normalizeSemanticJsonType(
+    normalized.jsonType || dataType?.jsonType,
+    normalized.curie || normalized.iri || dataType?.xsdType
+  );
+  if (jsonType) normalized.jsonType = jsonType;
+  return normalized;
+}
+
+function createLookupByKey(items = []) {
+  const lookup = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    if (item?.key) lookup.set(String(item.key), item);
+  }
+  return lookup;
+}
+
+function trimTrailingSlash(value) {
+  return String(value || "").replace(/\/+$/g, "");
+}
+
+function canonicalTermsBaseUrl(manifest, basePath) {
+  const baseIri = trimTrailingSlash(manifest?.baseIri);
+  if (baseIri) return `${baseIri}/terms`;
+
+  const termsUrl = trimTrailingSlash(manifest?.termsUrl);
+  if (termsUrl) return termsUrl.replace("/api/dictionary/", "/dictionary/");
+
+  return `${basePath}/terms`;
+}
+
+function xsdIriFromCurie(value) {
+  const type = String(value || "").trim();
+  if (!type) return null;
+  if (/^https?:\/\//i.test(type)) return type;
+  if (type.startsWith("xsd:")) return `http://www.w3.org/2001/XMLSchema#${type.slice(4)}`;
+  return null;
+}
+
+function rangeFromDataType(dataType) {
+  if (!isPlainObject(dataType)) return null;
+  return compactObject({
+    iri: xsdIriFromCurie(dataType.xsdType) || undefined,
+    curie: dataType.xsdType || undefined,
+    label: dataType.format || dataType.jsonType || undefined,
+    jsonType: dataType.jsonType || undefined,
+    items: dataType.items || undefined,
+  });
+}
+
+function normalizeTermsSource(termsSource, { manifest, basePath, units } = {}) {
+  const sourceTerms = Array.isArray(termsSource) ? termsSource : [];
+  const unitsByKey = createLookupByKey(units);
+  const termsBaseUrl = canonicalTermsBaseUrl(manifest, basePath);
+
+  return sourceTerms.map((rawTerm, index) => {
+    const term = isPlainObject(rawTerm) ? rawTerm : {};
+    const slug = term.slug ? String(term.slug) : "";
+    const internalKey = term.internalKey;
+    const number = term.number ?? index + 1;
+    const iri = term.iri || (slug && termsBaseUrl ? `${termsBaseUrl}/${slug}` : null);
+    const label = term.label;
+    const rawDomain = term.domain;
+    const domain = isPlainObject(rawDomain) ? { ...rawDomain } : rawDomain;
+    const dataType = normalizeDataType(term.dataType);
+    const range = normalizeRange(term.range, dataType) || rangeFromDataType(dataType);
+    const unit = term.unit || "none";
+    const unitRecord = unitsByKey.get(String(unit));
+    const unitDisplay = term.unitDisplay !== undefined
+      ? term.unitDisplay
+      : unit === "none"
+        ? "n.a."
+        : unitRecord?.display || unitRecord?.symbol || unitRecord?.label || unit;
+    if (!slug || !internalKey || !iri || !label || !isPlainObject(domain) || !isPlainObject(range)) {
+      throw new Error(`Semantic term at index ${index} must define slug, internalKey, iri, label, domain, and range.`);
+    }
+
+    return compactObject({
+      number,
+      specRef: term.specRef,
+      slug,
+      iri,
+      label,
+      definition: term.definition,
+      internalKey,
+      dataType,
+      unit,
+      unitDisplay,
+      domain,
+      range,
+      rangeKind: term.rangeKind,
+      minCount: term.minCount,
+      maxCount: term.maxCount,
+      relationshipType: term.relationshipType,
+    });
+  });
+}
+
+function modelSortValue(model) {
+  return `${model.family}/${model.version}/${model.semanticModelKey}`;
+}
+
+function indexTerms(terms = []) {
+  const termsBySlug = new Map();
+  const termsByIri = new Map();
+
+  for (const term of terms) {
+    if (term?.slug) termsBySlug.set(String(term.slug), term);
+    if (term?.iri) termsByIri.set(String(term.iri), term);
+    if (term?.termIri) termsByIri.set(String(term.termIri), term);
+  }
+
+  return { termsBySlug, termsByIri };
+}
+
+function summarizeModel(model) {
+  const manifest = model.manifest || {};
+  return {
+    semanticModelKey: model.semanticModelKey,
+    key: model.semanticModelKey,
+    family: model.family,
+    version: model.version,
+    name: manifest.name || model.semanticModelKey,
+    description: manifest.description || "",
+    dictionaryVersion: manifest.versioning?.dictionaryVersion || manifest.version || null,
+    sourceVersion: manifest.versioning?.sourceVersion || null,
+    contextUrl: manifest.contextUrl || model.contextUrl,
+    termsUrl: manifest.termsUrl || model.termsUrl,
+    catalogUrl: manifest.interoperabilityProfile?.catalogUrl || model.catalogUrl,
+    classesUrl: manifest.classesUrl || `${model.apiPath}/classes`,
+    enumsUrl: manifest.enumsUrl || `${model.apiPath}/enums`,
+    ontologyUrl: manifest.ontologyUrl || `${model.basePath}/ontology.jsonld`,
+    shapesUrl: manifest.shapesUrl || `${model.basePath}/shapes.jsonld`,
+    registered: true,
+  };
+}
+
+function buildModel(packageDefinition) {
+  const {
+    packageDir: modelDir,
+    family,
+    version,
+    manifest,
+  } = packageDefinition;
+
+  const semanticModelKey = normalizeKey(
+    manifest.semanticModelKey
+    || manifest.versioning?.semanticModelKey
+    || `${family}_${version}`
+  );
+  if (!semanticModelKey) return null;
+
+  const basePath = `/dictionary/${family}/${version}`;
+  const apiPath = `/api/dictionary/${family}/${version}`;
+  const termsSource = loadJsonIfExists(path.join(modelDir, "terms.json"), []);
+  const units = loadJsonIfExists(path.join(modelDir, "units.json"), []);
+  const classes = loadJsonIfExists(path.join(modelDir, "classes.json"), []);
+  const enums = loadJsonIfExists(path.join(modelDir, "enums.json"), []);
+  const terms = normalizeTermsSource(termsSource, { manifest, basePath, units });
+  const context = loadJsonIfExists(path.join(modelDir, "context.jsonld"), {});
+  const dcatCatalog = loadJsonIfExists(path.join(modelDir, "catalog.jsonld"), null);
+  const ontology = loadJsonIfExists(path.join(modelDir, "ontology.jsonld"), null);
+  const shapes = loadJsonIfExists(path.join(modelDir, "shapes.jsonld"), null);
+  const indexes = indexTerms(terms);
+
+  return {
+    semanticModelKey,
+    family,
+    version,
+    modelDir,
+    manifest,
+    terms,
+    units,
+    classes,
+    enums,
+    context,
+    dcatCatalog,
+    ontology,
+    shapes,
+    indexes,
+    contextUrl: manifest.contextUrl || `${basePath}/context.jsonld`,
+    termsUrl: manifest.termsUrl || `${basePath}/terms`,
+    catalogUrl: manifest.interoperabilityProfile?.catalogUrl || `${basePath}/catalog.jsonld`,
+    basePath,
+    apiPath,
+  };
+}
+
+module.exports = function createSemanticModelRegistry({ packagesDir = defaultPackagesDir } = {}) {
+  const modelsByKey = new Map();
+  const modelsByPath = new Map();
+
+  function loadModels() {
+    modelsByKey.clear();
+    modelsByPath.clear();
+    for (const packageDefinition of discoverPassportModulePackages({ packagesDir })) {
+      const model = buildModel(packageDefinition);
+      if (!model) continue;
+      modelsByKey.set(model.semanticModelKey, model);
+      modelsByPath.set(`${model.family}/${model.version}`, model);
+    }
+  }
+
+  loadModels();
+
+  function getModel(modelKey) {
+    return modelsByKey.get(normalizeKey(modelKey)) || null;
+  }
+
+  function getModelByPath(family, version) {
+    return modelsByPath.get(`${normalizePathSegment(family)}/${normalizePathSegment(version)}`) || null;
+  }
+
+  function listModels() {
+    return [...modelsByKey.values()]
+      .sort((left, right) => modelSortValue(left).localeCompare(modelSortValue(right)))
+      .map(summarizeModel);
+  }
+
+  function getManifest(modelKey) {
+    return getModel(modelKey)?.manifest || null;
+  }
+
+  function getTerms(modelKey) {
+    return getModel(modelKey)?.terms || [];
+  }
+
+  function getUnits(modelKey) {
+    return getModel(modelKey)?.units || [];
+  }
+
+  function getClasses(modelKey) {
+    return getModel(modelKey)?.classes || [];
+  }
+
+  function getEnums(modelKey) {
+    return getModel(modelKey)?.enums || [];
+  }
+
+  function getOntology(modelKey) {
+    return getModel(modelKey)?.ontology || null;
+  }
+
+  function getShapes(modelKey) {
+    return getModel(modelKey)?.shapes || null;
+  }
+
+  function getContext(modelKey) {
+    return getModel(modelKey)?.context || null;
+  }
+
+  function getDcatCatalog(modelKey) {
+    return getModel(modelKey)?.dcatCatalog || null;
+  }
+
+  function getTermBySlug(modelKey, slug) {
+    return getModel(modelKey)?.indexes.termsBySlug.get(String(slug || "")) || null;
+  }
+
+  function getTermByIri(modelKey, iri) {
+    return getModel(modelKey)?.indexes.termsByIri.get(String(iri || "")) || null;
+  }
+
+  function buildJsonLdContext(typeDef, modelKey = null) {
+    const resolvedModelKey = modelKey || typeDef?.semanticModelKey || typeDef?.fieldsJson?.semanticModelKey || null;
+    const model = getModel(resolvedModelKey);
+    const dppContext = {
+      "@version": 1.1,
+      dpp: "https://schema.digitalproductpassport.eu/ns/dpp#",
+      DigitalProductPassport: "dpp:DigitalProductPassport",
+      dppId: "dpp:dppId",
+      passportType: "dpp:passportType",
+      semanticModel: "dpp:semanticModel",
+      modelName: "dpp:modelName",
+      internalAliasId: "dpp:internalAliasId",
+      releaseStatus: "dpp:releaseStatus",
+      versionNumber: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
+      createdAt: { "@id": "dpp:createdAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
+      updatedAt: { "@id": "dpp:updatedAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
+    };
+
+    if (!model) return [dppContext];
+
+    const contexts = [dppContext, model.contextUrl];
+    const inlineOverrides = {};
+    for (const field of flattenSchemaFieldsFromSections(typeDef?.fieldsJson?.sections || [])) {
+      if (!field?.key) continue;
+      const termIri = field.semanticId;
+      if (termIri && !model.context?.["@context"]?.[field.key]) {
+        inlineOverrides[field.key] = { "@id": termIri };
+      }
+    }
+    if (Object.keys(inlineOverrides).length > 0) contexts.push(inlineOverrides);
+    return contexts;
+  }
+
+  return {
+    reload: loadModels,
+    getModel,
+    getModelByPath,
+    listModels,
+    summarizeModel,
+    getManifest,
+    getTerms,
+    getUnits,
+    getClasses,
+    getEnums,
+    getOntology,
+    getShapes,
+    getContext,
+    getDcatCatalog,
+    getTermBySlug,
+    getTermByIri,
+    buildJsonLdContext,
+  };
+};

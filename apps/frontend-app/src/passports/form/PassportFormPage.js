@@ -1,0 +1,1600 @@
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
+import {
+  alignRecordToSchemaKeys,
+  buildSchemaFieldKeyMap,
+  canonicalizeRecordToSchemaKeys,
+  extractFieldValuesFromElements,
+} from "../../shared/passports/schemaKeyUtils";
+import {
+  createEmptyTableRow,
+  normalizeTableColumns,
+  parseTableRows,
+} from "../../shared/passports/tableSchemaUtils";
+import {
+  flattenSchemaFieldsFromSections,
+  normalizeSchemaSections,
+} from "../../shared/passports/passportSchemaUtils";
+import {
+  normalizeSystemPassportHeader,
+  resolveSystemHeaderEntries,
+} from "../../admin/passport-types/builderHelpers";
+import SemanticGraphFieldEditor from "../../shared/passports/SemanticGraphFieldEditor";
+import {
+  coerceSemanticGraphPropertyValue,
+  getRootSemanticProperty,
+  getSemanticGraphClass,
+} from "../../shared/passports/semanticGraphUtils";
+import { resolveManagedSystemHeaderValue } from "../../shared/passports/systemHeaderManagedValues";
+import { formatFieldLabelWithUnit, getFieldUnitLabel } from "../../passport-viewer/utils/viewerHelpers";
+import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
+import RepositoryPicker from "./components/RepositoryPicker";
+import SymbolRepositoryPicker from "./components/SymbolRepositoryPicker";
+import "../../shared/styles/CreatePass.css";
+
+const api = import.meta.env.VITE_API_URL || "";
+const editSessionTimeoutMs = 12 * 60 * 60 * 1000;
+const editHeartbeatMs = 60 * 1000;
+function getFieldInputPrompt(field) {
+  const baseLabel = String(field?.label || field?.key || "value").toLowerCase();
+  const unitLabel = getFieldUnitLabel(field);
+  return unitLabel ? `Enter ${baseLabel} in ${unitLabel}` : `Enter ${baseLabel}`;
+}
+
+function buildDraftStorageKey({ mode, companyId, passportType, dppId }) {
+  return [
+    "passport-form-draft",
+    mode || "create",
+    companyId || "no-company",
+    passportType || "no-type",
+    dppId || "new",
+  ].join(":");
+}
+
+function normalizePersistedComparisonValue(value) {
+  if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  if (typeof value === "string") return value.trim();
+  return value ?? null;
+}
+
+function mergePassportRepresentations(rawRecord = {}, fullRecord = {}) {
+  const rawFields = rawRecord?.fields && typeof rawRecord.fields === "object" ? rawRecord.fields : {};
+  const fullFields = fullRecord?.fields && typeof fullRecord.fields === "object" ? fullRecord.fields : {};
+  return {
+    ...fullRecord,
+    ...rawRecord,
+    fields: {
+      ...fullFields,
+      ...rawFields,
+    },
+    elements: fullRecord?.elements || rawRecord?.elements,
+  };
+}
+
+function buildClonePrefill(record, sections) {
+  if (!record || typeof record !== "object") {
+    return { modelName: "", internalAliasId: "", formData: {} };
+  }
+
+  const keyMap = buildSchemaFieldKeyMap(sections);
+  const mergedRecord = {
+    ...record,
+    ...(record.fields && typeof record.fields === "object" ? record.fields : {}),
+    ...extractFieldValuesFromElements(record.elements, keyMap),
+  };
+  const aligned = alignRecordToSchemaKeys(mergedRecord, sections);
+  const excludedKeys = new Set([
+    "id",
+    "dppId",
+    "companyId",
+    "lineageId",
+    "createdAt",
+    "updatedAt",
+    "releaseStatus",
+    "versionNumber",
+    "archivedAt",
+    "releasedAt",
+    "deletedAt",
+    "elements",
+    "fields",
+    "linkedData",
+    "companyProfile",
+    "digitalProductPassportId",
+    "uniqueProductIdentifier",
+    "subjectDid",
+    "dppDid",
+    "companyDid",
+  ]);
+
+  const formData = Object.fromEntries(
+    Object.entries(aligned).filter(([key, value]) => {
+      if (excludedKeys.has(key)) return false;
+      if (value === undefined) return false;
+      return true;
+    })
+  );
+
+  return {
+    modelName: aligned?.modelName || record?.modelName || "",
+    internalAliasId: "",
+    formData,
+  };
+}
+
+function generateDraftLocalPassportId() {
+  if (typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID) {
+    return `dppId${globalThis.crypto.randomUUID()}`;
+  }
+  const randomPart = Math.random().toString(36).slice(2, 10);
+  const timestampPart = Date.now().toString(36);
+  return `dppId${timestampPart}${randomPart}`;
+}
+
+const nonEditableFormKeys = new Set([
+  "id",
+  "dppId",
+  "companyId",
+  "lineageId",
+  "createdBy",
+  "createdByEmail",
+  "createdAt",
+  "updatedBy",
+  "updatedAt",
+  "releaseStatus",
+  "versionNumber",
+  "archived",
+  "archivedAt",
+  "releasedAt",
+  "deletedAt",
+  "passportType",
+  "qrCode",
+  "uniqueProductIdentifier",
+  "digitalProductPassportId",
+  "subjectDid",
+  "dppDid",
+  "companyDid",
+  "modelName",
+  "internalAliasId",
+  "elements",
+  "fields",
+  "linkedData",
+  "companyProfile",
+  "firstName",
+  "lastName",
+]);
+
+const reservedSystemFieldKeys = new Set([
+  "carrierAuthenticity",
+  "carrierSecurityStatus",
+  "carrierAuthenticationMethod",
+  "carrierVerificationInstructions",
+  "signedCarrierPayload",
+  "issuerCertificateId",
+  "carrierCompatibilityProfiles",
+  "physicalCarrierSecurityFeatures",
+  "trustedViewerOrigin",
+  "trustedViewerHost",
+  "counterfeitRiskLevel",
+  "antiCounterfeitInstructions",
+  "safetyWarnings",
+  "qrPrintSpecification",
+  "signCarrierPayload",
+]);
+
+const nonPersistedPayloadKeys = new Set([
+  "digitalProductPassportId",
+  "uniqueProductIdentifier",
+  "internalAliasId",
+  "dppSchemaVersion",
+  "dppStatus",
+  "lastUpdate",
+  "economicOperatorId",
+  "contentSpecificationIds",
+  "subjectDid",
+  "dppDid",
+  "companyDid",
+  "schemaVersion",
+]);
+
+function PassportForm({ user, companyId, mode = "create", passportType: typeProp }) {
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const { dppId, passportType: typeParam } = useParams();
+
+  const passportType = typeProp || typeParam ||
+    new URLSearchParams(location.search).get("passportType");
+  const [resolvedPassportType, setResolvedPassportType] = useState(() => passportType || "");
+  const templateId = new URLSearchParams(location.search).get("templateId");
+  const effectiveCompanyId = String(
+    companyId ||
+    user?.companyId ||
+    localStorage.getItem("companyId") ||
+    ""
+  );
+
+  const activePassportType = mode === "edit"
+    ? (resolvedPassportType || passportType || "")
+    : (passportType || "");
+
+  // Module-derived passport type definitions are the only source of editable fields.
+  const [dynamicSections, setDynamicSections] = useState(null);
+  const [semanticGraph, setSemanticGraph] = useState(null);
+  const [loadingType,     setLoadingType]     = useState(false);
+  const [systemHeader,    setSystemHeader]    = useState(() => normalizeSystemPassportHeader());
+  const [complianceContext, setComplianceContext] = useState({ company: null, facilities: [] });
+
+  const sections    = dynamicSections || {};
+  const sectionKeys = Object.keys(sections);
+
+  const [expanded,       setExpanded]       = useState({});
+  const [modelName,      setModelName]      = useState("");
+  const [internalAliasId,      setInternalAliasId]      = useState(() => mode === "create" ? generateDraftLocalPassportId() : "");
+  const [formData,       setFormData]       = useState({});
+  const [modelDataKeys,  setModelDataKeys]  = useState(new Set()); // fields locked from template
+  const [templateName,   setTemplateName]   = useState("");
+  const [templateFieldFilter, setTemplateFieldFilter] = useState("full");
+  const [fileSelections, setFileSelections] = useState({});
+  const [uploadProgress, setUploadProgress] = useState({});
+  const [repoPicker,     setRepoPicker]     = useState(null);  // field.key being picked, or null
+  const [symbolPicker,   setSymbolPicker]   = useState(null);  // field.key being picked, or null
+  const [symbols,        setSymbols]        = useState([]);
+  const [isLoading,      setIsLoading]      = useState(mode === "edit");
+  const [isSaving,       setIsSaving]       = useState(false);
+  const [error,          setError]          = useState("");
+  const [success,        setSuccess]        = useState("");
+  const [displayName,    setDisplayName]    = useState("");
+  const [activeEditors,  setActiveEditors]  = useState([]);
+  const [autoSaveState,  setAutoSaveState]  = useState("idle");
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [lastSavedAt,    setLastSavedAt]    = useState(null);
+
+  const lastInteractionRef = useRef(Date.now());
+  const dirtyRef           = useRef(false);
+  const dirtyFieldsRef     = useRef(new Set());
+  const baselinePayloadRef = useRef({});
+  const formDataRef        = useRef({}); // Track current form data
+  const saveInFlightRef    = useRef(false);
+  const sessionActiveRef   = useRef(false);
+  const mountedRef         = useRef(true);
+  const draftHydratedRef   = useRef(false);
+  const cloneHydratedRef   = useRef(false);
+
+  const draftStorageKey = buildDraftStorageKey({
+    mode,
+    companyId: effectiveCompanyId,
+    passportType: activePassportType,
+    dppId,
+  });
+
+  const markDirty = () => {
+    dirtyRef.current = true;
+    setAutoSaveState("pending");
+  };
+
+  const markFieldDirty = (key) => {
+    const fieldKey = String(key || "").trim();
+    if (!fieldKey) return;
+    dirtyFieldsRef.current.add(fieldKey);
+    markDirty();
+  };
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const clearLocalDraft = () => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.removeItem(draftStorageKey);
+  };
+
+  const persistLocalDraft = () => {
+    if (typeof window === "undefined") return;
+    if (!dirtyRef.current) return;
+    const payload = {
+      modelName,
+      internalAliasId,
+      formData: formDataRef.current, // Use ref, not state (state updates are async)
+      savedAt: new Date().toISOString(),
+    };
+    window.sessionStorage.setItem(draftStorageKey, JSON.stringify(payload));
+  };
+
+  const restoreLocalDraft = (initialData = null) => {
+    if (typeof window === "undefined") return false;
+    const raw = window.sessionStorage.getItem(draftStorageKey);
+    if (!raw) return false;
+    try {
+      const draft = JSON.parse(raw);
+      setModelName(draft.modelName ?? initialData?.modelName ?? "");
+      setInternalAliasId(draft.internalAliasId ?? initialData?.internalAliasId ?? "");
+      const draftFormData = draft.formData && typeof draft.formData === "object" ? draft.formData : (initialData || {});
+      formDataRef.current = draftFormData; // ← Update ref
+      setFormData(draftFormData);
+      dirtyRef.current = true;
+      dirtyFieldsRef.current = new Set(
+        [
+          "modelName",
+          "internalAliasId",
+          ...Object.keys(draft.formData && typeof draft.formData === "object" ? draft.formData : {}),
+        ]
+          .map((key) => String(key || "").trim())
+          .filter(Boolean)
+      );
+      setAutoSaveState("pending");
+      setSuccess("Unsaved changes from this browser were restored.");
+      return true;
+    } catch {
+      window.sessionStorage.removeItem(draftStorageKey);
+      return false;
+    }
+  };
+
+  const hydrateFromPassportRecord = (data, { allowDraftRestore = false } = {}) => {
+    const keyMap = buildSchemaFieldKeyMap(sections);
+    const flattenedData = {
+      ...(data || {}),
+      ...(data?.fields && typeof data.fields === "object" ? data.fields : {}),
+      ...extractFieldValuesFromElements(data?.elements, keyMap),
+    };
+    const alignedData = alignRecordToSchemaKeys(flattenedData, sections);
+    const restored = allowDraftRestore ? restoreLocalDraft(alignedData) : false;
+    if (!restored) {
+      setModelName(alignedData?.modelName || "");
+      setInternalAliasId(alignedData?.internalAliasId || "");
+      formDataRef.current = alignedData || {}; // ← Update ref
+      setFormData(alignedData || {});
+      dirtyRef.current = false;
+      dirtyFieldsRef.current = new Set();
+      setAutoSaveState("idle");
+    }
+    baselinePayloadRef.current = {
+      modelName: normalizePersistedComparisonValue(alignedData?.modelName || ""),
+      internalAliasId: normalizePersistedComparisonValue(alignedData?.internalAliasId || ""),
+      ...Object.fromEntries(
+        Object.entries(canonicalizeRecordToSchemaKeys(alignedData || {}, sections)).map(([key, value]) => [
+          key,
+          normalizePersistedComparisonValue(value),
+        ])
+      ),
+    };
+    setLastSavedAt(alignedData?.updatedAt || null);
+    draftHydratedRef.current = true;
+  };
+
+  const fetchPassportRecord = async ({ allowDraftRestore = false } = {}) => {
+    const baseUrl = `${api}/api/companies/${effectiveCompanyId}/passports/${dppId}?passportType=${activePassportType}`;
+    const [rawResponse, fullResponse] = await Promise.all([
+      fetchWithAuth(baseUrl, { headers: authHeaders() }),
+      fetchWithAuth(`${baseUrl}&representation=full`, { headers: authHeaders() }),
+    ]);
+    if (!rawResponse.ok && !fullResponse.ok) throw new Error("Failed to load passport");
+    const rawData = rawResponse.ok ? await rawResponse.json() : {};
+    const fullData = fullResponse.ok ? await fullResponse.json() : {};
+    const data = mergePassportRepresentations(rawData, fullData);
+    const nextPassportType = data?.passportType || "";
+    if (nextPassportType && nextPassportType !== resolvedPassportType) {
+      setResolvedPassportType(nextPassportType);
+    }
+    hydrateFromPassportRecord(data, { allowDraftRestore });
+    return data;
+  };
+
+  // Load symbols from company repository
+  useEffect(() => {
+    if (!effectiveCompanyId) return;
+    fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/repository/symbols?flat=true`, { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : [])
+      .then(setSymbols)
+      .catch((error) => console.warn("Ignored async error", error));
+  }, [effectiveCompanyId]);
+
+  useEffect(() => {
+    if (!effectiveCompanyId) return;
+    fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/compliance-identity`, { headers: authHeaders() })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return;
+        const activeFacilities = Array.isArray(data.facilities)
+          ? data.facilities.filter((facility) => facility?.isActive)
+          : [];
+        setComplianceContext({
+          company: data.company || null,
+          facilities: activeFacilities,
+        });
+        setFormData((prev) => {
+          const next = { ...prev };
+          if (!next.economicOperatorId && data.company?.economicOperatorIdentifier) {
+            next.economicOperatorId = data.company.economicOperatorIdentifier;
+          }
+          if (!next.economicOperatorIdentifierScheme && data.company?.economicOperatorIdentifierScheme) {
+            next.economicOperatorIdentifierScheme = data.company.economicOperatorIdentifierScheme;
+          }
+          if (!next.facilityId && activeFacilities.length === 1) {
+            next.facilityId = activeFacilities[0].facilityIdentifier;
+          }
+          // CRITICAL: Keep formDataRef in sync with state updates
+          formDataRef.current = { ...formDataRef.current, ...next };
+          return next;
+        });
+      })
+      .catch((error) => console.warn("Ignored async error", error));
+  }, [effectiveCompanyId]);
+
+  // Load passport type definition from the server; fall back to static config only if needed.
+  useEffect(() => {
+    if (!activePassportType) return;
+    setLoadingType(true);
+    fetchWithAuth(`${api}/api/internal/passport-types/${activePassportType}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.fieldsJson?.sections) {
+          // Convert server format to component format
+          const sections = {};
+          for (const section of normalizeSchemaSections(data.fieldsJson.sections)) {
+            sections[section.key] = {
+              ...section,
+              label: section.label,
+              fields: section.fields || [],
+            };
+          }
+          setDynamicSections(sections);
+          setSemanticGraph(data.fieldsJson.semanticGraph || null);
+          setSystemHeader(normalizeSystemPassportHeader(data.fieldsJson.systemHeader));
+          setDisplayName(data.displayName || activePassportType);
+          // Expand first section by default
+          if (data.fieldsJson.sections.length > 0) {
+            setExpanded({ [data.fieldsJson.sections[0].key]: true });
+          }
+        } else {
+          setDynamicSections(null);
+          setSemanticGraph(null);
+          setSystemHeader(normalizeSystemPassportHeader());
+          setDisplayName(activePassportType);
+        }
+      })
+      .catch(() => {
+        setDynamicSections(null);
+        setSemanticGraph(null);
+        setSystemHeader(normalizeSystemPassportHeader());
+        setDisplayName(activePassportType);
+      })
+      .finally(() => setLoadingType(false));
+  }, [activePassportType]);
+
+  // Set first section expanded by default when sections load
+  useEffect(() => {
+    if (sectionKeys.length > 0 && Object.keys(expanded).length === 0) {
+      setExpanded({ [sectionKeys[0]]: true });
+    }
+  }, [sectionKeys.join(",")]);
+
+  // Load template pre-fill on create mode
+  useEffect(() => {
+    if (mode !== "create" || !templateId || !effectiveCompanyId) return;
+    fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/templates/${templateId}`, { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(tmpl => {
+        if (!tmpl) return;
+        setTemplateName(tmpl.name || "");
+        const vals = {};
+        const modelKeys = new Set();
+        for (const f of tmpl.fields || []) {
+          if (f.fieldValue) vals[f.fieldKey] = f.fieldValue;
+          if (f.isModelData) modelKeys.add(f.fieldKey);
+        }
+        formDataRef.current = vals; // Keep in sync
+        setFormData(vals);
+        setModelDataKeys(modelKeys);
+      })
+      .catch((error) => console.warn("Ignored async error", error));
+  }, [mode, templateId, effectiveCompanyId]);
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (cloneHydratedRef.current) return;
+    if (loadingType) return;
+    if (!activePassportType) return;
+    if (!sectionKeys.length) return;
+
+    const hydrateClone = async () => {
+      let source = location.state?.cloneData || null;
+      const cloneSource = location.state?.cloneSource || null;
+
+      if (cloneSource?.dppId && effectiveCompanyId) {
+        try {
+          const baseUrl = `${api}/api/companies/${effectiveCompanyId}/passports/${cloneSource.dppId}?passportType=${cloneSource.passportType || activePassportType}`;
+          const [rawResponse, fullResponse] = await Promise.all([
+            fetchWithAuth(baseUrl, { headers: authHeaders() }),
+            fetchWithAuth(`${baseUrl}&representation=full`, { headers: authHeaders() }),
+          ]);
+          const rawData = rawResponse.ok ? await rawResponse.json() : {};
+          const fullData = fullResponse.ok ? await fullResponse.json() : {};
+          if (rawResponse.ok || fullResponse.ok) {
+            source = mergePassportRepresentations(rawData, fullData);
+          }
+        } catch {
+          // Keep the navigation-state data if refetching the clone source fails.
+        }
+      }
+
+      if (!source) return;
+
+      const { modelName: nextModelName, internalAliasId: nextProductId, formData: nextFormData } =
+        buildClonePrefill(source, sections);
+
+      setModelName(nextModelName);
+      setInternalAliasId(nextProductId);
+      formDataRef.current = nextFormData; // Keep in sync
+      setFormData(nextFormData);
+      setModelDataKeys(new Set());
+      setTemplateName("");
+      draftHydratedRef.current = true;
+      cloneHydratedRef.current = true;
+      dirtyRef.current = false;
+      setAutoSaveState("idle");
+      setSuccess("Passport cloned. Update the copied values and save as a new passport.");
+    };
+
+    hydrateClone().catch((error) => console.warn("Ignored async error", error));
+  }, [mode, location.state, loadingType, activePassportType, sections, sectionKeys.length, effectiveCompanyId]);
+
+  useEffect(() => {
+    if (mode !== "edit" || !dppId || !activePassportType) return;
+    if (loadingType) return;
+    if (!dynamicSections) return;
+    (async () => {
+      try {
+        await fetchPassportRecord({ allowDraftRestore: true });
+      } catch (e) { setError(e.message); }
+      finally { setIsLoading(false); }
+    })();
+  }, [dppId, mode, activePassportType, effectiveCompanyId, loadingType, dynamicSections]);
+
+  useEffect(() => {
+    if (mode !== "edit") return;
+    if (isLoading || loadingType) return;
+    if (!draftHydratedRef.current) return;
+    persistLocalDraft();
+  }, [mode, isLoading, loadingType, modelName, internalAliasId, draftStorageKey]);
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (internalAliasId.trim()) return;
+    setInternalAliasId(generateDraftLocalPassportId());
+  }, [mode, internalAliasId]);
+
+  useEffect(() => {
+    if (mode !== "edit") return undefined;
+    const handleBeforeUnload = (event) => {
+      if (!dirtyRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [mode]);
+
+  const toggle      = (k)        => setExpanded(p => ({ ...p, [k]: !p[k] }));
+  const handleField = (key, val) => {
+    markFieldDirty(key);
+    formDataRef.current[key] = val; // ← Update ref immediately
+    setFormData((p) => ({ ...p, [key]: val }));
+  };
+
+  const handleModelNameChange = (value) => {
+    markFieldDirty("modelName");
+    setModelName(value);
+  };
+
+  const handleFile = (key, file) => {
+    if (!file) return;
+    if (file.type !== "application/pdf") { setError("Only PDF files allowed."); return; }
+    if (file.size > 20 * 1024 * 1024)   { setError("Max file size is 20 MB."); return; }
+    setError("");
+    markDirty();
+    setFileSelections(p => ({ ...p, [key]: file }));
+  };
+
+  const isTemplateCreateMode = mode === "create" && !!templateId;
+
+  const hasMeaningfulValue = (value) => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === "string") return value.trim() !== "";
+    if (Array.isArray(value)) return value.some((item) => hasMeaningfulValue(item));
+    if (typeof value === "object") {
+      return Object.values(value).some((item) => hasMeaningfulValue(item));
+    }
+    return true;
+  };
+
+  const isFieldUnfilled = (field) => !hasMeaningfulValue(formData[field.key]);
+
+  const getRequiredMissingFields = () => {
+    const currentFormData = formDataRef.current || {};
+    const fields = flattenSchemaFieldsFromSections(Object.values(sections || {}));
+    return fields.filter((field) => {
+      if (!field?.required) return false;
+      if (field.type === "file" && fileSelections[field.key]) return false;
+      return !hasMeaningfulValue(currentFormData[field.key]);
+    });
+  };
+
+  const getSemanticGraphValidationError = () => {
+    if (!semanticGraph) return "";
+    const rootClass = getSemanticGraphClass(semanticGraph, semanticGraph.rootClassKey);
+    for (const property of rootClass?.properties || []) {
+      const hasValue = Object.prototype.hasOwnProperty.call(formDataRef.current || {}, property.key);
+      if (!hasValue && property.minCount === 0) continue;
+      try {
+        coerceSemanticGraphPropertyValue(
+          property,
+          hasValue ? formDataRef.current[property.key] : undefined,
+          semanticGraph,
+          property.label || property.key
+        );
+      } catch (error) {
+        return error.message;
+      }
+    }
+    return "";
+  };
+
+  const shouldShowFieldForTemplateFilter = (field) => {
+    if (!isTemplateCreateMode) return true;
+    if (templateFieldFilter === "full") return true;
+    const isModelField = modelDataKeys.has(field.key);
+    if (templateFieldFilter === "model") return isModelField;
+    if (templateFieldFilter === "item") return !isModelField;
+    return true;
+  };
+
+  const uploadFile = async (key, file, guidToUse) => {
+    const fd = new FormData();
+    fd.append("file", file); fd.append("fieldKey", key); fd.append("passportType", activePassportType);
+    setUploadProgress(p => ({ ...p, [key]: "uploading" }));
+    const r = await fetchWithAuth(
+      `${api}/api/companies/${effectiveCompanyId}/passports/${guidToUse}/upload`,
+      { method:"POST", headers: authHeaders(), body:fd }
+    );
+    if (!r.ok) throw new Error("Upload failed");
+    const { url } = await r.json();
+    setUploadProgress(p => ({ ...p, [key]: "done" }));
+    return url;
+  };
+
+  const buildPersistedBody = ({ onlyDirty = false } = {}) => {
+    const canonicalFormData = canonicalizeRecordToSchemaKeys(formDataRef.current, sections); // ← Use ref instead of state
+    const schemaFieldKeys = new Set(
+      flattenSchemaFieldsFromSections(Object.values(sections || {}))
+        .map((field) => field?.key)
+        .filter((key) => key && !reservedSystemFieldKeys.has(key))
+    );
+    const managedEditableKeys = new Set([
+      "economicOperatorId",
+      "economicOperatorIdentifierScheme",
+      "facilityId",
+      "granularity",
+      "productImage",
+    ]);
+    const hasSchemaKeys = schemaFieldKeys.size > 0;
+    const allowedKeys = new Set([...schemaFieldKeys, ...managedEditableKeys]);
+    const cleanData = Object.fromEntries(
+      Object.entries(canonicalFormData)
+        .filter(([key]) => {
+          if (nonEditableFormKeys.has(key)) return false;
+          if (nonPersistedPayloadKeys.has(key)) return false;
+          if (reservedSystemFieldKeys.has(key)) return false;
+          if (hasSchemaKeys) {
+            if (!allowedKeys.has(key)) return false;
+          }
+          return true;
+        })
+        .map(([key, value]) => {
+          const normalizedValue = typeof value === "string"
+            ? value.trim()
+            : value;
+          return [
+            key,
+            (Array.isArray(normalizedValue) || (typeof normalizedValue === "object" && normalizedValue !== null))
+              ? JSON.stringify(normalizedValue)
+              : normalizedValue,
+          ];
+        })
+    );
+    const fullBody = {
+      passportType: activePassportType,
+      ...cleanData,
+      modelName: modelName.trim() || null,
+      internalAliasId: internalAliasId.trim() || null,
+    };
+    if (!onlyDirty) return fullBody;
+
+    const dirtyKeys = dirtyFieldsRef.current;
+    const deltaBody = { passportType: activePassportType };
+
+    for (const [key, value] of Object.entries(fullBody)) {
+      if (key === "passportType") continue;
+      if (!dirtyKeys.has(key)) continue;
+      const nextComparable = normalizePersistedComparisonValue(value);
+      const previousComparable = Object.prototype.hasOwnProperty.call(baselinePayloadRef.current, key)
+        ? baselinePayloadRef.current[key]
+        : null;
+      if (nextComparable === previousComparable) continue;
+      deltaBody[key] = value;
+    }
+    return deltaBody;
+  };
+
+  const renderProductImagePicker = () => {
+    const linkedUrl = typeof formData.productImage === "string" && formData.productImage.startsWith("http")
+      ? formData.productImage
+      : null;
+    const disabled = isSaving || (mode === "edit" && isLoading);
+
+    return (
+      <div className="passport-field-group passport-product-image-group">
+        <label>Product Image</label>
+        <div className="file-upload-widget">
+          {linkedUrl ? (
+            <div className="file-existing image-existing">
+              <img src={linkedUrl} alt="Product" className="pf-product-image-thumb" />
+              <span className="file-existing-link">Repository image linked</span>
+              <button
+                type="button"
+                className="file-clear-btn"
+                disabled={disabled}
+                onClick={() => handleField("productImage", "")}
+              >
+                ✕ Remove
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="file-upload-label"
+              disabled={disabled}
+              onClick={() => setRepoPicker("productImage")}
+            >
+              <span className="file-placeholder">🖼 Link Product Image from Repository</span>
+            </button>
+          )}
+          {linkedUrl && (
+            <button
+              type="button"
+              className="file-upload-label file-replace-label"
+              disabled={disabled}
+              onClick={() => setRepoPicker("productImage")}
+            >
+              <span className="file-placeholder">↺ Change</span>
+            </button>
+          )}
+          <div className="file-link-paste">
+            <input
+              type="text"
+              className="file-link-input"
+              placeholder="Or paste a repository image link here…"
+              disabled={disabled}
+              data-field-key="productImage"
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text").trim();
+                if (text.startsWith("http")) {
+                  e.preventDefault();
+                  handleField("productImage", text);
+                }
+              }}
+              onBlur={(e) => {
+                const text = e.target.value.trim();
+                if (text.startsWith("http")) {
+                  handleField("productImage", text);
+                  e.target.value = "";
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const text = e.target.value.trim();
+                  if (text.startsWith("http")) {
+                    handleField("productImage", text);
+                    e.target.value = "";
+                  }
+                }
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const refreshEditPresence = async (method = "GET") => {
+    if (mode !== "edit" || !dppId || !activePassportType || !effectiveCompanyId) return;
+    const init = method === "POST"
+      ? {
+          method,
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ passportType: activePassportType }),
+        }
+      : {
+          method,
+          headers: authHeaders(),
+        };
+    const r = await fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/passports/${dppId}/edit-session`, init);
+    if (!r.ok) throw new Error("Failed to update edit presence");
+    const data = await r.json();
+    if (mountedRef.current) {
+      setActiveEditors(Array.isArray(data.editors) ? data.editors : []);
+    }
+    sessionActiveRef.current = method === "DELETE" ? false : true;
+    return data;
+  };
+
+  const releaseEditPresence = async () => {
+    if (mode !== "edit" || !dppId || !effectiveCompanyId || !sessionActiveRef.current) return;
+    try {
+      await fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/passports/${dppId}/edit-session`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+    } catch (error) {
+      console.warn("Failed to release edit presence", error);
+    }
+    sessionActiveRef.current = false;
+  };
+
+  const saveEditChanges = async ({ showSuccessMessage = false } = {}) => {
+    if (mode !== "edit" || !dppId || !activePassportType || saveInFlightRef.current) return false;
+    const missingRequiredFields = getRequiredMissingFields();
+    if (missingRequiredFields.length) {
+      setError(`Required fields need values: ${missingRequiredFields.map((field) => field.label || field.key).join(", ")}`);
+      return false;
+    }
+    const semanticValidationError = getSemanticGraphValidationError();
+    if (semanticValidationError) {
+      setError(semanticValidationError);
+      return false;
+    }
+    if (!dirtyRef.current) return true;
+
+    saveInFlightRef.current = true;
+      if (mountedRef.current) setAutoSaveState("saving");
+
+    try {
+      const body = buildPersistedBody({ onlyDirty: true });
+      if (Object.keys(body).length === 1) {
+        dirtyRef.current = false;
+        dirtyFieldsRef.current = new Set();
+        if (mountedRef.current) setAutoSaveState("saved");
+        return true;
+      }
+      const r = await fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/passports/${dppId}`, {
+        method:"PATCH",
+        headers: authHeaders({ "Content-Type":"application/json" }),
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        const fieldSuffix = Array.isArray(d.fields) && d.fields.length
+          ? ` (${d.fields.join(", ")})`
+          : "";
+        throw new Error(d.detail || (d.error ? `${d.error}${fieldSuffix}` : "Failed to update"));
+      }
+
+      const uploadedKeys = [];
+      for (const [key, file] of Object.entries(fileSelections)) {
+        if (file) {
+          await uploadFile(key, file, dppId);
+          uploadedKeys.push(key);
+        }
+      }
+      if (uploadedKeys.length) {
+        setFileSelections(prev => {
+          const next = { ...prev };
+          uploadedKeys.forEach((key) => delete next[key]);
+          return next;
+        });
+      }
+
+      dirtyRef.current = false;
+      dirtyFieldsRef.current = new Set();
+      clearLocalDraft();
+      const responsePayload = await r.json().catch(() => ({}));
+      const refreshed = uploadedKeys.length
+        ? await fetchPassportRecord({ allowDraftRestore: false })
+        : responsePayload?.passport
+        ? hydrateFromPassportRecord(responsePayload.passport, { allowDraftRestore: false }) || responsePayload.passport
+        : await fetchPassportRecord({ allowDraftRestore: false });
+      const nowIso = refreshed?.updatedAt || new Date().toISOString();
+      if (mountedRef.current) {
+        setLastSavedAt(nowIso);
+        setAutoSaveState("saved");
+        if (showSuccessMessage) {
+          setSuccess("Changes saved successfully");
+        }
+      }
+      return true;
+    } catch (e) {
+      if (mountedRef.current) {
+        setError(e.message);
+        setAutoSaveState("error");
+      }
+      return false;
+    } finally {
+      saveInFlightRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (mode !== "edit" || !dppId || !activePassportType || !effectiveCompanyId || isLoading) return;
+
+    refreshEditPresence("POST").catch((error) => console.warn("Ignored async error", error));
+
+    const handleActivity = () => {
+      lastInteractionRef.current = Date.now();
+      if (sessionExpired) {
+        setSessionExpired(false);
+        refreshEditPresence("POST").catch((error) => console.warn("Ignored async error", error));
+      }
+    };
+
+    const heartbeat = setInterval(async () => {
+      const inactiveFor = Date.now() - lastInteractionRef.current;
+      if (inactiveFor >= editSessionTimeoutMs) {
+        await releaseEditPresence();
+        if (mountedRef.current) {
+          setSessionExpired(true);
+          setActiveEditors([]);
+          setSuccess(
+            dirtyRef.current
+              ? "✓ Edit session ended after 12 hours of inactivity. Unsaved changes are still on this page until you save them."
+              : "✓ Edit session ended after 12 hours of inactivity."
+          );
+        }
+        return;
+      }
+      refreshEditPresence("POST").catch((error) => console.warn("Ignored async error", error));
+    }, editHeartbeatMs);
+
+    window.addEventListener("pointerdown", handleActivity);
+    window.addEventListener("keydown", handleActivity);
+    window.addEventListener("scroll", handleActivity, { passive: true });
+
+    return () => {
+      clearInterval(heartbeat);
+      window.removeEventListener("pointerdown", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("scroll", handleActivity);
+      releaseEditPresence();
+    };
+  }, [mode, dppId, activePassportType, effectiveCompanyId, isLoading, sessionExpired]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(""); setSuccess(""); setIsSaving(true);
+
+    try {
+      if (!effectiveCompanyId) {
+        throw new Error("No company is attached to this session. Refresh the page and sign in again if needed.");
+      }
+      let passportDppId = dppId;
+
+      if (mode === "create") {
+        if (loadingType) {
+          throw new Error("Passport type is still loading. Please wait a moment and save again.");
+        }
+        const missingRequiredFields = getRequiredMissingFields();
+        if (missingRequiredFields.length) {
+          throw new Error(`Required fields need values: ${missingRequiredFields.map((field) => field.label || field.key).join(", ")}`);
+        }
+        const semanticValidationError = getSemanticGraphValidationError();
+        if (semanticValidationError) throw new Error(semanticValidationError);
+        const body = buildPersistedBody();
+        const r = await fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/passports`, {
+          method:"POST", headers:authHeaders({"Content-Type":"application/json"}),
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          const invalidFields = Array.isArray(d?.fields) && d.fields.length
+            ? ` (${d.fields.join(", ")})`
+            : "";
+          throw new Error(d.detail || `${d.error || "Failed to create"}${invalidFields}`);
+        }
+        const { passport } = await r.json();
+        passportDppId = passport.dppId;
+      } else {
+        const saved = await saveEditChanges({ showSuccessMessage: false });
+        if (!saved) throw new Error("Failed to update");
+      }
+
+      if (mode === "create") {
+        for (const [key, file] of Object.entries(fileSelections)) {
+          if (file) await uploadFile(key, file, passportDppId);
+        }
+        setFileSelections({});
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setSuccess("Passport created successfully");
+        setTimeout(() => setSuccess(""), 4000);
+        setModelName("");
+        setInternalAliasId(generateDraftLocalPassportId());
+        formDataRef.current = {}; // Keep in sync
+        setFormData({});
+        dirtyRef.current = false;
+        dirtyFieldsRef.current = new Set();
+        baselinePayloadRef.current = {};
+        clearLocalDraft();
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setSuccess("Changes saved successfully");
+        setTimeout(() => setSuccess(""), 4000);
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally { setIsSaving(false); }
+  };
+
+  const renderField = (field) => {
+    const val      = formData[field.key] ?? "";
+    const isLocked = mode === "create" && modelDataKeys.has(field.key);
+    const disabled = isSaving || (mode==="edit" && isLoading) || isLocked;
+    const fieldLabel = formatFieldLabelWithUnit(field.label, field);
+    const highlightMissing = isTemplateCreateMode && !isLocked && isFieldUnfilled(field);
+    const fieldClassName = highlightMissing ? "pf-needs-input" : "";
+    const semanticProperty = field.rangeKind
+      ? (getRootSemanticProperty(semanticGraph, field.key) || field)
+      : null;
+
+    if (semanticProperty && semanticGraph && !["file", "symbol"].includes(field.type)) {
+      return (
+        <SemanticGraphFieldEditor
+          graph={semanticGraph}
+          property={semanticProperty}
+          value={val}
+          disabled={disabled}
+          onChange={(nextValue) => handleField(field.key, nextValue)}
+        />
+      );
+    }
+
+    if (field.type === "boolean") {
+      return (
+        <label className={fieldClassName} style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
+          <input type="checkbox" checked={!!val}
+            onChange={e => handleField(field.key, e.target.checked)} disabled={disabled} />
+          <span style={{ fontSize:14, color:"var(--text-primary)", fontFamily:"var(--font)" }}>{fieldLabel}</span>
+        </label>
+      );
+    }
+
+    if (field.type === "file") {
+      const linkedUrl  = typeof val === "string" && val.startsWith("http") ? val : null;
+      const fileName   = linkedUrl ? linkedUrl.split("/").pop() : null;
+      return (
+        <div className="file-upload-widget">
+          {linkedUrl ? (
+            <div className="file-existing">
+              <a href={linkedUrl} target="_blank" rel="noopener noreferrer" className="file-existing-link">
+                📄 {decodeURIComponent(fileName || "Document")}
+              </a>
+              <button type="button" className="file-clear-btn" disabled={disabled}
+                onClick={() => handleField(field.key, "")}>✕ Remove</button>
+            </div>
+          ) : (
+            <button type="button" className="file-upload-label" disabled={disabled}
+              onClick={() => setRepoPicker(field.key)}>
+              <span className="file-placeholder">📁 Link PDF from Repository</span>
+            </button>
+          )}
+          {linkedUrl && (
+            <button type="button" className="file-upload-label file-replace-label" disabled={disabled}
+              onClick={() => setRepoPicker(field.key)}>
+              <span className="file-placeholder">↺ Change</span>
+            </button>
+          )}
+          <div className="file-link-paste">
+            <input
+              type="text"
+              className={`file-link-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
+              placeholder="Or paste a repository link here…"
+              disabled={disabled}
+              value={linkedUrl && document.activeElement?.dataset?.fieldKey !== field.key ? "" : undefined}
+              data-field-key={field.key}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text").trim();
+                if (text.startsWith("http")) { e.preventDefault(); handleField(field.key, text); }
+              }}
+              onBlur={(e) => {
+                const text = e.target.value.trim();
+                if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const text = e.target.value.trim();
+                  if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+                }
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    if (field.type === "symbol") {
+      const linkedUrl = typeof val === "string" && val.startsWith("http") ? val : null;
+      const picked    = linkedUrl ? symbols.find(s => s.fileUrl === linkedUrl) : null;
+      return (
+        <div className="file-upload-widget">
+          {linkedUrl ? (
+            <div className="file-existing">
+              <img src={linkedUrl} alt={picked?.name || "symbol"} className="pf-symbol-thumb" />
+              <span className="file-existing-link">{picked?.name || "Symbol"}</span>
+              <button type="button" className="file-clear-btn" disabled={disabled}
+                onClick={() => handleField(field.key, "")}>✕ Remove</button>
+            </div>
+          ) : (
+            <button type="button" className="file-upload-label" disabled={disabled}
+              onClick={() => setSymbolPicker(field.key)}>
+              <span className="file-placeholder">🔣 Link Symbol from Repository</span>
+            </button>
+          )}
+          {linkedUrl && (
+            <button type="button" className="file-upload-label file-replace-label" disabled={disabled}
+              onClick={() => setSymbolPicker(field.key)}>
+              <span className="file-placeholder">↺ Change</span>
+            </button>
+          )}
+          <div className="file-link-paste">
+            <input
+              type="text"
+              className={`file-link-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
+              placeholder="Or paste a repository link here…"
+              disabled={disabled}
+              data-field-key={field.key}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text").trim();
+                if (text.startsWith("http")) { e.preventDefault(); handleField(field.key, text); }
+              }}
+              onBlur={(e) => {
+                const text = e.target.value.trim();
+                if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const text = e.target.value.trim();
+                  if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+                }
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    if (field.type === "table") {
+      const tableColumns = normalizeTableColumns(field);
+      const rows = parseTableRows(val, field);
+      const commitTable = (nextRows) => handleField(field.key, nextRows);
+
+      const updateCell = (ri, ci, v) => {
+        const column = tableColumns[ci];
+        if (!column) return;
+        const next = rows.map(r => ({ ...r }));
+        next[ri][column.key] = v;
+        commitTable(next);
+      };
+      const addRow = () => commitTable([...rows, createEmptyTableRow(tableColumns)]);
+      const removeRow = (ri) => {
+        const next = rows.filter((_, i) => i !== ri);
+        commitTable(next.length ? next : [createEmptyTableRow(tableColumns)]);
+      };
+
+      return (
+        <div className="pf-table-wrap">
+          <table className="pf-table">
+            <thead>
+              <tr>
+                {tableColumns.map((column) => (
+                  <th key={column.key}>{formatFieldLabelWithUnit(column.label || column.key, column)}</th>
+                ))}
+                <th className="pf-table-action-col" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, ri) => (
+                <tr key={ri}>
+                  {tableColumns.map((column, ci) => (
+                    <td key={column.key}>
+                      <input
+                        type="text"
+                        value={row[column.key] ?? ""}
+                        disabled={disabled}
+                        placeholder="—"
+                        onChange={e => updateCell(ri, ci, e.target.value)}
+                        className={`pf-table-cell-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
+                      />
+                    </td>
+                  ))}
+                  <td className="pf-table-action-col">
+                    <button type="button" className="pf-table-remove-row" onClick={() => removeRow(ri)} disabled={disabled} title="Remove row">✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button type="button" className="pf-table-add-row" onClick={addRow} disabled={disabled}>+ Add Row</button>
+        </div>
+      );
+    }
+
+    if (field.type === "textarea") {
+      return <textarea value={val} disabled={disabled}
+        className={fieldClassName}
+        placeholder={getFieldInputPrompt(field)}
+        onChange={e => handleField(field.key,e.target.value)} />;
+    }
+
+    if (field.type === "date") {
+      // Store as YYYY-MM-DD (native date format); convert DD/MM/YYYY on load
+      const toInput = (v) => {
+        if (!v) return "";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+        const [d, m, y] = v.split("/");
+        return d && m && y ? `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}` : "";
+      };
+      const fromInput = (v) => v; // keep YYYY-MM-DD internally
+      return (
+        <div className="pf-date-wrap">
+          <input
+            type="date"
+            value={toInput(val)}
+            disabled={disabled}
+            onChange={e => handleField(field.key, fromInput(e.target.value))}
+            className={`pf-date-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
+          />
+          <span className="pf-date-hint">DD/MM/YYYY</span>
+        </div>
+      );
+    }
+
+    return <input type="text" value={val} disabled={disabled}
+      className={fieldClassName}
+      placeholder={getFieldInputPrompt(field)}
+      onChange={e => handleField(field.key,e.target.value)} />;
+  };
+
+  const getHeaderDisplayValue = (entry) => {
+    const value = entry.sourceType === "managed"
+      ? resolveManagedSystemHeaderValue(entry.managedKey, {
+          passport: formData,
+          typeDef: {
+            semanticModelKey: getFormValue("semanticModelKey"),
+            fieldsJson: {
+              dppSchemaVersion: formData.dppSchemaVersion || formData.schemaVersion || "",
+              semanticModelKey: getFormValue("semanticModelKey"),
+              systemHeader,
+            },
+          },
+          lastUpdateAt: formData.updatedAt || null,
+        })
+      : formData[entry.fieldKey];
+    if (value === null || value === undefined || value === "") return "No value yet";
+    if (Array.isArray(value)) return value.join(", ");
+    return String(value);
+  };
+
+  const renderPassportHeaderSection = () => {
+    const section = systemHeader?.section || {};
+    const entries = resolveSystemHeaderEntries(Object.values(sections), systemHeader)
+      .filter((entry) => entry.sourceType === "managed" || entry.field?.key !== "internalAliasId");
+    if (!entries.length) return null;
+
+    return (
+      <div className="form-section passport-header-section">
+        <div className="section-header passport-header-static">
+          <span className="section-title">{section.label || "Passport Header"}</span>
+          <span className="pf-header-locked-pill">Standards header</span>
+        </div>
+        <div className="section-content">
+          <p className="section-hint">
+            These header values come from explicit passport-header mappings defined in the module.
+          </p>
+          <div className="pf-header-grid">
+            {entries.map((entry) => (
+              <div key={`${entry.sourceType}:${entry.managedKey || entry.fieldKey || entry.slotKey}`} className="pf-header-field-card">
+                <div className="pf-header-field-top">
+                  <div>
+                    <label>{entry.label}</label>
+                    <code>{entry.sourceType === "managed" ? entry.slotKey : entry.fieldKey}</code>
+                  </div>
+                  {entry.semanticId && <span className="pf-header-locked-pill">{entry.semanticId}</span>}
+                </div>
+                <input
+                  type="text"
+                  value={getHeaderDisplayValue(entry)}
+                  readOnly
+                  disabled
+                  className="pf-header-readonly-input"
+                />
+                {entry.required && <div className="pf-header-meta-row"><span>Required field</span></div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderManagedComplianceSection = () => {
+    const activeFacilities = Array.isArray(complianceContext.facilities) ? complianceContext.facilities : [];
+
+    return (
+      <div className="form-section pf-managed-section">
+        <div className="section-header passport-header-static">
+          <span className="section-title">Release Metadata</span>
+          <span className="pf-header-locked-pill">Passport managed</span>
+        </div>
+        <div className="section-content">
+          <p className="section-hint">
+            These release-critical values are stored on each passport record. Use them for passport-specific operator identities and facility selection.
+          </p>
+          <div className="form-grid">
+            <div className="form-group">
+              <label htmlFor="economic-operator-id">Economic Operator Identifier</label>
+              <input
+                id="economic-operator-id"
+                type="text"
+                className="passport-model-input"
+                value={formData.economicOperatorId || ""}
+                placeholder="Enter the operator identifier for this passport"
+                onChange={(e) => handleField("economicOperatorId", e.target.value)}
+                disabled={isSaving || (mode === "edit" && isLoading)}
+              />
+              <div className="pf-managed-hint">Can differ per passport if a subsidiary or delegated operator should be identified here.</div>
+            </div>
+            <div className="form-group">
+              <label htmlFor="economic-operator-scheme">Operator Identifier Scheme</label>
+              <input
+                id="economic-operator-scheme"
+                type="text"
+                className="passport-model-input"
+                value={formData.economicOperatorIdentifierScheme || ""}
+                placeholder="Enter the identifier scheme used for this passport"
+                onChange={(e) => handleField("economicOperatorIdentifierScheme", e.target.value)}
+                disabled={isSaving || (mode === "edit" && isLoading)}
+              />
+              <div className="pf-managed-hint">Examples: `VAT`, `EORI`, or the scheme required by your target regulation.</div>
+            </div>
+            <div className="form-group full-width">
+              <label htmlFor="facility-id">Facility</label>
+              <input
+                id="facility-id"
+                type="text"
+                className="passport-model-input"
+                value={formData.facilityId || ""}
+                onChange={(e) => handleField("facilityId", e.target.value)}
+                placeholder="Enter the facility identifier for this passport"
+                disabled={isSaving || (mode === "edit" && isLoading)}
+                list={activeFacilities.length ? "passport-facility-suggestions" : undefined}
+              />
+              {activeFacilities.length ? (
+                <datalist id="passport-facility-suggestions">
+                  {activeFacilities.map((facility) => {
+                    const identifier = facility?.facilityIdentifier || "";
+                    const displayName = facility?.displayName ? `${facility.displayName} (${identifier})` : identifier;
+                    return <option key={identifier} value={identifier} label={displayName} />;
+                  })}
+                </datalist>
+              ) : null}
+              <div className="pf-managed-hint">
+                {activeFacilities.length
+                  ? "Enter a passport-specific facility identifier, or pick from the company’s active facility suggestions if helpful."
+                  : "Enter the facility identifier for this passport. Passport-type compliance rules decide whether a facility is required before release."}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (isLoading || loadingType) return (
+    <div className="createpass-page">
+      <div className="loading" style={{ padding:60 }}>Loading passport…</div>
+    </div>
+  );
+
+  const typeLabel = displayName || (activePassportType
+    ? activePassportType.charAt(0).toUpperCase() + activePassportType.slice(1)
+    : "");
+  const passportListPath = buildDashboardPath({
+    companyName: user?.companyName,
+    companyId: effectiveCompanyId,
+    subpath: `passports/${activePassportType}`,
+  });
+
+  return (
+    <div className="createpass-page">
+      <header className="createpass-header">
+        <button className="back-btn" onClick={() => navigate(passportListPath)}>
+          ← Back
+        </button>
+        <h1>{mode==="create" ? "Create New" : "Edit"} {typeLabel} Passport</h1>
+      </header>
+
+      <main className="createpass-main">
+        <div className="createpass-container">
+          {mode === "edit" && (
+            <div className="edit-session-banner">
+              <div className="edit-session-copy">
+                <strong>Edit session notice:</strong> this edit session ends automatically after 12 hours of inactivity. Changes are logged only when you press <strong>Save Changes</strong>, and unsaved edits stay in this browser until then.
+              </div>
+              <div className="edit-session-meta">
+                {activeEditors.length > 0
+                  ? `${activeEditors.map((editor) => editor.name).join(", ")} ${activeEditors.length === 1 ? "is" : "are"} editing now`
+                  : "Only you are editing right now"}
+                {autoSaveState === "pending" && <span className="edit-session-status">Unsaved changes</span>}
+                {autoSaveState === "saving" && <span className="edit-session-status">Saving…</span>}
+                {autoSaveState === "saved" && lastSavedAt && <span className="edit-session-status">Saved</span>}
+                {sessionExpired && <span className="edit-session-status">Session expired after inactivity</span>}
+              </div>
+            </div>
+          )}
+
+          {/* Identity row */}
+          <div className="passport-identity-row">
+            <div className="passport-field-group">
+              <label htmlFor="modelName">Model Name</label>
+              <input id="modelName" type="text" value={modelName}
+                className="passport-model-input"
+                placeholder="Enter model name (optional)"
+                onChange={e => handleModelNameChange(e.target.value)} />
+            </div>
+            <div className="passport-field-group">
+              <label>Passport Type</label>
+              <div className="type-badge" style={{ padding:"11px 14px", display:"inline-block" }}>
+                {typeLabel.toUpperCase()}
+              </div>
+            </div>
+          </div>
+
+          {renderProductImagePicker()}
+
+          {templateName && (
+            <div className="pf-template-banner">
+              <span className="pf-template-banner-icon">📋</span>
+              <span>
+                Creating from template <strong>{templateName}</strong>.
+                Fields marked <strong>📌 Model data</strong> are pre-filled and locked.
+              </span>
+            </div>
+          )}
+          {isTemplateCreateMode && (
+            <div className="pf-template-filter-bar">
+              <span className="pf-template-filter-label">Show fields:</span>
+              <div className="pf-template-filter-buttons">
+                <button type="button" className={`pf-template-filter-btn${templateFieldFilter === "model" ? " active" : ""}`} onClick={() => setTemplateFieldFilter("model")}>
+                  Model data
+                </button>
+                <button type="button" className={`pf-template-filter-btn${templateFieldFilter === "item" ? " active" : ""}`} onClick={() => setTemplateFieldFilter("item")}>
+                  Item data
+                </button>
+                <button type="button" className={`pf-template-filter-btn${templateFieldFilter === "full" ? " active" : ""}`} onClick={() => setTemplateFieldFilter("full")}>
+                  Full data
+                </button>
+              </div>
+              <span className="pf-template-filter-hint">Highlighted fields still need item-specific values.</span>
+            </div>
+          )}
+          <div className="pf-governance-panel">
+            Field confidentiality is set on the passport type by admins.
+            Editors cannot change it per passport record.
+          </div>
+          {error && <div className="alert alert-error" role="alert">{error}</div>}
+          {success && <div className="alert alert-success" role="status" aria-live="polite">{success}</div>}
+
+          <form onSubmit={handleSubmit} className="createpass-form">
+            {renderManagedComplianceSection()}
+            {renderPassportHeaderSection()}
+
+            {sectionKeys.map(sk => {
+              const section = sections[sk];
+              const sectionContentId = `passport-section-${sk}`;
+              const visibleFields = flattenSchemaFieldsFromSections([section])
+                .filter((field) => field?.key && !reservedSystemFieldKeys.has(field.key))
+                .filter(shouldShowFieldForTemplateFilter);
+              return (
+                <div key={sk} className="form-section">
+                  <button
+                    type="button"
+                    className="section-header"
+                    onClick={() => toggle(sk)}
+                    aria-expanded={!!expanded[sk]}
+                    aria-controls={sectionContentId}
+                  >
+                    <span className="section-title">{section.label}</span>
+                    <span className={`toggle-icon${expanded[sk]?" expanded":""}`}>▼</span>
+                  </button>
+                  {expanded[sk] && (
+                    <div id={sectionContentId} className="section-content">
+                      {sk==="compliance" && (
+                        <p className="section-hint">
+                          Upload official PDF documents. Stored securely and shown in the passport viewer.
+                        </p>
+                      )}
+                      {visibleFields.length > 0 ? (
+                      <div className="form-grid">
+                        {visibleFields.map(f => {
+                          const isLocked = mode === "create" && modelDataKeys.has(f.key);
+                          const needsInput = isTemplateCreateMode && !isLocked && isFieldUnfilled(f);
+                          return (
+                            <div key={f.key}
+                              className={`form-group${f.type==="textarea"||f.type==="file"||f.rangeKind==="class"?" full-width":""}${isLocked?" form-group-locked":""}${needsInput ? " form-group-needs-input" : ""}`}>
+                              {f.type !== "boolean" && (
+                                <label htmlFor={f.type==="file" ? `f-${f.key}` : f.key}>
+                                  {formatFieldLabelWithUnit(f.label, f)}
+                                  {isLocked && <span className="pf-model-badge">📌 Model data</span>}
+                                  {needsInput && <span className="pf-required-badge">Needs input</span>}
+                                </label>
+                              )}
+                              {renderField(f)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      ) : (
+                        <div className="pf-filter-empty-state">
+                          No fields in this section match the current filter.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <div className="form-actions">
+              <button type="button" className="cancel-btn"
+                onClick={() => navigate(passportListPath)} disabled={isSaving}>
+                Cancel
+              </button>
+              <button type="submit" className="submit-btn" disabled={isSaving || loadingType}>
+                {isSaving ? "Saving…" : mode==="create" ? "Create Passport" : "Save Changes"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </main>
+
+      <footer className="createpass-footer">
+        <p>© 2024 Digital Product Passport System.</p>
+      </footer>
+
+      {/* ── Repository PDF Picker ── */}
+      {repoPicker && (
+        <RepositoryPicker
+          companyId={effectiveCompanyId}
+          onSelect={(url) => { handleField(repoPicker, url); setRepoPicker(null); }}
+          onClose={() => setRepoPicker(null)}
+        />
+      )}
+
+      {/* ── Symbol Picker ── */}
+      {symbolPicker && (
+        <SymbolRepositoryPicker
+          companyId={effectiveCompanyId}
+          onSelect={(url) => { handleField(symbolPicker, url); setSymbolPicker(null); }}
+          onClose={() => setSymbolPicker(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+export default PassportForm;

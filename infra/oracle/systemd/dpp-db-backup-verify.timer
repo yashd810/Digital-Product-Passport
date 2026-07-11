@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly DPP PostgreSQL backup verification timer
+
+[Timer]
+OnCalendar=Sun *-*-* 03:15:00 UTC
+Persistent=true
+Unit=dpp-db-backup-verify.service
+
+[Install]
+WantedBy=timers.target

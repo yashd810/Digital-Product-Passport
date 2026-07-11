@@ -1,0 +1,488 @@
+"use strict";
+
+const logger = require("../../services/logger");
+const { generateDppRecordId } = require("../../services/dpp-record-id");
+const { recordSignedDppRelease } = require("../../services/dpp-release-record-service");
+const {
+  extractCarrierAuthenticityMutation,
+  applyCarrierAuthenticityMutation,
+  buildCarrierAuthenticityResponseFields,
+  normalizeCarrierAuthenticityMetadata,
+  validateQrPrintSpecification,
+} = require("../../shared/passports/carrier-authenticity");
+const registerApiKeyRoutes = require("../../modules/passports/register-api-key-routes");
+const registerAuditAnalyticsRoutes = require("../../modules/passports/register-audit-analytics-routes");
+const registerBackupRoutes = require("../../modules/passports/register-backup-routes");
+const registerCarrierSecurityRoutes = require("../../modules/passports/register-carrier-security-routes");
+const registerCompanyPassportReadRoutes = require("../../modules/passports/register-company-passport-read-routes");
+const registerBulkLifecycleRoutes = require("../../modules/passports/register-bulk-lifecycle-routes");
+const registerCreateRoutes = require("../../modules/passports/register-create-routes");
+const registerDeleteRoutes = require("../../modules/passports/register-delete-routes");
+const registerHistoryReadRoutes = require("../../modules/passports/register-history-read-routes");
+const registerLifecycleRoutes = require("../../modules/passports/register-lifecycle-routes");
+const registerPreviewManagementRoutes = require("../../modules/passports/register-preview-management-routes");
+const registerPassportSupportRoutes = require("../../modules/passports/register-support-routes");
+const registerUpdateRoutes = require("../../modules/passports/register-update-routes");
+const { createApiKeyHelpers } = require("../../modules/passports/api-key-helpers");
+const { createBackupEventHelpers } = require("../../modules/passports/backup-event-helpers");
+const { createCarrierSecurityHelpers } = require("../../modules/passports/carrier-security-helpers");
+const { createComplianceHelpers } = require("../../modules/passports/compliance-helpers");
+const { insertPassportRegistry: insertPassportRegistryWithClient } = require("../../modules/passports/passport-registry-repository");
+
+module.exports = function registerPassportRoutes(app, {
+  pool,
+  fs,
+  crypto,
+  authenticateToken,
+  requireBearerToken,
+  isSuperAdmin,
+  checkCompanyAccess,
+  checkCompanyAdmin,
+  requireEditor,
+  publicReadRateLimit,
+  publicUnlockRateLimit,
+  integrationWriteRateLimit,
+  assetWriteRateLimit,
+  upload,
+  validatePdfUpload,
+  hashSecret,
+  createDeviceKeyMaterial,
+  // passport service helpers
+  inRevisionStatusesSql,
+  editableReleaseStatusesSql,
+  revisionBlockingStatusesSql,
+  editSessionTimeoutHours,
+  editSessionTimeoutSql,
+  inRevisionStatus,
+  systemPassportFields,
+  // pure helpers from passport-helpers.js
+  getTable,
+  getPassportFieldValue,
+  normalizePassportRow,
+  normalizeReleaseStatus,
+  isEditablePassportStatus,
+  normalizeInternalAliasIdValue,
+  generateInternalAliasIdValue,
+  normalizePassportRequestBody,
+  extractExplicitFacilityId,
+  getWritablePassportColumns,
+  getStoredPassportValues,
+  joinQuotedSqlIdentifiers,
+  toStoredPassportValue,
+  coerceBulkFieldValue,
+  buildCurrentPublicPassportPath,
+  buildInactivePublicPassportPath,
+  buildPreviewPassportPath,
+  isPublicHistoryStatus,
+  // db helpers from passport-service.js
+  logAudit,
+  getPassportTypeSchema,
+  findExistingPassportByInternalAliasId,
+  getPassportLineageContext,
+  getPassportVersionsByLineage,
+  fetchCompanyPassportRecord,
+  resolveCompanyPreviewPassport,
+  archivePassportSnapshot,
+  archivePassportSnapshots,
+  updatePassportRowById,
+  buildPassportVersionHistory,
+  clearExpiredEditSessions,
+  listActiveEditSessions,
+  markOlderVersionsObsolete,
+  verifyAuditLogChain,
+  buildAuditLogRootSummary,
+  listAuditLogAnchors,
+  anchorAuditLogRoot,
+  stripRestrictedFieldsForPublicView,
+  getCompanyNameMap,
+  queryTableStats,
+  submitPassportToWorkflow,
+  // signing service
+  signPassport,
+  signPortableDataConstruct,
+  buildSemanticPassportJsonExport,
+  storageService,
+  complianceService,
+  didService,
+  productIdentifierService,
+  backupProviderService,
+  buildExpandedPassportPayload,
+  buildCanonicalPassportPayload,
+  createPassportTable = null
+}) {
+  const insertPassportRegistry = (params = {}) => insertPassportRegistryWithClient({
+    ...params,
+    client: params.client || pool,
+  });
+
+  const archivedHistoryReasonSql = `('beforeArchiveDelete','beforeBulkArchiveDelete','beforeDelete','beforeBulkDelete')`;
+  const archivedHistoryFilterSql = `("snapshotReason" IN ${archivedHistoryReasonSql})`;
+  const {
+    buildApiKeyHashRecord,
+    checkSecurityGroupApiKeyAccess,
+    getSecurityGroupKeyFromRequest,
+    isRestrictedField,
+    resolveSecurityGroupApiKey,
+  } = createApiKeyHelpers({ crypto });
+  const {
+    getActorIdentifier,
+    replicateAccessControlEventToBackup,
+    replicateAuditAnchorToBackup,
+    replicatePassportToBackup,
+    withAuditActorAliases,
+  } = createBackupEventHelpers({
+    backupProviderService,
+    complianceService,
+    getCompanyNameMap,
+    normalizePassportRow,
+  });
+  const {
+    buildCarrierAuthenticityStorageValue,
+    buildDataCarrierVerificationRecord,
+    maybeSignCarrierPayload,
+    recordPassportSecurityEvent,
+  } = createCarrierSecurityHelpers({
+    pool,
+    logger,
+    normalizeReleaseStatus,
+    buildCurrentPublicPassportPath,
+    buildPreviewPassportPath,
+    signPortableDataConstruct,
+  });
+  const {
+    validGranularities,
+    buildComplianceManagedFields,
+    buildStoredProductIdentifiers,
+    evaluateCompliance,
+    getCompanyDppPolicy,
+    hasReleasedLineageVersion,
+    isFullRepresentationRequest,
+    loadCompanySerializationContext,
+    loadLatestLivePassport,
+    reconcileManagedReleaseFields,
+    resolveGranularityForCreate,
+  } = createComplianceHelpers({
+    pool,
+    complianceService,
+    productIdentifierService,
+    extractExplicitFacilityId,
+    getTable,
+    getPassportTypeSchema,
+    normalizePassportRow,
+    normalizeInternalAliasIdValue,
+    normalizeReleaseStatus,
+    updatePassportRowById,
+  });
+
+  // ─── API KEY MANAGEMENT ────────────────────────────────────────────────────
+
+  registerApiKeyRoutes(app, {
+    pool,
+    logger,
+    authenticateToken,
+    checkCompanyAdmin,
+    logAudit,
+    buildApiKeyHashRecord,
+    getTable,
+    isRestrictedField,
+    normalizePassportRow,
+    replicateAccessControlEventToBackup,
+  });
+
+  // ─── PASSPORT CRUD ─────────────────────────────────────────────────────────
+
+  registerCreateRoutes(app, {
+    pool,
+    logger,
+    authenticateToken,
+    checkCompanyAccess,
+    requireEditor,
+    generateDppRecordId,
+    normalizePassportRequestBody,
+    getPassportTypeSchema,
+    createPassportTable,
+    getTable,
+    normalizeInternalAliasIdValue,
+    generateInternalAliasIdValue,
+    getCompanyDppPolicy,
+    resolveGranularityForCreate,
+    buildStoredProductIdentifiers,
+    buildComplianceManagedFields,
+    findExistingPassportByInternalAliasId,
+    normalizeReleaseStatus,
+    systemPassportFields,
+    getWritablePassportColumns,
+    joinQuotedSqlIdentifiers,
+    toStoredPassportValue,
+    extractCarrierAuthenticityMutation,
+    applyCarrierAuthenticityMutation,
+    maybeSignCarrierPayload,
+    buildCarrierAuthenticityStorageValue,
+    getCompanyNameMap,
+    insertPassportRegistry,
+    logAudit,
+    archivePassportSnapshot,
+    getActorIdentifier,
+  });
+
+  registerCompanyPassportReadRoutes(app, {
+    pool,
+    logger,
+    authenticateToken,
+    checkCompanyAccess,
+    normalizePassportRequestBody,
+    getTable,
+    getPassportFieldValue,
+    normalizePassportRow,
+    normalizeReleaseStatus,
+    normalizeInternalAliasIdValue,
+    getPassportTypeSchema,
+    fetchCompanyPassportRecord,
+    buildSemanticPassportJsonExport,
+    buildExpandedPassportPayload,
+    complianceService,
+    productIdentifierService,
+    isFullRepresentationRequest,
+    loadCompanySerializationContext,
+    inRevisionStatus,
+    inRevisionStatusesSql,
+    editableReleaseStatusesSql,
+    archivedHistoryFilterSql,
+  });
+
+  registerPreviewManagementRoutes(app, {
+    pool,
+    crypto,
+    authenticateToken,
+    checkCompanyAccess,
+    requireEditor,
+    editSessionTimeoutHours,
+    getCompanyNameMap,
+    normalizePassportRow,
+    resolveCompanyPreviewPassport,
+    clearExpiredEditSessions,
+    listActiveEditSessions,
+    buildPreviewPassportPath,
+    buildCurrentPublicPassportPath,
+    buildInactivePublicPassportPath,
+    buildCanonicalPassportPayload,
+    didService,
+    productIdentifierService,
+    logAudit,
+  });
+
+  registerUpdateRoutes(app, {
+    pool,
+    logger,
+    authenticateToken,
+    checkCompanyAccess,
+    requireEditor,
+    normalizePassportRequestBody,
+    getPassportTypeSchema,
+    createPassportTable,
+    getTable,
+    getWritablePassportColumns,
+    getStoredPassportValues,
+    normalizeInternalAliasIdValue,
+    normalizeReleaseStatus,
+    isEditablePassportStatus,
+    updatePassportRowById,
+    archivePassportSnapshot,
+    archivePassportSnapshots,
+    getActorIdentifier,
+    logAudit,
+    editableReleaseStatusesSql,
+    inRevisionStatusesSql,
+    validGranularities,
+    hasReleasedLineageVersion,
+    buildStoredProductIdentifiers,
+    findExistingPassportByInternalAliasId,
+    extractCarrierAuthenticityMutation,
+    applyCarrierAuthenticityMutation,
+    maybeSignCarrierPayload,
+    buildCarrierAuthenticityStorageValue,
+    getCompanyNameMap,
+    buildComplianceManagedFields,
+    systemPassportFields,
+  });
+
+  registerLifecycleRoutes(app, {
+    pool,
+    logger,
+    authenticateToken,
+    checkCompanyAccess,
+    requireEditor,
+    generateDppRecordId,
+    normalizePassportRequestBody,
+    getTable,
+    normalizeInternalAliasIdValue,
+    normalizePassportRow,
+    normalizeReleaseStatus,
+    findExistingPassportByInternalAliasId,
+    buildStoredProductIdentifiers,
+    productIdentifierService,
+    getPassportLineageContext,
+    archivePassportSnapshot,
+    archivePassportSnapshots,
+    insertPassportRegistry,
+    logAudit,
+    replicatePassportToBackup,
+    loadLatestLivePassport,
+    reconcileManagedReleaseFields,
+    evaluateCompliance,
+    editableReleaseStatusesSql,
+    revisionBlockingStatusesSql,
+    archivedHistoryFilterSql,
+    markOlderVersionsObsolete,
+    complianceService,
+    signPassport,
+    recordSignedDppRelease,
+    getActorIdentifier,
+    inRevisionStatus,
+    submitPassportToWorkflow,
+    validGranularities,
+  });
+
+  // ─── BULK REVISE ───────────────────────────────────────────────────────────
+
+  registerBulkLifecycleRoutes(app, {
+    pool,
+    logger,
+    authenticateToken,
+    checkCompanyAccess,
+    requireEditor,
+    generateDppRecordId,
+    normalizePassportRequestBody,
+    getTable,
+    normalizeReleaseStatus,
+    toStoredPassportValue,
+    coerceBulkFieldValue,
+    archivePassportSnapshot,
+    archivePassportSnapshots,
+    insertPassportRegistry,
+    logAudit,
+    replicatePassportToBackup,
+    evaluateCompliance,
+    editableReleaseStatusesSql,
+    revisionBlockingStatusesSql,
+    archivedHistoryFilterSql,
+    markOlderVersionsObsolete,
+    signPassport,
+    recordSignedDppRelease,
+    getActorIdentifier,
+    inRevisionStatus,
+    submitPassportToWorkflow,
+    getPassportLineageContext,
+  });
+
+  registerDeleteRoutes(app, {
+    pool,
+    logger,
+    authenticateToken,
+    checkCompanyAccess,
+    requireEditor,
+    normalizePassportRequestBody,
+    getPassportTypeSchema,
+    getTable,
+    normalizeInternalAliasIdValue,
+    normalizeReleaseStatus,
+    isEditablePassportStatus,
+    findExistingPassportByInternalAliasId,
+    archivePassportSnapshot,
+    getActorIdentifier,
+    logAudit,
+    editableReleaseStatusesSql,
+  });
+
+  // ─── DIFF & HISTORY ────────────────────────────────────────────────────────
+
+  registerHistoryReadRoutes(app, {
+    pool,
+    logger,
+    authenticateToken,
+    checkCompanyAccess,
+    getPassportLineageContext,
+    getPassportVersionsByLineage,
+    buildPassportVersionHistory,
+    productIdentifierService,
+  });
+  registerPassportSupportRoutes(app, {
+    pool,
+    crypto,
+    logger,
+    authenticateToken,
+    checkCompanyAccess,
+    requireEditor,
+    upload,
+    validatePdfUpload,
+    storageService,
+    logAudit,
+    getTable,
+    getPassportLineageContext,
+    normalizePassportRow,
+    isPublicHistoryStatus,
+    editableReleaseStatusesSql,
+  });
+
+  registerAuditAnalyticsRoutes(app, {
+    pool,
+    logger,
+    authenticateToken,
+    checkCompanyAccess,
+    checkCompanyAdmin,
+    queryTableStats,
+    getTable,
+    verifyAuditLogChain,
+    buildAuditLogRootSummary,
+    listAuditLogAnchors,
+    anchorAuditLogRoot,
+    withAuditActorAliases,
+    replicateAuditAnchorToBackup,
+    archivedHistoryFilterSql,
+  });
+
+  registerBackupRoutes(app, {
+    backupProviderService,
+    authenticateToken,
+    isSuperAdmin,
+    checkCompanyAccess,
+    checkCompanyAdmin,
+    logAudit,
+    loadLatestLivePassport,
+    normalizePassportRow,
+    stripRestrictedFieldsForPublicView,
+    getCompanyNameMap,
+    replicatePassportToBackup,
+  });
+  registerCarrierSecurityRoutes(app, {
+    pool,
+    crypto,
+    authenticateToken,
+    requireBearerToken,
+    integrationWriteRateLimit,
+    checkCompanyAccess,
+    requireEditor,
+    publicReadRateLimit,
+    publicUnlockRateLimit,
+    hashSecret,
+    createDeviceKeyMaterial,
+    logAudit,
+    normalizePassportRequestBody,
+    getTable,
+    normalizePassportRow,
+    getCompanyNameMap,
+    extractCarrierAuthenticityMutation,
+    applyCarrierAuthenticityMutation,
+    buildCarrierAuthenticityResponseFields,
+    normalizeCarrierAuthenticityMetadata,
+    validateQrPrintSpecification,
+    maybeSignCarrierPayload,
+    buildCarrierAuthenticityStorageValue,
+    buildDataCarrierVerificationRecord,
+    checkSecurityGroupApiKeyAccess,
+    getSecurityGroupKeyFromRequest,
+    recordPassportSecurityEvent,
+    resolveSecurityGroupApiKey,
+  });
+
+};
