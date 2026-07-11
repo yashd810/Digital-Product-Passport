@@ -3,9 +3,7 @@ import fs from "fs";
 import { defineConfig, transformWithOxc } from "vite";
 import react from "@vitejs/plugin-react";
 
-const localFrontendSrc = path.resolve(__dirname, "./frontend-app/src");
-const siblingFrontendSrc = path.resolve(__dirname, "../frontend-app/src");
-const frontendSrc = fs.existsSync(localFrontendSrc) ? localFrontendSrc : siblingFrontendSrc;
+const frontendSrc = path.resolve(__dirname, "../frontend-app/src");
 const appNodeModules = path.resolve(__dirname, "node_modules");
 const resolveAppDependency = (pkg) => {
   const localPackage = path.resolve(appNodeModules, pkg);
