@@ -7,6 +7,8 @@ const {
 const {
   flattenSchemaFieldsFromSections,
 } = require("../../shared/passports/passport-helpers");
+const { getApiOrigin } = require("../../shared/security/configured-origin");
+const { normalizeSafeImageReference } = require("../../shared/passports/passport-uri");
 
 function createRouteError(message, statusCode = 400) {
   return Object.assign(new Error(message), { statusCode });
@@ -74,7 +76,7 @@ function registerCarrierSecurityRoutes(app, deps) {
     recordPassportSecurityEvent,
     resolveSecurityGroupApiKey,
   } = deps;
-  const publicApiOrigin = String(process.env.SERVER_URL || process.env.APP_URL || "http://localhost:3001").replace(/\/+$/, "");
+  const publicApiOrigin = getApiOrigin();
 
   function secureDynamicLinks(value, passportDppId, fieldKey = null) {
     return rewriteRepositoryLinksForSignedAccessDeep(value, {
@@ -230,13 +232,11 @@ function registerCarrierSecurityRoutes(app, deps) {
       const normalizedBody = normalizePassportRequestBody(req.body);
       const { qrCode, passportType, carrierAuthenticity } = normalizedBody;
       if (!qrCode) return res.status(400).json({ error: "qrCode required" });
-
-      if (
-        !String(qrCode).startsWith("https://")
-        && !String(qrCode).startsWith("http://")
-        && !String(qrCode).startsWith("data:image/")
-      ) {
-        return res.status(400).json({ error: "QR code must be an HTTP(S) URL or data:image payload" });
+      let safeQrCode;
+      try {
+        safeQrCode = normalizeSafeImageReference(qrCode, { allowInlineRaster: true });
+      } catch {
+        return res.status(400).json({ error: "QR code must be a bounded raster image data URL or a credential-free HTTP(S)/local resource URL" });
       }
 
       const passportContext = await loadPassportContext(req.params.dppId);
@@ -287,7 +287,7 @@ function registerCarrierSecurityRoutes(app, deps) {
              "carrierAuthenticity" = $2,
              "updatedAt" = NOW()
          WHERE id = $3`,
-        [qrCode, buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity), passportContext.passportRowId]
+        [safeQrCode, buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity), passportContext.passportRowId]
       );
       await logAudit(
         passportCompanyId,
@@ -305,7 +305,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       );
       res.json({
         success: true,
-        qrCode,
+        qrCode: safeQrCode,
         ...buildCarrierAuthenticityResponseFields(nextCarrierAuthenticity),
       });
     } catch (error) {

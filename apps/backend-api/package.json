@@ -4,8 +4,9 @@
   "description": "Digital Product Passport Multi-Tenant System",
   "main": "src/server.js",
   "engines": {
-    "node": ">=22 <25"
+    "node": "22.23.1"
   },
+  "packageManager": "npm@10.9.8",
   "scripts": {
     "start": "node src/server.js",
     "db:migrate": "node scripts/migrate-db.js",
@@ -40,12 +41,12 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1085.0",
+    "@aws-sdk/client-s3": "^3.1087.0",
     "argon2": "^0.44.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "helmet": "^8.2.0",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",
     "nodemailer": "^9.0.3",

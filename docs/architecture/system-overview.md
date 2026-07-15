@@ -24,9 +24,9 @@ The normal journey looks like this:
 
 | App | Purpose | Main entrypoint |
 | --- | --- | --- |
-| Dashboard | Logged-in product, admin, and company workflows | [apps/frontend-app/src/app/bootstrap/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/frontend-app/src/app/bootstrap/index.js:1) |
-| Backend API | Auth, passport CRUD, workflow, repository, public reads, DID, semantics | [apps/backend-api/src/server.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/server.js:1) |
-| Public viewer | Standalone viewer for public passport URLs | [apps/public-passport-viewer/src/bootstrap/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/src/bootstrap/index.js:1) |
+| Dashboard | Logged-in product, admin, and company workflows | `apps/frontend-app/src/app/bootstrap/index.js:1` |
+| Backend API | Auth, passport CRUD, workflow, repository, public reads, DID, semantics | `apps/backend-api/src/server.js:1` |
+| Public viewer | Standalone viewer for public passport URLs | `apps/public-passport-viewer/src/bootstrap/index.js:1` |
 | Marketing site | Static public website | `apps/marketing-site/*.html` |
 
 ## Main Dependencies
@@ -46,7 +46,7 @@ The platform is generic at the product-passport level. Product-specific behavior
 
 Current product module packages live in:
 
-- [apps/backend-api/src/services/passport-module-registry.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/services/passport-module-registry.js:1)
+- `apps/backend-api/src/services/passport-module-registry.js:1`
 - `apps/backend-api/passport-modules/<family>-<version>/`
 
 Each package keeps its `module.js` and semantic resources together. Add only

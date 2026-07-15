@@ -1,6 +1,7 @@
 "use strict";
 
 const { canonicalKeyFromSemanticId } = require("./canonical-field-keys");
+const { isSafePassportUri } = require("./passport-uri");
 
 const semanticGraphRangeKinds = Object.freeze(["scalar", "class", "enum"]);
 const semanticGraphRelationshipTypes = Object.freeze(["composition", "reference"]);
@@ -48,9 +49,7 @@ function isCanonicalKey(value) {
 }
 
 function isAbsoluteIri(value) {
-  const iri = clean(value);
-  return /^[A-Za-z][A-Za-z0-9+.-]*:[^\s]+$/.test(iri)
-    && !/^(?:javascript|data|vbscript):/i.test(iri);
+  return isSafePassportUri(clean(value));
 }
 
 function normalizeCount(value, fallback = null) {

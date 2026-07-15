@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import { toSafeImageSrc, toSafeResourceHref } from "../../../shared/security/urlSafety";
 import {
   createEmptyTableRow,
   normalizeTableColumns,
@@ -59,7 +60,7 @@ function TemplateField({
       );
     }
     if (field.type === "file") {
-      const linkedUrl = typeof value === "string" && value.startsWith("http") ? value : null;
+      const linkedUrl = toSafeResourceHref(value);
       const fileName = linkedUrl ? linkedUrl.split("/").pop() : null;
       return (
         <div className="file-upload-widget">
@@ -88,16 +89,19 @@ function TemplateField({
               disabled={disabled}
               onPaste={(e) => {
                 const text = e.clipboardData.getData("text").trim();
-                if (text.startsWith("http")) { e.preventDefault(); onValueChange(text); }
+                const safeUrl = toSafeResourceHref(text);
+                if (safeUrl) { e.preventDefault(); onValueChange(safeUrl); }
               }}
               onBlur={(e) => {
                 const text = e.target.value.trim();
-                if (text.startsWith("http")) { onValueChange(text); e.target.value = ""; }
+                const safeUrl = toSafeResourceHref(text);
+                if (safeUrl) { onValueChange(safeUrl); e.target.value = ""; }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   const text = e.target.value.trim();
-                  if (text.startsWith("http")) { onValueChange(text); e.target.value = ""; }
+                  const safeUrl = toSafeResourceHref(text);
+                  if (safeUrl) { onValueChange(safeUrl); e.target.value = ""; }
                 }
               }}
             />
@@ -106,13 +110,13 @@ function TemplateField({
       );
     }
     if (field.type === "symbol") {
-      const linkedUrl = typeof value === "string" && value.startsWith("http") ? value : null;
+      const linkedUrl = toSafeResourceHref(value);
       const picked = linkedUrl ? symbols.find((symbol) => symbol.fileUrl === linkedUrl) : null;
       return (
         <div className="file-upload-widget">
           {linkedUrl ? (
             <div className="file-existing">
-              <img src={linkedUrl} alt={picked?.name || "symbol"} className="pf-symbol-thumb" />
+              {toSafeImageSrc(linkedUrl) && <img src={toSafeImageSrc(linkedUrl)} alt={picked?.name || "symbol"} className="pf-symbol-thumb" />}
               <span className="file-existing-link">{picked?.name || "Symbol"}</span>
               <button type="button" className="file-clear-btn" disabled={disabled} onClick={() => onValueChange("")}>✕ Remove</button>
             </div>
@@ -134,16 +138,19 @@ function TemplateField({
               disabled={disabled}
               onPaste={(e) => {
                 const text = e.clipboardData.getData("text").trim();
-                if (text.startsWith("http")) { e.preventDefault(); onValueChange(text); }
+                const safeUrl = toSafeResourceHref(text);
+                if (safeUrl) { e.preventDefault(); onValueChange(safeUrl); }
               }}
               onBlur={(e) => {
                 const text = e.target.value.trim();
-                if (text.startsWith("http")) { onValueChange(text); e.target.value = ""; }
+                const safeUrl = toSafeResourceHref(text);
+                if (safeUrl) { onValueChange(safeUrl); e.target.value = ""; }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   const text = e.target.value.trim();
-                  if (text.startsWith("http")) { onValueChange(text); e.target.value = ""; }
+                  const safeUrl = toSafeResourceHref(text);
+                  if (safeUrl) { onValueChange(safeUrl); e.target.value = ""; }
                 }
               }}
             />
@@ -441,7 +448,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
       {repoPicker && (
         <RepositoryPicker
           companyId={companyId}
-          onSelect={(url) => { setFieldValue(repoPicker, url); setRepoPicker(null); }}
+          onSelect={(url) => { const safeUrl = toSafeResourceHref(url); if (safeUrl) setFieldValue(repoPicker, safeUrl); setRepoPicker(null); }}
           onClose={() => setRepoPicker(null)}
         />
       )}
@@ -449,7 +456,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
       {symbolPicker && (
         <SymbolRepositoryPicker
           companyId={companyId}
-          onSelect={(url) => { setFieldValue(symbolPicker, url); setSymbolPicker(null); }}
+          onSelect={(url) => { const safeUrl = toSafeResourceHref(url); if (safeUrl) setFieldValue(symbolPicker, safeUrl); setSymbolPicker(null); }}
           onClose={() => setSymbolPicker(null)}
         />
       )}

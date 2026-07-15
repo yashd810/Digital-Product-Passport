@@ -1,4 +1,5 @@
 {
+	# prEN 18216 requires HTTP/2 as the minimum public transport version.
 	servers :443 {
 		protocols h1 h2 h3
 	}
@@ -20,32 +21,32 @@
 	}
 }
 
-claros-dpp.online, www.claros-dpp.online {
+__MARKETING_HOST__ {
 	import production_tls_policy
 	import security_headers
 	@dictionaryArtifacts {
 		path_regexp ^/dictionary/[^/]+/[^/]+/(context\.jsonld|catalog\.jsonld|manifest\.json|categories|units|terms(?:/.*)?)$
 	}
-	reverse_proxy @dictionaryArtifacts https://api.claros-dpp.online {
-		header_up Host api.claros-dpp.online
+	reverse_proxy @dictionaryArtifacts https://__API_HOST__ {
+		header_up Host __API_HOST__
 	}
 	reverse_proxy 127.0.0.1:8080
 }
 
-app.claros-dpp.online {
+__APP_HOST__ {
 	import production_tls_policy
 	import security_headers
 	reverse_proxy 127.0.0.1:3000
 }
 
-viewer.claros-dpp.online {
+__API_HOST__ {
+	import production_tls_policy
+	import security_headers
+	reverse_proxy 127.0.0.1:3001
+}
+
+__VIEWER_HOST__ {
 	import production_tls_policy
 	import security_headers
 	reverse_proxy 127.0.0.1:3004
-}
-
-assets.claros-dpp.online {
-	import production_tls_policy
-	import security_headers
-	reverse_proxy 127.0.0.1:3003
 }

@@ -6,6 +6,7 @@ services:
       args:
         VITE_API_URL: "${VITE_API_URL:?VITE_API_URL is required}"
         VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:?VITE_PUBLIC_VIEWER_URL is required}"
+        VITE_MARKETING_URL: "${MARKETING_URL:?MARKETING_URL is required}"
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-3000}:8080"
     healthcheck:
@@ -18,6 +19,12 @@ services:
     depends_on:
       backend-api:
         condition: service_healthy
+    networks:
+      - application
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   public-passport-viewer:
     build:
@@ -26,6 +33,7 @@ services:
       args:
         VITE_API_URL: "${VITE_API_URL:?VITE_API_URL is required}"
         VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:?VITE_PUBLIC_VIEWER_URL is required}"
+        VITE_MARKETING_URL: "${MARKETING_URL:?MARKETING_URL is required}"
     ports:
       - "127.0.0.1:${PUBLIC_VIEWER_PORT:-3004}:8080"
     healthcheck:
@@ -38,6 +46,12 @@ services:
     depends_on:
       backend-api:
         condition: service_healthy
+    networks:
+      - application
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   backend-api:
     build:
@@ -53,6 +67,7 @@ services:
       PORT: 3001
       DB_HOST: "${DB_HOST:-postgres}"
       DB_PORT: "${DB_PORT:-5432}"
+      VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:?VITE_PUBLIC_VIEWER_URL is required}"
       LOCAL_STORAGE_DIR: /data
       FILES_DIR: /data/passport-files
       REPO_DIR: /data/repository-files
@@ -71,9 +86,16 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
+    networks:
+      - application
+      - database
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   backend-storage-init:
-    image: alpine:3.22
+    image: alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
     command:
       - sh
       - -c
@@ -86,11 +108,16 @@ services:
     volumes:
       - localStorageData:/data
     restart: "no"
+    network_mode: none
 
   marketing-site:
     build:
       context: ..
       dockerfile: apps/marketing-site/Dockerfile
+      args:
+        MARKETING_URL: "${MARKETING_URL:?MARKETING_URL is required}"
+        MARKETING_APP_URL: "${APP_URL:?APP_URL is required}"
+        MARKETING_API_URL: "${SERVER_URL:?SERVER_URL is required}"
     ports:
       - "127.0.0.1:${MARKETING_PORT:-8080}:8080"
     healthcheck:
@@ -100,14 +127,20 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+    networks:
+      - application
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   postgres:
-    image: postgres:18-alpine
+    build:
+      context: ..
+      dockerfile: infra/docker/postgres/Dockerfile
+    image: dpp-postgres:18.4-trixie-gosu1.19-go1.26.5
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
-    env_file:
-      - path: ${DPP_ENV_FILE:-../.env}
-        required: true
     environment:
       POSTGRES_DB: "${DB_NAME:?DB_NAME is required}"
       POSTGRES_USER: "${DB_USER:?DB_USER is required}"
@@ -121,6 +154,10 @@ services:
       retries: 20
       start_period: 5s
     restart: unless-stopped
+    networks:
+      - database
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   localStorageData:
@@ -129,3 +166,8 @@ volumes:
   postgresData:
     name: "${POSTGRES_VOLUME_NAME:-dppPostgresData}"
     external: true
+
+networks:
+  application:
+  database:
+    internal: true

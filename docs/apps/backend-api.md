@@ -17,7 +17,7 @@ If the frontend is the face of the product, the backend is the engine room.
 
 ## Entry Point
 
-- [apps/backend-api/src/server.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/server.js:1)
+- `apps/backend-api/src/server.js:1`
 
 ## Main Backend Areas
 
@@ -55,9 +55,9 @@ If the frontend is the face of the product, the backend is the engine room.
 
 Most complex passport behavior is coordinated through:
 
-- [apps/backend-api/src/http/routes/passports.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/passports.js:34)
+- `apps/backend-api/src/http/routes/passports.js:34`
 - `apps/backend-api/src/modules/passports/*.js`
-- [apps/backend-api/src/services/passport-service.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/services/passport-service.js:1)
+- `apps/backend-api/src/services/passport-service.js:1`
 
 That area handles:
 
@@ -78,7 +78,7 @@ default production fixtures.
 
 Shared module and semantic-package loader:
 
-- [apps/backend-api/src/services/passport-module-registry.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/services/passport-module-registry.js:1)
+- `apps/backend-api/src/services/passport-module-registry.js:1`
 
 Add each generated package under
 `apps/backend-api/passport-modules/<family>-<version>/` and seed only the
@@ -87,7 +87,7 @@ and all semantic artifacts.
 
 Current semantic model registry:
 
-- [apps/backend-api/src/services/semantic-model-registry.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/services/semantic-model-registry.js:1)
+- `apps/backend-api/src/services/semantic-model-registry.js:1`
 
 Both registries discover the same package folders, so runtime definitions and
 semantic resources cannot be selected from different directory trees.
@@ -96,7 +96,7 @@ semantic resources cannot be selected from different directory trees.
 
 Schema creation and idempotent startup migrations live in:
 
-- [apps/backend-api/src/db/init.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/db/init.js:202)
+- `apps/backend-api/src/db/init.js:202`
 
 ## Useful Commands
 

@@ -6,6 +6,7 @@ const helmet = require("helmet");
 
 function configureHttp(app, {
   allowedOriginSet,
+  credentialedOriginSet = allowedOriginSet,
   cspConnectSrc,
   isPlainRecord,
   isProduction,
@@ -48,15 +49,18 @@ function configureHttp(app, {
     next();
   });
 
-  app.use(cors({
-    origin: (origin, cb) => {
-      if (!origin || allowedOriginSet.has(origin)) return cb(null, true);
-      const error = new Error("Forbidden: origin not allowed");
-      error.code = "corsOriginDenied";
-      error.statusCode = 403;
-      return cb(error);
-    },
-    credentials: true,
+  app.use(cors((req, cb) => {
+    const origin = req.headers.origin;
+    if (!origin || allowedOriginSet.has(origin)) {
+      return cb(null, {
+        origin: true,
+        credentials: Boolean(origin && credentialedOriginSet.has(origin)),
+      });
+    }
+    const error = new Error("Forbidden: origin not allowed");
+    error.code = "corsOriginDenied";
+    error.statusCode = 403;
+    return cb(error);
   }));
 
   app.use((err, req, res, next) => {
@@ -67,15 +71,27 @@ function configureHttp(app, {
   });
 
   app.use((req, res, next) => {
-    if (!isProduction) return next();
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return next();
-    if (/^Bearer\s+\S+$/i.test(String(req.headers.authorization || "").trim())) return next();
+    const hasBearerAuthorization = /^Bearer\s+\S+$/i.test(String(req.headers.authorization || "").trim());
+    const hasSessionCookie = Boolean(String(req.headers.cookie || "").trim());
+    // Bearer requests require a non-simple Authorization header, so a hostile
+    // browser origin cannot send them without passing the CORS preflight. Cookie
+    // requests are origin-validated in every environment; production also
+    // validates anonymous state-changing browser requests.
+    if (hasBearerAuthorization || (!isProduction && !hasSessionCookie)) return next();
     const origin = req.headers.origin || req.headers.referer;
     if (!origin) return res.status(403).json({ error: "Forbidden: missing origin header" });
     try {
       const { origin: parsedOrigin } = new URL(origin);
       if (!allowedOriginSet.has(parsedOrigin)) {
         return res.status(403).json({ error: "Forbidden: origin not allowed" });
+      }
+      // Public origins may make anonymous or API-key requests, but a request
+      // that carries a browser cookie is session-authenticated and must come
+      // only from the dashboard origin. This blocks a compromised public
+      // viewer from minting bearer tokens or mutating a dashboard session.
+      if (String(req.headers.cookie || "").trim() && !credentialedOriginSet.has(parsedOrigin)) {
+        return res.status(403).json({ error: "Forbidden: cookie-authenticated origin not allowed" });
       }
     } catch {
       return res.status(403).json({ error: "Forbidden: invalid origin header" });

@@ -16,7 +16,7 @@ A semantic model defines the machine-readable vocabulary behind those fields.
 
 ## Shared Package Loader
 
-- [apps/backend-api/src/services/passport-module-registry.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/services/passport-module-registry.js:1)
+- `apps/backend-api/src/services/passport-module-registry.js:1`
 
 ## Current Built-In Modules
 
@@ -27,7 +27,7 @@ child folder is one versioned, self-contained module package.
 
 Backend semantic registry:
 
-- [apps/backend-api/src/services/semantic-model-registry.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/services/semantic-model-registry.js:1)
+- `apps/backend-api/src/services/semantic-model-registry.js:1`
 
 Semantic resource files live beside `module.js` in the same package folder.
 The runtime module registry and semantic registry use the same discovery pass.

@@ -1,5 +1,5 @@
 # ClarosDPP — robots.txt
-# Update https://claros-dpp.online to your actual domain before deployment.
+# The Docker build writes the configured public marketing origin below.
 
 User-agent: *
 Allow: /
@@ -7,4 +7,4 @@ Allow: /
 # Block anything that shouldn't be indexed (none currently — all pages are public)
 # Disallow: /private/
 
-Sitemap: https://claros-dpp.online/sitemap.xml
+Sitemap: __MARKETING_URL__/sitemap.xml

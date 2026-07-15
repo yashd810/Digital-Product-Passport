@@ -2,6 +2,94 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
+const net = require("net");
+const { isPrivateOrReservedHostname, normalizeHostname } = require("../shared/security/network-address");
+const { normalizeConfiguredOrigin } = require("../shared/security/configured-origin");
+
+const requiredSecurityEnvVars = [
+  "JWT_SECRET",
+  "PEPPER_V1",
+  "OTP_HMAC_SECRET",
+  "REPOSITORY_FILE_LINK_SECRET",
+  "SIGNING_PRIVATE_KEY",
+  "SIGNING_PUBLIC_KEY",
+  "DB_PASSWORD",
+];
+const secretValueEnvVars = [
+  "JWT_SECRET",
+  "PEPPER_V1",
+  "OTP_HMAC_SECRET",
+  "REPOSITORY_FILE_LINK_SECRET",
+  "DB_PASSWORD",
+];
+
+function normalizePemEnvironmentValue(value) {
+  return String(value || "").replace(/\\n/g, "\n");
+}
+
+function assertMatchingP256SigningKeys() {
+  const privateKey = crypto.createPrivateKey(normalizePemEnvironmentValue(process.env.SIGNING_PRIVATE_KEY));
+  const publicKey = crypto.createPublicKey(normalizePemEnvironmentValue(process.env.SIGNING_PUBLIC_KEY));
+  const derivedPublicKey = crypto.createPublicKey(privateKey);
+  const configuredPublicJwk = publicKey.export({ format: "jwk" });
+  const derivedPublicJwk = derivedPublicKey.export({ format: "jwk" });
+  const matchingPublicKeys = Buffer.compare(
+    derivedPublicKey.export({ format: "der", type: "spki" }),
+    publicKey.export({ format: "der", type: "spki" })
+  ) === 0;
+  if (privateKey.asymmetricKeyType !== "ec"
+    || publicKey.asymmetricKeyType !== "ec"
+    || configuredPublicJwk.crv !== "P-256"
+    || derivedPublicJwk.crv !== "P-256"
+    || !matchingPublicKeys) {
+    throw new Error("signing keys must be a matching P-256 pair");
+  }
+}
+
+function assertRequiredSecurityEnvironment({ logger }) {
+  const missingEnvVars = requiredSecurityEnvVars.filter((key) => !process.env[key]);
+  if (missingEnvVars.length > 0) {
+    logger.error({ missing: missingEnvVars }, "Missing required security environment variables");
+    process.exit(1);
+    return;
+  }
+
+  const weakSecrets = secretValueEnvVars
+    .filter((name) => String(process.env[name] || "").length < 32);
+  if (weakSecrets.length) {
+    logger.error({ weak: weakSecrets }, "Security secrets must contain at least 32 characters");
+    process.exit(1);
+    return;
+  }
+
+  const placeholderValues = requiredSecurityEnvVars.filter((name) =>
+    /^(REPLACE|CHANGE|YOUR_)/i.test(String(process.env[name] || "").trim())
+  );
+  if (placeholderValues.length) {
+    logger.error({ placeholders: placeholderValues }, "Security environment variables must not use placeholders");
+    process.exit(1);
+    return;
+  }
+
+  const reusedSecrets = secretValueEnvVars.filter((name, index) =>
+    secretValueEnvVars.slice(0, index).some((previousName) =>
+      process.env[previousName] === process.env[name]
+    )
+  );
+  if (reusedSecrets.length) {
+    logger.error({ reused: reusedSecrets }, "Security secrets must use distinct values");
+    process.exit(1);
+    return;
+  }
+
+  try {
+    assertMatchingP256SigningKeys();
+  } catch {
+    logger.error("SIGNING_PRIVATE_KEY and SIGNING_PUBLIC_KEY must be a matching P-256 keypair");
+    process.exit(1);
+  }
+}
 
 function initEnvironment(serverDir) {
   const explicitPath = process.env.DOTENV_CONFIG_PATH;
@@ -117,36 +205,121 @@ function toBooleanEnv(value, fallback = false) {
 }
 
 function isLoopbackHost(hostname) {
-  const host = String(hostname || "").trim().toLowerCase();
-  return host === "localhost"
-    || host === "127.0.0.1"
-    || host === "0.0.0.0"
-    || host === "::1"
-    || host === "[::1]";
+  return isPrivateOrReservedHostname(hostname);
+}
+
+const cookieNamePattern = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const cookieDomainPattern = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+
+function normalizeSessionCookieName(value) {
+  const rawValue = value === undefined || value === null || value === ""
+    ? "dppSession"
+    : String(value);
+  if (rawValue.trim() !== rawValue || /[\u0000-\u001F\u007F\s]/.test(rawValue) || !cookieNamePattern.test(rawValue)) {
+    throw new Error("SESSION_COOKIE_NAME must be a valid cookie token");
+  }
+  return rawValue;
+}
+
+function normalizeCookieDomain(value, serverOrigin = process.env.SERVER_URL) {
+  const rawValue = String(value || "");
+  if (!rawValue) return null;
+  if (rawValue.trim() !== rawValue || /[\u0000-\u001F\u007F\s\\/]/.test(rawValue)) {
+    throw new Error("COOKIE_DOMAIN must be a DNS parent domain without whitespace, paths, or control characters");
+  }
+
+  const domain = (rawValue.startsWith(".") ? rawValue.slice(1) : rawValue).toLowerCase();
+  if (!cookieDomainPattern.test(domain) || net.isIP(domain)) {
+    throw new Error("COOKIE_DOMAIN must be a valid non-IP DNS domain");
+  }
+
+  let apiHostname;
+  try {
+    apiHostname = normalizeHostname(new URL(normalizeConfiguredOrigin(serverOrigin, "SERVER_URL")).hostname);
+  } catch {
+    throw new Error("COOKIE_DOMAIN requires a valid SERVER_URL");
+  }
+  if (apiHostname !== domain && !apiHostname.endsWith(`.${domain}`)) {
+    throw new Error("COOKIE_DOMAIN must be the API hostname or one of its parent domains");
+  }
+  return domain;
+}
+
+function assertCookieConfiguration({ logger }) {
+  try {
+    normalizeSessionCookieName(process.env.SESSION_COOKIE_NAME);
+    normalizeCookieDomain(process.env.COOKIE_DOMAIN, process.env.SERVER_URL);
+  } catch (error) {
+    logger.error({ err: error }, "Invalid session-cookie configuration");
+    process.exit(1);
+  }
+}
+
+function validateRuntimeOrigin(name, logger, { isProduction = false } = {}) {
+  let parsed;
+  try {
+    parsed = new URL(normalizeConfiguredOrigin(process.env[name], name));
+  } catch {
+    logger.error({ env: name }, "Runtime URL environment variable must be a valid HTTP(S) origin");
+    process.exit(1);
+    return null;
+  }
+
+  if (isProduction && (parsed.protocol !== "https:" || isLoopbackHost(parsed.hostname))) {
+    logger.error({ env: name, protocol: parsed.protocol, hostname: parsed.hostname }, "Production URL must use a public HTTPS origin");
+    process.exit(1);
+    return null;
+  }
+  return parsed.origin;
 }
 
 function validateProductionUrl(name, logger) {
-  const rawValue = process.env[name];
-  let parsed;
-  try {
-    parsed = new URL(rawValue);
-  } catch {
-    logger.error({ env: name }, "Production URL environment variable is not a valid URL");
+  return validateRuntimeOrigin(name, logger, { isProduction: true });
+}
+
+function assertRequiredRuntimeOrigins({ isProduction, logger }) {
+  const requiredEnvVars = ["APP_URL", "SERVER_URL", "VITE_PUBLIC_VIEWER_URL", "ALLOWED_ORIGINS"];
+  const missingEnvVars = requiredEnvVars.filter((key) => !String(process.env[key] || "").trim());
+  if (missingEnvVars.length > 0) {
+    logger.error({ missing: missingEnvVars }, "Missing required runtime origin environment variables");
     process.exit(1);
+    return null;
   }
 
-  const hasNonOriginComponents = Boolean(
-    parsed.username
-    || parsed.password
-    || (parsed.pathname && parsed.pathname !== "/")
-    || parsed.search
-    || parsed.hash
-  );
-  if (parsed.protocol !== "https:" || isLoopbackHost(parsed.hostname) || hasNonOriginComponents) {
-    logger.error({ env: name, protocol: parsed.protocol, hostname: parsed.hostname }, "Production URL must use a public HTTPS origin");
-    process.exit(1);
+  const appOrigin = validateRuntimeOrigin("APP_URL", logger, { isProduction });
+  validateRuntimeOrigin("SERVER_URL", logger, { isProduction });
+  const publicViewerOrigin = validateRuntimeOrigin("VITE_PUBLIC_VIEWER_URL", logger, { isProduction });
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    .split(",")
+    .filter(Boolean);
+  const normalizedAllowedOrigins = [];
+  for (const [index, origin] of allowedOrigins.entries()) {
+    const envName = `ALLOWED_ORIGINS[${index}]`;
+    try {
+      const normalizedOrigin = normalizeConfiguredOrigin(origin, envName);
+      const parsedOrigin = new URL(normalizedOrigin);
+      if (isProduction && (parsedOrigin.protocol !== "https:" || isLoopbackHost(parsedOrigin.hostname))) {
+        throw new Error("must be a public HTTPS origin");
+      }
+      normalizedAllowedOrigins.push(normalizedOrigin);
+    } catch {
+      logger.error({ env: envName }, "Allowed origin must be a valid runtime HTTP(S) origin");
+      process.exit(1);
+      return null;
+    }
   }
-  return parsed.origin;
+
+  if (!normalizedAllowedOrigins.includes(appOrigin)) {
+    logger.error("ALLOWED_ORIGINS must include APP_URL");
+    process.exit(1);
+    return null;
+  }
+  if (!normalizedAllowedOrigins.includes(publicViewerOrigin)) {
+    logger.error("ALLOWED_ORIGINS must include VITE_PUBLIC_VIEWER_URL");
+    process.exit(1);
+    return null;
+  }
+  return appOrigin;
 }
 
 function assertDatabaseName({ logger }) {
@@ -162,45 +335,42 @@ function assertDatabaseName({ logger }) {
   }
 }
 
-function deriveRuntimeFlags(port) {
+function deriveRuntimeFlags() {
   const isProduction = process.env.NODE_ENV === "production";
   const runSchemaMigrations =
     String(process.env.RUN_SCHEMA_MIGRATIONS || "").trim().toLowerCase() === "true"
     || (!isProduction && String(process.env.RUN_SCHEMA_MIGRATIONS || "").trim().toLowerCase() !== "false");
 
-  const defaultAllowedOrigins = isProduction ? [] : [
-    "http://localhost:3000", "http://127.0.0.1:3000",
-    "http://localhost:3004", "http://127.0.0.1:3004",
-    "http://localhost:8000", "http://127.0.0.1:8000",
-    "http://localhost:8001", "http://127.0.0.1:8001",
-    "http://localhost:5173", "http://127.0.0.1:5173",
-    `http://localhost:${port}`, `http://127.0.0.1:${port}`,
-  ];
   const envAllowedOrigins = (process.env.ALLOWED_ORIGINS || "")
-    .split(",").map((value) => value.trim()).filter(Boolean);
-  const allowedOriginSet = new Set([...defaultAllowedOrigins, ...envAllowedOrigins]);
+    .split(",")
+    .filter(Boolean)
+    .map((value, index) => normalizeConfiguredOrigin(value, `ALLOWED_ORIGINS[${index}]`));
+  const allowedOriginSet = new Set(envAllowedOrigins);
+  // The public passport viewer needs CORS for anonymous/API-key reads, but it
+  // must never become a second cookie-authenticated dashboard origin.
+  const credentialedOriginSet = new Set([
+    normalizeConfiguredOrigin(process.env.APP_URL, "APP_URL"),
+  ]);
 
   return {
     isProduction,
     runSchemaMigrations,
     allowedOriginSet,
+    credentialedOriginSet,
     cspConnectSrc: ["'self'", ...allowedOriginSet],
   };
 }
 
 function assertRequiredProductionEnvironment({ isProduction, logger }) {
+  assertRequiredSecurityEnvironment({ logger });
+  assertRequiredRuntimeOrigins({ isProduction, logger });
+  assertCookieConfiguration({ logger });
   if (!isProduction) return;
 
   const requiredEnvVars = [
-    "JWT_SECRET",
-    "PEPPER_V1",
     "DB_HOST",
     "DB_USER",
-    "DB_PASSWORD",
     "DB_NAME",
-    "APP_URL",
-    "SERVER_URL",
-    "ASSET_SOURCE_ALLOWED_HOSTS",
   ];
   const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
   if (missingEnvVars.length > 0) {
@@ -208,49 +378,12 @@ function assertRequiredProductionEnvironment({ isProduction, logger }) {
     process.exit(1);
   }
 
-  if (!process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS.trim() === "") {
-    logger.error("ALLOWED_ORIGINS must be configured in production");
+  if (String(process.env.OAUTH_ALLOW_INSECURE_HTTP || "").trim().toLowerCase() === "true") {
+    logger.error("OAUTH_ALLOW_INSECURE_HTTP cannot be enabled in production");
     process.exit(1);
   }
 
-  const appOrigin = validateProductionUrl("APP_URL", logger);
-  validateProductionUrl("SERVER_URL", logger);
-
-  const weakSecrets = ["JWT_SECRET", "PEPPER_V1"]
-    .filter((name) => String(process.env[name] || "").length < 32);
-  if (process.env.OTP_HMAC_SECRET && process.env.OTP_HMAC_SECRET.length < 32) {
-    weakSecrets.push("OTP_HMAC_SECRET");
-  }
-  if (weakSecrets.length) {
-    logger.error({ weak: weakSecrets }, "Production secrets must contain at least 32 characters");
-    process.exit(1);
-  }
-  if (process.env.JWT_SECRET === process.env.PEPPER_V1) {
-    logger.error("JWT_SECRET and PEPPER_V1 must be different secrets");
-    process.exit(1);
-  }
-
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  for (const [index, origin] of allowedOrigins.entries()) {
-    const envName = `ALLOWED_ORIGINS[${index}]`;
-    const previous = process.env[envName];
-    process.env[envName] = origin;
-    try {
-      validateProductionUrl(envName, logger);
-    } finally {
-      if (previous === undefined) delete process.env[envName];
-      else process.env[envName] = previous;
-    }
-  }
-  if (!allowedOrigins.map((value) => new URL(value).origin).includes(appOrigin)) {
-    logger.error("ALLOWED_ORIGINS must include APP_URL");
-    process.exit(1);
-  }
-
-  const assetHosts = process.env.ASSET_SOURCE_ALLOWED_HOSTS
+  const assetHosts = String(process.env.ASSET_SOURCE_ALLOWED_HOSTS || "")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
@@ -266,10 +399,24 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
   const storageProvider = String(process.env.STORAGE_PROVIDER || "local").trim().toLowerCase();
   const backupProviderEnabled = toBooleanEnv(process.env.BACKUP_PROVIDER_ENABLED, false);
   const backupProviderRequired = toBooleanEnv(process.env.BACKUP_PROVIDER_REQUIRED, false);
+  const dbBackupEnabledValue = String(process.env.DB_BACKUP_ENABLED || "").trim().toLowerCase();
+  const dbBackupEnabled = toBooleanEnv(process.env.DB_BACKUP_ENABLED, false);
   const missing = [];
+  const dbBackupRequiredEnvVars = [
+    "DB_BACKUP_S3_ENDPOINT",
+    "DB_BACKUP_S3_REGION",
+    "DB_BACKUP_S3_BUCKET",
+    "DB_BACKUP_S3_ACCESS_KEY_ID",
+    "DB_BACKUP_S3_SECRET_ACCESS_KEY",
+  ];
 
   if (storageProvider !== "s3") {
     throw new Error("[PRODUCTION] STORAGE_PROVIDER must be s3. Local or disabled production storage is not supported.");
+  }
+
+  if (dbBackupEnabledValue && !["true", "false"].includes(dbBackupEnabledValue)) {
+    logger.error({ value: dbBackupEnabledValue }, "DB_BACKUP_ENABLED must be true or false");
+    throw new Error("[PRODUCTION] DB_BACKUP_ENABLED must be true or false.");
   }
 
   for (const key of [
@@ -281,9 +428,47 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
   ]) {
     if (!process.env[key]) missing.push(key);
   }
+  if (dbBackupEnabled) {
+    for (const key of dbBackupRequiredEnvVars) {
+      if (!String(process.env[key] || "").trim()) missing.push(key);
+    }
+  }
+
+  const placeholderCredentialNames = [
+    "STORAGE_S3_ACCESS_KEY_ID",
+    "STORAGE_S3_SECRET_ACCESS_KEY",
+  ];
+  if (dbBackupEnabled) {
+    placeholderCredentialNames.push(...dbBackupRequiredEnvVars);
+  }
+  const placeholderValues = placeholderCredentialNames.filter((key) => {
+    const value = String(process.env[key] || "").trim();
+    return value && /(REPLACE|CHANGE|YOUR_)/i.test(value);
+  });
+  if (placeholderValues.length) {
+    logger.error({ placeholders: placeholderValues }, "Storage/DR credentials must not use placeholders");
+    throw new Error(`[PRODUCTION] Storage/DR credentials must not use placeholders: ${placeholderValues.join(", ")}`);
+  }
 
   if (process.env.STORAGE_S3_ENDPOINT) {
     validateProductionUrl("STORAGE_S3_ENDPOINT", logger);
+  }
+  if (dbBackupEnabled && process.env.DB_BACKUP_S3_ENDPOINT) {
+    validateProductionUrl("DB_BACKUP_S3_ENDPOINT", logger);
+  }
+
+  if (dbBackupEnabled && !missing.length) {
+    const duplicatedBackupValues = [
+      ["DB_BACKUP_S3_BUCKET", "STORAGE_S3_BUCKET"],
+      ["DB_BACKUP_S3_ACCESS_KEY_ID", "STORAGE_S3_ACCESS_KEY_ID"],
+      ["DB_BACKUP_S3_SECRET_ACCESS_KEY", "STORAGE_S3_SECRET_ACCESS_KEY"],
+    ].filter(([dbBackupKey, storageKey]) => process.env[dbBackupKey] === process.env[storageKey]);
+    if (duplicatedBackupValues.length) {
+      const duplicatedNames = duplicatedBackupValues
+        .map(([dbBackupKey, storageKey]) => `${dbBackupKey}/${storageKey}`);
+      logger.error({ duplicated: duplicatedNames }, "DB backups must use a separate bucket and credential material");
+      throw new Error(`[PRODUCTION] DB backups must use separate bucket and credential material: ${duplicatedNames.join(", ")}`);
+    }
   }
 
   if (backupProviderRequired && !backupProviderEnabled) {
@@ -301,7 +486,11 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
 
 module.exports = {
   assertDatabaseName,
+  assertCookieConfiguration,
+  assertMatchingP256SigningKeys,
   assertProductionStorageReadiness,
+  assertRequiredRuntimeOrigins,
+  assertRequiredSecurityEnvironment,
   assertRequiredProductionEnvironment,
   deriveRuntimeFlags,
   deriveRuntimePaths,
@@ -311,6 +500,8 @@ module.exports = {
   isPlainRecord,
   normalizeIncomingJsonValue,
   normalizeOutgoingJsonValue,
+  normalizeCookieDomain,
+  normalizeSessionCookieName,
   normalizeStorageRequestKey,
   toBooleanEnv,
 };

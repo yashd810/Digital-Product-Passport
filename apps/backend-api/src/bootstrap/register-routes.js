@@ -77,6 +77,7 @@ function registerAppRoutes(app, deps) {
     publicReadRateLimit: deps.publicReadRateLimit,
     authenticateToken: deps.authenticateToken,
     checkCompanyAccess: deps.checkCompanyAccess,
+    requireEditor: deps.requireEditor,
     oauthService: deps.oauthService,
     backupProviderService: deps.backupProviderService,
   });
@@ -242,6 +243,7 @@ function registerAppRoutes(app, deps) {
     pool: deps.pool,
     authenticateToken: deps.authenticateToken,
     checkCompanyAccess: deps.checkCompanyAccess,
+    checkCompanyAdmin: deps.checkCompanyAdmin,
     requireEditor: deps.requireEditor,
     publicReadRateLimit: deps.publicReadRateLimit,
     getTable: deps.getTable,

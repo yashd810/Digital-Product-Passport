@@ -11,7 +11,18 @@
 
 const dns = require("dns").promises;
 const net = require("net");
+const https = require("https");
 const logger = require("./logger");
+const {
+  isLocalHostname,
+  isPrivateOrReservedIpAddress,
+  normalizeHostname,
+} = require("../shared/security/network-address");
+const {
+  hasInlineAssetSourceCredentials,
+  normalizeAssetSourceMethod,
+  normalizeStoredAssetSourceConfig,
+} = require("../shared/assets/asset-source-config");
 
 module.exports = function createAssetService({
   pool,
@@ -39,9 +50,20 @@ module.exports = function createAssetService({
   assetMatchFields,
   assetIgnoredSystemColumns,
   assetSchedulerIntervalMs,
-  assetSourceAllowedHosts
+  assetSourceAllowedHosts = new Set(),
+  assetSourceCredentials = new Map(),
 }) {
   const validGranularities = new Set(["model", "batch", "item"]);
+  const maxSourceResponseBytes = 5 * 1024 * 1024;
+  const maxSourceRequestBytes = 64 * 1024;
+  const maxSourceUrlLength = 4 * 1024;
+  const sourceDnsLookupTimeoutMs = 5_000;
+  const configuredAssetSourceAllowedHosts = assetSourceAllowedHosts instanceof Set
+    ? assetSourceAllowedHosts
+    : new Set();
+  const configuredAssetSourceCredentials = assetSourceCredentials instanceof Map
+    ? assetSourceCredentials
+    : new Map();
 
   async function getCompanyDppPolicy(companyId) {
     const result = await pool.query(
@@ -119,165 +141,279 @@ module.exports = function createAssetService({
 
   // ─── SSRF protection helpers ────────────────────────────────────────────────
 
-  const isLocalHostname = (hostname) => {
-    const normalized = String(hostname || "").trim().toLowerCase().replace(/\.$/, "");
-    return normalized === "localhost" ||
-    normalized === "localhost.localdomain" ||
-    normalized.endsWith(".localhost") ||
-    normalized.endsWith(".local");
-  };
-
-  const isPrivateIpAddress = (address) => {
-    if (!address) return true;
-    const normalized = String(address).trim().toLowerCase();
-    const family = net.isIP(normalized);
-
-    if (family === 4) {
-      const octets = normalized.split(".").map((part) => Number.parseInt(part, 10));
-      const [a, b] = octets;
-      return a === 10 ||
-      a === 127 ||
-      a === 0 ||
-      a === 100 && b >= 64 && b <= 127 ||
-      a === 169 && b === 254 ||
-      a === 172 && b >= 16 && b <= 31 ||
-      a === 192 && b === 168 ||
-      a === 198 && (b === 18 || b === 19);
+  async function lookupAssetSourceHostname(hostname) {
+    let timeoutHandle;
+    try {
+      return await Promise.race([
+        dns.lookup(hostname, { all: true, verbatim: true }),
+        new Promise((_, reject) => {
+          timeoutHandle = setTimeout(
+            () => reject(new Error("ERP/API source DNS lookup timed out")),
+            sourceDnsLookupTimeoutMs
+          );
+        }),
+      ]);
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
     }
-
-    if (family === 6) {
-      return normalized === "::1" ||
-      normalized.startsWith("fc") ||
-      normalized.startsWith("fd") ||
-      normalized.startsWith("fe8") ||
-      normalized.startsWith("fe9") ||
-      normalized.startsWith("fea") ||
-      normalized.startsWith("feb") ||
-      normalized.startsWith("::ffff:127.") ||
-      normalized.startsWith("::ffff:10.") ||
-      normalized.startsWith("::ffff:192.168.") ||
-      /^::ffff:172\.(1[6-9]|2\d|3[0-1])\./.test(normalized);
-    }
-
-    return true;
-  };
+  }
 
   async function assertSafeAssetSourceUrl(urlString) {
-    const parsedUrl = new URL(urlString);
-    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-      throw new Error("Only HTTP(S) ERP/API endpoints are supported");
+    const rawUrl = String(urlString || "").trim();
+    if (!rawUrl || rawUrl.length > maxSourceUrlLength) {
+      throw new Error("ERP/API source URL is missing or exceeds the 4 KiB limit");
+    }
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(rawUrl);
+    } catch {
+      throw new Error("ERP/API source URL must be a valid URL");
+    }
+    if (parsedUrl.protocol !== "https:") {
+      throw new Error("Only HTTPS ERP/API endpoints are supported");
+    }
+    if (parsedUrl.username || parsedUrl.password) {
+      throw new Error("ERP/API source URLs must not include credentials");
     }
 
-    const hostname = String(parsedUrl.hostname || "").trim().toLowerCase().replace(/\.$/, "");
+    const hostname = normalizeHostname(parsedUrl.hostname);
     if (!hostname) throw new Error("Source URL hostname is required");
     if (isLocalHostname(hostname)) {
       throw new Error("Local ERP/API hostnames are not allowed");
     }
 
-    if (assetSourceAllowedHosts.size > 0 && !assetSourceAllowedHosts.has(hostname)) {
+    if (configuredAssetSourceAllowedHosts.size === 0) {
+      throw new Error("ERP/API source integrations are disabled until ASSET_SOURCE_ALLOWED_HOSTS is configured");
+    }
+    if (!configuredAssetSourceAllowedHosts.has(hostname)) {
       throw new Error("ERP/API hostname is not in the allowed list");
     }
 
+    const normalizedEndpointUrl = new URL(parsedUrl.toString());
+    normalizedEndpointUrl.hostname = hostname;
+    const endpoint = `${normalizedEndpointUrl.origin}${normalizedEndpointUrl.pathname}`;
+
     if (net.isIP(hostname)) {
-      if (isPrivateIpAddress(hostname)) {
+      if (isPrivateOrReservedIpAddress(hostname)) {
         throw new Error("Private ERP/API IP addresses are not allowed");
       }
-      return parsedUrl;
+      return {
+        parsedUrl,
+        hostname,
+        endpoint,
+        address: { address: hostname, family: net.isIP(hostname) },
+      };
     }
 
-    const resolvedAddresses = await dns.lookup(hostname, { all: true });
+    const resolvedAddresses = await lookupAssetSourceHostname(hostname);
     if (!resolvedAddresses.length) {
       throw new Error("Unable to resolve ERP/API hostname");
     }
-    if (resolvedAddresses.some((entry) => isPrivateIpAddress(entry.address))) {
+    if (resolvedAddresses.some((entry) => isPrivateOrReservedIpAddress(entry.address))) {
       throw new Error("ERP/API hostname resolves to a private network address");
     }
 
-    return parsedUrl;
+    const address = resolvedAddresses.find((entry) => entry.family === 4 || entry.family === 6);
+    if (!address) throw new Error("ERP/API hostname did not resolve to an IP address");
+    return { parsedUrl, hostname, endpoint, address };
+  }
+
+  function fetchPinnedAssetSource({ parsedUrl, hostname, address, method, headers, body }) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let timeoutHandle = null;
+      const settle = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        callback(value);
+      };
+      const fail = (error) => settle(reject, error);
+
+      let request;
+      try {
+        request = https.request({
+          protocol: parsedUrl.protocol,
+          hostname,
+          port: parsedUrl.port || undefined,
+          path: `${parsedUrl.pathname}${parsedUrl.search}`,
+          method,
+          headers,
+          servername: net.isIP(hostname) ? undefined : hostname,
+          lookup: (_requestedHostname, options, callback) => {
+            if (options?.all) return callback(null, [address]);
+            return callback(null, address.address, address.family);
+          },
+        }, (response) => {
+          const declaredLength = Number.parseInt(response.headers["content-length"], 10);
+          if (Number.isFinite(declaredLength) && declaredLength > maxSourceResponseBytes) {
+            const error = new Error("ERP/API source response exceeds the 5 MiB limit");
+            response.destroy(error);
+            fail(error);
+            return;
+          }
+
+          const chunks = [];
+          let receivedBytes = 0;
+          response.on("data", (chunk) => {
+            receivedBytes += chunk.length;
+            if (receivedBytes > maxSourceResponseBytes) {
+              const error = new Error("ERP/API source response exceeds the 5 MiB limit");
+              response.destroy(error);
+              fail(error);
+              return;
+            }
+            chunks.push(chunk);
+          });
+          response.once("aborted", () => fail(new Error("ERP/API source response was aborted")));
+          response.once("error", fail);
+          response.once("end", () => {
+            settle(resolve, {
+              ok: response.statusCode >= 200 && response.statusCode < 300,
+              status: response.statusCode,
+              text: Buffer.concat(chunks).toString("utf8"),
+            });
+          });
+        });
+        timeoutHandle = setTimeout(() => {
+          const error = new Error("ERP/API request timed out");
+          request.destroy(error);
+          fail(error);
+        }, 15_000);
+        request.once("error", fail);
+        if (body !== undefined && body !== "") request.write(body);
+        request.end();
+      } catch (error) {
+        if (request) request.destroy(error);
+        fail(error);
+      }
+    });
+  }
+
+  function resolveSourceRequestConfig(sourceConfig, {
+    allowInlineCredentials,
+    companyId = null,
+    connection,
+    method,
+  }) {
+    const credentialRef = String(sourceConfig.credentialRef || "").trim();
+    const credential = credentialRef ? configuredAssetSourceCredentials.get(credentialRef) : null;
+    const hasInlineCredentials = hasInlineAssetSourceCredentials(sourceConfig);
+    const hasInlineBody = sourceConfig.body !== undefined && sourceConfig.body !== "";
+    if (credentialRef) {
+      const numericCompanyId = Number(companyId);
+      const permitted = credential
+        && credential.companyIds instanceof Set
+        && credential.allowedEndpoints instanceof Set
+        && credential.allowedMethods instanceof Set
+        && credential.companyIds.has(numericCompanyId)
+        && credential.allowedEndpoints.has(connection.endpoint)
+        && credential.allowedMethods.has(method)
+        && !connection.parsedUrl.search;
+      if (!permitted) {
+        throw new Error("sourceConfig.credentialRef is not available for this company, endpoint, and method");
+      }
+      if (hasInlineCredentials || hasInlineBody) {
+        throw new Error("sourceConfig.credentialRef cannot be combined with inline headers or a request body");
+      }
+    }
+    if (!allowInlineCredentials && (hasInlineCredentials || hasInlineBody)) {
+      throw new Error("Scheduled asset jobs cannot use inline headers or bodies; use sourceConfig.credentialRef");
+    }
+    const inlineHeaders = allowInlineCredentials ? sourceConfig.headers : undefined;
+    const inlineBody = allowInlineCredentials ? sourceConfig.body : undefined;
+    return {
+      headers: normalizeAssetHeaders({ ...(credential?.headers || {}), ...(inlineHeaders || {}) }),
+      body: inlineBody !== undefined && inlineBody !== "" ? inlineBody : credential?.body,
+    };
   }
 
   // ─── Core asset functions ───────────────────────────────────────────────────
 
-  async function fetchAssetSourceRecords(sourceConfig = {}) {
+  async function fetchAssetSourceRecords(sourceConfig = {}, {
+    allowInlineCredentials = true,
+    companyId = null,
+  } = {}) {
     const url = String(sourceConfig.url || "").trim();
     if (!url) throw new Error("Source URL is required");
 
-    const parsedUrl = await assertSafeAssetSourceUrl(url);
+    const connection = await assertSafeAssetSourceUrl(url);
 
-    const method = String(sourceConfig.method || "GET").trim().toUpperCase();
-    const headers = normalizeAssetHeaders(sourceConfig.headers);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const method = normalizeAssetSourceMethod(sourceConfig.method);
+    const sourceRequest = resolveSourceRequestConfig(sourceConfig, {
+      allowInlineCredentials,
+      companyId,
+      connection,
+      method,
+    });
+    let requestBody;
+    if (sourceRequest.body !== undefined && sourceRequest.body !== "") {
+      const serializedBody = typeof sourceRequest.body === "string"
+        ? sourceRequest.body
+        : JSON.stringify(sourceRequest.body);
+      if (typeof serializedBody !== "string" || Buffer.byteLength(serializedBody, "utf8") > maxSourceRequestBytes) {
+        throw new Error("ERP/API source request body exceeds the 64 KiB limit");
+      }
+      if (method !== "POST") {
+        throw new Error("ERP/API source request bodies require the POST method");
+      }
+      requestBody = serializedBody;
+      if (!sourceRequest.headers["Content-Type"] && !sourceRequest.headers["content-type"]) {
+        sourceRequest.headers["Content-Type"] = "application/json";
+      }
+    }
 
+    const response = await fetchPinnedAssetSource({
+      ...connection,
+      method,
+      headers: sourceRequest.headers,
+      body: requestBody,
+    });
+    let parsedPayload = response.text;
     try {
-      const requestInit = {
-        method,
-        headers,
-        signal: controller.signal,
-        redirect: "error"
-      };
+      parsedPayload = response.text ? JSON.parse(response.text) : null;
+    } catch (error) {
+      logger.debug({ err: error }, "Asset source response was not JSON; using raw response text");
+    }
 
-      if (!["GET", "HEAD"].includes(method) && sourceConfig.body !== undefined && sourceConfig.body !== "") {
-        if (typeof sourceConfig.body === "string") {
-          requestInit.body = sourceConfig.body;
-        } else {
-          requestInit.body = JSON.stringify(sourceConfig.body);
-          if (!requestInit.headers["Content-Type"] && !requestInit.headers["content-type"]) {
-            requestInit.headers["Content-Type"] = "application/json";
-          }
-        }
-      }
+    if (!response.ok) {
+      throw new Error(`ERP/API request failed (${response.status})`);
+    }
 
-      const response = await fetch(parsedUrl, requestInit);
-      const text = await response.text();
-      let parsedPayload = text;
-      try {
-        parsedPayload = text ? JSON.parse(text) : null;
-      } catch (error) {
-        logger.debug({ err: error }, "Asset source response was not JSON; using raw response text");
-      }
-
-      if (!response.ok) {
-        throw new Error(`ERP/API request failed (${response.status})`);
-      }
-
-      let extracted = sourceConfig.recordPath ?
+    let extracted = sourceConfig.recordPath ?
       getValueAtPath(parsedPayload, sourceConfig.recordPath) :
       parsedPayload;
 
-      if (!Array.isArray(extracted) && isPlainObject(extracted)) {
-        extracted = extracted.items || extracted.records || extracted.rows || extracted.data;
-      }
-
-      if (!Array.isArray(extracted)) {
-        throw new Error("ERP/API source must resolve to an array of records");
-      }
-      if (extracted.length > 1000) {
-        throw new Error("ERP/API source returned more than 1000 records");
-      }
-
-      const fieldMap = isPlainObject(sourceConfig.fieldMap) ? sourceConfig.fieldMap : null;
-      const defaults = isPlainObject(sourceConfig.defaults) ? sourceConfig.defaults : {};
-      const records = extracted.map((item) => {
-        if (!isPlainObject(item)) return {};
-        if (!fieldMap) return { ...item, ...defaults };
-        return Object.entries(fieldMap).reduce((acc, [sourceKey, targetKey]) => {
-          if (!targetKey) return acc;
-          acc[String(targetKey)] = getValueAtPath(item, sourceKey);
-          return acc;
-        }, { ...defaults });
-      });
-
-      return {
-        count: records.length,
-        records,
-        sample: records.slice(0, 3),
-        endpoint: parsedUrl.toString(),
-        fetchedAt: new Date().toISOString()
-      };
-    } finally {
-      clearTimeout(timeout);
+    if (!Array.isArray(extracted) && isPlainObject(extracted)) {
+      extracted = extracted.items || extracted.records || extracted.rows || extracted.data;
     }
+
+    if (!Array.isArray(extracted)) {
+      throw new Error("ERP/API source must resolve to an array of records");
+    }
+    if (extracted.length > 1000) {
+      throw new Error("ERP/API source returned more than 1000 records");
+    }
+
+    const fieldMap = isPlainObject(sourceConfig.fieldMap) ? sourceConfig.fieldMap : null;
+    const defaults = isPlainObject(sourceConfig.defaults) ? sourceConfig.defaults : {};
+    const records = extracted.map((item) => {
+      if (!isPlainObject(item)) return {};
+      if (!fieldMap) return { ...item, ...defaults };
+      return Object.entries(fieldMap).reduce((acc, [sourceKey, targetKey]) => {
+        if (!targetKey) return acc;
+        acc[String(targetKey)] = getValueAtPath(item, sourceKey);
+        return acc;
+      }, { ...defaults });
+    });
+
+    return {
+      count: records.length,
+      records,
+      sample: records.slice(0, 3),
+      endpoint: `${connection.parsedUrl.origin}${connection.parsedUrl.pathname}`,
+      fetchedAt: new Date().toISOString()
+    };
   }
 
   async function prepareAssetPayload({ companyId, passportType, records, options = {} }) {
@@ -919,16 +1055,25 @@ module.exports = function createAssetService({
     if (!Number.isFinite(interval) || interval <= 0) {
       return start > from ? start : null;
     }
-    let next = new Date(start);
-    while (next <= from) {
-      next = new Date(next.getTime() + interval * 60 * 1000);
-    }
-    return next;
+    const current = new Date(from);
+    if (Number.isNaN(current.getTime())) return null;
+    if (start > current) return start;
+    const intervalMs = interval * 60 * 1000;
+    const elapsedMs = current.getTime() - start.getTime();
+    const periods = Math.floor(elapsedMs / intervalMs) + 1;
+    const nextTimestamp = start.getTime() + (periods * intervalMs);
+    return Number.isFinite(nextTimestamp) && Math.abs(nextTimestamp) <= 8.64e15
+      ? new Date(nextTimestamp)
+      : null;
   };
 
   async function resolveAssetJobRecords(job) {
     if (job.sourceKind === "api") {
-      const fetched = await fetchAssetSourceRecords(job.sourceConfig || {});
+      const sourceConfig = normalizeStoredAssetSourceConfig(job.sourceConfig || {});
+      const fetched = await fetchAssetSourceRecords(sourceConfig, {
+        allowInlineCredentials: false,
+        companyId: job.companyId,
+      });
       return {
         records: fetched.records,
         sourceMeta: {
@@ -1108,7 +1253,7 @@ module.exports = function createAssetService({
 
   return {
     isLocalHostname,
-    isPrivateIpAddress,
+    isPrivateOrReservedIpAddress,
     assertSafeAssetSourceUrl,
     fetchAssetSourceRecords,
     prepareAssetPayload,

@@ -242,7 +242,7 @@ export const coreDatabaseTables = [
     tables: [
       {
         name: "assetManagementJobs",
-        purpose: "Saved Asset Management schedules and source configurations.",
+        purpose: "Saved Asset Management schedules and non-secret source configurations; scheduled API credentials are resolved from a server-side credentialRef.",
         columns: ["id", "companyId", "passportType", "name", "sourceKind", "sourceConfig", "recordsJson", "optionsJson", "isActive", "startAt", "intervalMinutes", "nextRunAt", "lastRunAt", "lastStatus", "lastSummary", "createdAt", "updatedAt"],
       },
       {
@@ -358,8 +358,8 @@ export const backendApiFamilies = [
     details: [
       "Runs inside the authenticated company dashboard for bulk updates on existing passports.",
       "Supports staged CSV, JSON, and ERP/API ingestion, then validates rows before pushing updates into the backend.",
-      "Uses the normal session or Bearer authentication model with company access checks, plus editor authorization for writes.",
-      "Includes saved jobs, recent runs, and scheduled server-side fetch-and-push flows.",
+      "Uses the normal session or Bearer authentication model with company access checks and editor authorization for operational reads and writes.",
+      "Includes saved jobs, recent runs, and scheduled server-side fetch-and-push flows; scheduled jobs retain only a credentialRef, never source headers or bodies.",
     ],
   },
   {
@@ -689,14 +689,14 @@ export const assetManagementApiTable = {
   rows: [
     ["Load bootstrap data", "GET /api/companies/:companyId/passport-data-management/bootstrap", "Session cookie or Bearer token and company access", "No body", "Returns company info, allowed passport types, ERP presets, and security hints."],
     ["Load current passports", "GET /api/companies/:companyId/passport-data-management/passports", "Session cookie or Bearer token and company access", "Query param: passportType", "Returns the current passports and editable summary for the selected type."],
-    ["Fetch ERP or API rows", "POST /api/companies/:companyId/passport-data-management/source/fetch", "Session cookie or Bearer token, company access, and editor role", "{ sourceConfig } with url, method, headers, body, recordPath, fieldMap", "Fetches external rows and maps them into asset rows."],
+    ["Fetch ERP or API rows", "POST /api/companies/:companyId/passport-data-management/source/fetch", "Session cookie or Bearer token, company access, and editor role", "{ sourceConfig } with url, method, optional transient headers/body, recordPath, fieldMap", "Fetches external rows and maps them into asset rows. Inline credentials are one-time only and are never saved."],
     ["Preview staged changes", "POST /api/companies/:companyId/passport-data-management/preview", "Session cookie or Bearer token, company access, and editor role", "{ passportType, records }", "Validates matching and field rules, then builds the JSON package without changing any passports."],
     ["Push staged changes", "POST /api/companies/:companyId/passport-data-management/push", "Session cookie or Bearer token, company access, and editor role", "{ generatedPayload } or { passportType, records }", "Writes the prepared changes into the normal backend passport records."],
-    ["List saved jobs", "GET /api/companies/:companyId/passport-data-management/jobs", "Session cookie or Bearer token and company access", "No body", "Returns saved schedules for the current company."],
-    ["Create a job", "POST /api/companies/:companyId/passport-data-management/jobs", "Session cookie or Bearer token, company access, and editor role", "{ passportType, name, records, sourceKind, sourceConfig, startAt, intervalMinutes, isActive }", "Saves a recurring job that can run later on the server."],
-    ["Update a job", "PATCH /api/companies/:companyId/passport-data-management/jobs/:jobId", "Session cookie or Bearer token, company access, and editor role", "Name, schedule, source, records, and active state fields", "Edits an existing saved job."],
+    ["List saved jobs", "GET /api/companies/:companyId/passport-data-management/jobs", "Session cookie or Bearer token, company access, and editor role", "No body", "Returns saved schedules with sanitized source metadata for the current company."],
+    ["Create a job", "POST /api/companies/:companyId/passport-data-management/jobs", "Session cookie or Bearer token, company access, and editor role", "{ passportType, name, records, sourceKind, sourceConfig: { url, method, credentialRef, recordPath, fieldMap }, startAt, intervalMinutes, isActive }", "Saves a recurring job that can run later on the server. API jobs use a server-side credentialRef scoped to the company, exact URL, and GET/POST method; headers and bodies are rejected."],
+    ["Update a job", "PATCH /api/companies/:companyId/passport-data-management/jobs/:jobId", "Session cookie or Bearer token, company access, and editor role", "Name, schedule, non-secret source config, records, and active state fields", "Edits an existing saved job without exposing credentials."],
     ["Run one job immediately", "POST /api/companies/:companyId/passport-data-management/jobs/:jobId/run", "Session cookie or Bearer token, company access, and editor role", "No body", "Executes the saved job immediately instead of waiting for its next schedule."],
-    ["See recent runs", "GET /api/companies/:companyId/passport-data-management/runs", "Session cookie or Bearer token and company access", "No body", "Shows recent manual pushes and scheduled job runs."],
+    ["See recent runs", "GET /api/companies/:companyId/passport-data-management/runs", "Session cookie or Bearer token, company access, and editor role", "No body", "Shows recent manual pushes and scheduled job summaries without request credentials or generated payloads."],
   ],
 };
 

@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { readDbBackupObjectStorageConfig } = require("../src/shared/backups/db-backup-object-storage-config");
 const {
   S3Client,
   PutObjectCommand,
@@ -27,50 +28,18 @@ function requireArg(flag) {
   return value;
 }
 
-function normalizePrefix(value, fallback) {
-  return String(value || fallback || "db-backups/postgres")
-    .trim()
-    .replace(/^\/+/, "")
-    .replace(/\/+$/, "");
-}
-
 function readConfig() {
-  const endpoint = process.env.DB_BACKUP_S3_ENDPOINT || process.env.STORAGE_S3_ENDPOINT;
-  const region = process.env.DB_BACKUP_S3_REGION || process.env.STORAGE_S3_REGION;
-  const bucket = process.env.DB_BACKUP_S3_BUCKET || process.env.STORAGE_S3_BUCKET;
-  const accessKeyId = process.env.DB_BACKUP_S3_ACCESS_KEY_ID || process.env.STORAGE_S3_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.DB_BACKUP_S3_SECRET_ACCESS_KEY || process.env.STORAGE_S3_SECRET_ACCESS_KEY;
-  const forcePathStyle = String(process.env.DB_BACKUP_S3_FORCE_PATH_STYLE || process.env.STORAGE_S3_FORCE_PATH_STYLE || "true") !== "false";
-  const prefix = normalizePrefix(
-    process.env.DB_BACKUP_S3_PREFIX || process.env.DB_BACKUP_PREFIX,
-    "db-backups/postgres"
-  );
-  const retentionCount = Number.parseInt(process.env.DB_BACKUP_RETENTION_COUNT || "14", 10);
-  const dbName = process.env.DB_NAME || process.env.POSTGRES_DB || "dppSystem";
-
-  for (const [key, value] of Object.entries({
-    endpoint,
-    region,
-    bucket,
-    accessKeyId,
-    secretAccessKey
-  })) {
-    if (!value) {
-      throw new Error(`Missing S3 backup configuration: ${key}`);
-    }
-  }
-
-  return {
-    endpoint,
-    region,
-    bucket,
-    accessKeyId,
-    secretAccessKey,
-    forcePathStyle,
-    prefix,
-    retentionCount: Number.isFinite(retentionCount) && retentionCount > 0 ? retentionCount : 14,
-    dbName
-  };
+  return readDbBackupObjectStorageConfig({
+    endpoint: process.env.DB_BACKUP_S3_ENDPOINT,
+    region: process.env.DB_BACKUP_S3_REGION,
+    bucket: process.env.DB_BACKUP_S3_BUCKET,
+    accessKeyId: process.env.DB_BACKUP_S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.DB_BACKUP_S3_SECRET_ACCESS_KEY,
+    forcePathStyle: process.env.DB_BACKUP_S3_FORCE_PATH_STYLE,
+    prefix: process.env.DB_BACKUP_S3_PREFIX,
+    retentionCount: process.env.DB_BACKUP_RETENTION_COUNT,
+    dbName: process.env.DB_NAME || process.env.POSTGRES_DB,
+  });
 }
 
 function createClient(config) {
@@ -402,7 +371,13 @@ async function main() {
   throw new Error("Usage: node scripts/db-backup-object-storage.js <upload|download-latest|ensure-bucket|put-object> [options]");
 }
 
-main().catch((error) => {
-  console.error(error.message || error);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error.message || error);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  readConfig,
+};

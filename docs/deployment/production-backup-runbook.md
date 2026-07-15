@@ -24,7 +24,21 @@ Backups in this system are not a side note. They are part of how released passpo
 
 Production storage and disaster-recovery checks are enforced in:
 
-- [apps/backend-api/src/bootstrap/runtime-config.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/bootstrap/runtime-config.js:158)
+- `apps/backend-api/src/bootstrap/runtime-config.js:158`
+
+## Backup Credential Boundary
+
+When `DB_BACKUP_ENABLED=true`, configure all five dedicated values:
+`DB_BACKUP_S3_ENDPOINT`, `DB_BACKUP_S3_REGION`, `DB_BACKUP_S3_BUCKET`,
+`DB_BACKUP_S3_ACCESS_KEY_ID`, and `DB_BACKUP_S3_SECRET_ACCESS_KEY`.
+
+Use a separate OCI customer-secret pair with permission only for the separate
+DB-backup bucket. It must not reuse the application file-storage access key,
+secret, or bucket. The backup runner inherits those DB-backup values from the
+already-running backend container; it does not pass credentials on a host
+command line and never falls back to `STORAGE_S3_*` values. Rotate a DB-backup
+credential by updating `/etc/dpp/dpp.env` and redeploying the backend before
+running a backup, verification, or restore drill.
 
 ## OCI Backup Notes
 
@@ -46,3 +60,11 @@ Expected result: both services exit with status `0/SUCCESS`. If the backup
 output reports `retainedObjectsSkipped`, OCI is preserving older backup objects
 under the bucket retention rule. Do not remove the retention rule during routine
 cleanup unless the owner explicitly accepts that compliance/security change.
+
+The backup runner requires `/etc/dpp/dpp.env` to be a regular mode-`600` file,
+requires an explicit `DB_BACKUP_ENABLED=true|false`, and refuses to fall back to
+application-storage credentials, a default database name, or user. Backup,
+verification, and restore-drill runs share an exclusive lock so they cannot
+overwrite each other's temporary files. The systemd units allow up to two hours
+for a large backup or restore check; investigate a timeout rather than launching
+a parallel manual run.

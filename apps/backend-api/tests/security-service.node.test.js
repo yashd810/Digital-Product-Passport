@@ -7,7 +7,7 @@ const { hashOtpCode } = require("../src/services/security-service");
 
 test("OTP hashes are keyed and domain separated", () => {
   const previousSecret = process.env.OTP_HMAC_SECRET;
-  process.env.OTP_HMAC_SECRET = "test-only-otp-secret";
+  process.env.OTP_HMAC_SECRET = "test-only-otp-secret-with-32-characters";
   try {
     const code = "123456";
     const unkeyedHash = crypto.createHash("sha256").update(code).digest("hex");

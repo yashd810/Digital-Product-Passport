@@ -8,6 +8,7 @@ import {
   parseSemanticGraphValue,
   semanticPropertyCardinality,
 } from "./semanticGraphUtils";
+import { toSafeExternalHref } from "../security/urlSafety";
 
 function ScalarInput({ property, value, disabled, onChange }) {
   if (property.dataType === "boolean") {
@@ -74,7 +75,9 @@ function ClassEditor({ graph, classKey, value, disabled, onChange, depth }) {
           <strong>{classDef.label}</strong>
           <code>{classDef.key}</code>
         </div>
-        <a href={classDef.semanticId} target="_blank" rel="noopener noreferrer">Class IRI</a>
+        {toSafeExternalHref(classDef.semanticId)
+          ? <a href={toSafeExternalHref(classDef.semanticId)} target="_blank" rel="noopener noreferrer">Class IRI</a>
+          : <span>Class IRI unavailable</span>}
       </div>
       {classDef.definition && <p className="semantic-class-definition">{classDef.definition}</p>}
       <div className="semantic-class-properties">

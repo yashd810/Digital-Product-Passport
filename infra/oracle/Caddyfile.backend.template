@@ -18,7 +18,7 @@
 	}
 }
 
-api.claros-dpp.online {
+__API_HOST__ {
 	import production_tls_policy
 	import security_headers
 	reverse_proxy 127.0.0.1:3001

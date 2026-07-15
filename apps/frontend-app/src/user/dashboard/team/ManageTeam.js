@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import { toSafeImageSrc } from "../../../shared/security/urlSafety";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -231,8 +232,8 @@ function ManageTeam({ user, companyId }) {
                     <td>
                       <div className="member-cell">
                         <div className="member-avatar">
-                          {m.avatarUrl
-                            ? <img src={m.avatarUrl} alt="" />
+                          {toSafeImageSrc(m.avatarUrl, { allowInlineRaster: false })
+                            ? <img src={toSafeImageSrc(m.avatarUrl, { allowInlineRaster: false })} alt="" />
                             : <span>{(m.firstName?.[0] || "?").toUpperCase()}</span>
                           }
                         </div>

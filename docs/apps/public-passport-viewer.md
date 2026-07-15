@@ -8,9 +8,9 @@ It exists so public passport pages can have their own app shell without carrying
 
 ## Main Files
 
-- [apps/public-passport-viewer/src/bootstrap/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/src/bootstrap/index.js:1)
-- [apps/public-passport-viewer/src/containers/PublicViewerApp.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/src/containers/PublicViewerApp.js:19)
-- [apps/public-passport-viewer/vite.config.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/vite.config.js:15)
+- `apps/public-passport-viewer/src/bootstrap/index.js:1`
+- `apps/public-passport-viewer/src/containers/PublicViewerApp.js:19`
+- `apps/public-passport-viewer/vite.config.js:15`
 
 ## What It Actually Renders
 
@@ -33,9 +33,9 @@ That means:
 
 Mostly public backend routes from:
 
-- [apps/backend-api/src/http/routes/passport-public.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/passport-public.js:12)
-- [apps/backend-api/src/modules/passports/register-carrier-security-routes.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/modules/passports/register-carrier-security-routes.js:417)
-- [apps/backend-api/src/bootstrap/support-routes.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/bootstrap/support-routes.js:99)
+- `apps/backend-api/src/http/routes/passport-public.js:12`
+- `apps/backend-api/src/modules/passports/register-carrier-security-routes.js:417`
+- `apps/backend-api/src/bootstrap/support-routes.js:99`
 
 Public attachments use `/public-files/:publicId`. Restricted file fields receive
 short-lived `/public-files/access/:token` links only after a valid security group

@@ -107,6 +107,16 @@ test("passport module generator emits camelCase module identifiers by default", 
   assert.equal(generatedModule.sections[0].fields[0].key, "modelIdentifier");
 });
 
+test("passport module generator requires an explicit deployment base URL", () => {
+  const input = createGeneratorInput();
+  delete input.module.baseUrl;
+
+  assert.throws(
+    () => buildArtifacts(input),
+    /Base URL is required/
+  );
+});
+
 test("passport module generator derives field and table column keys from semantic slugs", () => {
   const input = createGeneratorInput();
   input.roles.businessIdentifierField = "assetSerialNumber";

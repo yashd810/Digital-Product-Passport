@@ -1,16 +1,6 @@
-/* ─── EMAIL TEMPLATE STYLES ──────────────────────────────────────────────────
-   Shared CSS for all transactional emails sent by the application.
-   The palette is intentionally light so every mail feels crisp and readable.
-
-   Sections:
-     1. Base
-     2. DPP app emails   (brandedEmail wrapper — OTP, password reset,
-                          invitations, review requests)
-     3. Contact form emails  (notification to admin, confirmation to enquirer)
-   ─────────────────────────────────────────────────────────────────────────── */
-
-
-/* ─── 1. BASE ────────────────────────────────────────────────────────────── */
+/* EMAIL TEMPLATE STYLES
+   Transactional email CSS is owned by the backend because it is rendered by
+   backend services and must not depend on dashboard source files. */
 
 body {
   margin: 0;
@@ -22,7 +12,6 @@ body {
 
 a { color: #0f8a85; }
 
-/* Shared header */
 .hdr {
   background: linear-gradient(135deg, #ffffff 0%, #f5faf9 100%);
   padding: 30px 40px;
@@ -43,7 +32,6 @@ a { color: #0f8a85; }
   margin: 6px 0 0;
 }
 
-/* Shared body */
 .body {
   background: #ffffff;
   padding: 32px 40px;
@@ -58,10 +46,6 @@ a { color: #0f8a85; }
 
 .body strong { color: #102124; }
 
-
-/* ─── 2. DPP APP EMAILS (server.js — brandedEmail) ──────────────────────── */
-
-/* Outer wrapper */
 .wrapper {
   max-width: 640px;
   margin: 36px auto;
@@ -72,7 +56,6 @@ a { color: #0f8a85; }
   box-shadow: 0 14px 42px rgba(16, 33, 36, .08);
 }
 
-/* Header overrides for branded layout */
 .wrapper .hdr {
   padding: 34px 40px;
   border-bottom-color: #d7e4e2;
@@ -83,7 +66,6 @@ a { color: #0f8a85; }
   margin-bottom: 6px;
 }
 
-/* Info box (invitation / review emails) */
 .info-box {
   background: #f6fbfa;
   border: 1px solid #d6e8e6;
@@ -115,7 +97,6 @@ a { color: #0f8a85; }
   font-weight: 600;
 }
 
-/* CTA button */
 .cta-wrap {
   text-align: center;
   margin: 28px 0;
@@ -134,7 +115,6 @@ a { color: #0f8a85; }
   box-shadow: 0 10px 24px rgba(15, 138, 133, .18);
 }
 
-/* Footer */
 .footer {
   background: #f6fbfa;
   padding: 20px 40px;
@@ -148,10 +128,6 @@ a { color: #0f8a85; }
   margin: 4px 0;
 }
 
-
-/* ─── 3. CONTACT FORM EMAILS (contact-server.js) ─────────────────────────── */
-
-/* Outer wrapper */
 .wrap {
   max-width: 620px;
   margin: 32px auto;
@@ -162,7 +138,6 @@ a { color: #0f8a85; }
   box-shadow: 0 12px 34px rgba(16, 33, 36, .07);
 }
 
-/* Header tag (e.g. product/platform eyebrow label) */
 .hdr-tag {
   font-size: 11px;
   font-weight: 700;
@@ -172,7 +147,6 @@ a { color: #0f8a85; }
   margin-bottom: 7px;
 }
 
-/* Notification email — submission details table */
 .tbl {
   width: 100%;
   border-collapse: collapse;
@@ -206,7 +180,6 @@ a { color: #0f8a85; }
   font-weight: 500;
 }
 
-/* Message block */
 .msg-lbl {
   font-size: 11px;
   font-weight: 700;
@@ -228,7 +201,6 @@ a { color: #0f8a85; }
   word-break: break-word;
 }
 
-/* Reply CTA */
 .cta {
   text-align: center;
   margin: 28px 0 8px;
@@ -246,7 +218,6 @@ a { color: #0f8a85; }
   box-shadow: 0 10px 24px rgba(15, 138, 133, .16);
 }
 
-/* Confirmation email — next-steps list */
 .body h2 {
   color: #102124;
   font-size: 17px;
@@ -279,7 +250,6 @@ a { color: #0f8a85; }
   margin-top: 1px;
 }
 
-/* Shared footer for contact emails */
 .foot {
   background: #f6fbfa;
   padding: 16px 40px;

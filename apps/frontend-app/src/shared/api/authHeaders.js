@@ -1,5 +1,18 @@
+import { isTrustedApiRequestUrl } from "../security/urlSafety";
+
 export function authHeaders(headers = {}) {
   return { ...headers };
+}
+
+function isPublicViewerRuntime() {
+  const viewerOrigin = String(import.meta.env.VITE_PUBLIC_VIEWER_URL || "").trim();
+  const currentOrigin = globalThis.window?.location?.origin;
+  if (!viewerOrigin || !currentOrigin) return false;
+  try {
+    return new URL(viewerOrigin).origin === new URL(currentOrigin).origin;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -12,8 +25,13 @@ export async function fetchWithAuth(url, options = {}) {
     skipAuthRedirect = false,
     ...fetchOptions
   } = options;
+  if (!isTrustedApiRequestUrl(url)) {
+    throw new TypeError("Refusing to send an authenticated request to an untrusted origin");
+  }
   const response = await fetch(url, {
-    credentials: "include",
+    // The dedicated public viewer shares renderer code with the dashboard, but
+    // its API reads must not carry a same-site dashboard cookie.
+    credentials: isPublicViewerRuntime() ? "omit" : "include",
     ...fetchOptions,
   });
 

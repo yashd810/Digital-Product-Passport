@@ -1,16 +1,24 @@
 import QRCode from "qrcode";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { toSafeHttpOrigin } from "../../shared/security/urlSafety";
 import { buildPublicPassportPath } from "../../passports/utils/passportRoutes";
-import { buildPublicViewerUrl } from "../../passports/utils/publicViewerUrl";
+import { buildPublicViewerUrl, getPublicViewerOrigin } from "../../passports/utils/publicViewerUrl";
 
 const api = import.meta.env.VITE_API_URL || "";
-const publicViewerUrl = import.meta.env.VITE_PUBLIC_VIEWER_URL || "";
 const defaultErrorCorrectionLevel = "H";
 const defaultQuietZoneModules = 4;
 const defaultQrWidthPx = 300;
 const minModuleMm = 0.25;
 const dppGraphicalMarking = "IEC_61406_TRIANGLE";
-const marketingContactUrl = "https://www.claros-dpp.online/contact.html";
+
+function configuredMarketingContactUrl(value) {
+  const rawValue = String(value ?? "");
+  if (!rawValue || rawValue.trim() !== rawValue) return null;
+  const origin = toSafeHttpOrigin(rawValue);
+  return origin ? `${origin}/contact.html` : null;
+}
+
+const marketingContactUrl = configuredMarketingContactUrl(import.meta.env.VITE_MARKETING_URL);
 
 function shouldRenderIec61406Marker(granularity = "item") {
   return String(granularity || "item").trim().toLowerCase() !== "model";
@@ -84,12 +92,15 @@ export function buildQrPrintSpecification({
 
   let trustedViewerHost = "";
   let trustedViewerOrigin = "";
-  try {
-    const resolved = new URL(publicViewerUrl || url, window?.location?.origin || "http://localhost");
-    trustedViewerOrigin = resolved.origin;
-    trustedViewerHost = resolved.host;
-  } catch (error) {
-    console.warn("Failed to resolve trusted viewer URL for QR metadata", error);
+  const publicViewerOrigin = getPublicViewerOrigin();
+  if (publicViewerOrigin) {
+    try {
+      const resolved = new URL(publicViewerOrigin);
+      trustedViewerOrigin = resolved.origin;
+      trustedViewerHost = resolved.host;
+    } catch {
+      // getPublicViewerOrigin already validates this value; retain empty metadata if unavailable.
+    }
   }
 
   return {

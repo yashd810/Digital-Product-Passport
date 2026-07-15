@@ -49,6 +49,26 @@ Examples:
 - `scripts/restart-local-stack.sh`
 - `scripts/deploy/deploy-to-oci.sh`
 - `scripts/troubleshoot-oci.sh`
+- `infra/oracle/generate-env-secrets.sh`
+- `infra/oracle/check-marketing-public-content.sh`
+
+`restart-local-stack.sh` requires the local `docker/.env` to be an untracked
+regular file with mode `600`, validates Compose, recreates changed services, and
+waits for health checks. The OCI helpers require a private key that is not
+group/world-readable and a pre-verified `SSH_KNOWN_HOSTS` file; they do not
+accept a first-seen production host key.
+
+`generate-env-secrets.sh --bootstrap` prints distinct 256-bit values, including
+`DB_PASSWORD`, and a matching P-256 signing pair for a new protected production
+environment file. For an existing deployment, use
+`--rotate-application-secrets`: it deliberately omits `DB_PASSWORD` so the
+running database role cannot be accidentally desynchronised. Redirect either
+output to a mode-`600` temporary file rather than a tracked file or terminal
+transcript.
+
+`check-marketing-public-content.sh` is a production deployment preflight for
+the public marketing site. It rejects known placeholder legal and contact data;
+it does not invent company, address, jurisdiction, or support-contact details.
 
 ## Recommended Verification Commands
 

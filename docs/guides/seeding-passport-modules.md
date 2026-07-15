@@ -69,7 +69,7 @@ That folder contains:
 
 The loader is:
 
-- [apps/backend-api/src/services/passport-module-registry.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/services/passport-module-registry.js:1)
+- `apps/backend-api/src/services/passport-module-registry.js:1`
 
 Folder naming is deterministic: replace the colon in `moduleKey` with a
 hyphen. For example, `example-product:v1` must use `example-product-v1`.
@@ -173,7 +173,7 @@ npm run seed:passport-types -- --module=<moduleKey> --grant-all-active-companies
 
 The implementation is here:
 
-- [apps/backend-api/scripts/seed-passport-types.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/scripts/seed-passport-types.js:1)
+- `apps/backend-api/scripts/seed-passport-types.js:1`
 
 ## Verify Locally
 
@@ -209,8 +209,8 @@ Tracked production files are:
 
 Important:
 
-- `local-tools/passport-module-generator/` is local-only and git-ignored
-- do not expect OCI to receive the local tool itself
+- `local-tools/passport-module-generator/` is a versioned local development tool, not a deployed service
+- it is intentionally absent from OCI runtime images; only the generated backend files are deployed
 - only the generated backend files matter for production
 
 ### Step 2. Deploy backend code to OCI
@@ -229,7 +229,7 @@ and recreates the backend container from the latest committed code.
 
 The deployment helper is here:
 
-- [scripts/deploy/deploy-to-oci.sh](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/scripts/deploy/deploy-to-oci.sh:1)
+- `scripts/deploy/deploy-to-oci.sh:1`
 
 ### Step 3. Create passport types from the module
 
@@ -248,34 +248,37 @@ SSH into the backend OCI host, then run:
 
 ```bash
 cd /opt/dpp
-sudo docker exec backend-api node scripts/seed-passport-types.js --module=<moduleKey>
+BACKEND_CONTAINER="$(sudo docker ps --filter 'label=com.docker.compose.service=backend-api' --format '{{.Names}}' | head -n1)"
+test -n "$BACKEND_CONTAINER" || { echo "Backend Compose service is not running"; exit 1; }
+sudo docker exec "$BACKEND_CONTAINER" node scripts/seed-passport-types.js --module=<moduleKey>
 ```
 
 Example:
 
 ```bash
 cd /opt/dpp
-sudo docker exec backend-api node scripts/seed-passport-types.js --module=example-product:v1
+BACKEND_CONTAINER="$(sudo docker ps --filter 'label=com.docker.compose.service=backend-api' --format '{{.Names}}' | head -n1)"
+test -n "$BACKEND_CONTAINER" || { echo "Backend Compose service is not running"; exit 1; }
+sudo docker exec "$BACKEND_CONTAINER" node scripts/seed-passport-types.js --module=example-product:v1
 ```
 
-If that environment uses a different container name, first check:
-
-```bash
-sudo docker ps --format "table {{.Names}}\t{{.Status}}"
-```
-
-Then use the backend container name shown there.
+The label lookup works with the project-prefixed container names that Docker
+Compose creates and avoids guessing a container name.
 
 Grant production company access during direct seed:
 
 ```bash
 cd /opt/dpp
-sudo docker exec backend-api node scripts/seed-passport-types.js --module=<moduleKey> --company-id=12
+BACKEND_CONTAINER="$(sudo docker ps --filter 'label=com.docker.compose.service=backend-api' --format '{{.Names}}' | head -n1)"
+test -n "$BACKEND_CONTAINER" || { echo "Backend Compose service is not running"; exit 1; }
+sudo docker exec "$BACKEND_CONTAINER" node scripts/seed-passport-types.js --module=<moduleKey> --company-id=12
 ```
 
 ```bash
 cd /opt/dpp
-sudo docker exec backend-api node scripts/seed-passport-types.js --module=<moduleKey> --grant-all-active-companies
+BACKEND_CONTAINER="$(sudo docker ps --filter 'label=com.docker.compose.service=backend-api' --format '{{.Names}}' | head -n1)"
+test -n "$BACKEND_CONTAINER" || { echo "Backend Compose service is not running"; exit 1; }
+sudo docker exec "$BACKEND_CONTAINER" node scripts/seed-passport-types.js --module=<moduleKey> --grant-all-active-companies
 ```
 
 ## Verify In OCI

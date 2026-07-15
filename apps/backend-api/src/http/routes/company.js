@@ -19,11 +19,13 @@ const {
   isManagedImportFieldLabel,
   resolveCsvImportField,
 } = require("../../modules/passports/import-field-guardrails");
+const { normalizeSafeImageReference } = require("../../shared/passports/passport-uri");
 
 module.exports = function registerCompanyRoutes(app, {
   pool,
   authenticateToken,
   checkCompanyAccess,
+  checkCompanyAdmin,
   requireEditor,
   // passport helpers
   getTable,
@@ -46,6 +48,13 @@ module.exports = function registerCompanyRoutes(app, {
   productIdentifierService,
   complianceService
 }) {
+  const safeCompanyLogo = (value) => {
+    try {
+      return normalizeSafeImageReference(value, { allowInlineRaster: true });
+    } catch {
+      return null;
+    }
+  };
   const governanceImportTokens = new Set([
     "confidentiality",
     "classification",
@@ -149,22 +158,29 @@ module.exports = function registerCompanyRoutes(app, {
       if (!r.rows.length) return res.status(404).json({ error: "Company not found" });
       res.json({
         companyName: r.rows[0].companyName || "",
-        companyLogo: r.rows[0].companyLogo || null,
+        companyLogo: safeCompanyLogo(r.rows[0].companyLogo),
         didSlug: r.rows[0].didSlug || null,
       });
     } catch {res.status(500).json({ error: "Failed to fetch company profile" });}
   });
 
-  app.post("/api/companies/:companyId/profile", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/profile", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
-      const companyLogo = req.body?.companyLogo;
+      let companyLogo = null;
+      if (req.body?.companyLogo !== null && req.body?.companyLogo !== undefined && req.body.companyLogo !== "") {
+        try {
+          companyLogo = normalizeSafeImageReference(req.body.companyLogo, { allowInlineRaster: true });
+        } catch {
+          return res.status(400).json({ error: "companyLogo must be a bounded raster image data URL or a credential-free HTTP(S)/local resource URL" });
+        }
+      }
       await pool.query(
         `UPDATE companies
          SET "companyLogo" = $1,
              "updatedAt" = NOW()
          WHERE id = $2`,
         [
-        companyLogo !== undefined ? companyLogo : null,
+        companyLogo,
         req.params.companyId]
 
       );
@@ -214,7 +230,7 @@ module.exports = function registerCompanyRoutes(app, {
     }
   });
 
-  app.post("/api/companies/:companyId/compliance-identity", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/compliance-identity", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const economicOperatorIdentifier = req.body?.economicOperatorIdentifier === undefined ?
       undefined :
@@ -256,7 +272,7 @@ module.exports = function registerCompanyRoutes(app, {
     }
   });
 
-  app.post("/api/companies/:companyId/facilities", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/facilities", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const facilityIdentifier = String(req.body?.facilityIdentifier || "").trim();
       const identifierScheme = String(req.body?.identifierScheme || "").trim();

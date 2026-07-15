@@ -26,15 +26,15 @@ If you are tracing a frontend request, first figure out which group it belongs t
 
 ## Main Route Files
 
-- [apps/backend-api/src/http/routes/auth.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/auth.js:1)
-- [apps/backend-api/src/http/routes/company.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/company.js:1)
-- [apps/backend-api/src/http/routes/repository.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/repository.js:1)
-- [apps/backend-api/src/http/routes/workflow.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/workflow.js:1)
-- [apps/backend-api/src/http/routes/passports.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/passports.js:34)
-- [apps/backend-api/src/http/routes/passport-public.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/passport-public.js:12)
-- [apps/backend-api/src/http/routes/dpp-api.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/dpp-api.js:26)
-- [apps/backend-api/src/http/routes/dictionary.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/dictionary.js:1)
-- [apps/backend-api/src/http/routes/admin.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/admin.js:135)
+- `apps/backend-api/src/http/routes/auth.js:1`
+- `apps/backend-api/src/http/routes/company.js:1`
+- `apps/backend-api/src/http/routes/repository.js:1`
+- `apps/backend-api/src/http/routes/workflow.js:1`
+- `apps/backend-api/src/http/routes/passports.js:34`
+- `apps/backend-api/src/http/routes/passport-public.js:12`
+- `apps/backend-api/src/http/routes/dpp-api.js:26`
+- `apps/backend-api/src/http/routes/dictionary.js:1`
+- `apps/backend-api/src/http/routes/admin.js:135`
 
 ## Where To Look For Detailed Passport Actions
 

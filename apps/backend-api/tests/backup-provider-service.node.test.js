@@ -56,6 +56,7 @@ test("implicit env backup provider is normalized before passport replication", a
   const service = createBackupProviderService({
     pool,
     storageService,
+    apiOrigin: "https://api.example.test",
     buildCanonicalPassportPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
     }),

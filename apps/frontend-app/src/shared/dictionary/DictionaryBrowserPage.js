@@ -1,10 +1,18 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { toSafeHttpOrInternalHref } from "../../shared/security/urlSafety";
 import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
 import "./DictionaryBrowserPage.css";
 
 const api = import.meta.env.VITE_API_URL || "";
+
+function SafeExternalLink({ href, className = "", children }) {
+  const safeHref = toSafeHttpOrInternalHref(href);
+  return safeHref
+    ? <a href={safeHref} target="_blank" rel="noopener noreferrer" className={className}>{children}</a>
+    : <span className={className}>{children}</span>;
+}
 
 function buildDictionaryBasePath(pathname, companySlug = "", dictionaryPath) {
   if (pathname.startsWith("/admin/")) return `/admin/dictionary/${dictionaryPath}`;
@@ -72,9 +80,9 @@ function TermCard({ term, unitsByKey, termHref }) {
           </div>
           <div className="dictionary-term-meta-line">
             <span className="dictionary-term-meta-label">IRI:</span>
-            <a href={term.iri} target="_blank" rel="noopener noreferrer" className="dictionary-link dictionary-link-mono">
+            <SafeExternalLink href={term.iri} className="dictionary-link dictionary-link-mono">
               {term.iri}
-            </a>
+            </SafeExternalLink>
           </div>
         </div>
         <div className="dictionary-term-side">
@@ -146,12 +154,12 @@ function DictionaryDetail({ term, unitsByKey, manifest, basePath, apiPath }) {
       <div className="dictionary-results-bar">
         <Link to={basePath} className="dictionary-inline-link">Back to dictionary</Link>
         <div className="dictionary-footer-links">
-          <a href={`${apiPath}/terms/${term.slug}`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+          <SafeExternalLink href={`${apiPath}/terms/${term.slug}`} className="dictionary-inline-link">
             Term JSON
-          </a>
-          <a href={term.iri} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+          </SafeExternalLink>
+          <SafeExternalLink href={term.iri} className="dictionary-inline-link">
             Term IRI
-          </a>
+          </SafeExternalLink>
         </div>
       </div>
 
@@ -182,17 +190,17 @@ function DictionaryDetail({ term, unitsByKey, manifest, basePath, apiPath }) {
         <aside className="dictionary-detail-panel dictionary-detail-sidebar">
           <div className="dictionary-side-card dictionary-side-card-plain">
             <h2>Dictionary reference URL</h2>
-            <a href={term.iri} target="_blank" rel="noopener noreferrer" className="dictionary-link dictionary-link-mono">
+            <SafeExternalLink href={term.iri} className="dictionary-link dictionary-link-mono">
               {term.iri}
-            </a>
+            </SafeExternalLink>
             <p>This is the canonical term identifier used by JSON-LD exports and semantic mappings.</p>
           </div>
 
           <div className="dictionary-side-card dictionary-side-card-plain">
             <h2>Dictionary context</h2>
-            <a href={manifest?.contextUrl} target="_blank" rel="noopener noreferrer" className="dictionary-link dictionary-link-mono">
+            <SafeExternalLink href={manifest?.contextUrl} className="dictionary-link dictionary-link-mono">
               {manifest?.contextUrl}
-            </a>
+            </SafeExternalLink>
             <p>The shared context provides the canonical namespace and type declarations for this semantic model.</p>
           </div>
 
@@ -200,9 +208,9 @@ function DictionaryDetail({ term, unitsByKey, manifest, basePath, apiPath }) {
             <h2>Dictionary artifacts</h2>
             <p>Use these JSON artifacts for field mappings and semantic exports.</p>
             <div className="dictionary-footer-links">
-              <a href={manifest?.termsUrl || `${apiPath}/terms`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+              <SafeExternalLink href={manifest?.termsUrl || `${apiPath}/terms`} className="dictionary-inline-link">
                 Terms JSON
-              </a>
+              </SafeExternalLink>
             </div>
           </div>
         </aside>
@@ -442,14 +450,9 @@ export default function DictionaryBrowserPage() {
         <aside className="dictionary-hero-side">
           <div className="dictionary-side-card">
             <h2>Dictionary Base IRI</h2>
-            <a
-              href={manifest?.baseIri}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="dictionary-link dictionary-link-mono"
-            >
-              {manifest?.baseIri}
-            </a>
+              <SafeExternalLink href={manifest?.baseIri} className="dictionary-link dictionary-link-mono">
+                {manifest?.baseIri}
+              </SafeExternalLink>
             <p>Use this as the canonical namespace for exported passport semantics.</p>
           </div>
 
@@ -457,9 +460,9 @@ export default function DictionaryBrowserPage() {
             <h2>Dictionary artifacts</h2>
             <p>Open the generated artifacts behind this semantic model.</p>
             <div className="dictionary-footer-links">
-              <a href={manifest?.termsUrl || `${apiPath}/terms`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+              <SafeExternalLink href={manifest?.termsUrl || `${apiPath}/terms`} className="dictionary-inline-link">
                 Terms JSON
-              </a>
+              </SafeExternalLink>
             </div>
           </div>
         </aside>
@@ -517,18 +520,18 @@ export default function DictionaryBrowserPage() {
             </p>
 
             <div className="dictionary-footer-links">
-              <a href={`${apiPath}/context.jsonld`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+              <SafeExternalLink href={`${apiPath}/context.jsonld`} className="dictionary-inline-link">
                 JSON-LD Context
-              </a>
-              <a href={`${apiPath}/manifest`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+              </SafeExternalLink>
+              <SafeExternalLink href={`${apiPath}/manifest`} className="dictionary-inline-link">
                 Manifest
-              </a>
-              <a href={`${apiPath}/terms`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+              </SafeExternalLink>
+              <SafeExternalLink href={`${apiPath}/terms`} className="dictionary-inline-link">
                 Terms JSON
-              </a>
-              <a href={`${apiPath}/units`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+              </SafeExternalLink>
+              <SafeExternalLink href={`${apiPath}/units`} className="dictionary-inline-link">
                 Units
-              </a>
+              </SafeExternalLink>
             </div>
           </div>
 

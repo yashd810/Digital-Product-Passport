@@ -4,6 +4,7 @@ const {
   decodePassportAttachmentAccessToken,
 } = require("../shared/repository/repository-file-links");
 const {
+  getEmailFromAddress,
   renderContactSubmissionBody,
   renderContactConfirmationBody,
 } = require("../services/email");
@@ -163,7 +164,7 @@ function registerSupportRoutes(app, deps) {
           res.removeHeader("X-Frame-Options");
         }
         const buffer = Buffer.from(await objectResponse.arrayBuffer());
-        // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write -- Attachments are signature-validated PDFs and legacy values are forced to octet-stream with nosniff.
+        // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write -- Attachment access and storage keys are authorized above; only PDFs are rendered, while all other types are served as octet-stream with nosniff.
         return res.send(buffer);
       }
 
@@ -218,7 +219,7 @@ function registerSupportRoutes(app, deps) {
         howFound: howFound ? String(howFound).trim() : "",
         message: String(message).trim(),
       };
-      const fromAddress = process.env.EMAIL_FROM || process.env.EMAIL_USER || "noreply@dpp-system.com";
+      const fromAddress = getEmailFromAddress();
 
       const transporter = createTransporter();
       const adminEmail = process.env.ADMIN_EMAIL;

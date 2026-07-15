@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 import "../styles/Landing.css";
 
+const currentYear = new Date().getFullYear();
+
 function Landing({ isAuthenticated, user, onLogout }) {
   const navigate = useNavigate();
   const dashboardHomePath = buildUserDashboardHomePath({ user });
@@ -152,7 +154,7 @@ function Landing({ isAuthenticated, user, onLogout }) {
       {/* ── FOOTER ── */}
       <footer className="lp-footer" role="contentinfo">
         <div className="lp-container">
-          <p>© 2025 Digital Product Passport Platform. All rights reserved.</p>
+          <p>© {currentYear} Digital Product Passport Platform. All rights reserved.</p>
           <p>Compliance intelligence for the circular economy.</p>
         </div>
       </footer>

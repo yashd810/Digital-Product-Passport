@@ -4,15 +4,16 @@ import {
   getSemanticGraphEnum,
   isManySemanticProperty,
   isPlainObject,
-  isSafeSemanticIri,
   parseSemanticGraphValue,
 } from "./semanticGraphUtils";
+import { toSafeExternalHref } from "../security/urlSafety";
 
 function ScalarValue({ property, value }) {
   if (property.dataType === "boolean") return <span>{value ? "Yes" : "No"}</span>;
   if (property.dataType === "uri" && typeof value === "string") {
-    return isSafeSemanticIri(value)
-      ? <a href={value} target="_blank" rel="noopener noreferrer">{value}</a>
+    const href = toSafeExternalHref(value);
+    return href
+      ? <a href={href} target="_blank" rel="noopener noreferrer">{value}</a>
       : <span>{value}</span>;
   }
   return <span>{String(value ?? "—")}</span>;
@@ -31,8 +32,9 @@ function OneSemanticValue({ graph, property, value, labelFormatter, depth }) {
   }
   if (property.relationshipType === "reference") {
     const iri = isPlainObject(value) ? value["@id"] : value;
-    return iri && isSafeSemanticIri(iri)
-      ? <a href={iri} target="_blank" rel="noopener noreferrer">{iri}</a>
+    const href = toSafeExternalHref(iri);
+    return href
+      ? <a href={href} target="_blank" rel="noopener noreferrer">{iri}</a>
       : <span>{iri || "—"}</span>;
   }
 
@@ -43,8 +45,8 @@ function OneSemanticValue({ graph, property, value, labelFormatter, depth }) {
       <div className="semantic-class-value-heading">
         <strong>{classDef.label}</strong>
         {value["@id"] && (
-          isSafeSemanticIri(value["@id"])
-            ? <a href={value["@id"]} target="_blank" rel="noopener noreferrer">{value["@id"]}</a>
+          toSafeExternalHref(value["@id"])
+            ? <a href={toSafeExternalHref(value["@id"])} target="_blank" rel="noopener noreferrer">{value["@id"]}</a>
             : <span>{value["@id"]}</span>
         )}
       </div>

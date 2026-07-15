@@ -19,12 +19,12 @@ Security in this app is not one feature. It is layered through authentication, c
 
 ## Main Security Files
 
-- [apps/backend-api/src/http/routes/auth.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/auth.js:1)
-- [apps/backend-api/src/http/middleware/auth.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/middleware/auth.js:1)
-- [apps/backend-api/src/http/routes/passports.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/passports.js:34)
-- [apps/backend-api/src/http/routes/passport-public.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/passport-public.js:12)
-- [apps/backend-api/src/services/signing-service.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/services/signing-service.js:1)
-- [apps/backend-api/src/modules/passports/api-key-helpers.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/modules/passports/api-key-helpers.js:1)
+- `apps/backend-api/src/http/routes/auth.js:1`
+- `apps/backend-api/src/http/middleware/auth.js:1`
+- `apps/backend-api/src/http/routes/passports.js:34`
+- `apps/backend-api/src/http/routes/passport-public.js:12`
+- `apps/backend-api/src/services/signing-service.js:1`
+- `apps/backend-api/src/modules/passports/api-key-helpers.js:1`
 
 ## Practical Reading Order
 

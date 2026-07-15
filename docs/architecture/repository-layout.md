@@ -19,8 +19,7 @@ If you are trying to understand “where the real connection lives,” start fro
 ├── docs/
 ├── infra/
 ├── local-tools/
-├── scripts/
-└── .docker-data/
+└── scripts/
 ```
 
 ## Backend Layout
@@ -62,9 +61,9 @@ The public viewer is intentionally small. It mostly reuses viewer UI from the da
 
 Main files:
 
-- [apps/public-passport-viewer/src/bootstrap/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/src/bootstrap/index.js:1)
-- [apps/public-passport-viewer/src/containers/PublicViewerApp.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/src/containers/PublicViewerApp.js:1)
-- [apps/public-passport-viewer/vite.config.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/vite.config.js:1)
+- `apps/public-passport-viewer/src/bootstrap/index.js:1`
+- `apps/public-passport-viewer/src/containers/PublicViewerApp.js:1`
+- `apps/public-passport-viewer/vite.config.js:1`
 
 ## Generated Output Folders
 

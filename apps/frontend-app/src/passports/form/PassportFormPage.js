@@ -27,6 +27,7 @@ import {
   getSemanticGraphClass,
 } from "../../shared/passports/semanticGraphUtils";
 import { resolveManagedSystemHeaderValue } from "../../shared/passports/systemHeaderManagedValues";
+import { toSafeImageSrc, toSafeResourceHref } from "../../shared/security/urlSafety";
 import { formatFieldLabelWithUnit, getFieldUnitLabel } from "../../passport-viewer/utils/viewerHelpers";
 import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
 import RepositoryPicker from "./components/RepositoryPicker";
@@ -36,6 +37,7 @@ import "../../shared/styles/CreatePass.css";
 const api = import.meta.env.VITE_API_URL || "";
 const editSessionTimeoutMs = 12 * 60 * 60 * 1000;
 const editHeartbeatMs = 60 * 1000;
+const currentYear = new Date().getFullYear();
 function getFieldInputPrompt(field) {
   const baseLabel = String(field?.label || field?.key || "value").toLowerCase();
   const unitLabel = getFieldUnitLabel(field);
@@ -735,9 +737,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   };
 
   const renderProductImagePicker = () => {
-    const linkedUrl = typeof formData.productImage === "string" && formData.productImage.startsWith("http")
-      ? formData.productImage
-      : null;
+    const linkedUrl = toSafeImageSrc(formData.productImage);
     const disabled = isSaving || (mode === "edit" && isLoading);
 
     return (
@@ -786,23 +786,26 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
               data-field-key="productImage"
               onPaste={(e) => {
                 const text = e.clipboardData.getData("text").trim();
-                if (text.startsWith("http")) {
+                const safeUrl = toSafeResourceHref(text);
+                if (safeUrl) {
                   e.preventDefault();
-                  handleField("productImage", text);
+                  handleField("productImage", safeUrl);
                 }
               }}
               onBlur={(e) => {
                 const text = e.target.value.trim();
-                if (text.startsWith("http")) {
-                  handleField("productImage", text);
+                const safeUrl = toSafeResourceHref(text);
+                if (safeUrl) {
+                  handleField("productImage", safeUrl);
                   e.target.value = "";
                 }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   const text = e.target.value.trim();
-                  if (text.startsWith("http")) {
-                    handleField("productImage", text);
+                  const safeUrl = toSafeResourceHref(text);
+                  if (safeUrl) {
+                    handleField("productImage", safeUrl);
                     e.target.value = "";
                   }
                 }
@@ -1074,7 +1077,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     }
 
     if (field.type === "file") {
-      const linkedUrl  = typeof val === "string" && val.startsWith("http") ? val : null;
+      const linkedUrl  = toSafeResourceHref(val);
       const fileName   = linkedUrl ? linkedUrl.split("/").pop() : null;
       return (
         <div className="file-upload-widget">
@@ -1108,16 +1111,19 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
               data-field-key={field.key}
               onPaste={(e) => {
                 const text = e.clipboardData.getData("text").trim();
-                if (text.startsWith("http")) { e.preventDefault(); handleField(field.key, text); }
+                const safeUrl = toSafeResourceHref(text);
+                if (safeUrl) { e.preventDefault(); handleField(field.key, safeUrl); }
               }}
               onBlur={(e) => {
                 const text = e.target.value.trim();
-                if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+                const safeUrl = toSafeResourceHref(text);
+                if (safeUrl) { handleField(field.key, safeUrl); e.target.value = ""; }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   const text = e.target.value.trim();
-                  if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+                  const safeUrl = toSafeResourceHref(text);
+                  if (safeUrl) { handleField(field.key, safeUrl); e.target.value = ""; }
                 }
               }}
             />
@@ -1127,13 +1133,13 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     }
 
     if (field.type === "symbol") {
-      const linkedUrl = typeof val === "string" && val.startsWith("http") ? val : null;
+      const linkedUrl = toSafeResourceHref(val);
       const picked    = linkedUrl ? symbols.find(s => s.fileUrl === linkedUrl) : null;
       return (
         <div className="file-upload-widget">
           {linkedUrl ? (
             <div className="file-existing">
-              <img src={linkedUrl} alt={picked?.name || "symbol"} className="pf-symbol-thumb" />
+              {toSafeImageSrc(linkedUrl) && <img src={toSafeImageSrc(linkedUrl)} alt={picked?.name || "symbol"} className="pf-symbol-thumb" />}
               <span className="file-existing-link">{picked?.name || "Symbol"}</span>
               <button type="button" className="file-clear-btn" disabled={disabled}
                 onClick={() => handleField(field.key, "")}>✕ Remove</button>
@@ -1159,16 +1165,19 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
               data-field-key={field.key}
               onPaste={(e) => {
                 const text = e.clipboardData.getData("text").trim();
-                if (text.startsWith("http")) { e.preventDefault(); handleField(field.key, text); }
+                const safeUrl = toSafeResourceHref(text);
+                if (safeUrl) { e.preventDefault(); handleField(field.key, safeUrl); }
               }}
               onBlur={(e) => {
                 const text = e.target.value.trim();
-                if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+                const safeUrl = toSafeResourceHref(text);
+                if (safeUrl) { handleField(field.key, safeUrl); e.target.value = ""; }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   const text = e.target.value.trim();
-                  if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+                  const safeUrl = toSafeResourceHref(text);
+                  if (safeUrl) { handleField(field.key, safeUrl); e.target.value = ""; }
                 }
               }}
             />
@@ -1573,14 +1582,14 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       </main>
 
       <footer className="createpass-footer">
-        <p>© 2024 Digital Product Passport System.</p>
+        <p>© {currentYear} Digital Product Passport System.</p>
       </footer>
 
       {/* ── Repository PDF Picker ── */}
       {repoPicker && (
         <RepositoryPicker
           companyId={effectiveCompanyId}
-          onSelect={(url) => { handleField(repoPicker, url); setRepoPicker(null); }}
+          onSelect={(url) => { const safeUrl = toSafeResourceHref(url); if (safeUrl) handleField(repoPicker, safeUrl); setRepoPicker(null); }}
           onClose={() => setRepoPicker(null)}
         />
       )}
@@ -1589,7 +1598,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       {symbolPicker && (
         <SymbolRepositoryPicker
           companyId={effectiveCompanyId}
-          onSelect={(url) => { handleField(symbolPicker, url); setSymbolPicker(null); }}
+          onSelect={(url) => { const safeUrl = toSafeResourceHref(url); if (safeUrl) handleField(symbolPicker, safeUrl); setSymbolPicker(null); }}
           onClose={() => setSymbolPicker(null)}
         />
       )}

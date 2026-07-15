@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
+import { toSafeInternalPath } from "../../shared/security/urlSafety";
 
 function OAuthCallback({ setIsAuthenticated, setUser, setCompanyId }) {
   const apiBaseUrl = import.meta.env.VITE_API_URL || "";
@@ -24,7 +25,7 @@ function OAuthCallback({ setIsAuthenticated, setUser, setCompanyId }) {
         setIsAuthenticated(true);
         setUser(data);
         setCompanyId(data.companyId || "");
-        const next = requestedNext || (
+        const next = toSafeInternalPath(requestedNext) || (
           data.role === "superAdmin"
             ? "/admin"
             : buildUserDashboardHomePath({ user: data, companyId: data.companyId || "" })

@@ -38,6 +38,7 @@ node_modules/.cache/
 # User-uploaded files (runtime data, not source code)
 storage/local-storage/
 .docker-data/
+apps/marketing-site/nginx.conf
 
 # macOS
 .DS_Store
@@ -50,6 +51,3 @@ npm-debug.log*
 .vscode/
 .idea/
 .claude/
-
-# Local-only passport module generator
-local-tools/passport-module-generator/

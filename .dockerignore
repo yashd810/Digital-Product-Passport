@@ -17,11 +17,19 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-.env
-.env.*
-docker/.env
-docker/.env.*
-apps/backend-api/.env
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/secrets
+**/secrets/**
+**/credentials
+**/credentials/**
+# The module generator is a local-only development tool and is not used by any
+# production Dockerfile. Keep it out of deployment build contexts.
+local-tools/
 apps/backend-api/backups
 storage/local-storage
 

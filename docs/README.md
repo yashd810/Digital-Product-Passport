@@ -49,7 +49,6 @@ You do not need to understand every source file before making safe changes. The 
 | `reference/` | Passport modules, semantic models, and glossary terms |
 | `security/` | Authentication, signing, audit, and access model |
 | `troubleshooting/` | Common breakpoints and where to look first |
-| `archive/` | Historical or internal notes that are not the main source of truth |
 
 ## Rules For Future Docs
 

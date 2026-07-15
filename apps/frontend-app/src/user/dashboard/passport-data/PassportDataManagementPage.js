@@ -24,6 +24,7 @@ const defaultSourceConfig = {
   recordPath: "",
   headers: "{}",
   body: "",
+  credentialRef: "",
 };
 
 function normalizeText(value) {
@@ -112,6 +113,11 @@ function parseJsonText(text, fallback) {
   const raw = String(text || "").trim();
   if (!raw) return fallback;
   return JSON.parse(raw);
+}
+
+function hasInlineSourceCredentials(sourceConfig) {
+  const headers = String(sourceConfig?.headers || "").trim();
+  return (headers && headers !== "{}") || Boolean(String(sourceConfig?.body || "").trim());
 }
 
 function buildFieldList(schemaFields = [], rows = []) {
@@ -577,21 +583,31 @@ function PassportDataManagementPage({ companyId, user }) {
       recordPath: config.recordPath || "",
       headers: config.headers ? JSON.stringify(config.headers, null, 2) : "{}",
       body: config.body ? JSON.stringify(config.body, null, 2) : "",
+      credentialRef: sourceConfig.credentialRef,
     });
     setSourceFieldMap(Object.entries(config.fieldMap || {}).map(([source, target]) => ({ source, target })));
   };
 
-  const currentSourceConfig = () => ({
-    url: sourceConfig.url.trim(),
-    method: sourceConfig.method,
-    recordPath: sourceConfig.recordPath.trim(),
-    headers: parseJsonText(sourceConfig.headers, {}),
-    body: parseJsonText(sourceConfig.body, ""),
-    fieldMap: sourceFieldMap.reduce((acc, row) => {
-      if (row.source && row.target) acc[row.source] = row.target;
-      return acc;
-    }, {}),
-  });
+  const currentSourceConfig = ({ includeInlineCredentials = true } = {}) => {
+    const useInlineCredentials = includeInlineCredentials && hasInlineSourceCredentials(sourceConfig);
+    const config = {
+      url: sourceConfig.url.trim(),
+      method: sourceConfig.method,
+      recordPath: sourceConfig.recordPath.trim(),
+      fieldMap: sourceFieldMap.reduce((acc, row) => {
+        if (row.source && row.target) acc[row.source] = row.target;
+        return acc;
+      }, {}),
+    };
+    if (sourceConfig.credentialRef.trim() && !useInlineCredentials) {
+      config.credentialRef = sourceConfig.credentialRef.trim();
+    }
+    if (includeInlineCredentials) {
+      config.headers = parseJsonText(sourceConfig.headers, {});
+      config.body = parseJsonText(sourceConfig.body, "");
+    }
+    return config;
+  };
 
   const fetchSourceRows = async () => {
     if (!canManagePassportData) return;
@@ -622,6 +638,10 @@ function PassportDataManagementPage({ companyId, user }) {
       setError("Give the source job a name.");
       return;
     }
+    if (sourceConfig.url.trim() && hasInlineSourceCredentials(sourceConfig) && !sourceConfig.credentialRef.trim()) {
+      setError("Scheduled API jobs cannot store headers or request bodies. Configure a server-side credential reference first.");
+      return;
+    }
     setBusy(true);
     try {
       const response = await fetchWithAuth(`${apiBase}/jobs`, {
@@ -631,7 +651,7 @@ function PassportDataManagementPage({ companyId, user }) {
           passportType: selectedType,
           name: jobForm.name.trim(),
           sourceKind: sourceConfig.url.trim() ? "api" : "manual",
-          sourceConfig: sourceConfig.url.trim() ? currentSourceConfig() : {},
+          sourceConfig: sourceConfig.url.trim() ? currentSourceConfig({ includeInlineCredentials: false }) : {},
           records: sourceConfig.url.trim() ? [] : buildSerializableRows(rows),
           startAt: jobForm.startAt || null,
           intervalMinutes: jobForm.intervalMinutes || null,
@@ -971,7 +991,6 @@ function PassportDataManagementPage({ companyId, user }) {
                   <select value={sourceConfig.method} onChange={(event) => setSourceConfig((current) => ({ ...current, method: event.target.value }))} disabled={!canManagePassportData}>
                     <option value="GET">GET</option>
                     <option value="POST">POST</option>
-                    <option value="PUT">PUT</option>
                   </select>
                 </label>
                 <label>
@@ -987,6 +1006,11 @@ function PassportDataManagementPage({ companyId, user }) {
                 <span>Body JSON</span>
                 <textarea rows={3} value={sourceConfig.body} onChange={(event) => setSourceConfig((current) => ({ ...current, body: event.target.value }))} placeholder="{ }" disabled={!canManagePassportData} />
               </label>
+              <label>
+                <span>Server credential reference</span>
+                <input value={sourceConfig.credentialRef} onChange={(event) => setSourceConfig((current) => ({ ...current, credentialRef: event.target.value }))} placeholder="erp-primary" disabled={!canManagePassportData} />
+              </label>
+              <p className="pdm-muted">Headers and body are used only for one-time fetches. If they are filled, Fetch Source Rows uses them instead of the server credential reference. Saved jobs use the server-managed reference and never retain browser-supplied credentials.</p>
               <div className="pdm-map-head">
                 <span>Field map</span>
                 <button type="button" className="pdm-mini-btn" onClick={() => setSourceFieldMap((current) => [...current, { source: "", target: "" }])} disabled={!canManagePassportData}>Add</button>

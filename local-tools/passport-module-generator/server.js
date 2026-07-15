@@ -470,7 +470,11 @@ function jsValue(value) {
 }
 
 function normalizeBaseUrl(value) {
-  const rawUrl = clean(value || "https://www.claros-dpp.online").replace(/\/+$/, "");
+  const suppliedValue = String(value ?? "");
+  if (!suppliedValue || suppliedValue.trim() !== suppliedValue) {
+    throw new Error("Base URL is required and must not contain surrounding whitespace.");
+  }
+  const rawUrl = suppliedValue.replace(/\/+$/, "");
   let parsed;
   try {
     parsed = new URL(rawUrl);
@@ -482,7 +486,8 @@ function normalizeBaseUrl(value) {
   if (parsed.protocol !== "https:" && !isLocalHttp) {
     throw new Error("Base URL must use HTTPS, except for localhost development.");
   }
-  if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+  if (!parsed.hostname || /[\u0000-\u001F\u007F\s\\]/.test(rawUrl)
+    || parsed.username || parsed.password || parsed.search || parsed.hash) {
     throw new Error("Base URL must not include credentials, a query, or a fragment.");
   }
   if (parsed.pathname !== "/" && parsed.pathname !== "") {
@@ -1797,6 +1802,7 @@ async function handleApi(req, res, pathname) {
   }
 }
 
+// nosemgrep: problem-based-packs.insecure-transport.js-node.using-http-server.using-http-server -- This export-only tool listens exclusively on 127.0.0.1, never a network interface; HTTPS would require a locally trusted certificate without improving transport security.
 const server = http.createServer((req, res) => {
   try {
     const url = new URL(req.url || "/", "http://127.0.0.1");

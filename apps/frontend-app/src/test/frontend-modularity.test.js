@@ -124,7 +124,7 @@ describe("frontend modularity helpers", () => {
     ], "equipmentPassportV3", {
       semanticModel: {
         semanticModelKey: "equipmentDictionaryV3",
-        contextUrl: "https://www.claros-dpp.online/dictionary/equipment/v3/context.jsonld",
+        contextUrl: "https://www.example.test/dictionary/equipment/v3/context.jsonld",
         family: "equipment",
         version: "v3",
       },
@@ -206,7 +206,7 @@ describe("frontend modularity helpers", () => {
       },
     });
 
-    expect(exported["@context"]).toContain("https://www.claros-dpp.online/dictionary/equipment/v3/context.jsonld");
+    expect(exported["@context"]).toContain("https://www.example.test/dictionary/equipment/v3/context.jsonld");
     expect(exported.semanticModel).toMatchObject({
       semanticModelKey: "equipmentDictionaryV3",
       family: "equipment",

@@ -13,6 +13,7 @@ services:
       PORT: 3001
       DB_HOST: "${DB_HOST:-postgres}"
       DB_PORT: "${DB_PORT:-5432}"
+      VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:?VITE_PUBLIC_VIEWER_URL is required}"
       LOCAL_STORAGE_DIR: /data
       FILES_DIR: /data/passport-files
       REPO_DIR: /data/repository-files
@@ -31,9 +32,16 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
+    networks:
+      - application
+      - database
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   backend-storage-init:
-    image: alpine:3.22
+    image: alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
     command:
       - sh
       - -c
@@ -46,14 +54,15 @@ services:
     volumes:
       - localStorageData:/data
     restart: "no"
+    network_mode: none
 
   postgres:
-    image: postgres:18-alpine
+    build:
+      context: ..
+      dockerfile: infra/docker/postgres/Dockerfile
+    image: dpp-postgres:18.4-trixie-gosu1.19-go1.26.5
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
-    env_file:
-      - path: ${DPP_ENV_FILE:-/etc/dpp/dpp.env}
-        required: true
     environment:
       POSTGRES_DB: "${DB_NAME:?DB_NAME is required}"
       POSTGRES_USER: "${DB_USER:?DB_USER is required}"
@@ -67,6 +76,10 @@ services:
     volumes:
       - postgresData:/var/lib/postgresql
     restart: unless-stopped
+    networks:
+      - database
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   localStorageData:
@@ -75,3 +88,8 @@ volumes:
   postgresData:
     name: "${POSTGRES_VOLUME_NAME:-dppPostgresData}"
     external: true
+
+networks:
+  application:
+  database:
+    internal: true

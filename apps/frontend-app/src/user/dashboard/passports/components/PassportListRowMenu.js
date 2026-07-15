@@ -71,6 +71,11 @@ export function PassportListRowMenu({
           }
           const isPassportLink = getPassportLinkType(passport.releaseStatus) === "passport";
           const url = isPassportLink ? buildPublicViewerUrl(path) : `${window.location.origin}${path}`;
+          if (!url) {
+            showError("No viewer link is available for this passport");
+            setOpenMenuId(null);
+            return;
+          }
           navigator.clipboard.writeText(url).then(() => {
             showSuccess(`${isPassportLink ? "Passport" : "Preview"} link copied to clipboard`);
           }).catch(() => {

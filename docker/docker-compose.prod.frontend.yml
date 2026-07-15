@@ -6,6 +6,7 @@ services:
       args:
         VITE_API_URL: "${VITE_API_URL:?VITE_API_URL is required}"
         VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:?VITE_PUBLIC_VIEWER_URL is required}"
+        VITE_MARKETING_URL: "${MARKETING_URL:?MARKETING_URL is required}"
     environment:
       BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:?BACKEND_API_UPSTREAM is required}"
     ports:
@@ -17,6 +18,12 @@ services:
       retries: 8
       start_period: 20s
     restart: unless-stopped
+    networks:
+      - application
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   public-passport-viewer:
     build:
@@ -25,6 +32,7 @@ services:
       args:
         VITE_API_URL: "${VITE_API_URL:?VITE_API_URL is required}"
         VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:?VITE_PUBLIC_VIEWER_URL is required}"
+        VITE_MARKETING_URL: "${MARKETING_URL:?MARKETING_URL is required}"
     environment:
       BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:?BACKEND_API_UPSTREAM is required}"
     ports:
@@ -36,13 +44,21 @@ services:
       retries: 8
       start_period: 20s
     restart: unless-stopped
+    networks:
+      - application
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   marketing-site:
     build:
       context: ..
       dockerfile: apps/marketing-site/Dockerfile
-    environment:
-      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:?BACKEND_API_UPSTREAM is required}"
+      args:
+        MARKETING_URL: "${MARKETING_URL:?MARKETING_URL is required}"
+        MARKETING_APP_URL: "${APP_URL:?APP_URL is required}"
+        MARKETING_API_URL: "${SERVER_URL:?SERVER_URL is required}"
     ports:
       - "127.0.0.1:${MARKETING_PORT:-8080}:8080"
     healthcheck:
@@ -52,3 +68,12 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+    networks:
+      - application
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  application:

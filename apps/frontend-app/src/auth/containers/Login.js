@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { isTrustedApiRequestUrl } from "../../shared/security/urlSafety";
 import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 import "../styles/Landing.css";
 
@@ -125,7 +126,11 @@ function Login({ setIsAuthenticated, setUser, setCompanyId }) {
 
   const startSso = (providerKey) => {
     const next = new URLSearchParams(window.location.search).get("next") || "";
-    const target = `${apiBaseUrl}/api/auth/sso/${providerKey}/start${next ? `?next=${encodeURIComponent(next)}` : ""}`;
+    const target = `${apiBaseUrl}/api/auth/sso/${encodeURIComponent(providerKey)}/start${next ? `?next=${encodeURIComponent(next)}` : ""}`;
+    if (!isTrustedApiRequestUrl(target)) {
+      setError("Single sign-on is unavailable because the configured API origin is invalid.");
+      return;
+    }
     window.location.assign(target);
   };
 

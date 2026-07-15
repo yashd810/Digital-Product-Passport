@@ -1,5 +1,7 @@
 "use strict";
 
+const { normalizeSafeImageReference } = require("../../../shared/passports/passport-uri");
+
 function hasMeaningfulValue(value) {
   if (value === null || value === undefined) return false;
   if (typeof value === "string") return value.trim() !== "";
@@ -92,6 +94,17 @@ function updateEditablePassportUseCase(deps) {
     for (const key of Object.keys(fields)) {
       if (!typeSchema.allowedKeys.has(key) && !builtInEditableFields.has(key)) {
         delete fields[key];
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "productImage")) {
+      if (fields.productImage === null || fields.productImage === "") {
+        fields.productImage = null;
+      } else {
+        try {
+          fields.productImage = normalizeSafeImageReference(fields.productImage);
+        } catch {
+          throw Object.assign(new Error("productImage must be a credential-free HTTP(S) or local resource URL"), { statusCode: 400 });
+        }
       }
     }
 

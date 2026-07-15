@@ -2,6 +2,7 @@
 
 const { buildCanonicalIdentityBundle } = require("../../shared/identifiers/canonical-identity-bundle");
 const { rewriteRepositoryLinksForSignedAccessDeep } = require("../../shared/repository/repository-file-links");
+const { getApiOrigin } = require("../../shared/security/configured-origin");
 const { createApiKeyHelpers } = require("./api-key-helpers");
 
 module.exports = function registerPreviewManagementRoutes(app, deps) {
@@ -25,7 +26,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     productIdentifierService,
     logAudit,
   } = deps;
-  const previewAppBaseUrl = process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.SERVER_URL || "http://localhost:3001";
+  const previewAppBaseUrl = getApiOrigin();
   const {
     buildRestrictedUnlockPassportPayload,
     checkSecurityGroupApiKeyAccess,

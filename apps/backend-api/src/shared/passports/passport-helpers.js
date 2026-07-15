@@ -1,6 +1,13 @@
 "use strict";
 
 const { rewriteRepositoryLinksDeep } = require("../repository/repository-file-links");
+const { getOptionalConfiguredOrigin } = require("../security/configured-origin");
+const {
+  isResourceField,
+  isSafePassportUri,
+  normalizeSafeImageReference,
+  normalizePassportUri,
+} = require("./passport-uri");
 const {
   getSemanticGraphClass,
   getSemanticGraphEnum,
@@ -159,10 +166,18 @@ const extractSchemaFields = (schema) => {
   return [];
 };
 
+const safeCompanyLogo = (value) => {
+  try {
+    return normalizeSafeImageReference(value, { allowInlineRaster: true });
+  } catch {
+    return null;
+  }
+};
+
 const mapCompanyRow = (row = {}) => ({
   id: row.id ?? null,
   companyName: row.companyName ?? "",
-  companyLogo: row.companyLogo ?? null,
+  companyLogo: safeCompanyLogo(row.companyLogo),
   didSlug: row.didSlug ?? null,
   economicOperatorIdentifier: row.economicOperatorIdentifier ?? null,
   economicOperatorIdentifierScheme: row.economicOperatorIdentifierScheme ?? null,
@@ -295,7 +310,7 @@ const normalizePassportRow = (row, schema) => {
     qrPrintSpecification: rowData.qrPrintSpecification ?? null,
     signCarrierPayload: rowData.signCarrierPayload ?? null,
   }, {
-    appBaseUrl: process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.SERVER_URL || "http://localhost:3001",
+    appBaseUrl: getOptionalConfiguredOrigin("SERVER_URL"),
   });
 
   return normalized;
@@ -503,9 +518,11 @@ const coercePassportScalarValue = (fieldDef, rawValue) => {
     throw new Error(`Expected date-time for ${fieldLabel}`);
   }
   if (dataType === "uri") {
-    const text = String(rawValue).trim();
-    if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return text;
-    throw new Error(`Expected URI for ${fieldLabel}`);
+    try {
+      return normalizePassportUri(rawValue, { resource: isResourceField(fieldDef) });
+    } catch {
+      throw new Error(`Expected safe URI for ${fieldLabel}`);
+    }
   }
   if (dataType === "string") {
     if (Array.isArray(rawValue) || (rawValue && typeof rawValue === "object")) {
@@ -570,6 +587,10 @@ const coerceSemanticGraphPropertyValue = (property, rawValue, semanticGraph, pat
       return coercePassportScalarValue({
         key: property.key,
         label: entryPath,
+        // Runtime schema fields carry their control as `type`; normalized
+        // semantic graph properties carry it as `uiType`. Preserve either so
+        // URI resource fields retain the local-resource safety rules.
+        type: property.uiType || property.type,
         dataType: property.dataType,
         objectType: "SingleValuedDataElement",
       }, entryValue);
@@ -586,10 +607,7 @@ const coerceSemanticGraphPropertyValue = (property, rawValue, semanticGraph, pat
     if (property.relationshipType === "reference") {
       const reference = isPlainObject(entryValue) ? entryValue["@id"] : entryValue;
       const iri = String(reference || "").trim();
-      if (
-        !/^[A-Za-z][A-Za-z0-9+.-]*:[^\s]+$/.test(iri)
-        || /^(?:javascript|data|vbscript):/i.test(iri)
-      ) {
+      if (!isSafePassportUri(iri)) {
         throw new Error(`${entryPath} must be an absolute IRI reference`);
       }
       return { "@id": iri };
@@ -604,10 +622,7 @@ const coerceSemanticGraphPropertyValue = (property, rawValue, semanticGraph, pat
     const typedObject = {};
     if (entryValue["@id"] !== undefined) {
       const iri = String(entryValue["@id"] || "").trim();
-      if (
-        !/^[A-Za-z][A-Za-z0-9+.-]*:[^\s]+$/.test(iri)
-        || /^(?:javascript|data|vbscript):/i.test(iri)
-      ) {
+      if (!isSafePassportUri(iri)) {
         throw new Error(`${entryPath}.@id must be an absolute IRI`);
       }
       typedObject["@id"] = iri;
@@ -779,9 +794,46 @@ const getValueAtPath = (value, pathExpression) => {
 
 const normalizeAssetHeaders = (headers) => {
   if (!isPlainObject(headers)) return {};
-  return Object.entries(headers).reduce((acc, [key, value]) => {
-    if (!key) return acc;
-    acc[String(key)] = typeof value === "string" ? value : JSON.stringify(value);
+  const blockedHeaders = new Set([
+    "connection",
+    "content-length",
+    "expect",
+    "host",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "proxy-connection",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade",
+  ]);
+  const entries = Object.entries(headers);
+  if (entries.length > 32) throw new Error("A source request may include at most 32 headers");
+  let totalBytes = 0;
+  return entries.reduce((acc, [key, value]) => {
+    const headerName = String(key || "").trim();
+    if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(headerName)) {
+      throw new Error("Source request headers must use valid HTTP header names");
+    }
+    if (blockedHeaders.has(headerName.toLowerCase())) {
+      throw new Error(`Source request header ${headerName} is not allowed`);
+    }
+    const headerValue = typeof value === "string" ? value : JSON.stringify(value);
+    if (typeof headerValue !== "string") {
+      throw new Error(`Source request header ${headerName} must have a value`);
+    }
+    if (/[\r\n]/.test(headerValue)) {
+      throw new Error(`Source request header ${headerName} must not contain line breaks`);
+    }
+    if (headerValue.length > 8 * 1024) {
+      throw new Error(`Source request header ${headerName} is too large`);
+    }
+    totalBytes += Buffer.byteLength(headerName, "utf8") + Buffer.byteLength(headerValue, "utf8") + 4;
+    if (totalBytes > 32 * 1024) {
+      throw new Error("Source request headers must not exceed 32 KiB in total");
+    }
+    acc[headerName] = headerValue;
     return acc;
   }, {});
 };

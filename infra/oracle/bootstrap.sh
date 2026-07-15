@@ -7,13 +7,22 @@ BRANCH="${BRANCH:-main}"
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-all}"
 
+if [ -L "$APP_DIR" ]; then
+  echo "Refusing a symlinked application directory: $APP_DIR"
+  exit 1
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required but not installed."
   exit 1
 fi
 
 if [ ! -d "$APP_DIR/.git" ]; then
-  rm -rf "$APP_DIR"
+  if [ -e "$APP_DIR" ] && [ -n "$(find "$APP_DIR" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+    echo "Refusing to replace a non-empty directory without a Git checkout: $APP_DIR"
+    echo "Move or remove it deliberately, then run bootstrap again."
+    exit 1
+  fi
   git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
 else
   git -C "$APP_DIR" fetch origin

@@ -2,11 +2,9 @@
    ClarosDPP — Shared Stylesheet
    All pages import this single file.
    No external assets. All icons are inline SVG
-   or emoji. Fonts loaded via Google Fonts CDN
-   (only external dependency).
+   or emoji. The typography uses the visitor's
+   local system font stack.
 ═══════════════════════════════════════════════ */
-
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=DM+Mono:wght@400;500&display=swap");
 
 /* ── RESET ── */
 *,
@@ -22,9 +20,11 @@ html {
 }
 body {
   font-family:
-    "DM Sans",
+    ui-sans-serif,
     system-ui,
     -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
     sans-serif;
   background: var(--navy);
   color: var(--white);
@@ -100,9 +100,9 @@ button {
   --hero-pad-y: 4rem;
   --footer-pad-top: 6rem;
   --footer-pad-bottom: 2rem;
-  --sans: "DM Sans", system-ui, -apple-system, sans-serif;
-  --serif: "DM Sans", system-ui, -apple-system, sans-serif;
-  --mono: "DM Mono", "Courier New", monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --serif: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
 }
 [data-theme="light"] {
   --navy: #f5f8fb;

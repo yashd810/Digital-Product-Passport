@@ -1,7 +1,8 @@
 "use strict";
 
 const logger = require("../../services/logger");
-const { escapeHtml } = require("../../services/email");
+const { escapeHtml, getEmailFromAddress, isEmailConfigured } = require("../../services/email");
+const { getAppOrigin } = require("../../shared/security/configured-origin");
 
 module.exports = function registerSuperAdminRoutes(app, deps) {
   const {
@@ -48,7 +49,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
     registerUrl,
   }) {
     await transporter.sendMail({
-      from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+      from: getEmailFromAddress(),
       to: inviteeEmail,
       subject: `${inviterName} invited you to become a Super Admin on Digital Product Passport`.replace(/[\r\n]+/g, " "),
       html: brandedEmail({ preheader: "You have been invited as a Super Admin", bodyHtml: `
@@ -78,7 +79,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
 
     if (!recipientsRes.rows.length) return;
 
-    const appUrl = process.env.APP_URL || "http://localhost:3000";
+    const appUrl = getAppOrigin();
     const approveUrl = `${appUrl}/admin/admin-management?approveInvite=${inviteId}`;
     const declineUrl = `${appUrl}/admin/admin-management?declineInvite=${inviteId}`;
 
@@ -91,7 +92,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
           "Super Admin";
 
         return transporter.sendMail({
-          from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+          from: getEmailFromAddress(),
           to: admin.email,
           subject: `Super Admin approval requested for ${inviteeEmail}`.replace(/[\r\n]+/g, " "),
           html: brandedEmail({
@@ -205,7 +206,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       );
       const inviteId = insertResult.rows[0]?.id;
 
-      if (!process.env.EMAIL_PASS) {
+      if (!isEmailConfigured()) {
         return res.status(201).json({
           success: true,
           emailSent: false,
@@ -280,7 +281,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       if ((invite.approvalStatus || "approved") === "approved") {
         return res.status(400).json({ error: "This invitation has already been approved." });
       }
-      if (!process.env.EMAIL_PASS) {
+      if (!isEmailConfigured()) {
         return res.status(500).json({ error: "Email not configured on server." });
       }
 
@@ -291,7 +292,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
         `${invite.inviterFirstName || ""} ${invite.inviterLastName || ""}`.trim() ||
         invite.invitedByEmail ||
         "A colleague";
-      const appUrl = process.env.APP_URL || "http://localhost:3000";
+      const appUrl = getAppOrigin();
       const tokenValue = generateOneTimeToken();
       const tokenHash = hashOpaqueToken(tokenValue);
       const registerUrl = `${appUrl}/register#token=${encodeURIComponent(tokenValue)}`;

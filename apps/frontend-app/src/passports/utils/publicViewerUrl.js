@@ -1,15 +1,24 @@
-function trimTrailingSlash(value) {
-  return String(value || "").replace(/\/+$/g, "");
+import { toSafeHttpOrigin, toSafeInternalPath } from "../../shared/security/urlSafety";
+
+export function normalizePublicViewerOrigin(value) {
+  const rawValue = String(value ?? "");
+  if (!rawValue || rawValue.trim() !== rawValue) return null;
+  return toSafeHttpOrigin(rawValue);
 }
 
 export function getPublicViewerOrigin() {
-  const configured = trimTrailingSlash(import.meta.env.VITE_PUBLIC_VIEWER_URL || "");
+  const configured = normalizePublicViewerOrigin(import.meta.env.VITE_PUBLIC_VIEWER_URL);
   if (configured) return configured;
-  if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
-  return "http://localhost:3000";
+
+  if (typeof window !== "undefined") {
+    return normalizePublicViewerOrigin(window.location?.origin) || "";
+  }
+  return "";
 }
 
 export function buildPublicViewerUrl(path) {
-  if (!path) return null;
-  return `${getPublicViewerOrigin()}${path.startsWith("/") ? path : `/${path}`}`;
+  const origin = getPublicViewerOrigin();
+  const safePath = toSafeInternalPath(path, { allowedPrefixes: ["/dpp"] });
+  if (!origin || !safePath) return null;
+  return `${origin}${safePath}`;
 }

@@ -2,9 +2,13 @@
 const crypto = require("crypto");
 const logger = require("../../services/logger");
 const {
+  getEmailFromAddress,
+  isEmailConfigured,
   renderPasswordResetBody,
   renderCompanyInvitationBody,
 } = require("../../services/email");
+const { getAppOrigin } = require("../../shared/security/configured-origin");
+const { normalizeSafeImageReference } = require("../../shared/passports/passport-uri");
 
 module.exports = function registerAuthRoutes(app, {
   pool,
@@ -32,9 +36,17 @@ module.exports = function registerAuthRoutes(app, {
   publicReadRateLimit,
   authenticateToken,
   checkCompanyAccess,
+  requireEditor,
   oauthService,
   backupProviderService,
 }) {
+  const safeAvatarUrl = (value) => {
+    try {
+      return normalizeSafeImageReference(value);
+    } catch {
+      return null;
+    }
+  };
   function buildAuthIdentityPayload(row = {}) {
     const operatorIdentifier = row.economicOperatorIdentifier || row.economicOperatorId || null;
     const operatorIdentifierScheme = row.economicOperatorIdentifierScheme || row.operatorIdentifierScheme || null;
@@ -62,7 +74,7 @@ module.exports = function registerAuthRoutes(app, {
       lastName: row.lastName ?? "",
       companyName: row.companyName ?? null,
       assetManagementEnabled: Boolean(row.assetManagementEnabled),
-      avatarUrl: row.avatarUrl ?? null,
+      avatarUrl: safeAvatarUrl(row.avatarUrl),
       phone: row.phone ?? null,
       jobTitle: row.jobTitle ?? null,
       bio: row.bio ?? null,
@@ -88,7 +100,7 @@ module.exports = function registerAuthRoutes(app, {
       lastName: row.lastName ?? "",
       role: row.role,
       jobTitle: row.jobTitle ?? null,
-      avatarUrl: row.avatarUrl ?? null,
+      avatarUrl: safeAvatarUrl(row.avatarUrl),
       isActive: Boolean(row.isActive),
       createdAt: row.createdAt ?? null,
       passportCount: Number(row.passportCount ?? 0),
@@ -320,6 +332,9 @@ module.exports = function registerAuthRoutes(app, {
       });
 
       if (u.twoFactorEnabled) {
+        if (!isEmailConfigured()) {
+          return res.status(503).json({ error: "Two-factor email delivery is not configured on the server." });
+        }
         const otp     = generateOtpCode();
         const otpHash = hashOtpCode(otp);
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -500,7 +515,7 @@ module.exports = function registerAuthRoutes(app, {
       const redirectUrl = await oauthService.handleCallback(req.params.providerKey, req, res);
       res.redirect(redirectUrl);
     } catch (e) {
-      const appUrl = String(process.env.APP_URL || "http://localhost:3000").replace(/\/+$/, "");
+      const appUrl = getAppOrigin();
       res.redirect(`${appUrl}/login?error=${encodeURIComponent(e.message || "SSO login failed")}`);
     }
   });
@@ -526,6 +541,10 @@ module.exports = function registerAuthRoutes(app, {
       if (!result.rows.length) return res.status(401).json({ error: "User not found" });
       const u = result.rows[0];
 
+      if (!isEmailConfigured()) {
+        return res.status(503).json({ error: "Two-factor email delivery is not configured on the server." });
+      }
+
       const otp     = generateOtpCode();
       const otpHash = hashOtpCode(otp);
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -544,6 +563,9 @@ module.exports = function registerAuthRoutes(app, {
       const { email } = req.body;
       if (!email) return res.status(400).json({ error: "Email required" });
       const normalizedEmail = String(email).trim().toLowerCase();
+      if (!isEmailConfigured()) {
+        return res.status(503).json({ error: "Password reset email delivery is not configured on the server." });
+      }
       const u = await pool.query('SELECT id FROM users WHERE email = $1 AND "isActive" = true', [normalizedEmail]);
       if (!u.rows.length) return res.json({ success: true });
       const token = generateOneTimeToken();
@@ -553,9 +575,9 @@ module.exports = function registerAuthRoutes(app, {
         "INSERT INTO \"passwordResetTokens\" (\"userId\", \"tokenHash\", \"expiresAt\") VALUES ($1,$2,$3)",
         [u.rows[0].id, tokenHash, exp]
       );
-      const resetUrl = `${process.env.APP_URL || "http://localhost:3000"}/reset-password#token=${encodeURIComponent(token)}`;
+      const resetUrl = `${getAppOrigin()}/reset-password#token=${encodeURIComponent(token)}`;
       await createTransporter().sendMail({
-        from: process.env.EMAIL_FROM || "noreply@example.com", to: normalizedEmail,
+        from: getEmailFromAddress(), to: normalizedEmail,
         subject: "Reset your Digital Product Passport password",
         html: brandedEmail({
           preheader: "Password Reset Request",
@@ -624,7 +646,7 @@ module.exports = function registerAuthRoutes(app, {
   });
 
   // ─── COMPANY INVITE ──────────────────────────────────────────────────────────
-  app.post("/api/companies/:companyId/invite", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.post("/api/companies/:companyId/invite", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const { companyId } = req.params;
       const { inviteeEmail, roleToAssign } = req.body;
@@ -639,7 +661,7 @@ module.exports = function registerAuthRoutes(app, {
       if (!["companyAdmin", "editor", "viewer"].includes(finalRole)) {
         return res.status(400).json({ error: "Invalid role" });
       }
-      if (!process.env.EMAIL_PASS) return res.status(500).json({ error: "Email not configured on server." });
+      if (!isEmailConfigured()) return res.status(503).json({ error: "Email is not configured on the server." });
 
       const existing = await pool.query("SELECT id FROM users WHERE email = $1", [normalizedInviteeEmail]);
       if (existing.rows.length) return res.status(400).json({ error: "This email is already registered" });
@@ -669,11 +691,11 @@ module.exports = function registerAuthRoutes(app, {
         [tokenHash, normalizedInviteeEmail, companyId, req.user.userId, expiresAt, finalRole]
       );
 
-      const appUrl      = process.env.APP_URL || "http://localhost:3000";
+      const appUrl      = getAppOrigin();
       const registerUrl = `${appUrl}/register#token=${encodeURIComponent(tokenValue)}`;
 
       await createTransporter().sendMail({
-        from: process.env.EMAIL_FROM || "onboarding@resend.dev", to: normalizedInviteeEmail,
+        from: getEmailFromAddress(), to: normalizedInviteeEmail,
         subject: `${inviterName} invited you to join ${companyName} on Digital Product Passport`.replace(/[\r\n]+/g, " "),
         html: brandedEmail({
           preheader: `You have been invited to join ${companyName}`,
@@ -690,7 +712,7 @@ module.exports = function registerAuthRoutes(app, {
       res.json({ success: true, message: `Invitation sent to ${normalizedInviteeEmail}` });
     } catch (e) {
       logger.error("Invite error:", e.message);
-      res.status(500).json({ error: "Failed to send invitation.", detail: e.message });
+      res.status(500).json({ error: "Failed to send invitation." });
     }
   });
 
@@ -743,7 +765,15 @@ module.exports = function registerAuthRoutes(app, {
       const updates = [];
       for (const [inputKey, columnName] of fieldMap.entries()) {
         if (!Object.prototype.hasOwnProperty.call(req.body || {}, inputKey)) continue;
-        updates.push([columnName, req.body[inputKey] !== undefined ? req.body[inputKey] : null]);
+        let value = req.body[inputKey] !== undefined ? req.body[inputKey] : null;
+        if (inputKey === "avatarUrl" && value !== null && value !== "") {
+          try {
+            value = normalizeSafeImageReference(value);
+          } catch {
+            return res.status(400).json({ error: "avatarUrl must be a credential-free HTTP(S) or local resource URL" });
+          }
+        }
+        updates.push([columnName, value || null]);
       }
       if (!updates.length) return res.status(400).json({ error: "Nothing to update" });
       const sets = updates.map(([columnName], i) => `${columnName} = $${i + 1}`).join(", ");

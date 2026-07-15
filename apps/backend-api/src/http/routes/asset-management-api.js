@@ -1,6 +1,10 @@
 "use strict";
 
 const logger = require("../../services/logger");
+const {
+  normalizeStoredAssetSourceConfig,
+  toPublicAssetSourceConfig,
+} = require("../../shared/assets/asset-source-config");
 
 module.exports = function registerAssetManagementApiRoutes(app, {
   pool,
@@ -29,6 +33,31 @@ module.exports = function registerAssetManagementApiRoutes(app, {
   const routeBase = "/api/companies/:companyId/passport-data-management";
   const getCompanyId = (req) => Number.parseInt(req.params.companyId, 10);
   const getUserId = (req) => req.user?.userId || req.user?.id || null;
+  const toAssetJobResponse = (job) => {
+    let sourceConfig = {};
+    try {
+      sourceConfig = toPublicAssetSourceConfig(job.sourceConfig);
+    } catch {
+      sourceConfig = {};
+    }
+    return {
+      id: job.id,
+      companyId: job.companyId,
+      passportType: job.passportType,
+      name: job.name,
+      sourceKind: job.sourceKind,
+      sourceConfig,
+      isActive: job.isActive,
+      startAt: job.startAt,
+      intervalMinutes: job.intervalMinutes,
+      nextRunAt: job.nextRunAt,
+      lastRunAt: job.lastRunAt,
+      lastStatus: job.lastStatus,
+      lastSummary: job.lastSummary,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    };
+  };
 
   app.use(routeBase, (req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
@@ -127,7 +156,10 @@ module.exports = function registerAssetManagementApiRoutes(app, {
   app.post(`${routeBase}/source/fetch`, assetSourceFetchRateLimit, requireEditor, async (req, res) => {
     try {
       const sourceConfig = isPlainObject(req.body?.sourceConfig) ? req.body.sourceConfig : {};
-      const fetched = await fetchAssetSourceRecords(sourceConfig);
+      const fetched = await fetchAssetSourceRecords(sourceConfig, {
+        allowInlineCredentials: true,
+        companyId: getCompanyId(req),
+      });
       res.json(fetched);
     } catch (error) {
       logger.error("Passport data source fetch error:", error.message);
@@ -199,15 +231,18 @@ module.exports = function registerAssetManagementApiRoutes(app, {
     }
   });
 
-  app.get(`${routeBase}/jobs`, publicReadRateLimit, async (req, res) => {
+  app.get(`${routeBase}/jobs`, publicReadRateLimit, requireEditor, async (req, res) => {
     try {
       const companyId = getCompanyId(req);
       const jobs = await pool.query(
-        `SELECT * FROM "assetManagementJobs" WHERE "companyId" = $1
+        `SELECT id, "companyId", "passportType", name, "sourceKind", "sourceConfig", "isActive",
+                "startAt", "intervalMinutes", "nextRunAt", "lastRunAt", "lastStatus", "lastSummary",
+                "createdAt", "updatedAt"
+           FROM "assetManagementJobs" WHERE "companyId" = $1
          ORDER BY "updatedAt" DESC, "createdAt" DESC LIMIT 50`,
         [companyId]
       );
-      res.json({ jobs: jobs.rows });
+      res.json({ jobs: jobs.rows.map(toAssetJobResponse) });
     } catch (error) {
       logger.error("Passport data jobs load error:", error.message);
       res.status(500).json({ error: "Failed to load Passport Data Management jobs" });
@@ -221,7 +256,10 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       const passportType = String(normalizedBody.passportType || "").trim();
       const name = String(normalizedBody.name || "").trim();
       const sourceKind = String(normalizedBody.sourceKind || "manual").trim().toLowerCase();
-      const sourceConfig = isPlainObject(normalizedBody.sourceConfig) ? normalizedBody.sourceConfig : {};
+      if (!["api", "manual"].includes(sourceKind)) return res.status(400).json({ error: "sourceKind must be api or manual" });
+      const sourceConfig = sourceKind === "api"
+        ? normalizeStoredAssetSourceConfig(isPlainObject(normalizedBody.sourceConfig) ? normalizedBody.sourceConfig : {})
+        : {};
       const records = Array.isArray(normalizedBody.records) ? normalizedBody.records : [];
       const options = isPlainObject(normalizedBody.options) ? normalizedBody.options : {};
       const startAt = normalizedBody.startAt ? new Date(normalizedBody.startAt) : null;
@@ -247,9 +285,11 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       const inserted = await pool.query(
         `INSERT INTO "assetManagementJobs"
-           ("companyId", "passportType", name, "sourceKind", "sourceConfig", "recordsJson", "optionsJson", "isActive", "startAt", "intervalMinutes", "nextRunAt")
+         ("companyId", "passportType", name, "sourceKind", "sourceConfig", "recordsJson", "optionsJson", "isActive", "startAt", "intervalMinutes", "nextRunAt")
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-         RETURNING *`,
+         RETURNING id, "companyId", "passportType", name, "sourceKind", "sourceConfig", "isActive",
+                   "startAt", "intervalMinutes", "nextRunAt", "lastRunAt", "lastStatus", "lastSummary",
+                   "createdAt", "updatedAt"`,
         [
           companyId, typeSchema.typeName, name, sourceKind,
           JSON.stringify(sourceConfig), JSON.stringify(records), JSON.stringify(options),
@@ -259,7 +299,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         ]
       );
 
-      res.status(201).json({ job: inserted.rows[0] });
+      res.status(201).json({ job: toAssetJobResponse(inserted.rows[0]) });
     } catch (error) {
       logger.error("Passport data job create error:", error.message);
       res.status(400).json({ error: error.message || "Failed to save Passport Data Management job" });
@@ -282,10 +322,14 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       const passportType = normalizedBody.passportType || current.passportType;
       const typeSchema = await assertCompanyAssetPassportTypeAccess(companyId, passportType);
 
-      const sourceKind = normalizedBody.sourceKind || current.sourceKind;
-      const sourceConfig = normalizedBody.sourceConfig !== undefined
-        ? (isPlainObject(normalizedBody.sourceConfig) ? normalizedBody.sourceConfig : {})
-        : (current.sourceConfig || {});
+      const sourceKind = String(normalizedBody.sourceKind || current.sourceKind || "manual").trim().toLowerCase();
+      if (!["api", "manual"].includes(sourceKind)) return res.status(400).json({ error: "sourceKind must be api or manual" });
+      const sourceConfig = sourceKind === "api"
+        ? (normalizedBody.sourceConfig !== undefined
+          ? normalizeStoredAssetSourceConfig(isPlainObject(normalizedBody.sourceConfig) ? normalizedBody.sourceConfig : {})
+          : normalizeStoredAssetSourceConfig(current.sourceConfig || {}))
+        : {};
+      const clearExecutionState = normalizedBody.sourceConfig !== undefined || sourceKind !== current.sourceKind;
       const records = normalizedBody.records !== undefined
         ? (Array.isArray(normalizedBody.records) ? normalizedBody.records : [])
         : (Array.isArray(current.recordsJson) ? current.recordsJson : []);
@@ -317,19 +361,26 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         `UPDATE "assetManagementJobs"
          SET "passportType" = $2, name = $3, "sourceKind" = $4, "sourceConfig" = $5,
              "recordsJson" = $6, "optionsJson" = $7, "isActive" = $8, "startAt" = $9,
-             "intervalMinutes" = $10, "nextRunAt" = $11, "updatedAt" = NOW()
+             "intervalMinutes" = $10, "nextRunAt" = $11,
+             "lastRunAt" = CASE WHEN $12 THEN NULL ELSE "lastRunAt" END,
+             "lastStatus" = CASE WHEN $12 THEN NULL ELSE "lastStatus" END,
+             "lastSummary" = CASE WHEN $12 THEN NULL ELSE "lastSummary" END,
+             "updatedAt" = NOW()
          WHERE id = $1
-         RETURNING *`,
+         RETURNING id, "companyId", "passportType", name, "sourceKind", "sourceConfig", "isActive",
+                   "startAt", "intervalMinutes", "nextRunAt", "lastRunAt", "lastStatus", "lastSummary",
+                   "createdAt", "updatedAt"`,
         [
           jobId, typeSchema.typeName, name, sourceKind,
           JSON.stringify(sourceConfig), JSON.stringify(records), JSON.stringify(options),
           !!(isActive && nextRunAt), startAt,
           Number.isFinite(intervalMinutes) ? intervalMinutes : null,
           nextRunAt,
+          clearExecutionState,
         ]
       );
 
-      res.json({ job: updated.rows[0] });
+      res.json({ job: toAssetJobResponse(updated.rows[0]) });
     } catch (error) {
       logger.error("Passport data job update error:", error.message);
       res.status(400).json({ error: error.message || "Failed to update Passport Data Management job" });
@@ -359,13 +410,15 @@ module.exports = function registerAssetManagementApiRoutes(app, {
     }
   });
 
-  app.get(`${routeBase}/runs`, publicReadRateLimit, async (req, res) => {
+  app.get(`${routeBase}/runs`, publicReadRateLimit, requireEditor, async (req, res) => {
     try {
       const companyId = getCompanyId(req);
       const limit = Math.min(Number.parseInt(req.query.limit, 10) || 25, 100);
 
       const runs = await pool.query(
-        `SELECT * FROM "assetManagementRuns" WHERE "companyId" = $1 ORDER BY "createdAt" DESC LIMIT $2`,
+        `SELECT id, "jobId", "companyId", "passportType", "triggerType", "sourceKind", status,
+                "summaryJson", "createdAt"
+           FROM "assetManagementRuns" WHERE "companyId" = $1 ORDER BY "createdAt" DESC LIMIT $2`,
         [companyId, limit]
       );
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
+import { safeWindowOpen, toSafeInternalPath } from "../../../shared/security/urlSafety";
 import "../../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -99,12 +100,13 @@ function NotificationsPanel({ user }) {
   const handleClick = (n) => {
     markRead(n.id);
     setOpen(false);
-    if (n.actionUrl) {
-      navigate(n.actionUrl);
+    const safeActionPath = toSafeInternalPath(n.actionUrl);
+    if (safeActionPath) {
+      navigate(safeActionPath);
       return;
     }
     if (n.passportDppId) {
-      window.open(`${window.location.origin}/dpp/preview/company/product/${encodeURIComponent(n.passportDppId)}`, "_blank", "noopener,noreferrer");
+      safeWindowOpen(`${window.location.origin}/dpp/preview/company/product/${encodeURIComponent(n.passportDppId)}`);
       return;
     }
   };

@@ -22,5 +22,5 @@ In Docker, it is served by Nginx.
 
 Relevant files:
 
-- [apps/marketing-site/Dockerfile](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/marketing-site/Dockerfile:1)
-- [docker/docker-compose.yml](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/docker/docker-compose.yml:66)
+- `apps/marketing-site/Dockerfile:1`
+- `docker/docker-compose.yml:1`

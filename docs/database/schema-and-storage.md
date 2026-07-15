@@ -15,7 +15,7 @@ Files such as repository uploads and passport-related files are stored through t
 
 The database initializer is:
 
-- [apps/backend-api/src/db/init.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/db/init.js:202)
+- `apps/backend-api/src/db/init.js:202`
 
 It is idempotent, which means startup can safely re-run the same schema setup logic.
 
@@ -44,7 +44,7 @@ That means the schema is partly fixed and partly generated from passport type de
 
 Runtime path derivation is in:
 
-- [apps/backend-api/src/bootstrap/runtime-config.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/bootstrap/runtime-config.js:12)
+- `apps/backend-api/src/bootstrap/runtime-config.js:12`
 
 Important directories:
 
@@ -58,17 +58,13 @@ Important directories:
 
 Current storage implementation entrypoint:
 
-- [apps/backend-api/src/infrastructure/storage/create-storage-service.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/infrastructure/storage/create-storage-service.js:1)
-
-Underlying implementation:
-
-- [apps/backend-api/src/services/storage-service.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/services/storage-service.js:1)
+- `apps/backend-api/src/services/storage-service.js:1`
 
 ## Health Checks
 
 Health endpoints:
 
-- [apps/backend-api/src/http/routes/health.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/health.js:10)
+- `apps/backend-api/src/http/routes/health.js:10`
 
 They check:
 

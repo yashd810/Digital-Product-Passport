@@ -1,7 +1,8 @@
 "use strict";
 
 const { buildDashboardPath } = require("../../shared/navigation/dashboard-paths");
-const { escapeHtml } = require("../../services/email");
+const { getAppOrigin } = require("../../shared/security/configured-origin");
+const { escapeHtml, getEmailFromAddress } = require("../../services/email");
 
 function createWorkflowHelpers({
   pool,
@@ -27,6 +28,36 @@ function createWorkflowHelpers({
     }
   }
 
+  function normalizeWorkflowAssigneeId(value, label) {
+    if (value === null || value === undefined || value === "") return null;
+    const text = String(value).trim();
+    if (!/^[1-9][0-9]{0,9}$/.test(text)) {
+      throw new Error(`${label} must be a valid user identifier`);
+    }
+    const id = Number(text);
+    if (!Number.isSafeInteger(id)) {
+      throw new Error(`${label} must be a valid user identifier`);
+    }
+    return id;
+  }
+
+  async function assertWorkflowAssigneesBelongToCompany({ companyId, reviewerId, approverId }) {
+    const assigneeIds = [...new Set([reviewerId, approverId].filter(Boolean))];
+    if (!assigneeIds.length) return;
+    const result = await pool.query(
+      `SELECT id
+       FROM users
+       WHERE "companyId" = $1
+         AND "isActive" = true
+         AND id = ANY($2::int[])`,
+      [companyId, assigneeIds]
+    );
+    const activeCompanyAssigneeIds = new Set(result.rows.map((row) => Number(row.id)));
+    if (assigneeIds.some((id) => !activeCompanyAssigneeIds.has(id))) {
+      throw new Error("Reviewer and approver must be active members of this company");
+    }
+  }
+
   async function submitPassportToWorkflow({
     companyId,
     dppId = null,
@@ -36,12 +67,17 @@ function createWorkflowHelpers({
     approverId,
   }) {
     const tableName = getTable(passportType);
-    const resolvedReviewerId = reviewerId ? parseInt(reviewerId, 10) : null;
-    const resolvedApproverId = approverId ? parseInt(approverId, 10) : null;
+    const resolvedReviewerId = normalizeWorkflowAssigneeId(reviewerId, "reviewerId");
+    const resolvedApproverId = normalizeWorkflowAssigneeId(approverId, "approverId");
 
     if (!resolvedReviewerId && !resolvedApproverId) {
       throw new Error("At least one reviewer or approver is required to submit a revision to workflow.");
     }
+    await assertWorkflowAssigneesBelongToCompany({
+      companyId,
+      reviewerId: resolvedReviewerId,
+      approverId: resolvedApproverId,
+    });
 
     const pRes = await pool.query(
       `SELECT * FROM ${tableName}
@@ -114,7 +150,7 @@ function createWorkflowHelpers({
       }));
     }
 
-    const appUrl = process.env.APP_URL || "http://localhost:3000";
+    const appUrl = getAppOrigin();
     const companyDashboardWorkflowPath = buildDashboardPath({ companyId, subpath: "workflow/inprogress" });
 
     if (resolvedReviewerId) {
@@ -136,7 +172,7 @@ function createWorkflowHelpers({
             submitter.rows[0]?.email ||
             "A colleague";
           await createTransporter().sendMail({
-            from: process.env.EMAIL_FROM || "noreply@example.com",
+            from: getEmailFromAddress(),
             to: reviewer.rows[0].email,
             subject: `[DPP] Review requested — ${passport.internalAliasId}`.replace(/[\r\n]+/g, " "),
             html: brandedEmail({

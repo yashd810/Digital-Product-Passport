@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { getApiOrigin } = require("../shared/security/configured-origin");
 const logger = require("./logger");
 
 function normalizeBaseUrl(value) {
@@ -266,11 +267,7 @@ function createS3StorageService(options) {
 function createStorageService(options) {
   const provider = String(process.env.STORAGE_PROVIDER || "local").trim().toLowerCase();
   const serverBaseUrl = normalizeBaseUrl(
-    process.env.PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    process.env.SERVER_URL ||
-    options.serverBaseUrl ||
-    "http://localhost:3001"
+    options.serverBaseUrl || getApiOrigin()
   );
   const localStorageDir = path.resolve(options.localStorageDir);
   const filesBaseDir = path.resolve(options.filesBaseDir);

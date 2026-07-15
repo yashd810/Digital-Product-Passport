@@ -10,6 +10,7 @@ const {
 const {
   flattenSchemaFieldsFromSections,
 } = require("../shared/passports/passport-helpers");
+const { getApiOrigin } = require("../shared/security/configured-origin");
 
 function toBoolean(value, fallback = false) {
   if (value === undefined || value === null || value === "") return fallback;
@@ -93,7 +94,8 @@ function normalizeProviderRecord(provider = {}) {
 module.exports = function createBackupProviderService({
   pool,
   storageService,
-  buildCanonicalPassportPayload
+  buildCanonicalPassportPayload,
+  apiOrigin = null,
 }) {
   function parseStoredJson(value, fallback = null) {
     if (value === null || value === undefined || value === "") return fallback;
@@ -511,12 +513,7 @@ module.exports = function createBackupProviderService({
       companyId: passport.companyId,
       passportDppId: passport.dppId,
     });
-    const appBaseUrl = normalizeText(
-      process.env.PUBLIC_APP_URL ||
-      process.env.APP_URL ||
-      process.env.SERVER_URL,
-      "http://localhost:3001"
-    ).replace(/\/+$/, "");
+    const appBaseUrl = apiOrigin || getApiOrigin();
 
     const attachmentCopies = [];
     const includedByReference = [];

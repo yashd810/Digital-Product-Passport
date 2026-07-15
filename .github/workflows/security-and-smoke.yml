@@ -1,5 +1,8 @@
 name: Security And Smoke
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -9,26 +12,28 @@ on:
 
 jobs:
   secret-scan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - name: Scan the current source tree for committed secrets
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          fetch-depth: 0
+      - name: Scan committed history and current source for secrets
         run: >-
           docker run --rm
           -v "$PWD:/repo:ro"
-          zricethezav/gitleaks:v8.30.1
-          detect --source=/repo --no-git --redact --config=/repo/.gitleaks.toml
+          zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          detect --source=/repo --redact --config=/repo/.gitleaks.toml
 
   backend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/backend-api
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 22
+          node-version: 22.23.1
           cache: npm
           cache-dependency-path: apps/backend-api/package-lock.json
       - run: npm ci
@@ -39,9 +44,9 @@ jobs:
       - run: npm audit --omit=dev --audit-level=moderate
 
   repository-hygiene:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
           fetch-depth: 0
       - name: Check repository secret hygiene
@@ -55,53 +60,60 @@ jobs:
           fi
 
   backend-smoke:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: dpp_system
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d dpp_system"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/backend-api
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 22
+          node-version: 22.23.1
           cache: npm
           cache-dependency-path: apps/backend-api/package-lock.json
       - run: npm ci
+      - name: Build and start hardened PostgreSQL
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker build --pull=false -f infra/docker/postgres/Dockerfile -t dpp-postgres:ci .
+          docker run -d --name dpp-ci-postgres -p 127.0.0.1:5432:5432 \
+            -e POSTGRES_DB=dppSystem \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=ci-postgres-password-only-not-a-production-secret-1234567890 \
+            dpp-postgres:ci
+          for attempt in $(seq 1 30); do
+            if docker exec dpp-ci-postgres pg_isready -U postgres -d dppSystem; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs dpp-ci-postgres
+          exit 1
+      - name: Create ephemeral backend smoke secrets
+        working-directory: ${{ github.workspace }}
+        run: |
+          umask 077
+          bash infra/oracle/generate-env-secrets.sh > docker/.env
       - name: Boot backend and hit health endpoint
         env:
           NODE_ENV: development
           PORT: 3001
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
-          DB_NAME: dpp_system
+          DB_NAME: dppSystem
           DB_USER: postgres
-          DB_PASSWORD: postgres
-          JWT_SECRET: ci-smoke-secret
-          PEPPER_V1: ci-smoke-pepper
+          DB_PASSWORD: ci-postgres-password-only-not-a-production-secret-1234567890
           SERVER_URL: http://127.0.0.1:3001
           APP_URL: http://127.0.0.1:3000
-          PUBLIC_APP_URL: http://127.0.0.1:3000
-          DID_WEB_DOMAIN: www.example.test
+          VITE_PUBLIC_VIEWER_URL: http://127.0.0.1:3004
+          ALLOWED_ORIGINS: http://127.0.0.1:3000,http://127.0.0.1:3004,http://127.0.0.1:8080
         run: |
           node src/server.js > /tmp/backend-smoke.log 2>&1 &
           backend_pid=$!
           cleanup() {
             kill "$backend_pid" >/dev/null 2>&1 || true
             wait "$backend_pid" >/dev/null 2>&1 || true
+            docker rm -f dpp-ci-postgres >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
           for attempt in $(seq 1 30); do
@@ -112,26 +124,29 @@ jobs:
           done
           cat /tmp/backend-smoke.log
           exit 1
+      - name: Stop hardened PostgreSQL
+        if: always()
+        run: docker rm -f dpp-ci-postgres >/dev/null 2>&1 || true
 
   compose-config:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
       - name: Create safe compose env for CI
         run: |
+          umask 077
           cat > docker/.env <<'EOF'
           NODE_ENV=development
-          DB_NAME=dpp_system
+          DB_NAME=dppSystem
           DB_USER=postgres
-          DB_PASSWORD=postgres
-          JWT_SECRET=ci-compose-secret
-          PEPPER_V1=ci-compose-pepper
           SERVER_URL=http://localhost:3001
           APP_URL=http://localhost:3000
-          VITE_API_URL=http://localhost:3001
+          MARKETING_URL=http://localhost:8080
           VITE_PUBLIC_VIEWER_URL=http://localhost:3004
-          ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3004
+          ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3004,http://localhost:8080
           EOF
+          bash infra/oracle/generate-env-secrets.sh >> docker/.env
+          chmod 600 docker/.env
       - run: docker compose -f docker/docker-compose.yml --env-file docker/.env config -q
       - run: DPP_ENV_FILE=../infra/oracle/oci.env.example docker compose -f docker/docker-compose.prod.yml --env-file infra/oracle/oci.env.example config -q
       - run: DPP_ENV_FILE=../infra/oracle/oci.env.example docker compose -f docker/docker-compose.prod.backend.yml --env-file infra/oracle/oci.env.example config -q
@@ -139,12 +154,12 @@ jobs:
       - run: sh infra/oracle/check-edge-policy-config.sh
 
   ops-and-local-tools:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 22
+          node-version: 22.23.1
       - name: Check local generator syntax
         run: |
           node --check local-tools/passport-module-generator/server.js
@@ -155,6 +170,7 @@ jobs:
           bash -n infra/oracle/check-edge-policy-config.sh
           bash -n infra/oracle/check-edge-tls.sh
           bash -n infra/oracle/check-live-edge.sh
+          bash -n infra/oracle/check-marketing-public-content.sh
           bash -n infra/oracle/db-backup.sh
           bash -n infra/oracle/deploy-prod.sh
           bash -n infra/oracle/install-db-backup-jobs.sh
@@ -163,15 +179,15 @@ jobs:
           bash -n scripts/troubleshoot-oci.sh
 
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/frontend-app
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 22
+          node-version: 22.23.1
           cache: npm
           cache-dependency-path: apps/frontend-app/package-lock.json
       - run: npm ci
@@ -181,15 +197,15 @@ jobs:
       - run: npm audit --omit=dev --audit-level=moderate
 
   public-viewer:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/public-passport-viewer
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 22
+          node-version: 22.23.1
           cache: npm
           cache-dependency-path: apps/public-passport-viewer/package-lock.json
       - run: npm ci
@@ -197,27 +213,53 @@ jobs:
       - run: npm audit --omit=dev --audit-level=moderate
 
   container-builds:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: backend
             dockerfile: apps/backend-api/Dockerfile
+            build_args: ""
           - name: frontend
             dockerfile: apps/frontend-app/Dockerfile
+            build_args: |
+              VITE_API_URL=https://api.example.test
+              VITE_PUBLIC_VIEWER_URL=https://viewer.example.test
+              VITE_MARKETING_URL=https://www.example.test
           - name: public-viewer
             dockerfile: apps/public-passport-viewer/Dockerfile
+            build_args: |
+              VITE_API_URL=https://api.example.test
+              VITE_PUBLIC_VIEWER_URL=https://viewer.example.test
+              VITE_MARKETING_URL=https://www.example.test
           - name: marketing
             dockerfile: apps/marketing-site/Dockerfile
+            build_args: |
+              MARKETING_URL=https://www.example.test
+              MARKETING_APP_URL=https://app.example.test
+              MARKETING_API_URL=https://api.example.test
+          - name: postgres
+            dockerfile: infra/docker/postgres/Dockerfile
+            build_args: ""
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - name: Build ${{ matrix.name }} production image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: ${{ matrix.dockerfile }}
           push: false
+          load: true
+          tags: dpp-ci-${{ matrix.name }}:scan
+          build-args: ${{ matrix.build_args }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: Scan ${{ matrix.name }} image for fixable high-severity vulnerabilities
+        run: >-
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
+          image --ignore-unfixed --exit-code 1 --severity HIGH,CRITICAL
+          dpp-ci-${{ matrix.name }}:scan

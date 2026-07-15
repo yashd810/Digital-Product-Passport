@@ -1,8 +1,7 @@
-const absoluteIriPattern = /^[A-Za-z][A-Za-z0-9+.-]*:[^\s]+$/;
+import { isSafeIdentifierUri } from "../security/urlSafety";
 
 export function isSafeSemanticIri(value) {
-  const iri = String(value || "").trim();
-  return absoluteIriPattern.test(iri) && !/^(?:javascript|data|vbscript):/i.test(iri);
+  return isSafeIdentifierUri(value);
 }
 
 export function isPlainObject(value) {

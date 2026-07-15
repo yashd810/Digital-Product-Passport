@@ -1,3 +1,7 @@
+"use strict";
+
+const { getApiOrigin, getPublicViewerOrigin } = require("../../shared/security/configured-origin");
+
 function createCarrierSecurityHelpers({
   pool,
   logger,
@@ -12,7 +16,7 @@ function createCarrierSecurityHelpers({
 
   function buildPublicAccessUrl(pathname) {
     if (!pathname) return null;
-    const origin = process.env.PUBLIC_ORIGIN || process.env.APP_URL || "http://localhost:3001";
+    const origin = getPublicViewerOrigin();
     try {
       return new URL(pathname, origin).toString();
     } catch {
@@ -39,7 +43,7 @@ function createCarrierSecurityHelpers({
   }
 
   function getTrustedViewerOrigin() {
-    return process.env.PUBLIC_APP_URL || process.env.PUBLIC_VIEWER_URL || process.env.APP_URL || "http://localhost:3000";
+    return getPublicViewerOrigin();
   }
 
   function getTrustedViewerHost() {
@@ -159,7 +163,7 @@ function createCarrierSecurityHelpers({
         carrierCompatibilityProfiles: enrichedMetadata.carrierCompatibilityProfiles || [],
         physicalCarrierSecurityFeatures: enrichedMetadata.physicalCarrierSecurityFeatures || [],
       },
-      contexts: ["https://api.claros-dpp.online/contexts/dpp/v1"],
+      contexts: [`${getApiOrigin()}/contexts/dpp/v1`],
     });
 
     if (!credential) return enrichedMetadata;

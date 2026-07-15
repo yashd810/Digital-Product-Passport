@@ -2,6 +2,7 @@ const {
   flattenSchemaFieldsFromSections,
   mapPassportTypeRow,
 } = require("../../shared/passports/passport-helpers");
+const { getApiOrigin } = require("../../shared/security/configured-origin");
 
 function registerPassportSupportRoutes(app, deps) {
   const {
@@ -147,7 +148,7 @@ function registerPassportSupportRoutes(app, deps) {
         });
         const fileUrl = stored.url;
         const publicId = crypto.randomBytes(10).toString("base64url").slice(0, 16);
-        const apiUrl = String(process.env.SERVER_URL || process.env.APP_URL || "http://localhost:3001").replace(/\/+$/, "");
+        const apiUrl = getApiOrigin();
         const publicFileUrl = `${apiUrl}/public-files/${publicId}`;
         const client = await pool.connect();
         try {

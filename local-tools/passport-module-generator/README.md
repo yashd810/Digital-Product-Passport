@@ -1,12 +1,9 @@
 # Passport Module Generator
 
-Local-only helper for creating code-defined passport modules and semantic dictionary files.
-
-This folder is intentionally ignored by Git:
-
-```text
-local-tools/passport-module-generator/
-```
+Versioned, local-only development helper for creating code-defined passport
+modules and semantic dictionary files. It is kept in the repository so its
+export format and security boundaries are covered by the backend test suite;
+it is not bundled into, deployed with, or reachable from the runtime app.
 
 Run it from the repo root:
 

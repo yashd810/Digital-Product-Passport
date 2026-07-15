@@ -9,6 +9,7 @@ const {
   getPassportFieldValue,
 } = require("../shared/passports/passport-helpers");
 const { getPassportFieldDataTypeError } = require("../shared/passports/passport-field-data-types");
+const { isResourceField, isSafePassportUri } = require("../shared/passports/passport-uri");
 const {
   getSemanticGraphClass,
   isManyProperty,
@@ -86,6 +87,84 @@ function createCanonicalPassportSerializer({
     return String(value || "").trim();
   }
 
+  const maxSemanticPatternLength = 256;
+  const maxSemanticPatternInputLength = 4096;
+
+  function compileSafeSemanticPattern(value) {
+    const pattern = normalizeText(value);
+    if (!pattern || pattern.length > maxSemanticPatternLength) return null;
+
+    let index = pattern.startsWith("^") ? 1 : 0;
+    let hasAtom = false;
+    while (index < pattern.length) {
+      if (pattern[index] === "$") {
+        if (index !== pattern.length - 1 || !hasAtom) return null;
+        break;
+      }
+
+      const token = pattern[index];
+      if (token === "\\") {
+        const escaped = pattern[index + 1];
+        // Backreferences turn a regular expression into a potentially
+        // super-linear matcher, so semantic patterns deliberately do not
+        // support them.
+        if (!escaped || /[1-9]/.test(escaped) || escaped === "k") return null;
+        index += 2;
+      } else if (token === "[") {
+        index += 1;
+        let closed = false;
+        while (index < pattern.length) {
+          if (pattern[index] === "\\") {
+            if (!pattern[index + 1]) return null;
+            index += 2;
+            continue;
+          }
+          if (pattern[index] === "[") return null;
+          if (pattern[index] === "]") {
+            closed = true;
+            index += 1;
+            break;
+          }
+          index += 1;
+        }
+        if (!closed) return null;
+      } else if (/[\\()[\]|*+?{}^$]/.test(token)) {
+        // Groups, alternation, and unbounded repetitions are not needed for
+        // dictionary identifier formats and can cause catastrophic backtracking.
+        return null;
+      } else {
+        index += 1;
+      }
+
+      hasAtom = true;
+      if (pattern[index] === "?") {
+        index += 1;
+      } else if (pattern[index] === "{") {
+        const closingBrace = pattern.indexOf("}", index + 1);
+        if (closingBrace < 0) return null;
+        const parts = pattern.slice(index + 1, closingBrace).split(",");
+        if (parts.length > 2 || parts.some((part) => !/^\d+$/.test(part))) return null;
+        const minimum = Number(parts[0]);
+        const maximum = Number(parts[parts.length - 1]);
+        if (!Number.isSafeInteger(minimum)
+          || !Number.isSafeInteger(maximum)
+          || minimum > maximum
+          || maximum > 1024) {
+          return null;
+        }
+        index = closingBrace + 1;
+      }
+    }
+
+    if (!hasAtom) return null;
+    try {
+      // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- The parser above accepts only bounded, group-free, backreference-free semantic identifier patterns before compilation.
+      return new RegExp(pattern, "u");
+    } catch {
+      return null;
+    }
+  }
+
   function normalizeLookupKey(value) {
     return normalizeText(value)
       .toLowerCase()
@@ -94,10 +173,7 @@ function createCanonicalPassportSerializer({
   }
 
   function isUriLikeValue(value) {
-    const text = normalizeText(value);
-    if (!text) return false;
-    if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return true;
-    return /^https?:\/\//i.test(text);
+    return isSafePassportUri(value);
   }
 
   function parseBoolean(value) {
@@ -309,13 +385,6 @@ function createCanonicalPassportSerializer({
     return /^\d{4}-(0[1-9]|1[0-2])$/.test(normalizeText(value));
   }
 
-  function isUriLike(value) {
-    const text = normalizeText(value);
-    if (!text) return false;
-    if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return true;
-    return /^https?:\/\//i.test(text);
-  }
-
   function isLanguageTagLike(value) {
     return /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(normalizeText(value));
   }
@@ -491,7 +560,7 @@ function createCanonicalPassportSerializer({
         pushIssue("semanticTypeMismatch", `Expected xsd:gYearMonth string for "${key}".`);
       }
     } else if (xsdType.endsWith(":anyuri")) {
-      if (typeof value !== "string" || !isUriLike(value)) {
+      if (typeof value !== "string" || !isSafePassportUri(value, { resource: isResourceField(fieldDef) })) {
         pushIssue("semanticTypeMismatch", `Expected xsd:anyURI string for "${key}".`);
       }
     } else if (xsdType.endsWith(":base64binary")) {
@@ -505,13 +574,13 @@ function createCanonicalPassportSerializer({
     }
 
     if (pattern && typeof value === "string") {
-      try {
-        const regex = new RegExp(pattern);
-        if (!regex.test(value)) {
-          pushIssue("semanticPatternMismatch", `Value for "${key}" does not match its declared pattern.`);
-        }
-      } catch {
-        // Ignore malformed repository patterns rather than breaking export.
+      const regex = compileSafeSemanticPattern(pattern);
+      if (!regex) {
+        pushIssue("semanticPatternUnsupported", `Dictionary pattern for "${key}" is not a bounded safe pattern.`);
+      } else if (value.length > maxSemanticPatternInputLength) {
+        pushIssue("semanticPatternInputTooLong", `Value for "${key}" is too long to validate against a dictionary pattern.`);
+      } else if (!regex.test(value)) {
+        pushIssue("semanticPatternMismatch", `Value for "${key}" does not match its declared pattern.`);
       }
     }
 
@@ -665,7 +734,7 @@ function createCanonicalPassportSerializer({
         pushIssue("fieldTypeMismatch", `Expected date-time value for "${key}".`);
       }
     } else if (!skipTypeValidation && (normalizedDataType === "uri" || normalizedFieldType === "url")) {
-      if (typeof value !== "string" || !isUriLike(value)) {
+      if (typeof value !== "string" || !isSafePassportUri(value, { resource: isResourceField(fieldDef) })) {
         pushIssue("fieldTypeMismatch", `Expected URL/URI value for "${key}".`);
       }
     }

@@ -4,13 +4,93 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/dpp}"
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
-LOCK_FILE="${DPP_DEPLOY_LOCK_FILE:-/tmp/dpp-deploy.lock}"
+LOCK_FILE=""
+
+file_mode() {
+  local file="$1"
+  if stat -c '%a' "$file" >/dev/null 2>&1; then
+    stat -c '%a' "$file"
+  else
+    stat -f '%Lp' "$file"
+  fi
+}
+
+file_owner() {
+  local file="$1"
+  if stat -c '%u' "$file" >/dev/null 2>&1; then
+    stat -c '%u' "$file"
+  else
+    stat -f '%u' "$file"
+  fi
+}
+
+prepare_deployment_lock() {
+  local state_dir
+  local expected_owner
+  local state_mode
+  local lock_mode
+
+  expected_owner="$(id -u)"
+  if [ "$expected_owner" -eq 0 ]; then
+    state_dir="/var/lock/dpp"
+    if [ -L "$state_dir" ]; then
+      echo "Refusing symlinked deployment state directory: $state_dir"
+      exit 1
+    fi
+    install -d -o root -g root -m 0700 "$state_dir"
+  else
+    state_dir="${XDG_RUNTIME_DIR:-${HOME:-$APP_DIR}/.cache}/dpp"
+    if [ -L "$state_dir" ]; then
+      echo "Refusing symlinked deployment state directory: $state_dir"
+      exit 1
+    fi
+    install -d -m 0700 "$state_dir"
+  fi
+
+  if [ ! -d "$state_dir" ] || [ -L "$state_dir" ]; then
+    echo "Deployment state directory is not a safe directory: $state_dir"
+    exit 1
+  fi
+  if [ "$(file_owner "$state_dir")" != "$expected_owner" ]; then
+    echo "Deployment state directory must be owned by the deploying user: $state_dir"
+    exit 1
+  fi
+  state_mode="$(file_mode "$state_dir")"
+  if (( (8#$state_mode & 8#077) != 0 )); then
+    echo "Deployment state directory must not be accessible to group or others: $state_dir"
+    exit 1
+  fi
+
+  LOCK_FILE="$state_dir/deploy.lock"
+  if [ -L "$LOCK_FILE" ] || { [ -e "$LOCK_FILE" ] && [ ! -f "$LOCK_FILE" ]; }; then
+    echo "Deployment lock must be a regular non-symlinked file: $LOCK_FILE"
+    exit 1
+  fi
+
+  umask 077
+  : >>"$LOCK_FILE"
+  if [ "$(file_owner "$LOCK_FILE")" != "$expected_owner" ]; then
+    echo "Deployment lock must be owned by the deploying user: $LOCK_FILE"
+    exit 1
+  fi
+  lock_mode="$(file_mode "$LOCK_FILE")"
+  if (( (8#$lock_mode & 8#077) != 0 )); then
+    echo "Deployment lock must not be accessible to group or others: $LOCK_FILE"
+    exit 1
+  fi
+
+  exec 9>>"$LOCK_FILE"
+  if ! flock -n 9; then
+    echo "Another DPP deployment is already running. Lock: $LOCK_FILE"
+    exit 1
+  fi
+}
 
 read_env_var() {
   local key="$1"
-  awk -F= -v target="$key" '
-    $1 ~ "^[[:space:]]*" target "[[:space:]]*$" {
-      value=$2
+  awk -v target="$key" '
+    $0 ~ "^[[:space:]]*" target "[[:space:]]*=" {
+      value=substr($0, index($0, "=") + 1)
       gsub(/^[[:space:]"'\''"]+|[[:space:]"'\''"]+$/, "", value)
       print value
       exit
@@ -24,6 +104,73 @@ require_env_var() {
   value="$(read_env_var "$key")"
   if [ -z "$value" ]; then
     echo "Missing required production env var: $key"
+    exit 1
+  fi
+}
+
+require_secret_env_var() {
+  local key="$1"
+  local value
+  value="$(read_env_var "$key")"
+  if [ "${#value}" -lt 32 ] || [[ "$value" == REPLACE_* ]]; then
+    echo "Production secret $key must contain at least 32 characters"
+    exit 1
+  fi
+}
+
+require_non_placeholder_env_var() {
+  local key="$1"
+  local value
+  value="$(read_env_var "$key")"
+  if [ -z "$value" ]; then
+    echo "Missing required production env var: $key"
+    exit 1
+  fi
+  case "${value^^}" in
+    *REPLACE*|*CHANGE*|*YOUR_*)
+      echo "Production env var $key must not use a placeholder"
+      exit 1
+      ;;
+  esac
+}
+
+require_boolean_env_var() {
+  local key="$1"
+  local value
+  value="$(read_env_var "$key")"
+  case "$value" in
+    true|false)
+      return 0
+      ;;
+    *)
+      echo "Production env var $key must be explicitly set to true or false"
+      exit 1
+      ;;
+  esac
+}
+
+require_distinct_secret_env_vars() {
+  local first="$1"
+  local second="$2"
+  local first_value
+  local second_value
+  first_value="$(read_env_var "$first")"
+  second_value="$(read_env_var "$second")"
+  if [ "$first_value" = "$second_value" ]; then
+    echo "Production secrets $first and $second must use distinct values"
+    exit 1
+  fi
+}
+
+require_distinct_env_vars() {
+  local first="$1"
+  local second="$2"
+  local first_value
+  local second_value
+  first_value="$(read_env_var "$first")"
+  second_value="$(read_env_var "$second")"
+  if [ "$first_value" = "$second_value" ]; then
+    echo "Production configuration $first and $second must use distinct values"
     exit 1
   fi
 }
@@ -50,15 +197,47 @@ require_https_url_env() {
   esac
 }
 
+require_matching_https_origin_env() {
+  local first_key="$1"
+  local second_key="$2"
+  local first_value
+  local second_value
+  first_value="$(read_env_var "$first_key")"
+  second_value="$(read_env_var "$second_key")"
+  first_value="${first_value%/}"
+  second_value="${second_value%/}"
+  if [ "$first_value" != "$second_value" ]; then
+    echo "Production URL env vars $first_key and $second_key must be the same origin"
+    exit 1
+  fi
+}
+
 if [ ! -d "$APP_DIR" ]; then
   echo "Missing app directory: $APP_DIR"
   exit 1
 fi
 
-if [ ! -f "$ENV_FILE" ]; then
+if [ -L "$ENV_FILE" ] || [ ! -f "$ENV_FILE" ]; then
   echo "Missing production env file: $ENV_FILE"
   exit 1
 fi
+
+ENV_MODE="$(file_mode "$ENV_FILE")"
+if [ "$ENV_MODE" != "600" ]; then
+  echo "Production env file must have mode 600: $ENV_FILE"
+  exit 1
+fi
+if [ "$(id -u)" -eq 0 ] && [ "$(file_owner "$ENV_FILE")" != "0" ]; then
+  echo "Production env file must be owned by root when deploying as root: $ENV_FILE"
+  exit 1
+fi
+
+if ! command -v flock >/dev/null 2>&1; then
+  echo "flock is required to prevent concurrent deployments."
+  exit 1
+fi
+
+prepare_deployment_lock
 
 if [ -z "${DPP_DEPLOY_TARGET:-}" ]; then
   DEPLOY_TARGET="$(read_env_var DPP_DEPLOY_TARGET)"
@@ -158,27 +337,73 @@ fi
 
 case "$DEPLOY_TARGET" in
   backend|all)
-    require_env_var "JWT_SECRET"
-    require_env_var "PEPPER_V1"
+    require_secret_env_var "JWT_SECRET"
+    require_secret_env_var "PEPPER_V1"
+    require_secret_env_var "OTP_HMAC_SECRET"
+    require_secret_env_var "REPOSITORY_FILE_LINK_SECRET"
+    require_env_var "SIGNING_PRIVATE_KEY"
+    require_env_var "SIGNING_PUBLIC_KEY"
     require_env_var "DB_HOST"
     require_env_var "DB_USER"
-    require_env_var "DB_PASSWORD"
+    require_secret_env_var "DB_PASSWORD"
     require_env_var "DB_NAME"
     require_env_var "ALLOWED_ORIGINS"
     require_https_url_env "APP_URL"
     require_https_url_env "SERVER_URL"
+    require_distinct_secret_env_vars "JWT_SECRET" "PEPPER_V1"
+    require_distinct_secret_env_vars "JWT_SECRET" "OTP_HMAC_SECRET"
+    require_distinct_secret_env_vars "JWT_SECRET" "REPOSITORY_FILE_LINK_SECRET"
+    require_distinct_secret_env_vars "PEPPER_V1" "OTP_HMAC_SECRET"
+    require_distinct_secret_env_vars "PEPPER_V1" "REPOSITORY_FILE_LINK_SECRET"
+    require_distinct_secret_env_vars "OTP_HMAC_SECRET" "REPOSITORY_FILE_LINK_SECRET"
+
+    require_env_var "STORAGE_PROVIDER"
+    if [ "$(read_env_var STORAGE_PROVIDER)" != "s3" ]; then
+      echo "STORAGE_PROVIDER must be s3 for a production backend deployment"
+      exit 1
+    fi
+    require_https_url_env "STORAGE_S3_ENDPOINT"
+    require_non_placeholder_env_var "STORAGE_S3_ENDPOINT"
+    require_non_placeholder_env_var "STORAGE_S3_REGION"
+    require_non_placeholder_env_var "STORAGE_S3_BUCKET"
+    require_non_placeholder_env_var "STORAGE_S3_ACCESS_KEY_ID"
+    require_non_placeholder_env_var "STORAGE_S3_SECRET_ACCESS_KEY"
+    require_secret_env_var "STORAGE_S3_SECRET_ACCESS_KEY"
+
+    require_boolean_env_var "DB_BACKUP_ENABLED"
+    if [ "$(read_env_var DB_BACKUP_ENABLED)" = "true" ]; then
+      require_https_url_env "DB_BACKUP_S3_ENDPOINT"
+      require_non_placeholder_env_var "DB_BACKUP_S3_ENDPOINT"
+      require_non_placeholder_env_var "DB_BACKUP_S3_REGION"
+      require_non_placeholder_env_var "DB_BACKUP_S3_BUCKET"
+      require_non_placeholder_env_var "DB_BACKUP_S3_ACCESS_KEY_ID"
+      require_non_placeholder_env_var "DB_BACKUP_S3_SECRET_ACCESS_KEY"
+      require_secret_env_var "DB_BACKUP_S3_SECRET_ACCESS_KEY"
+      require_distinct_env_vars "DB_BACKUP_S3_BUCKET" "STORAGE_S3_BUCKET"
+      require_distinct_env_vars "DB_BACKUP_S3_ACCESS_KEY_ID" "STORAGE_S3_ACCESS_KEY_ID"
+      require_distinct_env_vars "DB_BACKUP_S3_SECRET_ACCESS_KEY" "STORAGE_S3_SECRET_ACCESS_KEY"
+    fi
     ;;
 esac
 
 case "$DEPLOY_TARGET" in
   frontend|all)
+    require_https_url_env "MARKETING_URL"
+    require_https_url_env "APP_URL"
+    require_https_url_env "SERVER_URL"
     require_https_url_env "VITE_API_URL"
     require_https_url_env "VITE_PUBLIC_VIEWER_URL"
+    require_matching_https_origin_env "VITE_API_URL" "SERVER_URL"
     if [ "$DEPLOY_TARGET" = "frontend" ]; then
-      require_env_var "BACKEND_API_UPSTREAM"
+      require_https_url_env "BACKEND_API_UPSTREAM"
+      require_matching_https_origin_env "BACKEND_API_UPSTREAM" "VITE_API_URL"
     fi
     ;;
 esac
+
+if [ "$DEPLOY_TARGET" = "frontend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
+  bash "$APP_DIR/infra/oracle/check-marketing-public-content.sh"
+fi
 
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-$DEFAULT_REMOVE_ORPHANS}"
 ORPHAN_ARGS=()
@@ -211,13 +436,13 @@ wait_for_service_http() {
   local service_name="$1"
   case "$service_name" in
     frontend-app)
-      wait_for_http "http://127.0.0.1:${FRONTEND_PORT:-3000}/" "Frontend HTTP" 30 2 >/tmp/dpp-frontend-health.txt
+      wait_for_http "http://127.0.0.1:${FRONTEND_PORT:-3000}/" "Frontend HTTP" 30 2
       ;;
     public-passport-viewer)
-      wait_for_http "http://127.0.0.1:${PUBLIC_VIEWER_PORT:-3004}/" "Viewer HTTP" 30 2 >/tmp/dpp-viewer-health.txt
+      wait_for_http "http://127.0.0.1:${PUBLIC_VIEWER_PORT:-3004}/" "Viewer HTTP" 30 2
       ;;
     marketing-site)
-      wait_for_http "http://127.0.0.1:${MARKETING_PORT:-8080}/" "Marketing HTTP" 30 2 >/tmp/dpp-marketing-health.txt
+      wait_for_http "http://127.0.0.1:${MARKETING_PORT:-8080}/" "Marketing HTTP" 30 2
       ;;
   esac
 }
@@ -227,7 +452,7 @@ deploy_frontend_sequentially() {
   local service
   for service in "${services[@]}"; do
     echo "Building service sequentially: $service"
-    DOCKER_BUILDKIT=0 DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build "$service"
+    DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build "$service"
     echo "Recreating service sequentially: $service"
     DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-deps --force-recreate "$service"
     wait_for_container_health "$service" "$service container" 50 2
@@ -241,21 +466,15 @@ wait_for_http() {
   local label="$2"
   local attempts="${3:-30}"
   local sleep_seconds="${4:-2}"
-  local tmp_file
-  tmp_file="$(mktemp)"
   local attempt
   for attempt in $(seq 1 "$attempts"); do
-    if curl -fsS "$url" >"$tmp_file" 2>/dev/null; then
+    if curl -fsS --connect-timeout 3 --max-time 10 --output /dev/null "$url" 2>/dev/null; then
       echo "✅ $label ready"
-      cat "$tmp_file"
-      rm -f "$tmp_file"
       return 0
     fi
     sleep "$sleep_seconds"
   done
   echo "❌ $label did not become ready: $url"
-  cat "$tmp_file" 2>/dev/null || true
-  rm -f "$tmp_file"
   return 1
 }
 
@@ -285,18 +504,38 @@ wait_for_container_health() {
   return 1
 }
 
-caddyfile_for_target() {
+caddy_template_for_target() {
   case "$DEPLOY_TARGET" in
     backend)
-      echo "$APP_DIR/infra/oracle/Caddyfile.backend"
+      echo "$APP_DIR/infra/oracle/Caddyfile.backend.template"
       ;;
     frontend)
-      echo "$APP_DIR/infra/oracle/Caddyfile.frontend"
+      echo "$APP_DIR/infra/oracle/Caddyfile.frontend.template"
       ;;
     all)
-      echo "$APP_DIR/infra/oracle/Caddyfile"
+      echo "$APP_DIR/infra/oracle/Caddyfile.template"
       ;;
   esac
+}
+
+validate_caddy_template() {
+  local template_file
+  local rendered_file
+  template_file="$(caddy_template_for_target)"
+  rendered_file="$(mktemp)"
+
+  if [ ! -f "$template_file" ]; then
+    echo "Missing Caddyfile template for deploy target: $template_file"
+    rm -f "$rendered_file"
+    exit 1
+  fi
+
+  if ! DPP_ENV_FILE="$ENV_FILE" "$APP_DIR/infra/oracle/render-caddyfile.sh" \
+    "$DEPLOY_TARGET" "$template_file" "$rendered_file"; then
+    rm -f "$rendered_file"
+    exit 1
+  fi
+  rm -f "$rendered_file"
 }
 
 install_or_reload_caddy() {
@@ -305,35 +544,49 @@ install_or_reload_caddy() {
     return 0
   fi
 
-  local source_file
+  local template_file
   local destination_file
-  source_file="$(caddyfile_for_target)"
+  local rendered_file
+  template_file="$(caddy_template_for_target)"
   destination_file="${DPP_CADDYFILE:-/etc/caddy/Caddyfile}"
+  rendered_file="$(mktemp)"
 
-  if [ ! -f "$source_file" ]; then
-    echo "Missing Caddyfile for deploy target: $source_file"
+  if [ ! -f "$template_file" ]; then
+    echo "Missing Caddyfile template for deploy target: $template_file"
+    rm -f "$rendered_file"
+    exit 1
+  fi
+
+  if ! DPP_ENV_FILE="$ENV_FILE" "$APP_DIR/infra/oracle/render-caddyfile.sh" \
+    "$DEPLOY_TARGET" "$template_file" "$rendered_file"; then
+    rm -f "$rendered_file"
     exit 1
   fi
 
   if ! command -v systemctl >/dev/null 2>&1 ||
     ! systemctl list-unit-files caddy.service --no-legend 2>/dev/null | grep -q '^caddy\.service'; then
     echo "Caddy service is not installed on this host; skipping edge reload."
+    rm -f "$rendered_file"
     return 0
   fi
 
   if command -v caddy >/dev/null 2>&1; then
-    caddy validate --config "$source_file" --adapter caddyfile
+    if ! caddy validate --config "$rendered_file" --adapter caddyfile; then
+      rm -f "$rendered_file"
+      exit 1
+    fi
   else
     echo "Caddy CLI is not on PATH; skipping config validation before reload."
   fi
 
-  install -m 0644 "$source_file" "$destination_file"
+  install -m 0644 "$rendered_file" "$destination_file"
+  rm -f "$rendered_file"
   if systemctl is-active --quiet caddy; then
     systemctl reload caddy || systemctl restart caddy
   else
     systemctl restart caddy
   fi
-  echo "Caddy edge config installed from $source_file"
+  echo "Caddy edge config installed from $template_file at $destination_file"
 }
 
 append_live_edge_target() {
@@ -374,7 +627,8 @@ run_live_edge_check() {
     return 0
   fi
 
-  "$APP_DIR/infra/oracle/check-live-edge.sh" "${LIVE_EDGE_TARGETS[@]}"
+  DPP_MARKETING_URL="$(read_env_var MARKETING_URL)" \
+    "$APP_DIR/infra/oracle/check-live-edge.sh" "${LIVE_EDGE_TARGETS[@]}"
 }
 
 ensure_docker_volume() {
@@ -413,6 +667,7 @@ if [ -z "$EXPLICIT_POSTGRES_VOLUME_NAME" ]; then
 fi
 
 echo "Deploying target=$DEPLOY_TARGET compose=$COMPOSE_FILE project=$COMPOSE_PROJECT_NAME remove_orphans=$REMOVE_ORPHANS"
+validate_caddy_template
 
 if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   CURRENT_POSTGRES_VOLUMES="$(
@@ -441,32 +696,26 @@ if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   prepare_local_storage_volume "$LOCAL_STORAGE_VOLUME_NAME"
 fi
 
-(
-  flock -n 9 || {
-    echo "Another DPP deployment is already running. Lock: $LOCK_FILE"
-    exit 1
-  }
-  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" config --quiet
-  if [ "$DEPLOY_TARGET" = "frontend" ]; then
-    deploy_frontend_sequentially
-  else
-    DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "${UP_ARGS[@]}"
-  fi
-  if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
-    APP_DIR="$APP_DIR" "$APP_DIR/infra/oracle/install-db-backup-jobs.sh"
-    echo "Running storage probe health check..."
-    wait_for_http "http://127.0.0.1:${BACKEND_PORT:-3001}/health" "Backend health" 40 2 >/tmp/dpp-backend-health.json
-    wait_for_http "http://127.0.0.1:${BACKEND_PORT:-3001}/health/storage" "Backend storage probe" 40 2 >/tmp/dpp-storage-health.json
-  fi
-  if [ "$DEPLOY_TARGET" = "frontend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
-    wait_for_container_health "frontend-app" "Frontend app" 50 2
-    wait_for_container_health "public-passport-viewer" "Public viewer" 50 2
-    wait_for_container_health "marketing-site" "Marketing site" 50 2
-    wait_for_service_http "frontend-app"
-    wait_for_service_http "public-passport-viewer"
-    wait_for_service_http "marketing-site"
-  fi
-  install_or_reload_caddy
-  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
-  run_live_edge_check
-) 9>"$LOCK_FILE"
+DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" config --quiet
+if [ "$DEPLOY_TARGET" = "frontend" ]; then
+  deploy_frontend_sequentially
+else
+  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "${UP_ARGS[@]}"
+fi
+if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
+  APP_DIR="$APP_DIR" "$APP_DIR/infra/oracle/install-db-backup-jobs.sh"
+  echo "Running storage probe health check..."
+  wait_for_http "http://127.0.0.1:${BACKEND_PORT:-3001}/health" "Backend health" 40 2
+  wait_for_http "http://127.0.0.1:${BACKEND_PORT:-3001}/health/storage" "Backend storage probe" 40 2
+fi
+if [ "$DEPLOY_TARGET" = "frontend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
+  wait_for_container_health "frontend-app" "Frontend app" 50 2
+  wait_for_container_health "public-passport-viewer" "Public viewer" 50 2
+  wait_for_container_health "marketing-site" "Marketing site" 50 2
+  wait_for_service_http "frontend-app"
+  wait_for_service_http "public-passport-viewer"
+  wait_for_service_http "marketing-site"
+fi
+install_or_reload_caddy
+DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
+run_live_edge_check

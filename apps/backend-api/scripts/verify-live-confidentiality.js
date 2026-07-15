@@ -244,7 +244,7 @@ async function run() {
       },
       body: "{}",
     });
-    assert.equal(missingOriginCookieMutation.response.status, process.env.NODE_ENV === "production" ? 403 : 401);
+    assert.equal(missingOriginCookieMutation.response.status, 403);
     const cookieOnlyHeaders = {
       cookie: `${process.env.SESSION_COOKIE_NAME || "dppSession"}=${adminToken}`,
       "content-type": "application/json",

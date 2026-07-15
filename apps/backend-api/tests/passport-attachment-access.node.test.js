@@ -12,6 +12,13 @@ const {
   getPublicAttachmentFieldKeys,
 } = require("../src/modules/passports/register-lifecycle-routes");
 
+const previousRepositoryFileLinkSecret = process.env.REPOSITORY_FILE_LINK_SECRET;
+process.env.REPOSITORY_FILE_LINK_SECRET = "test-repository-file-link-secret-with-32-chars";
+test.after(() => {
+  if (previousRepositoryFileLinkSecret === undefined) delete process.env.REPOSITORY_FILE_LINK_SECRET;
+  else process.env.REPOSITORY_FILE_LINK_SECRET = previousRepositoryFileLinkSecret;
+});
+
 test("passport attachment access tokens reject tampering and expiry", () => {
   const publicId = "attachmentAbc123";
   const token = encodePassportAttachmentAccessToken({

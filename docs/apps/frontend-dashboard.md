@@ -17,8 +17,8 @@ It includes:
 
 ## Entry Points
 
-- [apps/frontend-app/src/app/bootstrap/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/frontend-app/src/app/bootstrap/index.js:1)
-- [apps/frontend-app/src/app/containers/App.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/frontend-app/src/app/containers/App.js:82)
+- `apps/frontend-app/src/app/bootstrap/index.js:1`
+- `apps/frontend-app/src/app/containers/App.js:82`
 
 ## Main Frontend Areas
 
@@ -35,7 +35,7 @@ It includes:
 
 ## Route Shape
 
-The route map is centralized in [apps/frontend-app/src/app/containers/App.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/frontend-app/src/app/containers/App.js:107).
+The route map is centralized in `apps/frontend-app/src/app/containers/App.js:107`.
 
 Important route families:
 
@@ -53,9 +53,9 @@ The dashboard applies theme and session behavior at the app layer.
 
 Important files:
 
-- [apps/frontend-app/src/app/hooks/useSessionAuth.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/frontend-app/src/app/hooks/useSessionAuth.js:1)
-- [apps/frontend-app/src/app/providers/ThemeContext.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/frontend-app/src/app/providers/ThemeContext.js:1)
-- [apps/frontend-app/src/app/bootstrap/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/frontend-app/src/app/bootstrap/index.js:8)
+- `apps/frontend-app/src/app/hooks/useSessionAuth.js:1`
+- `apps/frontend-app/src/app/providers/ThemeContext.js:1`
+- `apps/frontend-app/src/app/bootstrap/index.js:8`
 
 ## Shared Styles
 
@@ -67,7 +67,6 @@ This includes:
 
 - dashboard shared styles
 - create/edit shared styles
-- transactional email stylesheet used by the backend build
 
 ## Build Output
 

@@ -4,6 +4,21 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createCarrierSecurityHelpers } = require("../src/modules/passports/carrier-security-helpers");
 
+const previousOrigins = {
+  APP_URL: process.env.APP_URL,
+  SERVER_URL: process.env.SERVER_URL,
+  VITE_PUBLIC_VIEWER_URL: process.env.VITE_PUBLIC_VIEWER_URL,
+};
+process.env.APP_URL = "https://dashboard.example.test";
+process.env.SERVER_URL = "https://api.example.test";
+process.env.VITE_PUBLIC_VIEWER_URL = "https://viewer.example.test";
+test.after(() => {
+  for (const [key, value] of Object.entries(previousOrigins)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
+
 function createHelpers(capturedPayloads) {
   return createCarrierSecurityHelpers({
     pool: { query: async () => ({ rows: [] }) },
@@ -61,4 +76,19 @@ test("carrier credentials retain a distinct global product identifier", async ()
     capturedPayloads[0].uniqueProductIdentifier,
     "did:web:example.test:products:global-1"
   );
+});
+
+test("carrier credentials bind public access and viewer trust to the public viewer origin", async () => {
+  const capturedPayloads = [];
+  const helpers = createHelpers(capturedPayloads);
+
+  const metadata = await helpers.maybeSignCarrierPayload({
+    passport: { dppId: "DPP-1", releaseStatus: "released" },
+    metadata: {},
+    forceSign: true,
+  });
+
+  assert.equal(capturedPayloads[0].publicAccessUrl, "https://viewer.example.test/dpp/DPP-1");
+  assert.equal(metadata.trustedViewerOrigin, "https://viewer.example.test");
+  assert.equal(metadata.trustedViewerHost, "viewer.example.test");
 });

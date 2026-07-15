@@ -64,7 +64,9 @@ const sample = {
       dppDid: "__managed__:internalManagedDppDid",
       companyDid: "__managed__:internalManagedCompanyDid",
     },
-    baseUrl: "https://www.claros-dpp.online",
+    // A non-routable documentation origin keeps the sample self-contained.
+    // Real modules must always be generated with the deployment's explicit URL.
+    baseUrl: "https://example.invalid",
     dictionaryName: "Example Product Dictionary",
     dictionaryDescription: "Starter dictionary for a new Digital Product Passport module.",
   },
@@ -721,7 +723,7 @@ function createBlankSpec() {
       systemHeaderFieldAssignments: Object.fromEntries(
         headerSlotDefinitions.map((slot) => [slot.slotKey, `__managed__:${slot.managedKey}`])
       ),
-      baseUrl: "https://www.claros-dpp.online",
+      baseUrl: "",
       dictionaryName: "",
       dictionaryDescription: "",
     },

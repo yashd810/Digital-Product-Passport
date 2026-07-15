@@ -4,6 +4,7 @@ import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildPassportJsonLdExport } from "../../../shared/utils/semanticPassportExport";
 import { formatPassportStatus, isPublishedPassportStatus, normalizePassportStatus } from "../../../passports/utils/passportStatus";
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
+import { safeWindowOpen } from "../../../shared/security/urlSafety";
 import { renderPassportQrToCanvas } from "../../../passport-viewer/utils/QRcode";
 import { getPassportSerialNumberForType } from "../passports/utils/passportListHelpers";
 import "../../../shared/styles/Dashboard.css";
@@ -368,7 +369,7 @@ function ArchivedPassports({ user, companyId }) {
           showError("Archived passport link is unavailable for this version.");
           return;
         }
-        window.open(archivedUrl, "_blank", "noopener,noreferrer");
+        safeWindowOpen(archivedUrl);
       })
       .catch(() => showError("Failed to open archived passport"));
   };

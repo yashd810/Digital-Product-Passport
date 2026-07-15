@@ -33,11 +33,19 @@ const sensitiveKeys = new Set([
   "SMTP_USER",
   "JWT_SECRET",
   "PEPPER_V1",
+  "OTP_HMAC_SECRET",
+  "REPOSITORY_FILE_LINK_SECRET",
   "DB_PASSWORD",
   "POSTGRES_PASSWORD",
+  "STORAGE_S3_ACCESS_KEY_ID",
   "STORAGE_S3_SECRET_ACCESS_KEY",
+  "DB_BACKUP_S3_ACCESS_KEY_ID",
+  "DB_BACKUP_S3_SECRET_ACCESS_KEY",
   "BACKUP_PROVIDER_KEY",
   "SIGNING_PRIVATE_KEY",
+  "SIGNING_PUBLIC_KEY",
+  "OAUTH_PROVIDERS_JSON",
+  "ASSET_SOURCE_CREDENTIALS_JSON",
 ]);
 
 const ignoredFiles = [
@@ -88,7 +96,7 @@ const looksAllowedPlaceholder = (value) => {
 };
 
 const assignmentViolations = [];
-const assignmentPattern = /\b([A-Z][A-Z0-9_]*(?:PASS|PASSWORD|SECRET|TOKEN|PRIVATE_KEY|ACCESS_KEY|API_KEY|USER)[A-Z0-9_]*)\b\s*(?::|=(?!=))\s*([^#\s,}]+)/;
+const assignmentPattern = /\b([A-Z][A-Z0-9_]*)\b\s*(?::|=(?!=))\s*([^#\s,}]+)/;
 
 for (const file of tracked) {
   if (allowedEnvTemplate(file) || ignoredFiles.some((pattern) => pattern.test(file))) continue;

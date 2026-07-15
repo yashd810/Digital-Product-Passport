@@ -1,8 +1,13 @@
 [Unit]
 Description=Run DPP PostgreSQL backup restore drill
-After=docker.service
+After=docker.service network-online.target
 Requires=docker.service
+Wants=network-online.target
 
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/dpp-db-backup drill
+WorkingDirectory=/opt/dpp
+User=root
+Group=root
+TimeoutStartSec=2h

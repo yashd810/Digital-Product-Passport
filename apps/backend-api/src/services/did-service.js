@@ -1,15 +1,28 @@
 "use strict";
 
-function defaultDidDomain() {
-  return String(process.env.DID_WEB_DOMAIN || "www.claros-dpp.online").trim() || "www.claros-dpp.online";
-}
+const { getApiOrigin, getPublicViewerOrigin } = require("../shared/security/configured-origin");
 
 function defaultPublicOrigin() {
-  return String(process.env.PUBLIC_APP_URL || process.env.APP_URL || "http://localhost:3000").replace(/\/+$/g, "");
+  return getPublicViewerOrigin();
 }
 
 function defaultApiOrigin() {
-  return String(process.env.SERVER_URL || "http://localhost:3001").replace(/\/+$/g, "");
+  return getApiOrigin();
+}
+
+function didDomainFromApiOrigin(apiOrigin) {
+  const parsed = new URL(apiOrigin);
+  const hostname = String(parsed.hostname || "").trim().toLowerCase();
+  if (!hostname) throw new Error("SERVER_URL must include a hostname for DID generation");
+  return parsed.port ? `${hostname}%3A${parsed.port}` : hostname;
+}
+
+function normalizeExplicitDidDomain(value) {
+  const candidate = String(value || "").trim().toLowerCase();
+  if (!/^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?(?:%3a[0-9]{1,5})?$/i.test(candidate)) {
+    throw new Error("didDomain must be a hostname, optionally followed by an encoded port");
+  }
+  return candidate;
 }
 
 function slugify(value) {
@@ -82,9 +95,13 @@ function normalizeGranularity(granularity) {
 }
 
 function createDidService(options = {}) {
-  const didDomain = cleanPathValue(options.didDomain) || defaultDidDomain();
   const publicOrigin = cleanPathValue(options.publicOrigin || defaultPublicOrigin()).replace(/\/+$/g, "");
   const apiOrigin = cleanPathValue(options.apiOrigin || defaultApiOrigin()).replace(/\/+$/g, "");
+  // Production derives this from SERVER_URL so the declared did:web authority
+  // is always served by the API edge. The option is retained for isolated tests.
+  const didDomain = cleanPathValue(options.didDomain)
+    ? normalizeExplicitDidDomain(options.didDomain)
+    : didDomainFromApiOrigin(apiOrigin);
   const platformDid = `did:web:${didDomain}`;
 
   function generateCompanyDid(companySlug) {
@@ -197,7 +214,7 @@ function createDidService(options = {}) {
 
   function didToDocumentUrl(did) {
     const docPath = didToDocumentPath(did);
-    return docPath ? `https://${didDomain}${docPath}` : null;
+    return docPath ? `${apiOrigin}${docPath}` : null;
   }
 
   function publicUrlToSubjects(publicPath) {
@@ -206,7 +223,7 @@ function createDidService(options = {}) {
 
     let pathname = candidate;
     try {
-      pathname = new URL(candidate, publicOrigin || "http://localhost").pathname || "";
+      pathname = new URL(candidate, publicOrigin).pathname || "";
     } catch (_error) {
       // Treat malformed public URLs as already-normalized path input.
     }

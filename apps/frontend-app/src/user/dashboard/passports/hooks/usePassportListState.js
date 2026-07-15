@@ -5,6 +5,7 @@ import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { isObsoletePassportStatus, normalizePassportStatus } from "../../../../passports/utils/passportStatus";
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
+import { safeWindowOpen } from "../../../../shared/security/urlSafety";
 import {
   calcCompleteness,
   formatPassportTypeLabel,
@@ -107,7 +108,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     const isPublicRoute = !options.forcePreview && (normalizedStatus === "released" || isObsoletePassportStatus(normalizedStatus));
     const url = isPublicRoute ? buildPublicViewerUrl(path) : `${window.location.origin}${path}`;
     if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
+    safeWindowOpen(url);
   }, [getViewerPath]);
 
   useEffect(() => {

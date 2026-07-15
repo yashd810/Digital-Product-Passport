@@ -8,6 +8,13 @@ const {
   buildRepositoryFilePublicPath,
 } = require("../src/shared/repository/repository-file-links");
 
+const previousRepositoryFileLinkSecret = process.env.REPOSITORY_FILE_LINK_SECRET;
+process.env.REPOSITORY_FILE_LINK_SECRET = "test-repository-file-link-secret-with-32-chars";
+test.after(() => {
+  if (previousRepositoryFileLinkSecret === undefined) delete process.env.REPOSITORY_FILE_LINK_SECRET;
+  else process.env.REPOSITORY_FILE_LINK_SECRET = previousRepositoryFileLinkSecret;
+});
+
 function createResponse() {
   return {
     statusCode: 200,

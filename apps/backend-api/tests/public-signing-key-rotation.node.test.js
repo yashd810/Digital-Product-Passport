@@ -65,6 +65,10 @@ async function withServer(app, run) {
     const { port } = server.address();
     await run(`http://127.0.0.1:${port}`);
   } finally {
+    // Node's fetch client can retain a keep-alive socket after the final
+    // response. Explicitly close test-owned connections so server.close()
+    // cannot wait indefinitely for that idle socket.
+    server.closeAllConnections?.();
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 }

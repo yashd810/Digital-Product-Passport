@@ -18,7 +18,7 @@ For public passports, the flow is similar, except the request comes from a publi
 
 ## Dashboard Wiring
 
-The dashboard bootstraps in [apps/frontend-app/src/app/bootstrap/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/frontend-app/src/app/bootstrap/index.js:1).
+The dashboard bootstraps in `apps/frontend-app/src/app/bootstrap/index.js:1`.
 
 Important behavior there:
 
@@ -26,7 +26,7 @@ Important behavior there:
 - global fetch is patched to include credentials by default
 - bad placeholder bearer tokens are stripped before sending requests
 
-The main route map lives in [apps/frontend-app/src/app/containers/App.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/frontend-app/src/app/containers/App.js:1).
+The main route map lives in `apps/frontend-app/src/app/containers/App.js:1`.
 
 That file wires:
 
@@ -38,14 +38,14 @@ That file wires:
 
 ## Backend Wiring
 
-The backend starts in [apps/backend-api/src/server.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/server.js:1).
+The backend starts in `apps/backend-api/src/server.js:1`.
 
 That file does four big jobs:
 
 1. loads environment and runtime paths
 2. creates Express, PostgreSQL, storage, auth, semantics, signing, and related services
-3. initializes schema through [apps/backend-api/src/db/init.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/db/init.js:202)
-4. registers route groups through [apps/backend-api/src/bootstrap/register-routes.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/bootstrap/register-routes.js:17)
+3. initializes schema through `apps/backend-api/src/db/init.js:202`
+4. registers route groups through `apps/backend-api/src/bootstrap/register-routes.js:17`
 
 ## Backend Route Groups
 
@@ -67,23 +67,26 @@ The route registration file wires these HTTP surfaces:
 
 ## How Public Viewer Wiring Works
 
-The standalone public viewer starts in [apps/public-passport-viewer/src/bootstrap/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/src/bootstrap/index.js:1) and routes in [apps/public-passport-viewer/src/containers/PublicViewerApp.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/src/containers/PublicViewerApp.js:19).
+The standalone public viewer starts in `apps/public-passport-viewer/src/bootstrap/index.js:1` and routes in `apps/public-passport-viewer/src/containers/PublicViewerApp.js:19`.
 
-It does not duplicate the full dashboard codebase. Instead, it imports the shared viewer UI from `apps/frontend-app/src/passport-viewer/...` through the `@frontend` alias configured in [apps/public-passport-viewer/vite.config.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/vite.config.js:30).
+It does not duplicate the full dashboard codebase. Instead, it imports the shared viewer UI from `apps/frontend-app/src/passport-viewer/...` through the `@frontend` alias configured in `apps/public-passport-viewer/vite.config.js:30`.
 
 ## Docker Wiring
 
 Local orchestration:
 
-- [docker/docker-compose.yml](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/docker/docker-compose.yml:1)
+- `docker/docker-compose.yml:1`
 
 Production-style orchestration:
 
-- [docker/docker-compose.prod.yml](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/docker/docker-compose.prod.yml:1)
+- `docker/docker-compose.prod.yml:1`
 
 Important current behavior:
 
 - local dashboard runs on port `3000`
 - local backend runs on port `3001`
 - local public viewer runs on port `3004`
-- backend email templates reuse the frontend email stylesheet at `apps/frontend-app/src/shared/styles/email-styles.css`
+- Docker builds leave `VITE_API_URL` empty locally so browser requests stay
+  same-origin and Nginx proxies `/api` to `backend-api:3001`
+- local published ports bind only to `127.0.0.1`
+- backend email templates own their stylesheet at `apps/backend-api/src/shared/email/email-styles.css`

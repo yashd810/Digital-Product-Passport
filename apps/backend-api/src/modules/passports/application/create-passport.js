@@ -1,6 +1,7 @@
 "use strict";
 
 const { withTransaction } = require("../../../infrastructure/postgres/with-transaction");
+const { normalizeSafeImageReference } = require("../../../shared/passports/passport-uri");
 
 function hasMeaningfulValue(value) {
   if (value === null || value === undefined) return false;
@@ -79,7 +80,17 @@ function createDraftPassportUseCase(deps) {
       facilityId,
       ...fields
     } = item;
-    if (productImage !== undefined) fields.productImage = productImage;
+    if (productImage !== undefined) {
+      if (productImage === null || productImage === "") {
+        fields.productImage = null;
+      } else {
+        try {
+          fields.productImage = normalizeSafeImageReference(productImage);
+        } catch {
+          throw Object.assign(new Error("productImage must be a credential-free HTTP(S) or local resource URL"), { statusCode: 400 });
+        }
+      }
+    }
 
     const dppId = generateDppRecordId();
     const lineageId = dppId;

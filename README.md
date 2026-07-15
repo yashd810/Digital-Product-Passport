@@ -5,7 +5,8 @@ Claros DPP is a multi-app Digital Product Passport platform for creating, managi
 ## Quick Start
 
 ```bash
-docker compose -f docker/docker-compose.yml up -d --build
+chmod 600 docker/.env
+bash scripts/restart-local-stack.sh
 ```
 
 Local services:
@@ -18,7 +19,10 @@ Local services:
 | Marketing site | http://localhost:8080 | `apps/marketing-site` |
 | PostgreSQL | localhost:5432 | `docker/docker-compose.yml` |
 
-Detailed setup lives in [docs/guides/getting-started.md](./docs/guides/getting-started.md).
+The local ports bind only to `127.0.0.1` by default. The dashboard and public
+viewer call the backend through their same-origin `/api` proxy; direct backend
+access at port `3001` is for local diagnostics. Detailed setup lives in
+[docs/guides/getting-started.md](./docs/guides/getting-started.md).
 
 ## Repository Map
 
@@ -32,8 +36,7 @@ Detailed setup lives in [docs/guides/getting-started.md](./docs/guides/getting-s
 ├── docker/                       # Local and production compose files
 ├── docs/                         # Centralized developer and product documentation
 ├── infra/                        # Nginx, Caddy, OCI, semantic resources, templates
-├── scripts/                      # Deployment, generation, migration, and utility scripts
-└── .docker-data/                 # Local Docker-backed database and file storage
+└── scripts/                      # Deployment, generation, migration, and utility scripts
 ```
 
 ## Documentation

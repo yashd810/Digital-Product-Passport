@@ -10,7 +10,7 @@ server {
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;
   add_header X-Frame-Options "SAMEORIGIN" always;
   add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-  add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https:; upgrade-insecure-requests" always;
+  add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' __MARKETING_SCRIPT_HASHES__; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' __MARKETING_API_URL__;__MARKETING_TRANSPORT_DIRECTIVE__" always;
 
 	  # HTML should revalidate so deployments and legal copy updates appear promptly.
 	  location ~ \.html$ {
@@ -20,7 +20,7 @@ server {
 	    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 	    add_header X-Frame-Options "SAMEORIGIN" always;
 	    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-	    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https:; upgrade-insecure-requests" always;
+	    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' __MARKETING_SCRIPT_HASHES__; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' __MARKETING_API_URL__;__MARKETING_TRANSPORT_DIRECTIVE__" always;
 	    try_files $uri =404;
 	  }
 
@@ -32,20 +32,18 @@ server {
 	    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 	    add_header X-Frame-Options "SAMEORIGIN" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https:; upgrade-insecure-requests" always;
+    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' __MARKETING_SCRIPT_HASHES__; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' __MARKETING_API_URL__;__MARKETING_TRANSPORT_DIRECTIVE__" always;
     try_files $uri =404;
   }
 
-	  # SPA routing fallback for root and dynamic routes
+	  # This is a static site: only explicitly shipped paths are served.
 	  location / {
-	    try_files $uri /index.html;
+	    try_files $uri $uri/ =404;
 	    add_header Cache-Control "no-cache, no-store, must-revalidate" always;
 	    add_header X-Content-Type-Options "nosniff" always;
 	    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 	    add_header X-Frame-Options "SAMEORIGIN" always;
 	    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-	    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https:; upgrade-insecure-requests" always;
+	    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' __MARKETING_SCRIPT_HASHES__; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' __MARKETING_API_URL__;__MARKETING_TRANSPORT_DIRECTIVE__" always;
 	  }
-
-  error_page 404 /index.html;
 }

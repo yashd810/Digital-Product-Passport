@@ -1,6 +1,7 @@
 [Unit]
 Description=DPP PostgreSQL backup to OCI Object Storage
 After=docker.service network-online.target
+Requires=docker.service
 Wants=network-online.target
 
 [Service]
@@ -9,3 +10,4 @@ ExecStart=/usr/local/bin/dpp-db-backup backup
 WorkingDirectory=/opt/dpp
 User=root
 Group=root
+TimeoutStartSec=2h

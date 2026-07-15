@@ -12,6 +12,8 @@ const {
   isPlainRecord,
   normalizeIncomingJsonValue,
   normalizeOutgoingJsonValue,
+  normalizeCookieDomain,
+  normalizeSessionCookieName,
   normalizeStorageRequestKey,
   toBooleanEnv,
 } = require("./bootstrap/runtime-config");
@@ -48,6 +50,8 @@ const createProductIdentifierService      = require("./services/product-identifi
 const createBackupProviderService         = require("./services/backup-provider-service");
 const canonicalizeJson                    = require("./services/json-canonicalization");
 const { generateDppRecordId }             = require("./services/dpp-record-id");
+const { parseAssetSourceCredentials }     = require("./shared/assets/asset-source-config");
+const { getApiOrigin, getPublicViewerOrigin } = require("./shared/security/configured-origin");
 
 global.console = logger.console;
 
@@ -80,15 +84,19 @@ const {
 ensureLocalDirectories(runtimePaths);
 
 // ─── EXPRESS SETUP ───────────────────────────────────────────────────────────
-const app  = express();
 const port = process.env.PORT || 3001;
-const { isProduction: isProduction, runSchemaMigrations: runSchemaMigrations, allowedOriginSet, cspConnectSrc } = deriveRuntimeFlags(port);
+const isProduction = process.env.NODE_ENV === "production";
 
-// Validate required environment variables in production
 assertRequiredProductionEnvironment({ isProduction: isProduction, logger });
 assertDatabaseName({ logger });
+const { runSchemaMigrations, allowedOriginSet, credentialedOriginSet, cspConnectSrc } = deriveRuntimeFlags();
+const runtimeApiOrigin = getApiOrigin();
+const runtimePublicViewerOrigin = getPublicViewerOrigin();
+// nosemgrep: javascript.express.security.audit.express-check-csurf-middleware-usage.express-check-csurf-middleware-usage -- configureHttp installs a fail-closed origin/referrer CSRF guard for browser-cookie mutations and all production mutations.
+const app  = express();
 configureHttp(app, {
   allowedOriginSet,
+  credentialedOriginSet,
   cspConnectSrc,
   isPlainRecord,
   isProduction: isProduction,
@@ -110,14 +118,14 @@ pool.on("error", (err) => {
 });
 
 // ─── SECRETS + AUTH CONSTANTS ────────────────────────────────────────────────
-const jwtSecret             = process.env.JWT_SECRET || "change-me-in-production";
+const jwtSecret             = process.env.JWT_SECRET;
 const jwtExpiry             = "7d";
-const pepper                 = process.env.PEPPER_V1  || "change-this-pepper-in-production";
+const pepper                 = process.env.PEPPER_V1;
 const currentPepperVersion = 1;
-const sessionCookieName    = process.env.SESSION_COOKIE_NAME || "dppSession";
+const sessionCookieName    = normalizeSessionCookieName(process.env.SESSION_COOKIE_NAME);
 const cookieSecure          = isProduction || process.env.COOKIE_SECURE === "true";
 const cookieSameSite       = String(process.env.COOKIE_SAME_SITE || "lax").trim().toLowerCase();
-const cookieDomain          = process.env.COOKIE_DOMAIN || "";
+const cookieDomain          = normalizeCookieDomain(process.env.COOKIE_DOMAIN, runtimeApiOrigin);
 const assetSourceAllowedHosts = new Set(
   String(process.env.ASSET_SOURCE_ALLOWED_HOSTS || "")
     .split(",").map(v => v.trim().toLowerCase()).filter(Boolean)
@@ -158,17 +166,6 @@ const assetErpPresets = [
   },
 ];
 
-if (isProduction) {
-  const missing = [];
-  if (!process.env.JWT_SECRET) missing.push("JWT_SECRET");
-  if (!process.env.PEPPER_V1)  missing.push("PEPPER_V1");
-  if (missing.length) throw new Error(`[SECURITY] Missing required production secrets: ${missing.join(", ")}`);
-  if (jwtSecret === "change-me-in-production") throw new Error("[SECURITY] JWT_SECRET is still the default value. Set a strong secret before deploying.");
-  if (pepper === "change-this-pepper-in-production") throw new Error("[SECURITY] PEPPER_V1 is still the default value. Set a strong secret before deploying.");
-} else {
-  if (!process.env.JWT_SECRET) logger.warn("[SECURITY] JWT_SECRET is not set — using insecure default. Set it in .env before deploying.");
-  if (!process.env.PEPPER_V1)  logger.warn("[SECURITY] PEPPER_V1 is not set — using insecure default. Set it in .env before deploying.");
-}
 if (!["strict", "lax", "none"].includes(cookieSameSite)) {
   throw new Error("[SECURITY] COOKIE_SAME_SITE must be strict, lax, or none.");
 }
@@ -243,7 +240,7 @@ const storageService = createStorageService({
   filesBaseDir: filesBaseDir,
   repoBaseDir: repoBaseDir,
   uploadsBaseDir: uploadsBaseDir,
-  serverBaseUrl: process.env.SERVER_URL || `http://localhost:${port}`,
+  serverBaseUrl: runtimeApiOrigin,
 });
 const oauthService = createOauthService({
   jwt, pool, jwtSecret, generateToken, setAuthCookie, cache, hashPassword,
@@ -336,9 +333,8 @@ const validateSymbolUpload = createUploadSignatureValidator(
 
 // ─── DID + CANONICAL SERIALIZATION SERVICES ─────────────────────────────────
 const didService = createDidService({
-  didDomain: process.env.DID_WEB_DOMAIN || "www.claros-dpp.online",
-  publicOrigin: process.env.PUBLIC_APP_URL || process.env.APP_URL || "http://localhost:3000",
-  apiOrigin: process.env.SERVER_URL || `http://localhost:${port}`,
+  publicOrigin: runtimePublicViewerOrigin,
+  apiOrigin: runtimeApiOrigin,
 });
 const productIdentifierService = createProductIdentifierService({ didService, pool });
 const semanticModelRegistry = createSemanticModelRegistry();
@@ -375,6 +371,7 @@ const backupProviderService = createBackupProviderService({
   pool,
   storageService,
   buildCanonicalPassportPayload,
+  apiOrigin: runtimeApiOrigin,
 });
 
 // ─── PASSPORT SERVICE ────────────────────────────────────────────────────────
@@ -386,7 +383,7 @@ const passportService = createPassportService({
   quoteSqlIdentifier, joinQuotedSqlIdentifiers,
   coerceBulkFieldValue, comparableHistoryFieldValue, formatHistoryFieldValue, getHistoryFieldDefs,
   buildCurrentPublicPassportPath, buildInactivePublicPassportPath, flattenSchemaFieldsFromSections,
-  createTransporter, brandedEmail,
+  createTransporter, brandedEmail, renderInfoTable,
 });
 
 const {
@@ -411,6 +408,7 @@ const {
 } = passportService;
 
 // ─── ASSET SERVICE ───────────────────────────────────────────────────────────
+const assetSourceCredentials = parseAssetSourceCredentials(process.env.ASSET_SOURCE_CREDENTIALS_JSON);
 const assetService = createAssetService({
   pool, getTable, logAudit,
   assertCompanyAssetPassportTypeAccess, assertAssetManagementEnabled, getLatestCompanyPassports,
@@ -419,14 +417,14 @@ const assetService = createAssetService({
   isPlainObject, getValueAtPath, normalizeAssetHeaders, coerceAssetFieldValue,
   comparableHistoryFieldValue, toDynamicStoredValue, getAssetFieldMap,
   editableReleaseStatusesSql, assetMatchFields, assetIgnoredSystemColumns,
-  assetSchedulerIntervalMs, assetSourceAllowedHosts,
+  assetSchedulerIntervalMs, assetSourceAllowedHosts, assetSourceCredentials,
 });
 const {
   fetchAssetSourceRecords, prepareAssetPayload, executeAssetPush,
   runAssetManagementJob, recordAssetRun, resolveAssetJobNextRunAt,
 } = assetService;
 
-// ─── PATH MIGRATION ──────────────────────────────────────────────────────────
+// ─── PATH SAFETY ─────────────────────────────────────────────────────────────
 const isPathInsideBase = (targetPath, baseDir) => {
   const nb = path.resolve(baseDir);
   const nt = path.resolve(targetPath);

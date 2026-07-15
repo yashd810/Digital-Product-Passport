@@ -1,20 +1,15 @@
 #!/bin/bash
 # OCI Deployment Script - Robust version with proper SSH handling
-# Usage: OCI_IP="your-ip" bash scripts/deploy/deploy-to-oci.sh
+# Usage: SSH_KEY="/path/to/key" OCI_IP="your-ip" DPP_DEPLOY_TARGET=backend bash scripts/deploy/deploy-to-oci.sh
 
-set -e
+set -euo pipefail
+umask 077
 
 # Configuration
 OCI_USER="${OCI_USER:-ubuntu}"
 OCI_IP="${OCI_IP:-}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_FILES_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
-DEFAULT_SSH_KEY="$PROJECT_FILES_ROOT/AMD keys/ssh-key-2026-04-27.key"
-LEGACY_SSH_KEY="$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key"
-SSH_KEY="${SSH_KEY:-$DEFAULT_SSH_KEY}"
-if [ ! -f "$SSH_KEY" ] && [ -f "$LEGACY_SSH_KEY" ]; then
-    SSH_KEY="$LEGACY_SSH_KEY"
-fi
+SSH_KEY="${SSH_KEY:-}"
+SSH_KNOWN_HOSTS="${SSH_KNOWN_HOSTS:-${HOME:-}/.ssh/known_hosts}"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
@@ -28,6 +23,41 @@ BRANCH="main"
 SSH_CMD="/usr/bin/ssh"
 TIMEOUT_SECONDS="${DPP_DEPLOY_TIMEOUT_SECONDS:-1800}"
 TIMEOUT_CMD=""
+REMOTE_DEPLOY_DIR=""
+REMOTE_DEPLOY_SCRIPT=""
+
+quote_for_remote() {
+    printf '%q' "$1"
+}
+
+file_mode() {
+    local file="$1"
+    if stat -c '%a' "$file" >/dev/null 2>&1; then
+        stat -c '%a' "$file"
+    else
+        stat -f '%Lp' "$file"
+    fi
+}
+
+require_private_key_file() {
+    local mode
+
+    if [ -L "$SSH_KEY" ] || [ ! -f "$SSH_KEY" ]; then
+        echo "❌ SSH key not found or is a symlink: $SSH_KEY"
+        exit 1
+    fi
+
+    mode="$(file_mode "$SSH_KEY")"
+    if (( (8#$mode & 8#077) != 0 )); then
+        echo "❌ SSH key must not be readable by group or others: $SSH_KEY (mode $mode)"
+        exit 1
+    fi
+}
+
+if ! [[ "$TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+    echo "❌ DPP_DEPLOY_TIMEOUT_SECONDS must be a positive integer."
+    exit 1
+fi
 
 if command -v timeout >/dev/null 2>&1; then
     TIMEOUT_CMD="timeout"
@@ -46,6 +76,22 @@ if [ -z "$OCI_IP" ]; then
     echo "Examples:"
     echo "  DPP_DEPLOY_TARGET=frontend OCI_IP=<frontend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
     echo "  DPP_DEPLOY_TARGET=backend OCI_IP=<backend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
+    exit 1
+fi
+
+if ! [[ "$OCI_IP" =~ ^[A-Za-z0-9][A-Za-z0-9.:-]*$ ]]; then
+    echo "❌ OCI_IP must be a hostname, IPv4 address, or IPv6 address without shell metacharacters."
+    exit 1
+fi
+
+if ! [[ "$OCI_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+    echo "❌ OCI_USER must be a valid Linux account name."
+    exit 1
+fi
+
+if [ -z "$SSH_KEY" ]; then
+    echo "❌ SSH_KEY is required and must point to the OCI deployment private key."
+    echo "Example: SSH_KEY=/secure/path/oci.key DPP_DEPLOY_TARGET=backend OCI_IP=<backend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
     exit 1
 fi
 
@@ -74,18 +120,20 @@ echo "  Live Edge Check: ${SKIP_LIVE_EDGE_CHECK:-enabled}"
 echo "  Caddy Reload: ${SKIP_CADDY_RELOAD:-enabled}"
 echo ""
 
-# Check if SSH key exists
-if [ ! -f "$SSH_KEY" ]; then
-    echo "❌ SSH key not found: $SSH_KEY"
+require_private_key_file
+
+if [ -L "$SSH_KNOWN_HOSTS" ] || [ ! -f "$SSH_KNOWN_HOSTS" ]; then
+    echo "❌ SSH_KNOWN_HOSTS must point to an existing non-symlinked trusted known_hosts file: $SSH_KNOWN_HOSTS"
+    echo "   Verify the OCI host key fingerprint in the OCI Console before adding it."
     exit 1
 fi
 
-echo "✅ SSH key found"
+echo "✅ SSH key and trusted host key file found"
 echo ""
 
 # Test SSH connection
 echo "🔌 Testing SSH connection..."
-SSH_OPTS=(-i "$SSH_KEY" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=60)
+SSH_OPTS=(-i "$SSH_KEY" -o UserKnownHostsFile="$SSH_KNOWN_HOSTS" -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=60)
 
 if $SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "echo 'SSH OK'" > /dev/null 2>&1; then
     echo "✅ SSH connection successful"
@@ -104,19 +152,59 @@ echo ""
 echo "📦 Starting remote deployment..."
 echo ""
 
-# Create temporary deployment script
-DEPLOY_SCRIPT=$(mktemp)
-trap "rm -f $DEPLOY_SCRIPT" EXIT
+# Create a private local script and a unique private remote directory. The remote
+# path is intentionally generated server-side rather than reusing a fixed remote path.
+DEPLOY_SCRIPT="$(mktemp "${TMPDIR:-/tmp}/dpp-deploy-script.XXXXXX")"
+cleanup_deploy_artifacts() {
+    local exit_code=$?
+
+    trap - EXIT
+    if [ -n "${REMOTE_DEPLOY_DIR:-}" ]; then
+        "$SSH_CMD" "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" \
+            "rm -f -- $(quote_for_remote "$REMOTE_DEPLOY_SCRIPT"); rmdir -- $(quote_for_remote "$REMOTE_DEPLOY_DIR")" \
+            >/dev/null 2>&1 || true
+    fi
+    rm -f -- "$DEPLOY_SCRIPT"
+    exit "$exit_code"
+}
+trap cleanup_deploy_artifacts EXIT
+
+if ! REMOTE_DEPLOY_DIR="$(
+    "$SSH_CMD" "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" \
+        "umask 077 && mktemp -d /tmp/dpp-deploy.XXXXXXXXXX"
+)"; then
+    echo "❌ Failed to create a private remote deployment directory."
+    exit 1
+fi
+if ! [[ "$REMOTE_DEPLOY_DIR" =~ ^/tmp/dpp-deploy\.[A-Za-z0-9]{6,}$ ]]; then
+    echo "❌ Remote deployment directory did not match the expected safe path."
+    REMOTE_DEPLOY_DIR=""
+    exit 1
+fi
+REMOTE_DEPLOY_SCRIPT="$REMOTE_DEPLOY_DIR/deploy.sh"
 
 cat > "$DEPLOY_SCRIPT" << 'EOF'
 #!/bin/bash
-set -e
+set -euo pipefail
+
+REMOTE_SCRIPT_PATH="${BASH_SOURCE[0]}"
+REMOTE_DEPLOY_DIR="$(CDPATH= cd -- "$(dirname -- "$REMOTE_SCRIPT_PATH")" && pwd -P)"
+if ! [[ "$REMOTE_DEPLOY_DIR" =~ ^/tmp/dpp-deploy\.[A-Za-z0-9]{6,}$ ]]; then
+    echo "Refusing to run a deployment script outside a private deployment directory."
+    exit 1
+fi
+cleanup_remote_deploy_artifacts() {
+    rm -f -- "$REMOTE_SCRIPT_PATH"
+    rmdir -- "$REMOTE_DEPLOY_DIR" 2>/dev/null || true
+}
+trap cleanup_remote_deploy_artifacts EXIT
 
 APP_DIR="/opt/dpp"
 ENV_FILE="/etc/dpp/dpp.env"
 REPO="https://github.com/yashd810/Digital-Product-Passport.git"
 BRANCH="main"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:?DPP_DEPLOY_TARGET is required}"
+DEPLOY_USER="${DPP_DEPLOY_USER:?DPP_DEPLOY_USER is required}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
 SKIP_LIVE_EDGE_CHECK="${DPP_SKIP_LIVE_EDGE_CHECK:-}"
@@ -125,26 +213,28 @@ CADDYFILE="${DPP_CADDYFILE:-}"
 DEPLOY_TIMEOUT_SECONDS="${DPP_DEPLOY_TIMEOUT_SECONDS:-1800}"
 
 echo "📂 Checking application directory..."
+if [ -L "$APP_DIR" ]; then
+    echo "Refusing to deploy through a symbolic-link application directory: $APP_DIR"
+    exit 1
+fi
 if [ ! -d "$APP_DIR" ]; then
     echo "📥 Cloning repository..."
     sudo mkdir -p "$APP_DIR"
     sudo git clone --branch "$BRANCH" --filter=blob:none --no-checkout "$REPO" "$APP_DIR" 2>&1 | tail -5
-    sudo chown -R ubuntu:ubuntu "$APP_DIR"
+    sudo chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
     cd "$APP_DIR"
     git sparse-checkout init --no-cone
     git sparse-checkout set '/*' '!/local-tools/'
     git checkout "$BRANCH"
-    rm -rf local-tools
 else
     echo "📥 Pulling latest changes..."
     cd "$APP_DIR"
     sudo git sparse-checkout init --no-cone
     sudo git sparse-checkout set '/*' '!/local-tools/'
-    sudo git fetch origin 2>&1 | grep -E "(From|Already|Fetching|fetch)" || true
-    sudo git checkout "$BRANCH" 2>&1 | grep -E "(Switched|Already)" || true
-    sudo git pull --ff-only origin "$BRANCH" 2>&1 | grep -E "(Fast-forward|Already|up to date)" || true
+    sudo git fetch origin
+    sudo git checkout "$BRANCH"
+    sudo git pull --ff-only origin "$BRANCH"
     sudo git sparse-checkout reapply
-    sudo rm -rf local-tools
 fi
 
 echo "✅ Repository ready"
@@ -165,6 +255,7 @@ cd "$APP_DIR"
 DEPLOY_ENV=(
     DPP_ENV_FILE="$ENV_FILE"
     DPP_DEPLOY_TARGET="$DEPLOY_TARGET"
+    DPP_DEPLOY_USER="$DEPLOY_USER"
 )
 if [ -n "$COMPOSE_PROJECT_NAME" ]; then
     DEPLOY_ENV+=(COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME")
@@ -195,57 +286,74 @@ chmod +x "$DEPLOY_SCRIPT"
 
 # Copy script to remote and execute
 echo "📤 Uploading deployment script..."
-if scp -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "$DEPLOY_SCRIPT" "${OCI_USER}@${OCI_IP}:/tmp/deploy.sh" 2>&1 | grep -v "100%" | grep -v "^$"; then
-    echo "✅ Script uploaded"
-else
-    echo "✅ Script uploaded (scp silent mode)"
+if ! scp -q "${SSH_OPTS[@]}" "$DEPLOY_SCRIPT" "${OCI_USER}@${OCI_IP}:$REMOTE_DEPLOY_SCRIPT"; then
+    echo "❌ Failed to upload deployment script."
+    exit 1
 fi
+echo "✅ Script uploaded"
 
 echo ""
 echo "⏱️  Starting remote deployment (timeout: ${TIMEOUT_SECONDS}s)..."
 echo "---"
+DEPLOY_LOG="$(mktemp "${TMPDIR:-/tmp}/dpp-deploy-output.XXXXXX")"
+chmod 600 "$DEPLOY_LOG"
 
 # Execute with timeout
-REMOTE_ENV="DPP_DEPLOY_TARGET='$DEPLOY_TARGET'"
+REMOTE_ENV="DPP_DEPLOY_TARGET=$(quote_for_remote "$DEPLOY_TARGET")"
+REMOTE_ENV="$REMOTE_ENV DPP_DEPLOY_USER=$(quote_for_remote "$OCI_USER")"
 if [ -n "$COMPOSE_PROJECT_NAME" ]; then
-    REMOTE_ENV="$REMOTE_ENV COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME'"
+    REMOTE_ENV="$REMOTE_ENV COMPOSE_PROJECT_NAME=$(quote_for_remote "$COMPOSE_PROJECT_NAME")"
 fi
 if [ -n "$REMOVE_ORPHANS" ]; then
-    REMOTE_ENV="$REMOTE_ENV DPP_REMOVE_ORPHANS='$REMOVE_ORPHANS'"
+    REMOTE_ENV="$REMOTE_ENV DPP_REMOVE_ORPHANS=$(quote_for_remote "$REMOVE_ORPHANS")"
 fi
 if [ -n "$SKIP_LIVE_EDGE_CHECK" ]; then
-    REMOTE_ENV="$REMOTE_ENV DPP_SKIP_LIVE_EDGE_CHECK='$SKIP_LIVE_EDGE_CHECK'"
+    REMOTE_ENV="$REMOTE_ENV DPP_SKIP_LIVE_EDGE_CHECK=$(quote_for_remote "$SKIP_LIVE_EDGE_CHECK")"
 fi
 if [ -n "$SKIP_CADDY_RELOAD" ]; then
-    REMOTE_ENV="$REMOTE_ENV DPP_SKIP_CADDY_RELOAD='$SKIP_CADDY_RELOAD'"
+    REMOTE_ENV="$REMOTE_ENV DPP_SKIP_CADDY_RELOAD=$(quote_for_remote "$SKIP_CADDY_RELOAD")"
 fi
 if [ -n "$CADDYFILE" ]; then
-    REMOTE_ENV="$REMOTE_ENV DPP_CADDYFILE='$CADDYFILE'"
+    REMOTE_ENV="$REMOTE_ENV DPP_CADDYFILE=$(quote_for_remote "$CADDYFILE")"
 fi
-REMOTE_ENV="$REMOTE_ENV DPP_DEPLOY_TIMEOUT_SECONDS='$TIMEOUT_SECONDS'"
+REMOTE_ENV="$REMOTE_ENV DPP_DEPLOY_TIMEOUT_SECONDS=$(quote_for_remote "$TIMEOUT_SECONDS")"
+set +e
 if [ -n "$TIMEOUT_CMD" ]; then
-    ($TIMEOUT_CMD $((TIMEOUT_SECONDS + 30)) $SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "$REMOTE_ENV bash /tmp/deploy.sh" 2>&1) | tee /tmp/deploy-output.log
+    ($TIMEOUT_CMD $((TIMEOUT_SECONDS + 30)) $SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "$REMOTE_ENV bash $(quote_for_remote "$REMOTE_DEPLOY_SCRIPT")" 2>&1) | tee "$DEPLOY_LOG"
 else
     echo "⚠️  Local timeout command not found; running SSH deployment without local timeout wrapper."
-    ($SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "$REMOTE_ENV bash /tmp/deploy.sh" 2>&1) | tee /tmp/deploy-output.log
+    ($SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "$REMOTE_ENV bash $(quote_for_remote "$REMOTE_DEPLOY_SCRIPT")" 2>&1) | tee "$DEPLOY_LOG"
+fi
+PIPE_CODES=("${PIPESTATUS[@]}")
+set -e
+
+EXIT_CODE="${PIPE_CODES[0]}"
+if [ "${PIPE_CODES[1]}" -ne 0 ]; then
+    echo "❌ Unable to write the deployment log: $DEPLOY_LOG"
+    EXIT_CODE="${PIPE_CODES[1]}"
 fi
 
-EXIT_CODE=${PIPESTATUS[0]}
-
 echo "---"
-echo "📋 Deployment log saved to: /tmp/deploy-output.log"
+echo "📋 Deployment log saved to: $DEPLOY_LOG"
 echo ""
 
 if [ $EXIT_CODE -eq 0 ]; then
+    LOG_SERVICE="backend-api"
+    if [ "$DEPLOY_TARGET" = "frontend" ]; then
+        LOG_SERVICE="frontend-app"
+    fi
     echo "=================================="
     echo "✅ Deployment Complete!"
     echo "=================================="
     echo ""
     echo "📍 Next steps:"
-    echo "1. SSH into instance: $SSH_CMD -i '$SSH_KEY' ${OCI_USER}@${OCI_IP}"
+    echo "1. SSH into instance: $SSH_CMD -i '$SSH_KEY' -o UserKnownHostsFile='$SSH_KNOWN_HOSTS' -o StrictHostKeyChecking=yes ${OCI_USER}@${OCI_IP}"
     echo "2. Check running services: sudo docker ps"
-    echo "3. View logs: sudo docker logs backend-api 2>&1 | tail -20"
-    echo "4. Test API health: curl -s http://localhost:3001/health | jq ."
+    echo "3. Find the ${LOG_SERVICE} container: sudo docker ps --filter 'label=com.docker.compose.service=${LOG_SERVICE}' --format '{{.Names}}'"
+    echo "4. View its logs: sudo docker logs <container-name-from-step-3> 2>&1 | tail -20"
+    if [ "$DEPLOY_TARGET" != "frontend" ]; then
+        echo "5. Test API health: curl -s http://127.0.0.1:3001/health | jq ."
+    fi
     echo ""
     echo "✅ Deployment process completed (see above for details)"
     exit 0

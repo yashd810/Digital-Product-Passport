@@ -1,6 +1,7 @@
 "use strict";
 
 const logger = require("./logger");
+const { getApiOrigin, getPublicViewerOrigin } = require("../shared/security/configured-origin");
 
 module.exports = function createSigningService({ pool, crypto, canonicalizeJson, didService, buildCanonicalPassportPayload }) {
   // ─── DIGITAL SIGNATURE ──────────────────────────────────────────────────────
@@ -32,29 +33,23 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     const privPem = process.env.SIGNING_PRIVATE_KEY?.replace(/\\n/g, "\n");
     const pubPem = process.env.SIGNING_PUBLIC_KEY?.replace(/\\n/g, "\n");
 
-    if (privPem && pubPem) {
-      const keyId = crypto.createHash("sha256").update(pubPem).digest("hex").slice(0, 16);
-      const algorithmVersion = inferKeyAlgorithmVersion(pubPem);
-      _signingKey = { privateKey: privPem, publicKey: pubPem, keyId, algorithmVersion };
-      logger.info({ keyId, algorithmVersion }, "[Signing] Loaded signing key from environment");
-    } else {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(
-          "[Signing] SIGNING_PRIVATE_KEY and SIGNING_PUBLIC_KEY must be set in production. " +
-          "Ephemeral keys are not allowed in production because signatures become unverifiable after restart."
-        );
-      }
-      logger.warn("[Signing] SIGNING_PRIVATE_KEY not set — generating ephemeral P-256 key pair for local development.");
-      logger.warn("[Signing] This is only safe for local development. Set SIGNING_PRIVATE_KEY and SIGNING_PUBLIC_KEY before deploying.");
-      const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", {
-        namedCurve: "P-256",
-        publicKeyEncoding: { type: "spki", format: "pem" },
-        privateKeyEncoding: { type: "pkcs8", format: "pem" }
-      });
-      const keyId = crypto.createHash("sha256").update(publicKey).digest("hex").slice(0, 16);
-      _signingKey = { privateKey, publicKey, keyId, algorithmVersion: "ES256" };
-      logger.info({ keyId }, "[Signing] Ephemeral ES256 key generated");
+    if (!privPem || !pubPem) {
+      throw new Error("[Signing] SIGNING_PRIVATE_KEY and SIGNING_PUBLIC_KEY must be configured.");
     }
+    const privateKey = crypto.createPrivateKey(privPem);
+    const publicKey = crypto.createPublicKey(pubPem);
+    const derivedPublicKey = crypto.createPublicKey(privateKey);
+    if (privateKey.asymmetricKeyType !== "ec"
+      || Buffer.compare(
+        derivedPublicKey.export({ format: "der", type: "spki" }),
+        publicKey.export({ format: "der", type: "spki" })
+      ) !== 0) {
+      throw new Error("[Signing] SIGNING_PRIVATE_KEY and SIGNING_PUBLIC_KEY must be a matching keypair.");
+    }
+    const keyId = crypto.createHash("sha256").update(pubPem).digest("hex").slice(0, 16);
+    const algorithmVersion = inferKeyAlgorithmVersion(pubPem);
+    _signingKey = { privateKey: privPem, publicKey: pubPem, keyId, algorithmVersion };
+    logger.info({ keyId, algorithmVersion }, "[Signing] Loaded signing key from environment");
 
     assertCertificateBackedSigningConfiguration();
 
@@ -78,7 +73,9 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
   }
 
   function issuerDid() {
-    return didService?.getPlatformDid?.() || "did:web:www.claros-dpp.online";
+    const did = didService?.getPlatformDid?.();
+    if (!did) throw new Error("[Signing] A configured DID service is required for signing.");
+    return did;
   }
 
   function getSigningTrustMetadata() {
@@ -146,7 +143,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
   }
 
   async function buildVC(passport, typeDef, releasedAt) {
-    const appUrl = didService?.getPublicOrigin?.() || process.env.APP_URL || "http://localhost:3000";
+    const appUrl = didService?.getPublicOrigin?.() || getPublicViewerOrigin();
     const company = await loadCompanyForPassport(passport.companyId);
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, {
       company,
@@ -171,7 +168,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       "@context": [
       "https://www.w3.org/ns/credentials/v2",
       "https://w3id.org/security/suites/jws-2020/v1",
-      `${didService?.getApiOrigin?.() || process.env.SERVER_URL || "http://localhost:3001"}/contexts/dpp/v1`],
+      `${didService?.getApiOrigin?.() || getApiOrigin()}/contexts/dpp/v1`],
 
       id: `${appUrl}/passport/${passport.dppId}/credential/v${passport.versionNumber}`,
       type: ["VerifiableCredential", "DigitalProductPassport"],

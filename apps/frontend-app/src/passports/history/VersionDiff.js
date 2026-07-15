@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../shared/passports/passportSchemaUtils";
 import { formatPassportStatus } from "../utils/passportStatus";
+import { toSafeInternalPath, toSafeResourceHref } from "../../shared/security/urlSafety";
 import "../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -110,8 +111,9 @@ function VersionDiff({ companyId }) {
   const fmtVal = (value, type) => {
     if (value === null || value === undefined || value === "") return <span style={{ color: "var(--steel)", fontStyle: "italic" }}>—</span>;
     if (type === "boolean") return value ? "Yes" : "No";
-    if (typeof value === "string" && value.startsWith("http")) {
-      return <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: "var(--jet)", fontSize: 12 }}>Open file</a>;
+    const safeResourceHref = toSafeResourceHref(value);
+    if (safeResourceHref) {
+      return <a href={safeResourceHref} target="_blank" rel="noopener noreferrer" style={{ color: "var(--jet)", fontSize: 12 }}>Open file</a>;
     }
     return String(value);
   };
@@ -167,13 +169,13 @@ function VersionDiff({ companyId }) {
               </div>
               {(entry.publicPath || entry.inactivePath) && (
                 <div className="history-page-links">
-                  {entry.publicPath && entry.isCurrent && (
-                    <a href={entry.publicPath} target="_blank" rel="noopener noreferrer" className="pv-history-open-link">
+                  {entry.publicPath && entry.isCurrent && toSafeInternalPath(entry.publicPath, { allowedPrefixes: ["/dpp"] }) && (
+                    <a href={toSafeInternalPath(entry.publicPath, { allowedPrefixes: ["/dpp"] })} target="_blank" rel="noopener noreferrer" className="pv-history-open-link">
                       Open public passport
                     </a>
                   )}
-                  {entry.inactivePath && !entry.isCurrent && (
-                    <a href={entry.inactivePath} target="_blank" rel="noopener noreferrer" className="pv-history-open-link">
+                  {entry.inactivePath && !entry.isCurrent && toSafeInternalPath(entry.inactivePath, { allowedPrefixes: ["/dpp"] }) && (
+                    <a href={toSafeInternalPath(entry.inactivePath, { allowedPrefixes: ["/dpp"] })} target="_blank" rel="noopener noreferrer" className="pv-history-open-link">
                       Open snapshot
                     </a>
                   )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { NavLink, useParams } from "react-router-dom";
 import { fetchWithAuth } from "../../../shared/api/authHeaders";
+import { isTrustedApiRequestUrl, toSafeImageSrc, toSafeResourceHref } from "../../../shared/security/urlSafety";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "./CompanyRepository.css";
 
@@ -245,16 +246,16 @@ function SymbolsTab({ companyId }) {
           <div className="sym-upload-preview-col">
             <div className="sym-preview-box">
               {preview
-                ? <img src={preview} alt="preview" className="sym-preview-img" />
+                ? <img src={toSafeImageSrc(preview)} alt="preview" className="sym-preview-img" />
                 : <span className="sym-preview-empty">🖼</span>
               }
             </div>
             <label className="sym-file-btn">
               {file ? "Change file" : "Choose file"}
-              <input ref={fileRef} type="file" accept=".svg,.png,.jpg,.jpeg,.webp"
+              <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.webp"
                 style={{ display: "none" }} onChange={handleFileChange} />
             </label>
-            <p className="sym-file-hint">SVG, PNG, JPG, WebP · max 2 MB</p>
+            <p className="sym-file-hint">PNG, JPG, WebP · max 2 MB</p>
           </div>
           <div className="sym-upload-fields">
             <div className="sym-field-group">
@@ -285,7 +286,7 @@ function SymbolsTab({ companyId }) {
         <div className="repo-card-grid">
           {symbols.map(sym => (
             <div key={sym.id} className={`repo-card ${sym.type === "folder" ? "folder" : "sym-card-item"}`}>
-              <div className={`repo-card-body${sym.type !== "folder" && sym.fileUrl ? " repo-card-body-clickable" : ""}`} onClick={() => {
+              <div className={`repo-card-body${sym.type !== "folder" && toSafeResourceHref(sym.fileUrl) ? " repo-card-body-clickable" : ""}`} onClick={() => {
                 if (sym.type === "folder") navigate(sym);
                 else if (!renamingId) setPreviewSym(sym);
               }}>
@@ -293,7 +294,7 @@ function SymbolsTab({ companyId }) {
                   <div className="repo-card-icon">📁</div>
                 ) : (
                   <div className="sym-card-img-wrap">
-                    <img src={sym.fileUrl} alt={sym.name} className="sym-card-img" loading="lazy" />
+                    {toSafeImageSrc(sym.fileUrl) && <img src={toSafeImageSrc(sym.fileUrl)} alt={sym.name} className="sym-card-img" loading="lazy" />}
                   </div>
                 )}
                 <div className="repo-card-info">
@@ -355,7 +356,9 @@ function SymbolsTab({ companyId }) {
 
 // ─── Preview Dialog ───────────────────────────────────────────────────────────
 function PreviewDialog({ item, onClose }) {
-  const isPdf = item.mimeType === "application/pdf" || item.fileUrl?.toLowerCase().endsWith(".pdf");
+  const safeFileUrl = toSafeResourceHref(item.fileUrl);
+  const canEmbedPreview = Boolean(safeFileUrl && isTrustedApiRequestUrl(safeFileUrl));
+  const isPdf = item.mimeType === "application/pdf" || safeFileUrl?.toLowerCase().endsWith(".pdf");
   return (
     <div className="repo-preview-overlay" onClick={onClose}>
       <div className="repo-preview-box" onClick={e => e.stopPropagation()}>
@@ -364,15 +367,21 @@ function PreviewDialog({ item, onClose }) {
           <button className="repo-preview-close" onClick={onClose}>✕</button>
         </div>
         <div className="repo-preview-body">
-          {isPdf ? (
+          {!safeFileUrl ? <span>Preview unavailable</span> : !canEmbedPreview ? (
+            <div className="repo-preview-external">
+              <p>External files are opened in a separate tab and are not embedded in the dashboard.</p>
+              <a href={safeFileUrl} target="_blank" rel="noopener noreferrer">Open external file</a>
+            </div>
+          ) : isPdf ? (
             <iframe
-              src={item.fileUrl}
+              src={safeFileUrl}
               title={item.name}
               className="repo-preview-pdf"
+              referrerPolicy="no-referrer"
             />
           ) : (
-            <img
-              src={item.fileUrl}
+            toSafeImageSrc(safeFileUrl) && <img
+              src={toSafeImageSrc(safeFileUrl)}
               alt={item.name}
               className="repo-preview-img"
             />

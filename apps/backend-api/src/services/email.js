@@ -11,8 +11,7 @@ const nodemailer = require("nodemailer");
 const fs         = require("fs");
 const path       = require("path");
 
-const emailStylesPath = process.env.EMAIL_STYLES_PATH
-  || path.resolve(__dirname, "..", "..", "..", "frontend-app", "src", "shared", "styles", "email-styles.css");
+const emailStylesPath = path.resolve(__dirname, "..", "shared", "email", "email-styles.css");
 const emailStyles = fs.readFileSync(emailStylesPath, "utf8");
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -32,6 +31,66 @@ const safeHttpUrl = (value) => {
     return "#";
   }
 };
+
+function emailConfigurationError(message) {
+  const error = new Error(message);
+  error.code = "emailNotConfigured";
+  return error;
+}
+
+function getEmailConfiguration() {
+  const host = String(process.env.EMAIL_HOST || "").trim();
+  const user = String(process.env.EMAIL_USER || "").trim();
+  const pass = String(process.env.EMAIL_PASS || "");
+  const from = String(process.env.EMAIL_FROM || "").trim();
+  const missing = [
+    !host && "EMAIL_HOST",
+    !user && "EMAIL_USER",
+    !pass && "EMAIL_PASS",
+    !from && "EMAIL_FROM",
+  ].filter(Boolean);
+  if (missing.length) {
+    throw emailConfigurationError(`Email is not configured; missing ${missing.join(", ")}`);
+  }
+
+  if (/[^\x21-\x7E]/.test(host) || /[\r\n]/.test(host)) {
+    throw emailConfigurationError("EMAIL_HOST is invalid");
+  }
+  if (!/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(from)) {
+    throw emailConfigurationError("EMAIL_FROM must be a valid mailbox address");
+  }
+
+  const port = Number.parseInt(String(process.env.EMAIL_PORT || "587"), 10);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw emailConfigurationError("EMAIL_PORT must be a valid TCP port");
+  }
+  const secureValue = String(process.env.EMAIL_SECURE || "false").trim().toLowerCase();
+  if (!['true', 'false'].includes(secureValue)) {
+    throw emailConfigurationError("EMAIL_SECURE must be true or false");
+  }
+
+  return {
+    host,
+    port,
+    secure: secureValue === "true",
+    user,
+    pass,
+    from,
+  };
+}
+
+function isEmailConfigured() {
+  try {
+    getEmailConfiguration();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getEmailFromAddress() {
+  return getEmailConfiguration().from;
+}
 
 const renderInfoTable = (rows = []) => {
   const content = rows
@@ -115,12 +174,16 @@ const renderCompanyInvitationBody = ({ inviterName, companyName, inviteeEmail, r
   <div class="cta-wrap"><a href="${safeHttpUrl(registerUrl)}" class="cta-btn">Accept Invitation →</a></div>
 `;
 
-const createTransporter = () => nodemailer.createTransport({
-  host:   process.env.EMAIL_HOST   || "smtp.sendgrid.net",
-  port:   parseInt(process.env.EMAIL_PORT || "587"),
-  secure: process.env.EMAIL_SECURE === "true" || false,
-  auth:   { user: process.env.EMAIL_USER || "apikey", pass: process.env.EMAIL_PASS },
-});
+const createTransporter = () => {
+  const config = getEmailConfiguration();
+  return nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    requireTLS: !config.secure,
+    auth: { user: config.user, pass: config.pass },
+  });
+};
 
 const brandedEmail = ({ preheader, bodyHtml }) => `
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
@@ -142,7 +205,7 @@ const brandedEmail = ({ preheader, bodyHtml }) => `
 const sendOtpEmail = async (user, otp) => {
   const transporter = createTransporter();
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM || "noreply@dpp-system.com",
+    from: getEmailFromAddress(),
     to: user.email,
     subject: "Your verification code — Digital Product Passport",
     html: brandedEmail({
@@ -162,6 +225,9 @@ const sendOtpEmail = async (user, otp) => {
 
 module.exports = {
   createTransporter,
+  getEmailConfiguration,
+  getEmailFromAddress,
+  isEmailConfigured,
   brandedEmail,
   sendOtpEmail,
   renderInfoTable,

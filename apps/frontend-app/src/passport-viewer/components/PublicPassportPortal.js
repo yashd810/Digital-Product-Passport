@@ -3,6 +3,13 @@ import { translateFieldValue, translateSchemaLabel } from "../../app/providers/i
 import { normalizeSystemPassportHeader, resolveSystemHeaderEntries } from "../../admin/passport-types/builderHelpers";
 import { formatPassportStatus } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import {
+  safeWindowOpen,
+  toSafeExternalHref,
+  toSafeImageSrc,
+  toSafeInternalPath,
+  toSafeResourceHref,
+} from "../../shared/security/urlSafety";
 import { normalizeTableColumns, parseTableRows } from "../../shared/passports/tableSchemaUtils";
 import { resolveManagedSystemHeaderValue } from "../../shared/passports/systemHeaderManagedValues";
 import { flattenSchemaFieldsFromSections, normalizeSchemaSections } from "../../shared/passports/passportSchemaUtils";
@@ -49,21 +56,15 @@ function isViewerHiddenField(field) {
 }
 
 function isUrlLike(value) {
-  return typeof value === "string" && /^(https?:)?\/\//i.test(value);
-}
-
-function toHref(value) {
-  if (!value || typeof value !== "string") return null;
-  if (/^(https?:)?\/\//i.test(value) || value.startsWith("/")) return value;
-  return `https://${value}`;
+  return Boolean(toSafeResourceHref(value));
 }
 
 function isImageLikeUrl(value) {
-  return typeof value === "string" && /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(value);
+  return Boolean(toSafeImageSrc(value)) && /\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(String(value));
 }
 
 function isPdfLikeUrl(value) {
-  return typeof value === "string" && /\.pdf(\?.*)?$/i.test(value);
+  return Boolean(toSafeResourceHref(value)) && /\.pdf(\?.*)?$/i.test(String(value));
 }
 
 function formatValue(value) {
@@ -299,7 +300,7 @@ function buildVerificationRows(verificationBundle) {
   if (!verificationBundle) return [];
   return [
     ["DPP integrity", verificationBundle.integrity || ""],
-    ["Signer", verificationBundle.signedBy === "did:web:www.claros-dpp.online" ? "Platform issuer" : (verificationBundle.signedBy || "")],
+    ["Signer", verificationBundle.signedBy || ""],
     ["Company trust level", verificationBundle.trustLevel || ""],
     ["DPP data unchanged", verificationBundle.dppDataUnchanged ? "Yes" : "No"],
     ["External company certificate", verificationBundle.externalCompanyCertificate || "Not provided"],
@@ -352,13 +353,13 @@ function DataArtifactPreview({ field, raw, label, onPreviewImage, onRefreshField
       </div>
     );
   }
-  const href = toHref(raw);
+  const href = toSafeResourceHref(raw);
   if (field.type === "url" && href) {
     const handleOpen = async (e) => {
       if (typeof onRefreshFieldUrl !== "function") return;
       e.preventDefault();
       const nextUrl = await onRefreshFieldUrl(field.key, raw);
-      window.open(toHref(nextUrl || raw), "_blank", "noopener,noreferrer");
+      safeWindowOpen(nextUrl || raw, { resource: true });
     };
     return (
       <a href={href} target="_blank" rel="noopener noreferrer" className="artifact-link" onClick={handleOpen}>
@@ -641,11 +642,12 @@ function DocumentCard({
   const { field, fieldLabel, isLocked } = item;
   const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
   const documentValue = !isLocked && isFilled(resolved.raw) ? resolved.raw : null;
+  const safeDocumentHref = toSafeResourceHref(documentValue);
   const handleOpenDocument = async (e) => {
     if (typeof onRefreshFieldUrl !== "function") return;
     e.preventDefault();
     const nextUrl = await onRefreshFieldUrl(field.key, documentValue);
-    window.open(toHref(nextUrl || documentValue), "_blank", "noopener,noreferrer");
+    safeWindowOpen(nextUrl || documentValue, { resource: true });
   };
 
   return (
@@ -667,9 +669,9 @@ function DocumentCard({
               />
             </div>
             <div className="doc-asset-actions">
-              <a href={documentValue} target="_blank" rel="noopener noreferrer" className="pdf-open-link" onClick={handleOpenDocument}>
+              {safeDocumentHref && <a href={safeDocumentHref} target="_blank" rel="noopener noreferrer" className="pdf-open-link" onClick={handleOpenDocument}>
                 Open
-              </a>
+              </a>}
             </div>
           </div>
         ) : (
@@ -819,6 +821,12 @@ export default function PublicPassportPortal({
   const trustRows = buildTrustRows(passport, carrierAuthenticity, sigVerification);
   const verificationRows = buildVerificationRows(verificationBundle);
   const documentItems = buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, lang);
+  const verificationLinks = {
+    canonicalDppJsonUrl: toSafeExternalHref(verificationBundle?.canonicalDppJsonUrl),
+    signatureUrl: toSafeExternalHref(verificationBundle?.signatureUrl),
+    verificationBundleUrl: toSafeExternalHref(verificationBundle?.verificationBundleUrl),
+    didDocumentUrl: toSafeExternalHref(verificationBundle?.didDocumentUrl),
+  };
 
   const pages = [
     { key: "overview", label: "Overview" },
@@ -842,7 +850,10 @@ export default function PublicPassportPortal({
     dynamicValues,
     dynamicHistoryBasePath,
     securityGroupApiKey,
-    onPreviewImage: (src, label) => setPreviewImage({ src, label }),
+    onPreviewImage: (src, label) => {
+      const safeSrc = toSafeImageSrc(src);
+      if (safeSrc) setPreviewImage({ src: safeSrc, label });
+    },
     onRefreshFieldUrl,
   };
 
@@ -913,14 +924,14 @@ export default function PublicPassportPortal({
 
           <aside className="side-panel" aria-label="Product image and QR access">
             <div className={`product-photo${companyData?.companyLogo ? " has-img" : ""}`}>
-              {companyData?.companyLogo && <img src={companyData.companyLogo} alt={`${companyData.companyName || "Company"} logo`} />}
+              {toSafeImageSrc(companyData?.companyLogo) && <img src={toSafeImageSrc(companyData.companyLogo)} alt={`${companyData.companyName || "Company"} logo`} />}
             </div>
             <div className="qr-row">
               <div className="qr" aria-label="Passport QR code">
                 {qrLoading ? (
                   <div className="artifact-placeholder">Generating…</div>
-                ) : qrCode ? (
-                  <img src={qrCode} alt="Passport QR code" />
+                ) : toSafeImageSrc(qrCode) ? (
+                  <img src={toSafeImageSrc(qrCode)} alt="Passport QR code" />
                 ) : (
                   <div className="artifact-placeholder" />
                 )}
@@ -1014,23 +1025,23 @@ export default function PublicPassportPortal({
                     ))}
                   </div>
                   <div className="verification-actions">
-                    {verificationBundle.canonicalDppJsonUrl && (
-                      <a className="pill-button" href={verificationBundle.canonicalDppJsonUrl} target="_blank" rel="noopener noreferrer">
+                    {verificationLinks.canonicalDppJsonUrl && (
+                      <a className="pill-button" href={verificationLinks.canonicalDppJsonUrl} target="_blank" rel="noopener noreferrer">
                         Download DPP JSON
                       </a>
                     )}
-                    {verificationBundle.signatureUrl && (
-                      <a className="pill-button" href={verificationBundle.signatureUrl} target="_blank" rel="noopener noreferrer">
+                    {verificationLinks.signatureUrl && (
+                      <a className="pill-button" href={verificationLinks.signatureUrl} target="_blank" rel="noopener noreferrer">
                         Download signature proof
                       </a>
                     )}
-                    {verificationBundle.verificationBundleUrl && (
-                      <a className="pill-button" href={verificationBundle.verificationBundleUrl} target="_blank" rel="noopener noreferrer">
+                    {verificationLinks.verificationBundleUrl && (
+                      <a className="pill-button" href={verificationLinks.verificationBundleUrl} target="_blank" rel="noopener noreferrer">
                         Download verification bundle
                       </a>
                     )}
-                    {verificationBundle.didDocumentUrl && (
-                      <a className="pill-button" href={verificationBundle.didDocumentUrl} target="_blank" rel="noopener noreferrer">
+                    {verificationLinks.didDocumentUrl && (
+                      <a className="pill-button" href={verificationLinks.didDocumentUrl} target="_blank" rel="noopener noreferrer">
                         View DID document / public key
                       </a>
                     )}
@@ -1079,9 +1090,9 @@ export default function PublicPassportPortal({
                         </div>
                         <div className="pv-history-meta pv-history-meta-compact">
                           <span>{formatIsoDate(entry.updatedAt || entry.createdAt) || ""}</span>
-                          {(entry.publicPath || entry.inactivePath) && (
+                          {toSafeInternalPath(entry.isCurrent ? entry.publicPath : entry.inactivePath, { allowedPrefixes: ["/dpp"] }) && (
                             <a
-                              href={entry.isCurrent ? entry.publicPath : entry.inactivePath}
+                              href={toSafeInternalPath(entry.isCurrent ? entry.publicPath : entry.inactivePath, { allowedPrefixes: ["/dpp"] })}
                               className="pv-history-open-link"
                               target="_blank"
                               rel="noopener noreferrer"
@@ -1187,7 +1198,7 @@ export default function PublicPassportPortal({
             {verificationBundle && (
               <div className="verification-inline-note">
                 <strong>DPP integrity: {verificationBundle.integrity || "Unknown"}</strong>
-                <span>Signer: {verificationBundle.signedBy === "did:web:www.claros-dpp.online" ? "Platform issuer" : (verificationBundle.signedBy || "Unknown")}</span>
+                <span>Signer: {verificationBundle.signedBy || "Unknown"}</span>
               </div>
             )}
             <div className="trust-grid">
@@ -1252,7 +1263,7 @@ export default function PublicPassportPortal({
             >
               ×
             </button>
-            <img src={previewImage.src} alt={previewImage.label || "Image preview"} className="pv-image-lightbox-img" />
+            {toSafeImageSrc(previewImage.src) && <img src={toSafeImageSrc(previewImage.src)} alt={previewImage.label || "Image preview"} className="pv-image-lightbox-img" />}
             {previewImage.label && <div className="pv-image-lightbox-label">{previewImage.label}</div>}
           </div>
         </div>

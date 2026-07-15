@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { toSafeInternalPath } from "../../shared/security/urlSafety";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -31,7 +32,10 @@ export default function PublicPassportRedirectPage() {
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Passport not found")))
       .then((passport) => {
         if (cancelled) return;
-        const targetPath = versionNumber ? passport?.inactivePath : passport?.publicPath;
+        const targetPath = toSafeInternalPath(
+          versionNumber ? passport?.inactivePath : passport?.publicPath,
+          { allowedPrefixes: ["/dpp"] }
+        );
         if (!targetPath) throw new Error("Passport not found");
         navigate(targetPath, { replace: true });
       })

@@ -11,11 +11,11 @@ function joinUrl(base, nextPath) {
 }
 
 function getRepositoryFileLinkSecret() {
-  return String(
-    process.env.REPOSITORY_FILE_LINK_SECRET
-    || process.env.JWT_SECRET
-    || "local-dev-repository-link-secret"
-  );
+  const secret = String(process.env.REPOSITORY_FILE_LINK_SECRET || "");
+  if (secret.length < 32) {
+    throw new Error("REPOSITORY_FILE_LINK_SECRET must be configured with at least 32 characters");
+  }
+  return secret;
 }
 
 function signPayload(payload) {

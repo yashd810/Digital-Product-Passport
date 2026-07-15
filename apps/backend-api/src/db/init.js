@@ -1172,4 +1172,6 @@ async function initDb(pool, {
   }
 }
 
-module.exports = { initDb };
+module.exports = {
+  initDb,
+};

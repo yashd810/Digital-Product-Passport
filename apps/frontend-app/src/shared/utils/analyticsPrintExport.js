@@ -454,14 +454,17 @@ export function openAnalyticsPrintReport({
           ${chartCardsHtml}
           ${sectionsHtml}
         </div>
-        <script>
-          window.addEventListener("load", () => {
-            document.title = ${JSON.stringify(filename || title)};
-            setTimeout(() => window.print(), 350);
-          });
-        </script>
       </body>
     </html>`);
   win.document.close();
   win.focus();
+
+  const printReport = () => {
+    // Set this through the DOM API instead of interpolating it into an inline
+    // script. Report names may eventually include tenant-provided text.
+    win.document.title = String(filename || title || "Digital Product Passport report");
+    setTimeout(() => win.print(), 350);
+  };
+  if (win.document.readyState === "complete") printReport();
+  else win.addEventListener("load", printReport, { once: true });
 }

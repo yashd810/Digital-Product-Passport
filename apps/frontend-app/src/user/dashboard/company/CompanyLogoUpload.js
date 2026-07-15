@@ -1,4 +1,7 @@
 import React, { useRef } from "react";
+import { toSafeImageSrc } from "../../../shared/security/urlSafety";
+
+const allowedImageTypes = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 function CompanyLogoUpload({ logoPreview, onLogoChange }) {
   const fileInputRef = useRef(null);
@@ -11,9 +14,21 @@ function CompanyLogoUpload({ logoPreview, onLogoChange }) {
       event.target.value = "";
       return;
     }
+    if (!allowedImageTypes.has(file.type)) {
+      alert("Use a PNG, JPEG, WebP, or GIF image.");
+      event.target.value = "";
+      return;
+    }
 
     const reader = new FileReader();
-    reader.onloadend = () => onLogoChange(reader.result);
+    reader.onloadend = () => {
+      const safeImage = toSafeImageSrc(reader.result);
+      if (!safeImage) {
+        alert("The selected image could not be used safely.");
+        return;
+      }
+      onLogoChange(safeImage);
+    };
     reader.readAsDataURL(file);
     event.target.value = "";
   };
@@ -26,9 +41,9 @@ function CompanyLogoUpload({ logoPreview, onLogoChange }) {
         <div className="company-logo-upload-col">
           <p className="company-logo-upload-label">Company Logo</p>
           <div className="company-logo-upload-box">
-            {logoPreview ? (
+            {toSafeImageSrc(logoPreview) ? (
               <img
-                src={logoPreview}
+                src={toSafeImageSrc(logoPreview)}
                 alt="Company logo"
                 className="company-logo-upload-img"
               />
@@ -60,12 +75,12 @@ function CompanyLogoUpload({ logoPreview, onLogoChange }) {
             ) : null}
           </div>
 
-          <p className="company-logo-upload-hint">JPG, PNG, SVG — max 5 MB</p>
+          <p className="company-logo-upload-hint">PNG, JPG, WebP, or GIF — max 5 MB</p>
 
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/png,image/jpeg,image/webp,image/gif"
             onChange={handleFileChange}
             className="company-logo-upload-input"
           />

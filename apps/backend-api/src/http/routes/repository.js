@@ -4,6 +4,7 @@ const {
   buildRepositoryFilePublicUrl,
   decodeRepositoryFileToken,
 } = require("../../shared/repository/repository-file-links");
+const { getApiOrigin } = require("../../shared/security/configured-origin");
 const { resolveExistingContainedPath } = require("../../shared/storage/path-containment");
 
 module.exports = function registerRepositoryRoutes(app, {
@@ -22,7 +23,7 @@ module.exports = function registerRepositoryRoutes(app, {
   isPathInsideBase,
   storageService,
 }) {
-  const appBaseUrlFromRequest = (req) => `${req.protocol}://${req.get("host")}`;
+  const appBaseUrlFromRequest = () => getApiOrigin();
   const getCompanyId = (row) => row?.companyId || null;
   const getStorageKey = (row) => row?.storageKey || "";
   const getFilePath = (row) => row?.filePath || "";
@@ -196,22 +197,6 @@ module.exports = function registerRepositoryRoutes(app, {
       }
     }
   );
-
-  app.post("/api/companies/:companyId/repository/copy", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
-    try {
-      const { sourceUrl, name, parentId } = req.body;
-      if (!sourceUrl || !name?.trim()) return res.status(400).json({ error: "sourceUrl and name required" });
-      const r = await pool.query(
-        `INSERT INTO "companyRepository"
-           ("companyId", "parentId", name, type, "repositoryScope", "fileUrl", "mimeType", "createdBy")
-         VALUES ($1, $2, $3, 'file', 'files', $4, 'application/pdf', $5) RETURNING *`,
-        [req.params.companyId, parentId || null, name.trim(), sourceUrl, req.user.userId]
-      );
-      res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
-    } catch {
-      res.status(500).json({ error: "Failed to copy to repository" });
-    }
-  });
 
   app.patch("/api/companies/:companyId/repository/:itemId", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {

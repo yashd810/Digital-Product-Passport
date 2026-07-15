@@ -48,6 +48,7 @@ module.exports = function createPassportService({
   // email service
   createTransporter,
   brandedEmail,
+  renderInfoTable,
 }) {
   function isMissingRelationError(error) {
     return error?.code === "42P01";
@@ -162,6 +163,7 @@ module.exports = function createPassportService({
     logger,
     createTransporter,
     brandedEmail,
+    renderInfoTable,
     getTable,
     normalizePassportRow,
     normalizeReleaseStatus,

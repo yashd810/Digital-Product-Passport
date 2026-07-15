@@ -46,7 +46,10 @@ function hashSecret(secret) {
 }
 
 function hashOtpCode(secret) {
-  const hmacSecret = process.env.OTP_HMAC_SECRET || process.env.PEPPER_V1 || "development-only-otp-hmac-secret";
+  const hmacSecret = String(process.env.OTP_HMAC_SECRET || "");
+  if (hmacSecret.length < 32) {
+    throw new Error("OTP_HMAC_SECRET must be configured with at least 32 characters");
+  }
   return crypto
     .createHmac("sha256", hmacSecret)
     .update(`otp:${String(secret || "").trim()}`)

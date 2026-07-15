@@ -28,12 +28,12 @@ function createProductIdentifierService() {
 }
 
 function createExampleProductTypeDef() {
-  const rootClassIri = "https://www.claros-dpp.online/dictionary/example-product/v1/classes/ExampleProductPassport";
+  const rootClassIri = "https://www.example.test/dictionary/example-product/v1/classes/ExampleProductPassport";
   const graphProperties = [
     {
       key: "deviceMaterial",
       label: "Device Material",
-      semanticId: "https://www.claros-dpp.online/dictionary/example-product/v1/terms/device-material",
+      semanticId: "https://www.example.test/dictionary/example-product/v1/terms/device-material",
       domainClassKey: "exampleProductPassport",
       domainClassIri: rootClassIri,
       rangeKind: "scalar",
@@ -44,7 +44,7 @@ function createExampleProductTypeDef() {
     {
       key: "sterilizationCycles",
       label: "Sterilization Cycles",
-      semanticId: "https://www.claros-dpp.online/dictionary/example-product/v1/terms/sterilization-cycles",
+      semanticId: "https://www.example.test/dictionary/example-product/v1/terms/sterilization-cycles",
       domainClassKey: "exampleProductPassport",
       domainClassIri: rootClassIri,
       rangeKind: "scalar",
@@ -79,7 +79,7 @@ function createExampleProductTypeDef() {
             label: "Device Material",
             type: "text",
             dataType: "string",
-            semanticId: "https://www.claros-dpp.online/dictionary/example-product/v1/terms/device-material",
+            semanticId: "https://www.example.test/dictionary/example-product/v1/terms/device-material",
             domainClassKey: "exampleProductPassport",
             domainClassIri: rootClassIri,
             rangeKind: "scalar",
@@ -94,7 +94,7 @@ function createExampleProductTypeDef() {
             label: "Sterilization Cycles",
             type: "text",
             dataType: "integer",
-            semanticId: "https://www.claros-dpp.online/dictionary/example-product/v1/terms/sterilization-cycles",
+            semanticId: "https://www.example.test/dictionary/example-product/v1/terms/sterilization-cycles",
             domainClassKey: "exampleProductPassport",
             domainClassIri: rootClassIri,
             rangeKind: "scalar",
@@ -156,8 +156,49 @@ test("canonical serializer resolves terms from explicit semantic field metadata"
 
   assert.equal(
     cyclesElement.dictionaryReference,
-    "https://www.claros-dpp.online/dictionary/example-product/v1/terms/sterilization-cycles"
+    "https://www.example.test/dictionary/example-product/v1/terms/sterilization-cycles"
   );
   assert.equal(cyclesElement.valueDataType, "Integer");
   assert.equal(cyclesElement.value, 12);
+});
+
+test("canonical serializer refuses unsafe dictionary regex patterns without evaluating them", () => {
+  const typeDef = createExampleProductTypeDef();
+  const serializer = createCanonicalPassportSerializer({
+    didService: createDidService(),
+    productIdentifierService: createProductIdentifierService(),
+    semanticModelRegistry: {
+      getModel: () => ({
+        semanticModelKey: typeDef.semanticModelKey,
+        terms: [{
+          iri: "https://www.example.test/dictionary/example-product/v1/terms/device-material",
+          dataType: { jsonType: "string", xsdType: "xsd:string" },
+          pattern: "^(a+)+$",
+        }],
+      }),
+    },
+  });
+  const canonical = serializer.buildCanonicalPassportPayload({
+    passportType: "exampleProductPassportV1",
+    dppId: "MD-DPP-002",
+    lineageId: "MD-LINEAGE-002",
+    companyId: 42,
+    internalAliasId: "DEVICE-002",
+    releaseStatus: "released",
+    updatedAt: "2026-06-02T08:00:00.000Z",
+    contentSpecificationIds: ["exampleProductDictionaryV1"],
+    economicOperatorId: "EORI-EXAMPLE-001",
+    deviceMaterial: `${"a".repeat(128)}!`,
+  }, typeDef, {
+    company: {
+      id: 42,
+      companyName: "Nordic Devices",
+      didSlug: "nordic-devices",
+      economicOperatorIdentifier: "EORI-EXAMPLE-001",
+    },
+  });
+
+  assert.ok(canonical.extensions.platform.validationIssues.some((issue) =>
+    issue.key === "deviceMaterial" && issue.code === "semanticPatternUnsupported"
+  ));
 });

@@ -10,6 +10,7 @@ const { initDb } = require("../src/db/init");
 const createDidService = require("../src/services/did-service");
 const createPassportService = require("../src/services/passport-service");
 const createProductIdentifierService = require("../src/services/product-identifier-service");
+const { getApiOrigin, getPublicViewerOrigin } = require("../src/shared/security/configured-origin");
 const logger = require("../src/services/logger");
 const {
   inRevisionStatus,
@@ -44,9 +45,8 @@ const pool = new Pool({
 
 async function main() {
   const didService = createDidService({
-    didDomain: process.env.DID_WEB_DOMAIN,
-    publicOrigin: process.env.PUBLIC_ORIGIN || process.env.APP_URL,
-    apiOrigin: process.env.SERVER_URL,
+    publicOrigin: getPublicViewerOrigin(),
+    apiOrigin: getApiOrigin(),
   });
   const productIdentifierService = createProductIdentifierService({ didService, pool });
   const passportService = createPassportService({

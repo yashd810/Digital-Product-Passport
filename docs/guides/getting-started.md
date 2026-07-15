@@ -27,18 +27,26 @@ The easiest way to start them together is Docker Compose.
 From the repository root:
 
 ```bash
-docker compose -f docker/docker-compose.yml up -d --build
+chmod 600 docker/.env
+bash scripts/restart-local-stack.sh
 ```
 
-That local compose file is [docker/docker-compose.yml](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/docker/docker-compose.yml:1).
+That local compose file is `docker/docker-compose.yml:1`.
+The restart script validates the Compose configuration, rebuilds changed images,
+recreates services, and waits for their health checks.
 
 ## What That Compose File Does
 
-- runs the dashboard from `apps/frontend-app`
-- runs the public viewer from `apps/public-passport-viewer`
-- runs the backend from `apps/backend-api/src/server.js`
+- builds and runs the dashboard, public viewer, backend, and marketing site from their Dockerfiles
 - starts PostgreSQL
-- serves the static marketing site through Nginx
+- uses Docker-managed volumes for PostgreSQL and local backend storage
+- binds every published local port to `127.0.0.1` only
+- routes dashboard and viewer `/api` requests through their local Nginx proxy
+
+Local Compose intentionally has no LAN bind override. Use a protected
+production edge or an authenticated SSH tunnel for remote testing. Set
+`VITE_PUBLIC_VIEWER_URL` explicitly in `docker/.env`; use the viewer's public
+HTTPS origin in production.
 
 ## If You Want To Run Apps Individually
 
@@ -46,7 +54,7 @@ That local compose file is [docker/docker-compose.yml](/Users/yashdesai/Desktop/
 
 ```bash
 cd apps/frontend-app
-npm install
+npm ci
 npm run start
 ```
 
@@ -54,7 +62,7 @@ npm run start
 
 ```bash
 cd apps/backend-api
-npm install
+npm ci
 npm run start
 ```
 
@@ -62,7 +70,7 @@ npm run start
 
 ```bash
 cd apps/public-passport-viewer
-npm install
+npm ci
 npm run start
 ```
 
@@ -75,11 +83,9 @@ npm run start
 
 ## Important Local Storage Paths
 
-In local development, the backend uses the `.docker-data` folder as mounted storage when you run Docker Compose.
+In local Docker Compose, PostgreSQL and backend file storage use Docker-managed
+named volumes. This avoids database corruption and filesystem-read failures
+caused by host-directory mounts. `docker/.env` contains local credentials and
+must remain untracked with mode `600`.
 
-- `.docker-data/postgres`
-- `.docker-data/local-storage/passport-files`
-- `.docker-data/local-storage/repository-files`
-- `.docker-data/local-storage/uploads`
-
-The backend runtime path logic is in [apps/backend-api/src/bootstrap/runtime-config.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/bootstrap/runtime-config.js:12).
+The backend runtime path logic is in `apps/backend-api/src/bootstrap/runtime-config.js:12`.

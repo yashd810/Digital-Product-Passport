@@ -16,16 +16,36 @@
 ═══════════════════════════════════════════════ */
 
 (function () {
+  const currentYear = new Date().getFullYear();
   document.documentElement.setAttribute('data-theme', 'light');
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   if (themeMeta) themeMeta.setAttribute('content', '#f5f8fb');
 
-  /* ── APP URL ──
-     Use localhost during local preview and the live app domain elsewhere.
-  ── */
-  const APP_LOGIN_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:3000/login'
-    : 'https://app.claros-dpp.online/login';
+  function configuredOrigin(value, label) {
+    let parsed;
+    try {
+      parsed = new URL(String(value || ''));
+    } catch {
+      throw new Error(`${label} must be configured as an HTTP(S) origin`);
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)
+      || parsed.username
+      || parsed.password
+      || (parsed.pathname && parsed.pathname !== '/')
+      || parsed.search
+      || parsed.hash) {
+      throw new Error(`${label} must be an HTTP(S) origin without credentials, paths, queries, or fragments`);
+    }
+    return parsed.origin;
+  }
+
+  const DPP_MARKETING_CONFIG = Object.freeze({
+    siteOrigin: configuredOrigin('__MARKETING_URL__', 'MARKETING_URL'),
+    appOrigin: configuredOrigin('__MARKETING_APP_URL__', 'APP_URL'),
+    apiOrigin: configuredOrigin('__MARKETING_API_URL__', 'SERVER_URL'),
+  });
+  window.DPP_MARKETING_CONFIG = DPP_MARKETING_CONFIG;
+  const APP_LOGIN_URL = `${DPP_MARKETING_CONFIG.appOrigin}/login`;
 
   /* ── NAV HTML ── */
   const NAV_HTML = `
@@ -119,7 +139,7 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <p>© 2025 ClarosDPP. All rights reserved. Registered in the European Union.</p>
+        <p>© ${currentYear} ClarosDPP. All rights reserved. Registered in the European Union.</p>
         <p>contact@example.com &nbsp;|&nbsp; +xx xxxx xxxx</p>
       </div>
     </div>

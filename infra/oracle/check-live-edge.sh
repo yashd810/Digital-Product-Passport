@@ -2,13 +2,32 @@
 set -euo pipefail
 
 TARGETS=("$@")
+MARKETING_URL="${DPP_MARKETING_URL:-}"
+
+read_env_var() {
+  local key="$1"
+  local env_file="${DPP_ENV_FILE:-}"
+  [ -n "$env_file" ] && [ -f "$env_file" ] || return 0
+  awk -v target="$key" '
+    $0 ~ "^[[:space:]]*" target "[[:space:]]*=" {
+      value=substr($0, index($0, "=") + 1)
+      gsub(/^[[:space:]"'\''"]+|[[:space:]"'\''"]+$/, "", value)
+      print value
+      exit
+    }
+  ' "$env_file"
+}
+
 if [ "${#TARGETS[@]}" -eq 0 ]; then
-  TARGETS=(
-    "claros-dpp.online"
-    "app.claros-dpp.online"
-    "viewer.claros-dpp.online"
-    "api.claros-dpp.online"
-  )
+  MARKETING_URL="${MARKETING_URL:-$(read_env_var MARKETING_URL)}"
+  APP_URL="$(read_env_var APP_URL)"
+  VIEWER_URL="$(read_env_var VITE_PUBLIC_VIEWER_URL)"
+  SERVER_URL="$(read_env_var SERVER_URL)"
+  if [ -z "$MARKETING_URL" ] || [ -z "$APP_URL" ] || [ -z "$VIEWER_URL" ] || [ -z "$SERVER_URL" ]; then
+    echo "Pass explicit edge targets or set DPP_ENV_FILE with MARKETING_URL, APP_URL, VITE_PUBLIC_VIEWER_URL, and SERVER_URL."
+    exit 64
+  fi
+  TARGETS=("$MARKETING_URL" "$APP_URL" "$VIEWER_URL" "$SERVER_URL")
 fi
 
 require_header() {
@@ -41,12 +60,20 @@ path_for_host() {
 
 host_for_target() {
   local target="$1"
+  local authority
 
   target="${target#https://}"
   target="${target#http://}"
-  target="${target%%/*}"
-  target="${target%%:*}"
-  echo "$target"
+  authority="${target%%/*}"
+  if [[ "$authority" == \[* ]]; then
+    if [[ "$authority" =~ ^(\[[0-9A-Fa-f:.]+\])(:[0-9]+)?$ ]]; then
+      echo "${BASH_REMATCH[1]}"
+      return
+    fi
+    echo ""
+    return
+  fi
+  echo "${authority%%:*}"
 }
 
 explicit_path_for_target() {
@@ -81,7 +108,11 @@ check_host() {
   require_header "$host" "$headers" "x-content-type-options" || failed=1
   require_header "$host" "$headers" "referrer-policy" || failed=1
 
-  if [ "$host" = "claros-dpp.online" ]; then
+  local marketing_host=""
+  if [ -n "$MARKETING_URL" ]; then
+    marketing_host="$(host_for_target "$MARKETING_URL")"
+  fi
+  if [ -n "$marketing_host" ] && [ "$host" = "$marketing_host" ]; then
     if printf '%s\n' "$headers" | grep -iq '^cache-control:.*immutable'; then
       echo "FAIL: https://${host} serves HTML with immutable cache headers"
       failed=1

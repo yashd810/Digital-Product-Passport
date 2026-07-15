@@ -7,6 +7,7 @@ import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPasspor
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import { extractComplianceError } from "../../../shared/utils/complianceErrors";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
+import { safeWindowOpen } from "../../../shared/security/urlSafety";
 import "../../../admin/styles/AdminDashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -512,7 +513,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
       ? buildPublicViewerUrl(path)
       : `${window.location.origin}${path}`;
     if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
+    safeWindowOpen(url);
   };
 
   const renderRow = (wf, showActions, showActionColumn) => {
