@@ -3,6 +3,7 @@
 const nodeCrypto = require("crypto");
 const { normalizeSystemPassportHeader } = require("../../services/passport-header-fields");
 const {
+  assertCanonicalSchemaSections,
   flattenSchemaFieldsFromSections,
 } = require("../../shared/passports/passport-helpers");
 
@@ -77,6 +78,7 @@ function createSchemaStorageHelpers({
     identity = null,
     semanticGraph = null,
   } = {}) {
+    assertCanonicalSchemaSections(sections);
     const parsedVersion = Number.parseInt(currentSchemaVersion, 10);
     const schema = {
       schemaVersion: Number.isFinite(parsedVersion) && parsedVersion > 0 ? parsedVersion : 1,
@@ -298,61 +300,6 @@ function createSchemaStorageHelpers({
     });
   }
 
-  async function migratePassportStorageToSchemaKeys({ apply = false, includeArchives = true } = {}) {
-    const typeRows = await pool.query(
-      `SELECT "typeName" AS "typeName", "fieldsJson" AS "fieldsJson"
-       FROM "passportTypes"
-       ORDER BY "typeName"`
-    );
-    const results = [];
-
-    for (const typeRow of typeRows.rows) {
-      const tableName = getTable(typeRow.typeName);
-      const rawTableName = unquoteSqlIdentifier(tableName);
-      const tableExists = await pool.query(
-        `SELECT 1
-         FROM information_schema.tables
-         WHERE table_schema = 'public' AND table_name = $1
-         LIMIT 1`,
-        [rawTableName]
-      ).then((result) => result.rows.length > 0);
-
-      if (!tableExists) {
-        results.push({
-          typeName: typeRow.typeName,
-          tableName: rawTableName,
-          status: "skippedMissingTable",
-          columnRenames: [],
-          archiveKeyUpdates: [],
-        });
-        continue;
-      }
-
-      const columnMap = await getLiveTableColumnMap(tableName);
-      const missingExactColumns = flattenTypeFields(typeRow.fieldsJson)
-        .map((field) => String(field?.key || "").trim())
-        .filter((key) => key && !columnMap.has(key));
-
-      results.push({
-        typeName: typeRow.typeName,
-        tableName,
-        status: missingExactColumns.length ? "missingExactColumns" : "ok",
-        missingExactColumns,
-        columnRenames: [],
-        archiveKeyUpdates: [],
-        exactKeyPolicy: true,
-        applied: false,
-      });
-    }
-
-    return {
-      success: results.every((result) => !["failed"].includes(result.status)),
-      applied: apply,
-      checked: results.length,
-      results,
-    };
-  }
-
   async function validatePassportTypeStorage({ repair = false } = {}) {
     const typeRows = await pool.query('SELECT id, "typeName" AS "typeName", "fieldsJson" AS "fieldsJson" FROM "passportTypes" ORDER BY "typeName"');
     const results = [];
@@ -460,7 +407,6 @@ function createSchemaStorageHelpers({
     createPassportTable,
     validatePassportTypeStorage,
     queryTableStats,
-    migratePassportStorageToSchemaKeys,
   };
 }
 

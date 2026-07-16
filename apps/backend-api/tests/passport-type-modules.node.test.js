@@ -11,6 +11,7 @@ const {
   getPassportPolicyForPassportType,
   getPassportTypeModules,
   loadPassportTypeModuleDefinitions,
+  normalizeModuleDefinition,
 } = require("../src/services/passport-module-registry");
 const { flattenSchemaFieldsFromSections } = require("../src/shared/passports/passport-helpers");
 
@@ -205,6 +206,16 @@ test("passport type registry discovers arbitrary product module packages", () =>
   assert.equal(policy.key, "exampleProductDppV1");
   assert.ok(policies.some((definition) => definition.key === "exampleProductDppV1"));
 }));
+
+test("passport module registry rejects the retired groups schema alias", () => {
+  const definition = createModuleDefinition();
+  definition.sections[0].groups = [];
+
+  assert.throws(
+    () => normalizeModuleDefinition(definition),
+    /retired "groups" property is not supported/
+  );
+});
 
 test("passport package discovery enforces the moduleKey folder name", () => withTempModules((packagesDir) => {
   writeModulePackage(packagesDir, "wrong-folder-v1", createModuleDefinition());

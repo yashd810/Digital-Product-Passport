@@ -27,7 +27,7 @@ function createResponse() {
   };
 }
 
-function createRouteHarness({ jobOverrides = {} } = {}) {
+function createRouteHarness({ jobOverrides = {}, serviceOverrides = {} } = {}) {
   const routes = [];
   let sourceFetchOptions = null;
   const app = {};
@@ -95,6 +95,7 @@ function createRouteHarness({ jobOverrides = {} } = {}) {
     runAssetManagementJob: async () => ({}),
     recordAssetRun: async () => ({}),
     resolveAssetJobNextRunAt: () => null,
+    ...serviceOverrides,
   });
 
   return {
@@ -117,6 +118,74 @@ test("asset-job response DTO exposes only validated configuration and requires a
     method: "GET",
     credentialRef: "erp-primary",
   });
+});
+
+test("asset push rejects browser-generated payloads and regenerates an internal payload from raw rows", async () => {
+  let prepareInput = null;
+  let executeInput = null;
+  const trustedPayload = {
+    companyId: 7,
+    passportType: "battery",
+    records: [{ rowIndex: 1, action: "create", passportCreate: { internalAliasId: "trusted" } }],
+  };
+  const { routes } = createRouteHarness({
+    serviceOverrides: {
+      prepareAssetPayload: async (input) => {
+        prepareInput = input;
+        return { generatedPayload: trustedPayload };
+      },
+      executeAssetPush: async (input) => {
+        executeInput = input;
+        return {
+          summary: {
+            passportsCreated: 1,
+            passportsUpdated: 0,
+            dynamicFieldsPushed: 0,
+            skipped: 0,
+            failed: 0,
+          },
+          details: [],
+        };
+      },
+      recordAssetRun: async () => ({ id: 42 }),
+    },
+  });
+  const route = routes.find((entry) => entry.method === "post" && entry.path.endsWith("/push"));
+  assert.ok(route);
+
+  const rejectedResponse = createResponse();
+  await route.handlers.at(-1)({
+    params: { companyId: "7" },
+    body: {
+      generatedPayload: {
+        companyId: 7,
+        passportType: "battery",
+        records: [{ action: "create", passportCreate: { 'malicious"; DROP TABLE users; --': "x" } }],
+      },
+    },
+  }, rejectedResponse);
+  assert.equal(rejectedResponse.statusCode, 400);
+  assert.match(rejectedResponse.body.error, /generatedPayload is not accepted/);
+  assert.equal(prepareInput, null);
+  assert.equal(executeInput, null);
+
+  const rawResponse = createResponse();
+  const records = [{ internalAliasId: "trusted" }];
+  await route.handlers.at(-1)({
+    params: { companyId: "7" },
+    user: { userId: 99 },
+    body: { passportType: "battery", records, sourceKind: "manual" },
+  }, rawResponse);
+  assert.equal(rawResponse.statusCode, 200);
+  assert.deepEqual(prepareInput, {
+    companyId: 7,
+    passportType: "battery",
+    records,
+    options: undefined,
+  });
+  assert.strictEqual(executeInput.generatedPayload, trustedPayload);
+  assert.equal(executeInput.companyId, 7);
+  assert.equal(executeInput.userId, 99);
 });
 
 test("asset-job response refuses invalid persisted configuration without exposing it", async () => {
@@ -312,6 +381,17 @@ test("asset scheduling computes overdue occurrences without an unbounded loop", 
       from,
     }).toISOString(),
     "2026-01-03T00:00:00.000Z"
+  );
+});
+
+test("asset execution accepts only an in-memory payload prepared by the service", async () => {
+  const service = createAssetService({});
+  await assert.rejects(
+    service.executeAssetPush({
+      companyId: 7,
+      generatedPayload: { companyId: 7, passportType: "battery", records: [{ action: "create" }] },
+    }),
+    /must be prepared by this service/
   );
 });
 

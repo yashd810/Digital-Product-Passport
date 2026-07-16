@@ -1,6 +1,7 @@
 const {
   flattenSchemaFieldsFromSections,
   mapPassportTypeRow,
+  quoteSqlIdentifier,
 } = require("../../shared/passports/passport-helpers");
 const { getApiOrigin } = require("../../shared/security/configured-origin");
 
@@ -180,7 +181,7 @@ function registerPassportSupportRoutes(app, deps) {
           );
           await client.query(
             `UPDATE ${tableName}
-             SET ${fieldKey} = $1, "updatedAt" = NOW()
+             SET ${quoteSqlIdentifier(fieldKey)} = $1, "updatedAt" = NOW()
              WHERE id = $2
                AND "companyId" = $3`,
             [publicFileUrl, row.rows[0].id, companyId]

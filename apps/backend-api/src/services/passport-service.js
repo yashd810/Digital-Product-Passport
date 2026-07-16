@@ -50,10 +50,6 @@ module.exports = function createPassportService({
   brandedEmail,
   renderInfoTable,
 }) {
-  function isMissingRelationError(error) {
-    return error?.code === "42P01";
-  }
-
   const {
     logAudit,
     verifyAuditLogChain,
@@ -142,7 +138,6 @@ module.exports = function createPassportService({
     createPassportTable,
     validatePassportTypeStorage,
     queryTableStats,
-    migratePassportStorageToSchemaKeys,
   } = createSchemaStorageHelpers({
     pool,
     logger,
@@ -249,7 +244,6 @@ module.exports = function createPassportService({
     createPassportTable,
     validatePassportTypeStorage,
     queryTableStats,
-    migratePassportStorageToSchemaKeys,
     submitPassportToWorkflow,
   };
 };

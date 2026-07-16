@@ -1403,9 +1403,9 @@ function getFieldsCsvRowsFromSpec(spec = readSpec()) {
       tableColumns: field.fieldType === "table" ? serializeEditableTableColumns(field.tableColumns || []) : "",
       });
     });
-    (section.sections || section.groups || []).forEach(visitSection);
+    (section.sections || []).forEach(visitSection);
   };
-  (spec.sections || spec.groups || []).forEach(visitSection);
+  (spec.sections || []).forEach(visitSection);
   return rows;
 }
 
@@ -2184,7 +2184,7 @@ function addSection(data = {}, { afterSection = null, parentSection = null, addB
   } else {
     sectionsHost.appendChild(node);
   }
-  const childSections = data.sections || data.groups || [];
+  const childSections = data.sections || [];
   (data.fields || []).forEach((field) => addField(node, field));
   if (!data.fields?.length && addBlankField && !childSections.length) addField(node);
   childSections.forEach((childSection) => {
@@ -3899,6 +3899,23 @@ function readSection(sectionNode) {
   return section;
 }
 
+function assertCanonicalSectionsSpec(spec = {}) {
+  if (!spec || typeof spec !== "object") return;
+  if (Object.prototype.hasOwnProperty.call(spec, "groups")) {
+    throw new Error('Passport module sections must use "sections"; the retired "groups" property is not supported.');
+  }
+  const visit = (sections) => {
+    for (const section of Array.isArray(sections) ? sections : []) {
+      if (!section || typeof section !== "object") continue;
+      if (Object.prototype.hasOwnProperty.call(section, "groups")) {
+        throw new Error('Passport module sections must use "sections"; the retired "groups" property is not supported.');
+      }
+      visit(section.sections);
+    }
+  };
+  visit(spec.sections);
+}
+
 function hydrateSectionDefaults(section, objectTypes = {}, valueDataTypes = {}) {
   return {
     ...section,
@@ -3907,7 +3924,7 @@ function hydrateSectionDefaults(section, objectTypes = {}, valueDataTypes = {}) 
       objectType: field.objectType || objectTypes[field.fieldKey || field.key] || "",
       valueDataType: field.valueDataType || valueDataTypes[field.fieldKey || field.key] || "",
     })),
-    sections: (section.sections || section.groups || []).map((child) =>
+    sections: (section.sections || []).map((child) =>
       hydrateSectionDefaults(child, objectTypes, valueDataTypes)
     ),
   };
@@ -3951,6 +3968,7 @@ function readSpec() {
 }
 
 function loadSpec(spec) {
+  assertCanonicalSectionsSpec(spec);
   preservedRoleState = {
     ...(spec.roles || {}),
     summaryRoles: { ...(spec.roles?.summaryRoles || {}) },
@@ -3963,7 +3981,7 @@ function loadSpec(spec) {
   const roles = spec.roles || {};
   const objectTypes = roles.objectTypes && typeof roles.objectTypes === "object" ? roles.objectTypes : {};
   const valueDataTypes = roles.valueDataTypes && typeof roles.valueDataTypes === "object" ? roles.valueDataTypes : {};
-  const sections = (spec.sections || spec.groups || []).map((section) =>
+  const sections = (spec.sections || []).map((section) =>
     hydrateSectionDefaults(section, objectTypes, valueDataTypes)
   );
   $("#sections").innerHTML = "";
@@ -4007,8 +4025,13 @@ function loadDraft() {
     setMessage("No saved draft found in this browser.", "error");
     return;
   }
-  applyWorkspaceState(state);
-  setMessage("Loaded saved draft from this browser.", "success");
+  try {
+    applyWorkspaceState(state);
+    setMessage("Loaded saved draft from this browser.", "success");
+  } catch (error) {
+    localStorage.removeItem(draftStorageKey);
+    setMessage(`Discarded incompatible saved draft. ${error.message}`, "error");
+  }
 }
 
 function restoreSession() {
@@ -4017,8 +4040,13 @@ function restoreSession() {
     setMessage("No saved session found for this browser tab.", "error");
     return;
   }
-  applyWorkspaceState(state);
-  setMessage("Restored current browser session.", "success");
+  try {
+    applyWorkspaceState(state);
+    setMessage("Restored current browser session.", "success");
+  } catch (error) {
+    sessionStorage.removeItem(sessionStorageKey);
+    setMessage(`Discarded incompatible browser session. ${error.message}`, "error");
+  }
 }
 
 function clearModuleStep() {
@@ -4400,8 +4428,15 @@ document.addEventListener("change", () => {
 setupWorkspaceNavigation();
 setupModuleAutoFill();
 setupSearchableSelects();
-const restoredSession = loadJsonStorage(sessionStorage, sessionStorageKey);
-loadSpec(restoredSession?.spec || sample);
+let restoredSession = loadJsonStorage(sessionStorage, sessionStorageKey);
+try {
+  loadSpec(restoredSession?.spec || sample);
+} catch (error) {
+  sessionStorage.removeItem(sessionStorageKey);
+  restoredSession = null;
+  loadSpec(sample);
+  setMessage(`Discarded incompatible browser session. ${error.message}`, "error");
+}
 setGraphFirstLayerBuilt(
   typeof restoredSession?.graphFirstLayerBuilt === "boolean"
     ? restoredSession.graphFirstLayerBuilt

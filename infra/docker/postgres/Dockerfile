@@ -13,4 +13,5 @@ RUN git clone --depth 1 --branch "$GOSU_VERSION" https://github.com/tianon/gosu.
 
 FROM postgres:18.4-trixie@sha256:22c89fe0d0f507606260237fd55e51f6137f58b2d5bcf6152242b96d9fe8f9a4
 
-COPY --from=gosu-build --chmod=0555 /gosu /usr/local/bin/gosu
+COPY --from=gosu-build /gosu /usr/local/bin/gosu
+RUN chmod 0555 /usr/local/bin/gosu

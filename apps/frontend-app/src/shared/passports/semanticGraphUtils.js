@@ -222,27 +222,6 @@ export function decorateSemanticGraphPropertyValue(property, value, graph) {
   return many ? decorated : decorated[0];
 }
 
-export function formatSemanticGraphValue(property, value, graph) {
-  const parsed = parseSemanticGraphValue(value, value);
-  if (parsed === null || parsed === undefined || parsed === "") return "";
-  if (property?.rangeKind === "enum") {
-    const values = isManySemanticProperty(property) ? parsed : [parsed];
-    const enumDef = getSemanticGraphEnum(graph, property.rangeEnumKey);
-    return values
-      .map((entry) => enumDef?.values?.find((candidate) => candidate.key === entry)?.label || entry)
-      .join(", ");
-  }
-  if (property?.rangeKind === "class" && property.relationshipType === "reference") {
-    const values = isManySemanticProperty(property) ? parsed : [parsed];
-    return values.map((entry) => isPlainObject(entry) ? entry["@id"] : entry).filter(Boolean).join(", ");
-  }
-  if (Array.isArray(parsed)) {
-    return parsed.map((entry) => isPlainObject(entry) ? JSON.stringify(entry) : String(entry)).join("; ");
-  }
-  if (isPlainObject(parsed)) return JSON.stringify(parsed);
-  return String(parsed);
-}
-
 export function buildSemanticGraphInlineContext(graph) {
   if (!graph) return {};
   const buildClassContext = (classKey, visited = new Set()) => {

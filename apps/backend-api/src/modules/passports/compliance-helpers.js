@@ -88,7 +88,6 @@ function createComplianceHelpers({
       `SELECT c.id,
               c."companyName" AS "companyName",
               c."didSlug" AS "didSlug",
-              COALESCE(p."defaultGranularity", 'item') AS "dppGranularity",
               COALESCE(p."defaultGranularity", 'item') AS "defaultGranularity"
        FROM companies c
        LEFT JOIN "companyDppPolicies" p ON p."companyId" = c.id

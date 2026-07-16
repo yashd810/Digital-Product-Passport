@@ -80,6 +80,16 @@ services:
       - database
     security_opt:
       - no-new-privileges:true
+    # Initialization needs filesystem access, ownership changes, and the final uid/gid drop.
+    # PostgreSQL itself runs without effective capabilities after gosu executes it.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
 
 volumes:
   localStorageData:

@@ -1,6 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 
-import { getConsumerTheme } from "../app/providers/ThemeContext";
 import {
   buildProductCategoryOptions,
 } from "../admin/passport-types/builderHelpers";
@@ -19,13 +19,66 @@ import {
   buildPreviewPassportPath,
   buildPublicPassportPath,
 } from "../passports/utils/passportRoutes";
+import {
+  flattenSchemaFieldsFromSections,
+  normalizeSchemaSections,
+} from "../shared/passports/passportSchemaUtils";
 
 describe("frontend modularity helpers", () => {
-  test("consumer theme falls back to a neutral passport theme", () => {
-    const theme = getConsumerTheme("unknown-product-type", {});
+  test("dashboard retains only canonical CSV and public-viewer routes", () => {
+    const appSource = readFileSync(
+      new URL("../app/containers/App.js", import.meta.url),
+      "utf8",
+    );
 
-    expect(theme.headline).toBe("Digital Product Passport");
-    expect(theme.heroPattern).toBe("passport");
+    expect(appSource).not.toContain("PublicPassportRedirectPage");
+    expect(appSource).not.toContain('path="/p/:dppId"');
+    expect(appSource).not.toContain('path="/dpp/inactive');
+    expect(appSource).not.toContain('path="/dpp/:manufacturerSlug');
+    expect(appSource).not.toContain('path="messages"');
+    expect(appSource).not.toContain('path="profile"                      element={<Navigate');
+    expect(appSource).not.toContain('path="security"                     element={<Navigate');
+    expect(appSource).not.toContain("update-csv");
+    expect(appSource).not.toContain("update-json");
+    expect(appSource).toContain('path="/dpp/preview/:manufacturerSlug/:modelSlug/:previewId"');
+    expect(appSource).toContain('path="/csv-import/:passportType/create-csv"');
+    expect(appSource).toContain('path="/csv-import/:passportType/create-json"');
+  });
+
+  test("standalone public viewer retains only canonical public passport routes", () => {
+    const viewerSource = readFileSync(
+      new URL("../../../public-passport-viewer/src/containers/PublicViewerApp.js", import.meta.url),
+      "utf8",
+    );
+
+    expect(viewerSource).not.toContain("PublicPassportRedirectPage");
+    expect(viewerSource).not.toContain('path="/p/:dppId"');
+    expect(viewerSource).not.toContain('path="/p/inactive');
+    expect(viewerSource).toContain('path="/dpp/:manufacturerSlug/:modelSlug/:dppId"');
+  });
+
+  test("passport data apply submits raw rows for server-side validation", () => {
+    const pageSource = readFileSync(
+      new URL("../user/dashboard/passport-data/PassportDataManagementPage.js", import.meta.url),
+      "utf8",
+    );
+
+    expect(pageSource).toContain("passportType: selectedType");
+    expect(pageSource).toContain("records: buildSerializableRows(rows)");
+    expect(pageSource).not.toContain("generatedPayload: preview.generatedPayload, sourceKind");
+  });
+
+  test("schema nesting requires canonical sections", () => {
+    const legacyGroupShape = [{
+      key: "root",
+      groups: [{
+        key: "legacy-child",
+        fields: [{ key: "ignoredLegacyField" }],
+      }],
+    }];
+
+    expect(flattenSchemaFieldsFromSections(legacyGroupShape)).toEqual([]);
+    expect(normalizeSchemaSections(legacyGroupShape)[0].sections).toEqual([]);
   });
 
   test("semantic model labels are generated from any model key", () => {

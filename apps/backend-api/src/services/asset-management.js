@@ -23,6 +23,7 @@ const {
   normalizeAssetSourceMethod,
   normalizeStoredAssetSourceConfig,
 } = require("../shared/assets/asset-source-config");
+const { quoteSqlIdentifier } = require("../shared/passports/passport-helpers");
 
 module.exports = function createAssetService({
   pool,
@@ -64,6 +65,10 @@ module.exports = function createAssetService({
   const configuredAssetSourceCredentials = assetSourceCredentials instanceof Map
     ? assetSourceCredentials
     : new Map();
+  // A generated payload is an internal, in-memory capability. A browser can
+  // inspect a preview but cannot manufacture an object that this service will
+  // execute. The route nevertheless regenerates payloads before each write.
+  const trustedGeneratedPayloads = new WeakSet();
 
   async function getCompanyDppPolicy(companyId) {
     const result = await pool.query(
@@ -737,6 +742,14 @@ module.exports = function createAssetService({
       });
     });
 
+    const generatedPayload = {
+      companyId: Number(companyId),
+      passportType: typeSchema.typeName,
+      generatedAt: new Date().toISOString(),
+      records: generatedRecords
+    };
+    trustedGeneratedPayloads.add(generatedPayload);
+
     return {
       companyId: Number(companyId),
       passportType: typeSchema.typeName,
@@ -745,16 +758,17 @@ module.exports = function createAssetService({
       fields: Array.from(fieldMap.values()),
       summary,
       details,
-      generatedPayload: {
-        companyId: Number(companyId),
-        passportType: typeSchema.typeName,
-        generatedAt: new Date().toISOString(),
-        records: generatedRecords
-      }
+      generatedPayload
     };
   }
 
   async function executeAssetPush({ companyId, generatedPayload, source = "assetManagement", userId = null }) {
+    if (!generatedPayload || !trustedGeneratedPayloads.has(generatedPayload)) {
+      throw new Error("generated payload must be prepared by this service");
+    }
+    if (Number(generatedPayload.companyId) !== Number(companyId)) {
+      throw new Error("generated payload company does not match the requested company");
+    }
     const passportType = generatedPayload?.passportType;
     const records = Array.isArray(generatedPayload?.records) ? generatedPayload.records : [];
     if (!passportType) throw new Error("generated payload is missing passportType");
@@ -844,7 +858,7 @@ module.exports = function createAssetService({
 
           Object.entries(passportCreate).forEach(([key, value]) => {
             if (["dppId", "lineageId", "companyId", "modelName", "internalAliasId", "productIdentifierDid", "granularity", "createdBy"].includes(key)) return;
-            insertCols.push(`"${key}"`);
+            insertCols.push(quoteSqlIdentifier(key));
             insertVals.push(value);
           });
 

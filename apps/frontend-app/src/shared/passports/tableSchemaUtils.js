@@ -123,9 +123,3 @@ export function parseTableRows(value, field = {}) {
 
   return [createEmptyTableRow(columns)];
 }
-
-export function tableRowsHaveValues(rows = []) {
-  return rows.some((row) =>
-    row && typeof row === "object" && Object.values(row).some((value) => String(value ?? "").trim() !== "")
-  );
-}

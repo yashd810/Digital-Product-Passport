@@ -7,6 +7,7 @@ const {
   mapCompanyRow,
   mapCompanyFacilityRow,
   mapPassportTemplateFieldRow,
+  joinQuotedSqlIdentifiers,
 } = require("../../shared/passports/passport-helpers");
 const {
   createComplianceManagedFieldHelpers,
@@ -353,7 +354,7 @@ module.exports = function registerCompanyRoutes(app, {
                LEFT JOIN users u ON u.id = t."createdBy"
                WHERE t."companyId" = $1`;
       const params = [companyId];
-      if (passportTypeFilter) {q += ` AND t.passportType = $2`;params.push(passportTypeFilter);}
+      if (passportTypeFilter) {q += ` AND t."passportType" = $2`;params.push(passportTypeFilter);}
       q += ` ORDER BY t."passportType", t.name`;
       const r = await pool.query(q, params);
       res.json(r.rows.map(mapTemplateRow));
@@ -782,7 +783,7 @@ module.exports = function registerCompanyRoutes(app, {
             ...getStoredPassportValues(dataFields, fields)];
 
             await pool.query(
-              `INSERT INTO ${tableName} (${allCols.join(",")}) VALUES (${allCols.map((_, i) => `$${i + 1}`).join(",")})`,
+              `INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allCols)}) VALUES (${allCols.map((_, i) => `$${i + 1}`).join(",")})`,
               allVals
             );
             await pool.query(
@@ -982,7 +983,7 @@ module.exports = function registerCompanyRoutes(app, {
             ...getStoredPassportValues(dataFields, fields)];
 
             await pool.query(
-              `INSERT INTO ${tableName} (${allCols.join(",")}) VALUES (${allCols.map((_, i) => `$${i + 1}`).join(",")})`,
+              `INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allCols)}) VALUES (${allCols.map((_, i) => `$${i + 1}`).join(",")})`,
               allVals
             );
             await pool.query(

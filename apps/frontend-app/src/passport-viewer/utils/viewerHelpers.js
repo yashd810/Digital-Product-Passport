@@ -43,25 +43,6 @@ export function renderTextBlock(raw, className = "") {
   );
 }
 
-export function isHeroSummaryField(field) {
-  return field?.displayRole === "hero";
-}
-
-export function toInlineText(value) {
-  return String(value ?? "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-export function formatLinkLabel(value) {
-  const href = /^https?:\/\//i.test(value) ? value : `https://${value}`;
-  try {
-    return new URL(href).hostname.replace(/^www\./i, "");
-  } catch {
-    return value;
-  }
-}
-
 export function getFieldUnitLabel(field) {
   const unitDisplay = String(field?.unitDisplay || "").trim();
   const unit = String(field?.unit || "").trim();
@@ -112,29 +93,4 @@ export function formatIsoDate(value, { dateOnly = false } = {}) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-const presentationTones = {
-  data: { tone: "data", eyebrow: "" },
-  specCard: { tone: "data", eyebrow: "" },
-  document: { tone: "document", eyebrow: "Evidence file" },
-  evidenceFile: { tone: "document", eyebrow: "Evidence file" },
-  table: { tone: "table", eyebrow: "Structured data" },
-  dataset: { tone: "table", eyebrow: "Structured data" },
-  semanticTree: { tone: "table", eyebrow: "Semantic class" },
-  compositionChart: { tone: "composition", eyebrow: "Composition" },
-  liveMetric: { tone: "live", eyebrow: "Live metric" },
-  link: { tone: "link", eyebrow: "Reference link" },
-  symbol: { tone: "symbol", eyebrow: "Visual marker" },
-  badge: { tone: "status", eyebrow: "Status" },
-  status: { tone: "status", eyebrow: "Status" },
-  narrative: { tone: "narrative", eyebrow: "Detailed information" },
-  narrativeBlock: { tone: "narrative", eyebrow: "Detailed information" },
-};
-
-export function getFieldPresentation(field, raw, isLocked, pieItems) {
-  if (isLocked) return { tone: "restricted", eyebrow: "Protected data" };
-  if (pieItems) return presentationTones.compositionChart;
-  const presentation = String(field?.presentation).trim();
-  return presentationTones[presentation];
 }

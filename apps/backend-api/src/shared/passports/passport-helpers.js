@@ -109,9 +109,29 @@ const isEditablePassportStatus = (status) =>
 
 const getSectionChildren = (section) => {
   if (!section || typeof section !== "object") return [];
+  if (Object.prototype.hasOwnProperty.call(section, "groups")) {
+    throw new Error('Passport schemas must use "sections"; the retired "groups" property is not supported.');
+  }
   if (Array.isArray(section.sections)) return section.sections;
-  if (Array.isArray(section.groups)) return section.groups;
   return [];
+};
+
+const assertCanonicalSchemaSections = (sectionsOrSchema = []) => {
+  const schema = Array.isArray(sectionsOrSchema) ? null : sectionsOrSchema;
+  if (schema && typeof schema === "object" && Object.prototype.hasOwnProperty.call(schema, "groups")) {
+    throw new Error('Passport schemas must use "sections"; the retired "groups" property is not supported.');
+  }
+  const sections = Array.isArray(sectionsOrSchema) ? sectionsOrSchema : schema?.sections;
+  const visit = (sectionList) => {
+    for (const section of Array.isArray(sectionList) ? sectionList : []) {
+      if (!section || typeof section !== "object") continue;
+      if (Object.prototype.hasOwnProperty.call(section, "groups")) {
+        throw new Error('Passport schemas must use "sections"; the retired "groups" property is not supported.');
+      }
+      visit(section.sections);
+    }
+  };
+  visit(sections);
 };
 
 const walkSchemaSections = (sections = [], visitor, parentPath = []) => {
@@ -152,13 +172,11 @@ const flattenSchemaFieldsFromSections = (sections = []) => {
   return fields;
 };
 
-const countSchemaFields = (sectionOrSections = []) => {
-  const sections = Array.isArray(sectionOrSections) ? sectionOrSections : [sectionOrSections];
-  return flattenSchemaFieldsFromSections(sections).length;
-};
-
 const extractSchemaFields = (schema) => {
   if (!schema || typeof schema !== "object") return [];
+  if (Object.prototype.hasOwnProperty.call(schema, "groups")) {
+    throw new Error('Passport schemas must use "sections"; the retired "groups" property is not supported.');
+  }
   if (Array.isArray(schema.schemaFields)) return schema.schemaFields.filter((field) => field?.key);
   if (Array.isArray(schema.sections)) {
     return flattenSchemaFieldsFromSections(schema.sections);
@@ -182,8 +200,7 @@ const mapCompanyRow = (row = {}) => ({
   economicOperatorIdentifier: row.economicOperatorIdentifier ?? null,
   economicOperatorIdentifierScheme: row.economicOperatorIdentifierScheme ?? null,
   customerTrustLevel: row.customerTrustLevel ?? null,
-  dppGranularity: row.dppGranularity ?? row.defaultGranularity ?? "item",
-  defaultGranularity: row.defaultGranularity ?? row.dppGranularity ?? "item",
+  defaultGranularity: row.defaultGranularity ?? "item",
   jsonldExportEnabled: row.jsonldExportEnabled ?? true,
   isActive: row.isActive ?? null,
   createdAt: row.createdAt ?? null,
@@ -955,9 +972,9 @@ module.exports = {
   comparableHistoryFieldValue,
   isPlainObject,
   getSectionChildren,
+  assertCanonicalSchemaSections,
   walkSchemaSections,
   flattenSchemaFieldsFromSections,
-  countSchemaFields,
   extractSchemaFields,
   mapCompanyRow,
   mapCompanyFacilityRow,

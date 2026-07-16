@@ -425,7 +425,7 @@ export const backendOperationFlows = [
   {
     title: "Public-view and restricted-field flow",
     steps: [
-      "A QR code or copied link opens the public `/p/:dppId` route, which then loads the correct consumer-facing viewer for that passport type.",
+      "A QR code or copied link opens the canonical public `/dpp/:manufacturerSlug/:modelSlug/:dppId` route for the consumer-facing viewer.",
       "The viewer shows public fields immediately and tracks scan events.",
       "Restricted sections stay hidden until a valid security group API key is entered.",
       "Signature, VC payload, and signing-key endpoints provide verification material for released versions.",
@@ -691,7 +691,7 @@ export const assetManagementApiTable = {
     ["Load current passports", "GET /api/companies/:companyId/passport-data-management/passports", "Session cookie or Bearer token and company access", "Query param: passportType", "Returns the current passports and editable summary for the selected type."],
     ["Fetch ERP or API rows", "POST /api/companies/:companyId/passport-data-management/source/fetch", "Session cookie or Bearer token, company access, and editor role", "{ sourceConfig } with url, method, optional transient headers/body, recordPath, fieldMap", "Fetches external rows and maps them into asset rows. Inline credentials are one-time only and are never saved."],
     ["Preview staged changes", "POST /api/companies/:companyId/passport-data-management/preview", "Session cookie or Bearer token, company access, and editor role", "{ passportType, records }", "Validates matching and field rules, then builds the JSON package without changing any passports."],
-    ["Push staged changes", "POST /api/companies/:companyId/passport-data-management/push", "Session cookie or Bearer token, company access, and editor role", "{ generatedPayload } or { passportType, records }", "Writes the prepared changes into the normal backend passport records."],
+    ["Push staged changes", "POST /api/companies/:companyId/passport-data-management/push", "Session cookie or Bearer token, company access, and editor role", "{ passportType, records }", "Revalidates the rows on the server and writes the prepared changes into normal backend passport records."],
     ["List saved jobs", "GET /api/companies/:companyId/passport-data-management/jobs", "Session cookie or Bearer token, company access, and editor role", "No body", "Returns saved schedules with sanitized source metadata for the current company."],
     ["Create a job", "POST /api/companies/:companyId/passport-data-management/jobs", "Session cookie or Bearer token, company access, and editor role", "{ passportType, name, records, sourceKind, sourceConfig: { url, method, credentialRef, recordPath, fieldMap }, startAt, intervalMinutes, isActive }", "Saves a recurring job that can run later on the server. API jobs use a server-side credentialRef scoped to the company, exact URL, and GET/POST method; headers and bodies are rejected."],
     ["Update a job", "PATCH /api/companies/:companyId/passport-data-management/jobs/:jobId", "Session cookie or Bearer token, company access, and editor role", "Name, schedule, non-secret source config, records, and active state fields", "Edits an existing saved job without exposing credentials."],

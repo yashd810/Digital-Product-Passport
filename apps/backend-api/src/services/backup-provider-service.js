@@ -302,9 +302,9 @@ module.exports = function createBackupProviderService({
 
   async function listProviders({ companyId = null, activeOnly = true } = {}) {
     const params = [];
-    const filters = ["isBackupProvider = true"];
+    const filters = ["\"isBackupProvider\" = true"];
 
-    if (activeOnly) filters.push("isActive = true");
+    if (activeOnly) filters.push("\"isActive\" = true");
     if (companyId !== null && companyId !== undefined) {
       params.push(Number.parseInt(companyId, 10));
       filters.push(`("companyId" IS NULL OR "companyId" = $${params.length})`);
@@ -725,14 +725,15 @@ module.exports = function createBackupProviderService({
     const result = await pool.query(
       `INSERT INTO "passportBackupReplications" (
          "backupProviderId", "backupProviderKey", "passportDppId", "lineageId", "companyId", "passportType",
-         "versionNumber", "dppId", "snapshotScope", "replicationStatus", "storageProvider", "storageKey", "publicUrl",
+         "internalAliasId", "versionNumber", "dppId", "snapshotScope", "replicationStatus", "storageProvider", "storageKey", "publicUrl",
          "payloadHash", "payloadJson", "errorMessage", "verificationStatus", "verificationErrorMessage",
          "verifiedPayloadHash", "replicatedAt", "updatedAt"
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16, 'pending', NULL, NULL, NOW(), NOW())
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17, 'pending', NULL, NULL, NOW(), NOW())
        ON CONFLICT ("backupProviderKey", "passportDppId", "versionNumber", "snapshotScope")
        DO UPDATE SET
          "replicationStatus" = EXCLUDED."replicationStatus",
+         "internalAliasId" = EXCLUDED."internalAliasId",
          "storageProvider" = EXCLUDED."storageProvider",
          "storageKey" = EXCLUDED."storageKey",
          "publicUrl" = EXCLUDED."publicUrl",
@@ -752,6 +753,7 @@ module.exports = function createBackupProviderService({
       passport.lineageId || passport.dppId,
       passport.companyId,
       passport.passportType || null,
+      passport.internalAliasId || null,
       Number(passport.versionNumber) || 1,
       envelope?.passport?.digitalProductPassportId || null,
       snapshotScope,
@@ -1441,7 +1443,7 @@ module.exports = function createBackupProviderService({
     if (!isAutomaticPublicHandoverEnabled()) return null;
     if (!passportDppId && !internalAliasId) return null;
 
-    const filters = ["replicationStatus = 'synced'", "verificationStatus = 'verified'"];
+    const filters = ["\"replicationStatus\" = 'synced'", "\"verificationStatus\" = 'verified'"];
     const params = [];
 
     if (passportDppId) {

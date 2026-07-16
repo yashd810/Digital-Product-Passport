@@ -188,17 +188,22 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       const normalizedBody = normalizePassportRequestBody(req.body || {});
       const companyId = getCompanyId(req);
 
-      let preview;
-      if (normalizedBody.generatedPayload?.passportType) {
-        preview = { generatedPayload: normalizedBody.generatedPayload };
-      } else {
-        preview = await prepareAssetPayload({
-          companyId,
-          passportType: normalizedBody.passportType,
-          records: normalizedBody.records,
-          options: normalizedBody.options,
+      // A preview is advisory and is sent to an untrusted browser. Always
+      // regenerate it here so field allowlists, ownership checks, and release
+      // status checks are evaluated immediately before the write. This is a
+      // fresh application, so accepting the former generatedPayload shortcut
+      // would only preserve an unsafe compatibility path.
+      if (Object.prototype.hasOwnProperty.call(normalizedBody, "generatedPayload")) {
+        return res.status(400).json({
+          error: "generatedPayload is not accepted; submit passportType and records instead",
         });
       }
+      const preview = await prepareAssetPayload({
+        companyId,
+        passportType: normalizedBody.passportType,
+        records: normalizedBody.records,
+        options: normalizedBody.options,
+      });
 
       const pushResult = await executeAssetPush({
         companyId,

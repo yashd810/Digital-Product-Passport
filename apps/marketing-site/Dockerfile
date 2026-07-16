@@ -1,4 +1,4 @@
-FROM node:22.23.1-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS configuration
+FROM node:24.18.0-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS configuration
 WORKDIR /site
 COPY apps/marketing-site/ ./
 COPY infra/docker/website/nginx.conf.template ./nginx.conf.template

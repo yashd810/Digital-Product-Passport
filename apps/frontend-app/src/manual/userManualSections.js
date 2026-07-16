@@ -40,7 +40,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         items: [
           "Start on Overview to see what needs attention today.",
           "Go to Passports when you want to create, edit, release, or export product records.",
-          "Use Notifications and Messages when you need to respond to people or workflow events.",
+          "Use Notifications when you need to respond to people or workflow events.",
           "Open profile, company, repository, or security pages only when you need account or company setup work.",
         ],
       },
@@ -954,7 +954,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       title: "Know what the public viewer and consumer experience can do",
       summary: "Released passports become much more than rows in a table. Their public viewer can show introduction content, translations, charts, signatures, PDF previews, restricted-field unlocking, scan indicators, carrier authenticity evidence, suspicious-carrier reporting, and printable output for external audiences.",
       facts: [
-        { label: "Public entry points", value: "Copied link or QR code into the public `/p/:dppId` route" },
+        { label: "Public entry points", value: "Copied link or QR code into the canonical public `/dpp/:manufacturerSlug/:modelSlug/:dppId` route" },
         { label: "Viewer features", value: "Introduction tabs, translated sections, charts, composition visuals, PDF previews, QR display, print, signature badges, scan badges, and carrier authenticity indicators" },
         { label: "Restricted access", value: "Restricted fields stay hidden until unlocked with a matching security group API key" },
         { label: "Sharing options", value: "Public link, QR labels, print PDF, JSON-LD export, CSV exports, and analytics PDF exports" },

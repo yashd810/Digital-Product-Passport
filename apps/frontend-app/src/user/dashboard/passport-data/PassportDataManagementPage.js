@@ -548,7 +548,11 @@ function PassportDataManagementPage({ companyId, user }) {
       const response = await fetchWithAuth(`${apiBase}/push`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ generatedPayload: preview.generatedPayload, sourceKind: showSources ? "api" : "manual" }),
+        body: JSON.stringify({
+          passportType: selectedType,
+          records: buildSerializableRows(rows),
+          sourceKind: showSources ? "api" : "manual",
+        }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Apply failed");

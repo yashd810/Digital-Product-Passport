@@ -51,7 +51,7 @@ function buildCanonicalIdentityBundle({
   );
   const resolvedGranularity = normalizeGranularityValue(
     didService,
-    granularity || company?.defaultGranularity || company?.dppGranularity || passport?.granularity || "item"
+    granularity || company?.defaultGranularity || passport?.granularity || "item"
   );
 
   const resolvedCompanyName = String(company?.companyName || companyName || "").trim() || null;

@@ -1,6 +1,5 @@
 import QRCode from "qrcode";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
-import { toSafeHttpOrigin } from "../../shared/security/urlSafety";
 import { buildPublicPassportPath } from "../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl, getPublicViewerOrigin } from "../../passports/utils/publicViewerUrl";
 
@@ -11,21 +10,8 @@ const defaultQrWidthPx = 300;
 const minModuleMm = 0.25;
 const dppGraphicalMarking = "IEC_61406_TRIANGLE";
 
-function configuredMarketingContactUrl(value) {
-  const rawValue = String(value ?? "");
-  if (!rawValue || rawValue.trim() !== rawValue) return null;
-  const origin = toSafeHttpOrigin(rawValue);
-  return origin ? `${origin}/contact.html` : null;
-}
-
-const marketingContactUrl = configuredMarketingContactUrl(import.meta.env.VITE_MARKETING_URL);
-
 function shouldRenderIec61406Marker(granularity = "item") {
   return String(granularity || "item").trim().toLowerCase() !== "model";
-}
-
-export function getMarketingContactUrl() {
-  return marketingContactUrl;
 }
 
 export const renderPassportQrToCanvas = async (canvas, {

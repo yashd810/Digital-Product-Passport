@@ -2,8 +2,7 @@
 // Passport Status Normalization
 // ─────────────────────────────────────────────────────────────────────────────
 export const normalizePassportStatus = (status) => {
-  const normalized = String(status || "").trim();
-  return normalized === "revised" ? "inRevision" : normalized;
+  return String(status || "").trim();
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,12 +33,6 @@ export const getPassportLinkType = (status) =>
     : isObsoletePassportStatus(status)
       ? "inactive"
       : "preview";
-
-export const getPassportActivityState = (passport) => {
-  if (passport?.archived) return "archived";
-  if (isObsoletePassportStatus(passport?.releaseStatus)) return "obsolete";
-  return "active";
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Passport Status Labels

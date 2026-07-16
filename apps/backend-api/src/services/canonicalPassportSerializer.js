@@ -165,13 +165,6 @@ function createCanonicalPassportSerializer({
     }
   }
 
-  function normalizeLookupKey(value) {
-    return normalizeText(value)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
-  }
-
   function isUriLikeValue(value) {
     return isSafePassportUri(value);
   }
@@ -248,10 +241,6 @@ function createCanonicalPassportSerializer({
 
   function getFieldsJson(typeDef) {
     return readTypeValue(typeDef, "fieldsJson") || {};
-  }
-
-  function getProductCategory(typeDef, options = {}) {
-    return options.productCategory || readTypeValue(typeDef, "productCategory") || null;
   }
 
   function getSemanticModelKey(typeDef, options = {}) {
@@ -360,14 +349,6 @@ function createCanonicalPassportSerializer({
     return false;
   }
 
-  function isNumericString(value) {
-    return /^-?\d+(\.\d+)?$/.test(normalizeText(value));
-  }
-
-  function isIntegerString(value) {
-    return /^-?\d+$/.test(normalizeText(value));
-  }
-
   function isDateTimeLike(value) {
     const text = normalizeText(value);
     if (!text || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(text)) return false;
@@ -411,16 +392,6 @@ function createCanonicalPassportSerializer({
     if (populatedItems.length <= 1) return false;
     const expectedType = normalizeArrayItemType(populatedItems[0]);
     return populatedItems.some((item) => normalizeArrayItemType(item) !== expectedType);
-  }
-
-  function isRelatedResourceValue(fieldDef, value) {
-    const fieldType = normalizeText(fieldDef?.type).toLowerCase();
-    if (["url", "file", "symbol"].includes(fieldType)) return true;
-    if (isPlainObject(value)) {
-      return ["url", "uri", "href", "src", "downloadUrl", "fileName", "mimeType"]
-        .some((key) => Object.prototype.hasOwnProperty.call(value, key));
-    }
-    return false;
   }
 
   function isBase64BinaryLike(value) {

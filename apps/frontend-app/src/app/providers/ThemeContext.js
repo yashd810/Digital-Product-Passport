@@ -89,22 +89,6 @@ export const defaultCompanyBranding = {
   supportLink: "",
 };
 
-const consumerBase = {
-  gradient: "linear-gradient(135deg, #0b1826 0%, #132840 52%, #17304a 100%)",
-  cardBg: "rgba(220,232,240,0.2)",
-  accentColor: "#0db5b0",
-};
-
-export const consumerPageThemes = {
-  passport: {
-    ...consumerBase,
-    icon: "🪪",
-    headline: "Digital Product Passport",
-    tagline: "Verified product identity, compliance data, and lifecycle transparency.",
-    heroPattern: "passport",
-  },
-};
-
 export function normalizeCompanyBranding(branding) {
   const src = branding && typeof branding === "object" ? branding : {};
   return { ...defaultCompanyBranding, ...src };
@@ -141,26 +125,3 @@ export function applyTheme(themeKey) {
 export function getStoredTheme(userId) {
   return localStorage.getItem(`dppTheme:${userId}`) || "dark";
 }
-
-export function setStoredTheme(userId, themeKey) {
-  localStorage.setItem(`dppTheme:${userId}`, themeKey);
-}
-
-export const getConsumerTheme = (passportType, branding) => {
-  const base = consumerPageThemes.passport;
-  const b = normalizeCompanyBranding(branding);
-  return {
-    ...base,
-    accentColor: b.primaryColor || base.accentColor,
-    cardBg: "rgba(220,232,240,0.2)",
-    gradient: b.backgroundGradient || base.gradient,
-    headline: b.publicPageTitle || base.headline,
-    tagline: b.publicTagline || base.tagline,
-    companyWebsite: b.companyWebsite,
-    footerText: b.footerText,
-    supportLink: b.supportLink,
-    variant: b.consumerVariant,
-    secondaryColor: b.secondaryColor,
-    accentSurface: b.accentColor,
-  };
-};

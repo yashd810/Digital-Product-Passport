@@ -33,8 +33,7 @@ async function addPassportRegistryForeignKey(pool, {
     [tableName, columnName]
   );
   if (!columnExists.rows.length) {
-    logger.warn({ tableName, columnName, constraintName }, "Skipping passport registry foreign key because child column is missing");
-    return;
+    throw new Error(`Cannot add ${constraintName}: required child column ${tableName}.${columnName} is missing`);
   }
 
   const quotedTableName = quoteDbIdentifier(tableName);
@@ -234,6 +233,7 @@ async function initDb(pool, {
         "lineageId"                 TEXT,
         "companyId"                 INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
         "passportType"              VARCHAR(100),
+        "internalAliasId"           TEXT,
         "versionNumber"             INTEGER NOT NULL DEFAULT 1,
         "dppId"                     TEXT,
         "snapshotScope"             VARCHAR(60) NOT NULL DEFAULT 'releasedCurrent',
@@ -254,6 +254,10 @@ async function initDb(pool, {
         UNIQUE ("backupProviderKey", "passportDppId", "versionNumber", "snapshotScope")
       )
     `);
+    await pool.query(`
+      ALTER TABLE "passportBackupReplications"
+      ADD COLUMN IF NOT EXISTS "internalAliasId" TEXT
+    `);
 
     await pool.query(`
       CREATE INDEX IF NOT EXISTS "idxPassportBackupReplicationsPassport"
@@ -262,6 +266,10 @@ async function initDb(pool, {
     await pool.query(`
       CREATE INDEX IF NOT EXISTS "idxPassportBackupReplicationsStatus"
         ON "passportBackupReplications"("replicationStatus", "updatedAt" DESC)
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS "idxPassportBackupReplicationsAlias"
+        ON "passportBackupReplications"("internalAliasId", "replicationStatus", "verificationStatus", "updatedAt" DESC)
     `);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS "passportRegistry" (
@@ -1173,5 +1181,6 @@ async function initDb(pool, {
 }
 
 module.exports = {
+  addPassportRegistryForeignKey,
   initDb,
 };

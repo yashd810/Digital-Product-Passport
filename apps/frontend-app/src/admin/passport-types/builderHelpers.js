@@ -1,5 +1,4 @@
 import { languages } from "../../app/providers/i18n";
-import { flattenSchemaFieldsFromSections } from "../../shared/passports/passportSchemaUtils";
 
 export const transLangs = languages.filter((language) => language.code !== "en");
 
@@ -176,12 +175,6 @@ export function normalizeSystemPassportHeader(input = {}) {
     fieldMappings,
     fieldKeys,
   };
-}
-
-export function resolveSystemHeaderFields(sections = [], systemHeader = {}) {
-  return resolveSystemHeaderEntries(sections, systemHeader)
-    .filter((entry) => entry.sourceType === "field" && entry.field)
-    .map((entry) => entry.field);
 }
 
 export function resolveSystemHeaderEntries(sections = [], systemHeader = {}) {

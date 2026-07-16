@@ -26,7 +26,7 @@ function normalizeAdminAnalyticsPayload(payload) {
         ...item,
         passportType: item.passportType || "",
         displayName: item.displayName || "",
-        total: item.total ?? item.totalCount ?? 0,
+        total: item.total ?? 0,
         draftCount: item.draftCount ?? 0,
         inReviewCount: item.inReviewCount ?? 0,
         releasedCount: item.releasedCount ?? 0,

@@ -76,3 +76,45 @@ test("company identity and branding changes require company-admin authorization"
     assert.equal(route.handlers.includes(checkCompanyAccess), false);
   }
 });
+
+test("passport template filtering uses the quoted canonical passport type column", async () => {
+  const { app, routes } = createRouteApp();
+  const queries = [];
+  const pool = {
+    async query(sql, params = []) {
+      queries.push({ sql, params });
+      return { rows: [] };
+    },
+  };
+
+  registerCompanyRoutes(app, {
+    pool, authenticateToken: noop, checkCompanyAccess: noop, checkCompanyAdmin: noop, requireEditor: noop,
+    getTable: noop, getPassportFieldValue: noop, getPassportTypeSchema: noop,
+    normalizePassportRequestBody: noop, extractExplicitFacilityId: noop,
+    normalizeInternalAliasIdValue: noop, normalizeReleaseStatus: noop,
+    isEditablePassportStatus: noop, findExistingPassportByInternalAliasId: noop,
+    updatePassportRowById: noop, getWritablePassportColumns: noop,
+    getStoredPassportValues: noop, logAudit: noop,
+    editableReleaseStatusesSql: "('draft')", systemPassportFields: new Set(),
+    buildSemanticPassportJsonExport: noop, buildExpandedPassportPayload: noop,
+    productIdentifierService: {}, complianceService: {},
+  });
+
+  const route = routes.find((entry) =>
+    entry.method === "get" && entry.routePath === "/api/companies/:companyId/templates"
+  );
+  assert.ok(route);
+  const handler = route.handlers.at(-1);
+  const response = {
+    json(body) {
+      this.body = body;
+      return this;
+    },
+  };
+
+  await handler({ params: { companyId: "7" }, query: { passportType: "batteryPassportV1" } }, response);
+
+  assert.equal(queries.length, 1);
+  assert.match(queries[0].sql, /AND t\."passportType" = \$2/);
+  assert.deepEqual(queries[0].params, ["7", "batteryPassportV1"]);
+});

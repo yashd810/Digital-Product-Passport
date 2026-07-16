@@ -49,13 +49,11 @@ const api = import.meta.env.VITE_API_URL || "";
 
 function getSectionChildren(section = {}) {
   if (Array.isArray(section.sections)) return section.sections;
-  if (Array.isArray(section.groups)) return section.groups;
   return [];
 }
 
 function withSectionChildren(section, children) {
   const nextSection = { ...section };
-  delete nextSection.groups;
   if (children.length) {
     nextSection.sections = children;
   } else {

@@ -36,8 +36,8 @@ test("implicit env backup provider is normalized before passport replication", a
         return {
           rows: [{
             backupProviderKey: params[1],
-            replicationStatus: params[9],
-            storageKey: params[11],
+            replicationStatus: params[10],
+            storageKey: params[12],
           }],
         };
       }
@@ -68,6 +68,7 @@ test("implicit env backup provider is normalized before passport replication", a
       companyId: 7,
       lineageId: "lineage-1",
       passportType: "exampleProductPassportV1",
+      internalAliasId: "alias-1",
       versionNumber: 2,
       publicField: "public-value",
       restrictedField: "restricted-value",
@@ -89,12 +90,43 @@ test("implicit env backup provider is normalized before passport replication", a
 
   assert.equal(result.success, true);
   assert.equal(replicationParams[1], "oci-test");
-  assert.equal(replicationParams[9], "synced");
+  assert.equal(replicationParams[6], "alias-1");
+  assert.equal(replicationParams[10], "synced");
   assert.equal(savedObject.contentType, "application/json");
   assert.equal(savedObject.key, "custom-prefix/company-7/passport-lineage-1/v2/releasedCurrent.json");
   assert.equal(savedPayload.publicRowData.publicField, "public-value");
   assert.equal(savedPayload.publicRowData.restrictedField, undefined);
   assert.equal(savedPayload.publicRowData.unknownColumn, undefined);
+});
+
+test("backup provider queries use quoted canonical schema columns", async () => {
+  const queries = [];
+  const pool = {
+    async query(sql) {
+      queries.push(sql);
+      return { rows: [] };
+    },
+  };
+  const service = createBackupProviderService({
+    pool,
+    storageService: {},
+    buildCanonicalPassportPayload: () => ({}),
+  });
+
+  const previousAutoHandover = process.env.BACKUP_PUBLIC_HANDOVER_AUTO_ENABLE;
+  process.env.BACKUP_PUBLIC_HANDOVER_AUTO_ENABLE = "true";
+  try {
+    await service.listProviders({ companyId: 7 });
+    await service.ensureAutomaticPublicHandover({ passportDppId: "dpp-1", internalAliasId: "alias-1" });
+  } finally {
+    restoreEnv("BACKUP_PUBLIC_HANDOVER_AUTO_ENABLE", previousAutoHandover);
+  }
+
+  assert.match(queries[0], /"isBackupProvider" = true/);
+  assert.match(queries[0], /"isActive" = true/);
+  assert.match(queries[1], /"replicationStatus" = 'synced'/);
+  assert.match(queries[1], /"verificationStatus" = 'verified'/);
+  assert.match(queries[1], /"internalAliasId" AS "internalAliasId"/);
 });
 
 test("public handover rows expose camelCase fields expected by callers", async () => {

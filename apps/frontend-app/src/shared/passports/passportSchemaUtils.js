@@ -1,7 +1,6 @@
 export function getSectionChildren(section) {
   if (!section || typeof section !== "object") return [];
   if (Array.isArray(section.sections)) return section.sections;
-  if (Array.isArray(section.groups)) return section.groups;
   return [];
 }
 

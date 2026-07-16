@@ -4,13 +4,11 @@ import { normalizeTableColumns } from "../../shared/passports/tableSchemaUtils";
 
 function getSectionChildren(section = {}) {
   if (Array.isArray(section.sections)) return section.sections;
-  if (Array.isArray(section.groups)) return section.groups;
   return [];
 }
 
 function withChildSections(section, children) {
   const nextSection = { ...section };
-  delete nextSection.groups;
   if (children.length) {
     nextSection.sections = children;
   } else {

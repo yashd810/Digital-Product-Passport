@@ -472,7 +472,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         { label: "Super-admin actions", value: "Invite, revoke access, and restore access" },
         { label: "Tenant-user support", value: "Adjust company user roles from company analytics when necessary" },
         { label: "Session control", value: "Company admins can revoke user sessions; login also tracks SSO-only and auth-source state" },
-        { label: "Profile scope", value: "My Profile is available in the admin shell for personal account settings" },
+        { label: "Profile scope", value: "Personal account settings are managed from the company dashboard" },
         { label: "Audit mindset", value: "Keep super-admin access narrow and intentional because these actions affect the whole platform" },
       ],
       journeys: [
@@ -490,13 +490,12 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
             "Use company analytics when a tenant needs help adjusting a user role from the super-admin side.",
             "Prefer tenant self-service through company admins when the issue is routine and does not need super-admin intervention.",
             "When immediate access removal matters, make sure session revocation is part of the support playbook rather than only changing a role label.",
-            "Use My Profile for your own password and account hygiene so personal admin security stays current too.",
+            "Use the company dashboard for your own password and account hygiene so personal admin security stays current too.",
           ],
         },
       ],
       links: [
         { label: "Open Admin Management", route: "/admin/admin-management", description: "Invite or manage super admins." },
-        { label: "Open My Profile", route: "/admin/profile", description: "Review your own profile settings from the admin shell." },
       ],
       previews: [
         buildPreview(

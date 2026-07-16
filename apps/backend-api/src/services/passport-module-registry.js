@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { normalizeSystemPassportHeader, validateSystemPassportHeader } = require("./passport-header-fields");
 const { canonicalKeyFromSemanticId } = require("../shared/passports/canonical-field-keys");
+const { assertCanonicalSchemaSections } = require("../shared/passports/passport-helpers");
 const { getPassportFieldDataTypeError } = require("../shared/passports/passport-field-data-types");
 const {
   getSemanticGraphClass,
@@ -46,6 +47,7 @@ function normalizePassportPolicy(policyDefinition = null, moduleDefinition = {})
 }
 
 function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null, semanticGraph = null) {
+  assertCanonicalSchemaSections(sections);
   const seenSectionKeys = new Set();
   const seenFieldKeys = new Set();
   const rootClass = getSemanticGraphClass(semanticGraph, semanticGraph.rootClassKey);
@@ -128,12 +130,12 @@ function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null,
       throw new Error(`Passport module "${sourceModuleKey || "unknown"}" contains duplicate section key "${section.key}".`);
     }
     seenSectionKeys.add(section.key);
-    const { groups: _groups, sections: nestedSections, ...sectionRest } = section;
+    const { sections: nestedSections, ...sectionRest } = section;
     return {
       ...sectionRest,
       sourceModuleKey,
       fields: (section.fields || []).map(normalizeField),
-      sections: (nestedSections || _groups || []).map(normalizeSection),
+      sections: (Array.isArray(nestedSections) ? nestedSections : []).map(normalizeSection),
     };
   };
 
@@ -149,7 +151,11 @@ function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null,
 
 function normalizeModuleDefinition(moduleDefinition = {}) {
   const definition = clone(moduleDefinition);
+  if (Object.prototype.hasOwnProperty.call(definition, "groups")) {
+    throw new Error(`Passport module "${definition.moduleKey || definition.typeName || "unknown"}" must use "sections"; the retired "groups" property is not supported.`);
+  }
   const sections = Array.isArray(definition.sections) ? definition.sections : [];
+  assertCanonicalSchemaSections(sections);
   const semanticGraph = normalizeAndValidateSemanticGraph(definition.semanticGraph, { required: true });
   const passportPolicy = normalizePassportPolicy(definition.passportPolicy, definition);
   const sourceModuleKey = definition.moduleKey || null;

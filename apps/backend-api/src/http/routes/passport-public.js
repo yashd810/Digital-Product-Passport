@@ -5,6 +5,7 @@ const { buildCanonicalIdentityBundle } = require("../../shared/identifiers/canon
 const { isPublicVersionVisible } = require("../../modules/public-passports/visibility");
 const { rewriteRepositoryLinksForSignedAccessDeep } = require("../../shared/repository/repository-file-links");
 const {
+  assertCanonicalSchemaSections,
   flattenSchemaFieldsFromSections,
   mapCompanyRow,
   mapPassportTypeRow,
@@ -132,7 +133,6 @@ module.exports = function registerPassportPublicRoutes(app, {
               c."companyLogo" AS "companyLogo",
               c."didSlug" AS "didSlug",
               c."customerTrustLevel" AS "customerTrustLevel",
-              COALESCE(p."defaultGranularity", 'item') AS "dppGranularity",
               COALESCE(p."defaultGranularity", 'item') AS "defaultGranularity",
               COALESCE(p."jsonldExportEnabled", true) AS "jsonldExportEnabled",
               c."isActive" AS "isActive"
@@ -166,7 +166,6 @@ module.exports = function registerPassportPublicRoutes(app, {
               c."companyLogo" AS "companyLogo",
               c."didSlug" AS "didSlug",
               c."customerTrustLevel" AS "customerTrustLevel",
-              COALESCE(p."defaultGranularity", 'item') AS "dppGranularity",
               COALESCE(p."defaultGranularity", 'item') AS "defaultGranularity",
               COALESCE(p."jsonldExportEnabled", true) AS "jsonldExportEnabled",
               c."isActive" AS "isActive"
@@ -383,8 +382,9 @@ module.exports = function registerPassportPublicRoutes(app, {
   function buildViewerSafeTypeDef(typeDef) {
     if (!typeDef) return null;
     const fieldsJson = scrubPublicSchemaMetadata(typeDef.fieldsJson || {});
+    assertCanonicalSchemaSections(fieldsJson);
     const markSectionFields = (section) => {
-      const { groups: _groups, sections: nestedSections, ...rest } = section || {};
+      const { sections: nestedSections, ...rest } = section || {};
       return {
         ...rest,
         fields: (section?.fields || []).map((field) => ({
@@ -393,7 +393,7 @@ module.exports = function registerPassportPublicRoutes(app, {
             ? "public"
             : "restricted",
         })),
-        sections: (nestedSections || _groups || []).map(markSectionFields),
+        sections: (Array.isArray(nestedSections) ? nestedSections : []).map(markSectionFields),
       };
     };
     fieldsJson.sections = (fieldsJson.sections || []).map(markSectionFields);

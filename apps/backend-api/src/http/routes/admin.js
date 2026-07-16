@@ -5,6 +5,7 @@ const registerCompanyRoutes = require("../../modules/admin/register-company-rout
 const registerSuperAdminRoutes = require("../../modules/admin/register-super-admin-routes");
 const registerUserAccessRoutes = require("../../modules/admin/register-user-access-routes");
 const {
+  assertCanonicalSchemaSections,
   walkSchemaSections,
   systemPassportFields,
 } = require("../../shared/passports/passport-helpers");
@@ -13,26 +14,11 @@ const {
   normalizeSystemPassportHeader,
   validateSystemPassportHeader,
 } = require("../../services/passport-header-fields");
-
-const companyPolicyDefaults = {
-  defaultGranularity: "item",
-  allowGranularityOverride: false,
-  mintModelDids: true,
-  mintItemDids: true,
-  mintFacilityDids: false,
-  vcIssuanceEnabled: true,
-  jsonldExportEnabled: true,
-  semanticDictionaryEnabled: true
-};
-
-const companyPolicyBoolFields = [
-"allowGranularityOverride",
-"mintModelDids",
-"mintItemDids",
-"mintFacilityDids",
-"vcIssuanceEnabled",
-"jsonldExportEnabled",
-"semanticDictionaryEnabled"];
+const {
+  buildCompanyDppPolicyUpdateQuery,
+  companyPolicyDefaults,
+  validateCompanyDppPolicyInput,
+} = require("../../services/company-dpp-policy");
 
 const companyTrustLevels = new Set(["basic", "verifiedBusiness", "enterprise"]);
 
@@ -170,6 +156,11 @@ module.exports = function registerAdminRoutes(app, {
   function validatePassportTypeSections(sections) {
     if (!Array.isArray(sections) || sections.length === 0) {
       return "At least one section is required";
+    }
+    try {
+      assertCanonicalSchemaSections(sections);
+    } catch (error) {
+      return error.message;
     }
     const seenFieldKeys = new Set();
     let validationError = null;
@@ -334,45 +325,10 @@ module.exports = function registerAdminRoutes(app, {
     return result.rows[0] || null;
   }
 
-  function validateCompanyDppPolicyInput(body = {}) {
-    const nextPolicy = {};
-    if (body.defaultGranularity !== undefined) {
-      if (!["model", "batch", "item"].includes(body.defaultGranularity)) {
-        throw new Error("defaultGranularity must be one of: model, batch, item");
-      }
-      nextPolicy.defaultGranularity = body.defaultGranularity;
-    }
-
-    companyPolicyBoolFields.forEach((field) => {
-      if (body[field] === undefined) return;
-      if (typeof body[field] !== "boolean") {
-        throw new Error(`${field} must be a boolean`);
-      }
-      nextPolicy[field] = body[field];
-    });
-
-    return nextPolicy;
-  }
-
   async function updateCompanyDppPolicy(companyId, updates) {
-    const setClauses = [];
-    const params = [];
-    let idx = 1;
+    const { sql, params } = buildCompanyDppPolicyUpdateQuery(companyId, updates);
 
-    Object.entries(updates).forEach(([key, value]) => {
-      setClauses.push(`${key} = $${idx++}`);
-      params.push(value);
-    });
-    setClauses.push(`updatedAt = NOW()`);
-    params.push(companyId);
-
-    const result = await pool.query(
-      `UPDATE "companyDppPolicies"
-       SET ${setClauses.join(", ")}
-       WHERE "companyId" = $${idx}
-       RETURNING *`,
-      params
-    );
+    const result = await pool.query(sql, params);
 
     return result.rows[0] || null;
   }

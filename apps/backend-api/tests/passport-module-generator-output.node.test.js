@@ -117,6 +117,22 @@ test("passport module generator requires an explicit deployment base URL", () =>
   );
 });
 
+test("passport module generator rejects the retired groups schema alias", () => {
+  const nestedAlias = createGeneratorInput();
+  nestedAlias.sections[0].groups = [];
+  assert.throws(
+    () => buildArtifacts(nestedAlias),
+    /retired "groups" property is not supported/
+  );
+
+  const rootAlias = createGeneratorInput();
+  rootAlias.groups = [];
+  assert.throws(
+    () => buildArtifacts(rootAlias),
+    /retired "groups" property is not supported/
+  );
+});
+
 test("passport module generator derives field and table column keys from semantic slugs", () => {
   const input = createGeneratorInput();
   input.roles.businessIdentifierField = "assetSerialNumber";

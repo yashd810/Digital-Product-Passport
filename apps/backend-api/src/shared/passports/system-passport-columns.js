@@ -38,20 +38,8 @@ const livePassportSystemColumnDefinitions = systemPassportColumnMappings.map((it
   item.definition,
 ]);
 
-const systemPassportStorageToAppKey = new Map(
-  systemPassportColumnMappings.flatMap((item) => [
-    [item.storageKey, item.appKey],
-  ])
-);
-
-const systemPassportAppToStorageKey = new Map(
-  systemPassportColumnMappings.map((item) => [item.appKey, item.storageKey])
-);
-
 module.exports = {
   systemPassportColumnMappings,
   livePassportSystemColumns,
   livePassportSystemColumnDefinitions,
-  systemPassportStorageToAppKey,
-  systemPassportAppToStorageKey,
 };

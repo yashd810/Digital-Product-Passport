@@ -31,14 +31,8 @@ function canonicalKeyFromSemanticId(semanticId, fallback = "") {
   return toCamelCaseKey(getSemanticTerminalSegment(semanticId) || fallback);
 }
 
-function isCanonicalSemanticKey(key, semanticId) {
-  const expected = canonicalKeyFromSemanticId(semanticId);
-  return Boolean(expected) && String(key || "").trim() === expected;
-}
-
 module.exports = {
   canonicalKeyFromSemanticId,
   getSemanticTerminalSegment,
-  isCanonicalSemanticKey,
   toCamelCaseKey,
 };

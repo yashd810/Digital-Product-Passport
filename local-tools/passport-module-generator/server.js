@@ -296,8 +296,20 @@ function normalizeHeaderAssignments(value) {
 function getSectionChildren(section) {
   if (!section || typeof section !== "object") return [];
   if (Array.isArray(section.sections)) return section.sections;
-  if (Array.isArray(section.groups)) return section.groups;
   return [];
+}
+
+function assertCanonicalSections(sections = []) {
+  const visit = (sectionList) => {
+    for (const section of Array.isArray(sectionList) ? sectionList : []) {
+      if (!section || typeof section !== "object") continue;
+      if (Object.prototype.hasOwnProperty.call(section, "groups")) {
+        throw new Error('Passport module sections must use "sections"; the retired "groups" property is not supported.');
+      }
+      visit(section.sections);
+    }
+  };
+  visit(sections);
 }
 
 function flattenDraftSections(sections = []) {
@@ -736,6 +748,10 @@ function buildSemanticGraphDraft(rawGraph, { family, version, baseUrl, sections 
 }
 
 function validateSpec(input) {
+  if (Object.prototype.hasOwnProperty.call(input || {}, "groups")) {
+    throw new Error('Passport module sections must use "sections"; the retired "groups" property is not supported.');
+  }
+  assertCanonicalSections(input?.sections || []);
   const module = input.module || {};
   const roles = input.roles || {};
   const family = kebabCase(module.family);

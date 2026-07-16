@@ -125,25 +125,10 @@ function getSystemPassportHeader(typeDef = {}) {
   return normalizeSystemPassportHeader(typeDef?.fieldsJson?.systemHeader || typeDef?.systemHeader);
 }
 
-function getSystemPassportHeaderFields(typeDef = {}) {
-  const header = getSystemPassportHeader(typeDef);
-  const sections = typeDef?.fieldsJson?.sections || typeDef?.sections || [];
-  const fieldMap = new Map(
-    flattenSchemaFieldsFromSections(sections)
-      .filter((field) => field?.key)
-      .map((field) => [field.key, field])
-  );
-
-  return header.fieldKeys
-    .map((key) => fieldMap.get(key) || null)
-    .filter(Boolean);
-}
-
 module.exports = {
   defaultSystemPassportHeaderSection,
   systemHeaderManagedDefinitions,
   normalizeSystemPassportHeader,
   validateSystemPassportHeader,
   getSystemPassportHeader,
-  getSystemPassportHeaderFields,
 };
