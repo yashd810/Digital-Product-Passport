@@ -136,6 +136,7 @@ module.exports = function createPassportService({
     buildPassportTypeSchemaChange,
     passportTypeHasStoredRecords,
     createPassportTable,
+    assertPassportTypeStorageReady,
     validatePassportTypeStorage,
     queryTableStats,
   } = createSchemaStorageHelpers({
@@ -242,6 +243,7 @@ module.exports = function createPassportService({
     buildPassportTypeSchemaChange,
     passportTypeHasStoredRecords,
     createPassportTable,
+    assertPassportTypeStorageReady,
     validatePassportTypeStorage,
     queryTableStats,
     submitPassportToWorkflow,

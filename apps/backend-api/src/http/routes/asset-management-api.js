@@ -5,6 +5,7 @@ const {
   normalizeStoredAssetSourceConfig,
   toPublicAssetSourceConfig,
 } = require("../../shared/assets/asset-source-config");
+const { isSafePassportStorageFieldKey } = require("../../shared/passports/passport-helpers");
 
 module.exports = function registerAssetManagementApiRoutes(app, {
   pool,
@@ -134,6 +135,15 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       const assetFieldMap = getAssetFieldMap(typeSchema);
       const fields = Array.from(assetFieldMap.values());
+      const invalidStorageFieldKeys = fields
+        .map((field) => field?.key)
+        .filter((fieldKey) => !isSafePassportStorageFieldKey(fieldKey));
+      if (invalidStorageFieldKeys.length) {
+        const error = new Error("Passport type contains field keys that cannot be safely mapped to database storage.");
+        error.code = "passportTypeInvalidStorageFieldKeys";
+        error.statusCode = 503;
+        throw error;
+      }
       const allowedKeys = new Set([...assetFieldMap.keys(), ...assetMatchFields, "isEditable", "releaseStatus", "versionNumber"]);
 
       const cleanRows = rows.map(row => {
@@ -141,13 +151,6 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         Object.entries(row).forEach(([key, value]) => {
           if (allowedKeys.has(key)) {
             clean[key] = value;
-          } else if (key.length >= 63) {
-            for (const fk of assetFieldMap.keys()) {
-              if (fk.length > 63 && fk.substring(0, 63) === key.substring(0, 63)) {
-                clean[fk] = value;
-                break;
-              }
-            }
           }
         });
         return clean;
@@ -167,7 +170,11 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       });
     } catch (error) {
       logger.error("Passport data load error:", error.message);
-      res.status(500).json({ error: "Failed to load passports for Passport Data Management" });
+      const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
+      res.status(statusCode).json({
+        error: statusCode === 500 ? "Failed to load passports for Passport Data Management" : error.code,
+        detail: statusCode === 500 ? undefined : error.message,
+      });
     }
   });
 

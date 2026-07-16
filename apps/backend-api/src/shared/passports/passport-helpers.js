@@ -15,6 +15,13 @@ const {
 } = require("./passport-semantic-graph");
 
 const inRevisionStatus = "inRevision";
+// PostgreSQL silently truncates identifiers after 63 bytes. Passport field
+// keys are physical column names, so accepting a longer key can make two
+// distinct schema fields address the same column.
+const postgresIdentifierMaxBytes = 63;
+const passportStorageFieldKeyPattern = /^[a-z][A-Za-z0-9]*$/;
+const passportTypeNamePattern = /^[a-z][A-Za-z0-9]+$/;
+const passportTypeNameMaxLength = postgresIdentifierMaxBytes - "Passports".length;
 
 const systemPassportFields = new Set([
   "id",
@@ -60,9 +67,22 @@ const parseJsonOrFallback = (value, fallback = value) => {
   }
 };
 
+const hasPostgresIdentifierLength = (value) =>
+  Buffer.byteLength(String(value || ""), "utf8") <= postgresIdentifierMaxBytes;
+
+const isSafePassportStorageFieldKey = (value) => {
+  const key = String(value || "").trim();
+  return passportStorageFieldKeyPattern.test(key) && hasPostgresIdentifierLength(key);
+};
+
+const isSafePassportTypeName = (value) => {
+  const typeName = String(value || "").trim();
+  return passportTypeNamePattern.test(typeName) && typeName.length <= passportTypeNameMaxLength;
+};
+
 const quoteSqlIdentifier = (value) => {
   const identifier = String(value || "").trim();
-  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(identifier)) {
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(identifier) || !hasPostgresIdentifierLength(identifier)) {
     throw new Error(`Invalid SQL identifier: ${identifier}`);
   }
   return `"${identifier.replace(/"/g, "\"\"")}"`;
@@ -946,6 +966,8 @@ const toDynamicStoredValue = (value) => {
 
 module.exports = {
   inRevisionStatus,
+  postgresIdentifierMaxBytes,
+  passportTypeNameMaxLength,
   systemPassportFields,
   editablePassportStatuses,
   getTable,
@@ -980,6 +1002,8 @@ module.exports = {
   mapCompanyFacilityRow,
   mapPassportTemplateFieldRow,
   mapPassportTypeRow,
+  isSafePassportStorageFieldKey,
+  isSafePassportTypeName,
   quoteSqlIdentifier,
   joinQuotedSqlIdentifiers,
   getPassportFieldLookupKeys,

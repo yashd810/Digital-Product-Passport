@@ -322,3 +322,18 @@ test("passport type module rejects fields that are absent from the semantic grap
     /field "modelId" is missing from the semantic graph root class/
   );
 }));
+
+test("passport type modules reject field keys PostgreSQL would truncate", () => {
+  const definition = createModuleDefinition();
+  const longFieldKey = `a${"b".repeat(63)}`;
+  const semanticId = `https://example.test/dictionary/example-product/v1/terms/${longFieldKey}`;
+  definition.semanticGraph.classes[0].properties[0].key = longFieldKey;
+  definition.semanticGraph.classes[0].properties[0].semanticId = semanticId;
+  definition.sections[0].fields[0].key = longFieldKey;
+  definition.sections[0].fields[0].semanticId = semanticId;
+
+  assert.throws(
+    () => normalizeModuleDefinition(definition),
+    /PostgreSQL identifier of at most 63 characters/
+  );
+});

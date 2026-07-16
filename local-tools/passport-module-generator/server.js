@@ -12,6 +12,14 @@ const {
   __dirname,
   "../../apps/backend-api/src/shared/passports/passport-semantic-graph"
 ));
+const {
+  isSafePassportStorageFieldKey,
+  isSafePassportTypeName,
+  passportTypeNameMaxLength,
+} = require(path.resolve(
+  __dirname,
+  "../../apps/backend-api/src/shared/passports/passport-helpers"
+));
 
 const port = Number.parseInt(process.env.PORT || "5055", 10);
 const appDir = __dirname;
@@ -808,8 +816,8 @@ function validateSpec(input) {
   const compositionValueColumnKey = normalizeTableColumnKey(roles.compositionValueColumnKey);
 
   if (!family) throw new Error("Product family is required");
-  if (!/^[a-z][A-Za-z0-9]{1,99}$/.test(typeName)) {
-    throw new Error("typeName must be camelCase letters/numbers, 2-100 chars, start with lowercase");
+  if (!isSafePassportTypeName(typeName)) {
+    throw new Error(`typeName must be camelCase letters/numbers, 2-${passportTypeNameMaxLength} chars, start with lowercase`);
   }
 
   const normalizeInputField = (field) => {
@@ -1022,8 +1030,8 @@ function validateSpec(input) {
       throw new Error(`Invalid section key: ${section.key}`);
     }
     for (const field of section.fields || []) {
-      if (!/^[a-z][A-Za-z0-9]{0,199}$/.test(field.fieldKey)) {
-        throw new Error(`Invalid field key: ${field.fieldKey}`);
+      if (!isSafePassportStorageFieldKey(field.fieldKey)) {
+        throw new Error(`Invalid field key: ${field.fieldKey}. Field keys must be lower camelCase PostgreSQL identifiers of at most 63 characters.`);
       }
       if (field.fieldType === "table") {
         for (const column of field.tableColumns || []) {

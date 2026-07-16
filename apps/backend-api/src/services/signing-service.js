@@ -62,10 +62,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       _signingKey.publicKey,
       _signingKey.algorithmVersion,
       _signingKey.algorithmVersion]
-
-    ).catch((error) => {
-      logger.warn({ err: error, keyId: _signingKey.keyId }, "[Signing] Failed to persist public signing key");
-    });
+    );
   }
 
   function canonicalJSON(val) {

@@ -22,7 +22,7 @@ function registerUpdateRoutes(app, deps) {
     requireEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
-    createPassportTable,
+    assertPassportTypeStorageReady,
     getTable,
     getWritablePassportColumns,
     getStoredPassportValues,
@@ -102,6 +102,7 @@ function registerUpdateRoutes(app, deps) {
       const requestedType = passportType;
       const typeSchema = await getPassportTypeSchema(requestedType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+      await assertPassportTypeStorageReady(typeSchema.typeName);
       const tableName = getTable(typeSchema.typeName);
 
       const invalidKeys = Object.keys(update).filter((key) => !typeSchema.allowedKeys.has(key) && key !== "modelName" && key !== "internalAliasId");
@@ -247,12 +248,7 @@ function registerUpdateRoutes(app, deps) {
       }
       const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
-      if (createPassportTable) {
-        await createPassportTable(typeSchema.typeName, {
-          createdBy: userId,
-          eventType: "runtimeBulkPatchReconcileTable",
-        });
-      }
+      await assertPassportTypeStorageReady(typeSchema.typeName);
       const tableName = getTable(typeSchema.typeName);
 
       let updated = 0;

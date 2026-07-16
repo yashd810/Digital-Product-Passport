@@ -4,7 +4,12 @@ const fs = require("fs");
 const path = require("path");
 const { normalizeSystemPassportHeader, validateSystemPassportHeader } = require("./passport-header-fields");
 const { canonicalKeyFromSemanticId } = require("../shared/passports/canonical-field-keys");
-const { assertCanonicalSchemaSections } = require("../shared/passports/passport-helpers");
+const {
+  assertCanonicalSchemaSections,
+  isSafePassportStorageFieldKey,
+  isSafePassportTypeName,
+  passportTypeNameMaxLength,
+} = require("../shared/passports/passport-helpers");
 const { getPassportFieldDataTypeError } = require("../shared/passports/passport-field-data-types");
 const {
   getSemanticGraphClass,
@@ -58,6 +63,11 @@ function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null,
   const normalizeField = (field) => {
     if (!field?.key) {
       throw new Error(`Passport module "${sourceModuleKey || "unknown"}" contains a field without a key.`);
+    }
+    if (!isSafePassportStorageFieldKey(field.key)) {
+      throw new Error(
+        `Passport module "${sourceModuleKey || "unknown"}" field "${field.key}" must be a lower camelCase PostgreSQL identifier of at most 63 characters.`
+      );
     }
     if (seenFieldKeys.has(field.key)) {
       throw new Error(`Passport module "${sourceModuleKey || "unknown"}" contains duplicate field key "${field.key}".`);
@@ -156,6 +166,11 @@ function normalizeModuleDefinition(moduleDefinition = {}) {
   }
   const sections = Array.isArray(definition.sections) ? definition.sections : [];
   assertCanonicalSchemaSections(sections);
+  if (!isSafePassportTypeName(definition.typeName)) {
+    throw new Error(
+      `Passport module "${definition.moduleKey || definition.typeName || "unknown"}" typeName must be lower camelCase and 2-${passportTypeNameMaxLength} characters.`
+    );
+  }
   const semanticGraph = normalizeAndValidateSemanticGraph(definition.semanticGraph, { required: true });
   const passportPolicy = normalizePassportPolicy(definition.passportPolicy, definition);
   const sourceModuleKey = definition.moduleKey || null;

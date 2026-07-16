@@ -146,6 +146,12 @@ flag creates it, starts PostgreSQL, runs `node scripts/migrate-db.js` once, and 
 starts the normal backend with startup migrations disabled. The flag is a
 shell-only maintenance action; do not add it to `/etc/dpp/dpp.env`.
 
+`bootstrap.sh` also requires an explicit `DPP_DEPLOY_TARGET`; it does not
+default to `all`. Use `backend` on the database/API host and `frontend` on the
+website host. Use `all` only for a deliberately single-host deployment. This
+prevents a bootstrap command from creating duplicate services on the split OCI
+hosts.
+
 Do not use `docker compose down -v`, `docker volume rm`, or
 `DPP_INITIALIZE_POSTGRES_VOLUME=true` in routine operation. Those actions are
 only for an explicitly approved data reset. Container restarts, Docker daemon
@@ -241,7 +247,6 @@ APP_URL="$(read_origin APP_URL)"
 VITE_PUBLIC_VIEWER_URL="$(read_origin VITE_PUBLIC_VIEWER_URL)"
 MARKETING_URL="$(read_origin MARKETING_URL)"
 curl -fsS "$SERVER_URL/health"
-curl -fsS "$SERVER_URL/health/storage"
 curl -fsS "$APP_URL/"
 curl -fsS "$VITE_PUBLIC_VIEWER_URL/"
 curl -fsS "$MARKETING_URL/"
@@ -252,6 +257,9 @@ On the backend host:
 
 ```bash
 cd /opt/dpp
+sudo docker compose -p dpp -f docker/docker-compose.prod.backend.yml \
+  --env-file /etc/dpp/dpp.env exec -T backend-api node -e \
+  'fetch("http://127.0.0.1:3001/health/storage").then(async (response) => { process.stdout.write(await response.text()); process.exit(response.ok ? 0 : 1); }).catch(() => process.exit(1));'
 sudo docker compose -p dpp -f docker/docker-compose.prod.backend.yml \
   --env-file /etc/dpp/dpp.env exec -T backend-api node scripts/migrate-db.js
 sudo docker compose -p dpp -f docker/docker-compose.prod.backend.yml \

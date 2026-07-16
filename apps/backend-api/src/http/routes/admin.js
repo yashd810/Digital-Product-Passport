@@ -6,6 +6,7 @@ const registerSuperAdminRoutes = require("../../modules/admin/register-super-adm
 const registerUserAccessRoutes = require("../../modules/admin/register-user-access-routes");
 const {
   assertCanonicalSchemaSections,
+  isSafePassportStorageFieldKey,
   walkSchemaSections,
   systemPassportFields,
 } = require("../../shared/passports/passport-helpers");
@@ -179,8 +180,8 @@ module.exports = function registerAdminRoutes(app, {
           validationError = "Each field must have key, label, and type";
           return;
         }
-        if (!/^[a-z][A-Za-z0-9]{0,199}$/.test(field.key)) {
-          validationError = `Invalid field key: ${field.key}. Field keys must be camelCase, start with a lowercase letter, and contain only letters and numbers.`;
+        if (!isSafePassportStorageFieldKey(field.key)) {
+          validationError = `Invalid field key: ${field.key}. Field keys must be lower camelCase PostgreSQL identifiers of at most 63 characters.`;
           return;
         }
         if (seenFieldKeys.has(field.key)) {

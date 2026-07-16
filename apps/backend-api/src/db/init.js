@@ -1061,9 +1061,7 @@ async function initDb(pool, {
   // Idempotent — uses CREATE TABLE IF NOT EXISTS.
   const ptRows = await pool.query('SELECT "typeName" AS "typeName" FROM "passportTypes"');
   for (const { typeName } of ptRows.rows) {
-    await createPassportTable(typeName).catch(e =>
-      logger.warn({ err: e }, `Could not create table for ${typeName}`)
-    );
+    await createPassportTable(typeName);
   }
 
   // ── Templates tables ─────────────────────────────────────────────────────

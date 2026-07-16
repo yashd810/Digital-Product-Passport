@@ -212,7 +212,7 @@ function registerAppRoutes(app, deps) {
     productIdentifierService: deps.productIdentifierService,
     backupProviderService: deps.backupProviderService,
     buildExpandedPassportPayload: deps.buildExpandedPassportPayload,
-    createPassportTable: deps.createPassportTable,
+    assertPassportTypeStorageReady: deps.assertPassportTypeStorageReady,
   });
 
   registerPassportPublicRoutes(app, {

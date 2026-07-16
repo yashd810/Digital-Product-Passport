@@ -551,6 +551,26 @@ wait_for_http() {
   return 1
 }
 
+wait_for_backend_loopback_http() {
+  local path="$1"
+  local label="$2"
+  local attempts="${3:-30}"
+  local sleep_seconds="${4:-2}"
+  local attempt
+  local url="http://127.0.0.1:3001${path}"
+  for attempt in $(seq 1 "$attempts"); do
+    if DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
+      exec -T backend-api node -e 'fetch(process.argv[1]).then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1));' \
+      "$url" >/dev/null 2>&1; then
+      echo "✅ $label ready"
+      return 0
+    fi
+    sleep "$sleep_seconds"
+  done
+  echo "❌ $label did not become ready: $url"
+  return 1
+}
+
 wait_for_container_health() {
   local service_name="$1"
   local label="$2"
@@ -793,7 +813,7 @@ if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   APP_DIR="$APP_DIR" "$APP_DIR/infra/oracle/install-db-backup-jobs.sh"
   echo "Running storage probe health check..."
   wait_for_http "http://127.0.0.1:${BACKEND_PORT:-3001}/health" "Backend health" 40 2
-  wait_for_http "http://127.0.0.1:${BACKEND_PORT:-3001}/health/storage" "Backend storage probe" 40 2
+  wait_for_backend_loopback_http "/health/storage" "Backend storage probe" 40 2
   # This is a one-shot permissions initializer, not a long-running service.
   # Remove its completed container so the deployed project has no stopped
   # Compose containers after a successful backend rollout.

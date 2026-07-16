@@ -98,6 +98,12 @@ Schema creation and idempotent startup migrations live in:
 
 - `apps/backend-api/src/db/init.js:82`
 
+## Health Checks
+
+`/health` is the public, read-only database check. `/health/storage` performs
+a temporary storage write/read/delete verification and is restricted to the
+backend container's loopback interface; Caddy does not expose it publicly.
+
 ## Useful Commands
 
 ```bash

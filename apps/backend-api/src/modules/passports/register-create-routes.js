@@ -12,7 +12,7 @@ module.exports = function registerCreateRoutes(app, deps) {
     requireEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
-    createPassportTable,
+    assertPassportTypeStorageReady,
     getTable,
     normalizeInternalAliasIdValue,
     generateInternalAliasIdValue,
@@ -62,12 +62,7 @@ module.exports = function registerCreateRoutes(app, deps) {
 
       const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
-      if (createPassportTable) {
-        await createPassportTable(typeSchema.typeName, {
-          createdBy: userId,
-          eventType: "runtimeCreateReconcileTable",
-        });
-      }
+      await assertPassportTypeStorageReady(typeSchema.typeName);
 
       const resolvedPassportType = typeSchema.typeName;
       const tableName = getTable(resolvedPassportType);
@@ -106,6 +101,7 @@ module.exports = function registerCreateRoutes(app, deps) {
 
       const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+      await assertPassportTypeStorageReady(typeSchema.typeName);
 
       const resolvedPassportType = typeSchema.typeName;
       const tableName = getTable(resolvedPassportType);

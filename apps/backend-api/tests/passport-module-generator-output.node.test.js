@@ -117,6 +117,19 @@ test("passport module generator requires an explicit deployment base URL", () =>
   );
 });
 
+test("passport module generator rejects field keys PostgreSQL would truncate", () => {
+  const input = createGeneratorInput();
+  const longFieldKey = `a${"b".repeat(63)}`;
+  input.sections[0].fields[0].fieldKey = longFieldKey;
+  input.sections[0].fields[0].semanticSlug = longFieldKey;
+  input.roles.businessIdentifierField = longFieldKey;
+
+  assert.throws(
+    () => buildArtifacts(input),
+    /Field keys must be lower camelCase PostgreSQL identifiers of at most 63 characters/
+  );
+});
+
 test("passport module generator rejects the retired groups schema alias", () => {
   const nestedAlias = createGeneratorInput();
   nestedAlias.sections[0].groups = [];

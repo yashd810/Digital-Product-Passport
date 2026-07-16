@@ -27,7 +27,7 @@ function updateEditablePassportUseCase(deps) {
     pool,
     normalizePassportRequestBody,
     getPassportTypeSchema,
-    createPassportTable,
+    assertPassportTypeStorageReady,
     getTable,
     validGranularities,
     editableReleaseStatusesSql,
@@ -76,12 +76,7 @@ function updateEditablePassportUseCase(deps) {
       "internalAliasId",
       "productImage",
     ]);
-    if (createPassportTable) {
-      await createPassportTable(typeSchema.typeName, {
-        createdBy: userId,
-        eventType: "runtimePatchReconcileTable",
-      });
-    }
+    await assertPassportTypeStorageReady(typeSchema.typeName);
     const tableName = getTable(typeSchema.typeName);
 
     const current = await pool.query(

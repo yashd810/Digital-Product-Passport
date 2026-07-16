@@ -12,7 +12,7 @@ info:
     supplied in `X-API-Key` or `X-Security-Group-Key`. Company automation writes
     use the company-name slug integration namespace and require a Bearer token.
 servers:
-  - url: https://api.example.com
+  - url: https://api.claros-dpp.online
     description: Production
 tags:
   - name: Public read

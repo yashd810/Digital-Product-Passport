@@ -403,7 +403,7 @@ const {
   clearExpiredEditSessions, listActiveEditSessions, markOlderVersionsObsolete,
   getLatestCompanyPassports, normalizePassportTypeSchema, getTypeSchemaVersion,
   buildPassportTypeSchemaChange, passportTypeHasStoredRecords,
-  createPassportTable, validatePassportTypeStorage, queryTableStats, submitPassportToWorkflow,
+  createPassportTable, assertPassportTypeStorageReady, validatePassportTypeStorage, queryTableStats, submitPassportToWorkflow,
 } = passportService;
 
 // ─── ASSET SERVICE ───────────────────────────────────────────────────────────
@@ -412,7 +412,7 @@ const assetService = createAssetService({
   pool, getTable, logAudit,
   assertCompanyAssetPassportTypeAccess, assertAssetManagementEnabled, getLatestCompanyPassports,
   findExistingPassportByInternalAliasId, updatePassportRowById, normalizeInternalAliasIdValue,
-  generateInternalAliasIdValue, generateDppRecordId, productIdentifierService, createPassportTable, archivePassportSnapshot,
+  generateInternalAliasIdValue, generateDppRecordId, productIdentifierService, assertPassportTypeStorageReady, archivePassportSnapshot,
   isPlainObject, getValueAtPath, normalizeAssetHeaders, coerceAssetFieldValue,
   comparableHistoryFieldValue, toDynamicStoredValue, getAssetFieldMap,
   editableReleaseStatusesSql, assetMatchFields, assetIgnoredSystemColumns,
@@ -443,6 +443,14 @@ async function verifySchemaReady() {
     FROM companies
     LIMIT 1
   `);
+  const storageChecks = await validatePassportTypeStorage({ repair: false });
+  const unavailableStorage = storageChecks.filter((result) =>
+    result.issues.some((issue) => issue.type !== "extraColumn")
+  );
+  if (unavailableStorage.length) {
+    const typeNames = unavailableStorage.map((result) => result.typeName).join(", ");
+    throw new Error(`Passport storage is not ready for registered type(s): ${typeNames}`);
+  }
 }
 
 const startup = pool.query("SELECT NOW()")
@@ -597,6 +605,7 @@ registerAppRoutes(app, {
   getTypeSchemaVersion,
   buildPassportTypeSchemaChange,
   passportTypeHasStoredRecords,
+  assertPassportTypeStorageReady,
   validatePassportTypeStorage,
   createNotification,
   getAssetFieldMap,

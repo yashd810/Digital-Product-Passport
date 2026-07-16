@@ -12,6 +12,7 @@ const repoRoot = path.resolve(__dirname, "../../..");
 const templatePath = path.join(repoRoot, "infra/oracle/oci.env.example");
 const generatorPath = path.join(repoRoot, "infra/oracle/generate-env-secrets.sh");
 const deployScriptPath = path.join(repoRoot, "infra/oracle/deploy-prod.sh");
+const bootstrapScriptPath = path.join(repoRoot, "infra/oracle/bootstrap.sh");
 const bootstrapSuperAdminPath = path.join(repoRoot, "apps/backend-api/scripts/bootstrap-super-admin.js");
 const productionComposePaths = [
   path.join(repoRoot, "docker/docker-compose.prod.backend.yml"),
@@ -123,6 +124,16 @@ test("production environment template fixes data-volume identities and disables 
   assert.match(values.get("LOCAL_STORAGE_VOLUME_NAME"), /^[A-Za-z0-9][A-Za-z0-9_.-]*$/);
   assert.match(values.get("POSTGRES_VOLUME_NAME"), /^[A-Za-z0-9][A-Za-z0-9_.-]*$/);
   assert.equal(values.get("RUN_SCHEMA_MIGRATIONS"), "false");
+  assert.equal(values.get(["DPP", "DEPLOY", "TARGET"].join("_")), ["REPLACE", "WITH", "DEPLOY", "TARGET"].join("_"));
+});
+
+test("production bootstrap requires an explicit topology and database-volume initialization", () => {
+  const bootstrapScript = fs.readFileSync(bootstrapScriptPath, "utf8");
+
+  assert.match(bootstrapScript, /DEPLOY_TARGET="\$\{DPP_DEPLOY_TARGET:-\}"/);
+  assert.match(bootstrapScript, /INITIALIZE_POSTGRES_VOLUME="\$\{DPP_INITIALIZE_POSTGRES_VOLUME:-false\}"/);
+  assert.match(bootstrapScript, /DPP_DEPLOY_TARGET is required/);
+  assert.match(bootstrapScript, /frontend\|backend\|all/);
 });
 
 test("production deployment fails closed rather than selecting a fresh database volume", () => {

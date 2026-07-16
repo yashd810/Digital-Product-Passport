@@ -5,6 +5,7 @@ const { normalizeSystemPassportHeader } = require("../../services/passport-heade
 const {
   assertCanonicalSchemaSections,
   flattenSchemaFieldsFromSections,
+  isSafePassportStorageFieldKey,
 } = require("../../shared/passports/passport-helpers");
 
 function createSchemaStorageHelpers({
@@ -109,6 +110,40 @@ function createSchemaStorageHelpers({
       .filter((field) => field?.key);
   }
 
+  function getPassportStorageFieldKeyIssues(fields = []) {
+    const issues = [];
+    const seenFieldKeys = new Set();
+    for (const field of fields) {
+      const fieldKey = String(field?.key || "").trim();
+      if (!isSafePassportStorageFieldKey(fieldKey)) {
+        issues.push({
+          type: "invalidFieldKey",
+          field: fieldKey || null,
+          message: "Passport field keys must be lower camelCase PostgreSQL identifiers of at most 63 ASCII characters.",
+        });
+        continue;
+      }
+      if (seenFieldKeys.has(fieldKey)) {
+        issues.push({ type: "duplicateFieldKey", field: fieldKey });
+        continue;
+      }
+      seenFieldKeys.add(fieldKey);
+    }
+    return issues;
+  }
+
+  function assertPassportStorageFieldKeys(typeName, fields = []) {
+    const issues = getPassportStorageFieldKeyIssues(fields);
+    if (!issues.length) return;
+    const error = new Error(
+      `Passport type "${typeName}" has field keys that cannot be represented safely in PostgreSQL storage.`
+    );
+    error.code = "passportTypeInvalidStorageFieldKeys";
+    error.statusCode = 400;
+    error.issues = issues;
+    throw error;
+  }
+
   function isStructuredPassportField(field) {
     const storageType = String(field?.storageType || field?.valueType || "").trim().toLowerCase();
     return field?.type === "table"
@@ -170,14 +205,13 @@ function createSchemaStorageHelpers({
   async function passportTypeHasStoredRecords(typeName) {
     const tableName = getTable(typeName);
     const liveCount = await pool.query(`SELECT COUNT(*)::int AS count FROM ${tableName}`)
-      .then((result) => Number(result.rows[0]?.count) || 0)
-      .catch(() => 0);
+      .then((result) => Number(result.rows[0]?.count) || 0);
     if (liveCount > 0) return true;
 
     const archivedCount = await pool.query(
       "SELECT COUNT(*)::int AS count FROM \"passportArchives\" WHERE \"passportType\" = $1",
       [typeName]
-    ).then((result) => Number(result.rows[0]?.count) || 0).catch(() => 0);
+    ).then((result) => Number(result.rows[0]?.count) || 0);
     return archivedCount > 0;
   }
 
@@ -232,8 +266,11 @@ function createSchemaStorageHelpers({
     if (!typeRes.rows.length)
       throw new Error(`Passport type '${typeName}' not found in passportTypes`);
 
+    const fields = flattenTypeFields(typeRes.rows[0].fieldsJson || {});
+    assertPassportStorageFieldKeys(typeName, fields);
+
     const ddlCols = [];
-    for (const field of flattenTypeFields(typeRes.rows[0].fieldsJson || {})) {
+    for (const field of fields) {
       const colType = getPassportFieldColumnType(field);
       ddlCols.push(`    ${quoteSqlIdentifier(field.key)} ${colType}`);
     }
@@ -280,7 +317,7 @@ function createSchemaStorageHelpers({
 
     const addedColumns = [];
     const indexedColumns = [];
-    for (const field of flattenTypeFields(typeRes.rows[0].fieldsJson)) {
+    for (const field of fields) {
       await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(field.key)} ${getPassportFieldColumnType(field)}`);
       addedColumns.push({
         key: field.key,
@@ -300,62 +337,119 @@ function createSchemaStorageHelpers({
     });
   }
 
+  async function inspectPassportTypeStorage(typeRow) {
+    const typeName = typeRow?.typeName;
+    const fieldsJson = typeRow?.fieldsJson || {};
+    const fields = flattenTypeFields(fieldsJson);
+    const issues = getPassportStorageFieldKeyIssues(fields);
+    const tableName = getTable(typeName);
+    const rawTableName = unquoteSqlIdentifier(tableName);
+    const tableExists = await pool.query(
+      `SELECT 1
+       FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = $1
+       LIMIT 1`,
+      [rawTableName]
+    ).then((result) => result.rows.length > 0);
+
+    if (!tableExists) {
+      issues.push({ type: "missingTable" });
+      return {
+        typeName,
+        tableName: rawTableName,
+        schemaVersion: getTypeSchemaVersion(fieldsJson),
+        issues,
+      };
+    }
+
+    const columnMap = await getLiveTableColumnMap(tableName);
+    const expectedFieldKeys = new Set();
+    for (const systemColumn of livePassportSystemColumns) {
+      if (!columnMap.has(systemColumn)) {
+        issues.push({ type: "missingSystemColumn", field: systemColumn });
+      }
+    }
+
+    for (const field of fields) {
+      if (!isSafePassportStorageFieldKey(field.key)) continue;
+      expectedFieldKeys.add(field.key);
+      const actualDataType = columnMap.get(field.key);
+      const expectedDataType = getPassportFieldDataType(field);
+      if (!actualDataType) {
+        issues.push({ type: "missingColumn", field: field.key, expectedDataType });
+        continue;
+      }
+      const normalizedActual = actualDataType === "boolean" ? "boolean" : actualDataType === "jsonb" ? "jsonb" : "text";
+      if (normalizedActual !== expectedDataType) {
+        issues.push({ type: "columnTypeMismatch", field: field.key, expectedDataType, actualDataType });
+      }
+    }
+
+    for (const columnName of columnMap.keys()) {
+      if (livePassportSystemColumns.has(columnName) || expectedFieldKeys.has(columnName)) continue;
+      issues.push({ type: "extraColumn", field: columnName });
+    }
+
+    return {
+      typeName,
+      tableName: rawTableName,
+      schemaVersion: getTypeSchemaVersion(fieldsJson),
+      issues,
+    };
+  }
+
+  async function assertPassportTypeStorageReady(typeName) {
+    const typeRes = await pool.query(
+      'SELECT "typeName" AS "typeName", "fieldsJson" AS "fieldsJson" FROM "passportTypes" WHERE "typeName" = $1',
+      [typeName]
+    );
+    if (!typeRes.rows.length) {
+      const error = new Error(`Passport type "${typeName}" was not found.`);
+      error.code = "passportTypeStorageNotReady";
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const inspection = await inspectPassportTypeStorage(typeRes.rows[0]);
+    const blockingIssues = inspection.issues.filter((issue) => issue.type !== "extraColumn");
+    if (!blockingIssues.length) return inspection;
+
+    const error = new Error(
+      `Passport storage for "${inspection.typeName}" is not ready. Run controlled schema provisioning before accepting passport writes.`
+    );
+    error.code = "passportTypeStorageNotReady";
+    error.statusCode = 503;
+    error.issues = blockingIssues;
+    throw error;
+  }
+
   async function validatePassportTypeStorage({ repair = false } = {}) {
     const typeRows = await pool.query('SELECT id, "typeName" AS "typeName", "fieldsJson" AS "fieldsJson" FROM "passportTypes" ORDER BY "typeName"');
     const results = [];
 
     for (const typeRow of typeRows.rows) {
-      const tableName = getTable(typeRow.typeName);
-      const rawTableName = unquoteSqlIdentifier(tableName);
-      const tableExists = await pool.query(
-        `SELECT 1
-         FROM information_schema.tables
-         WHERE table_schema = 'public' AND table_name = $1
-         LIMIT 1`,
-        [rawTableName]
-      ).then((result) => result.rows.length > 0);
+      const inspection = await inspectPassportTypeStorage(typeRow);
+      const { typeName, tableName: rawTableName, issues } = inspection;
+      const missingTable = issues.some((issue) => issue.type === "missingTable");
 
-      if (!tableExists) {
+      if (missingTable) {
         if (repair) {
-          await createPassportTable(typeRow.typeName);
-          results.push({ typeName: typeRow.typeName, tableName: rawTableName, status: "repairedMissingTable", issues: [] });
+          await createPassportTable(typeName);
+          results.push({ typeName, tableName: rawTableName, status: "repairedMissingTable", issues: [] });
         } else {
-          results.push({ typeName: typeRow.typeName, tableName: rawTableName, status: "failed", issues: [{ type: "missingTable" }] });
+          results.push({ typeName, tableName: rawTableName, status: "failed", issues });
         }
         continue;
       }
 
-      const columnMap = await getLiveTableColumnMap(tableName);
-      const issues = [];
-      const expectedFieldKeys = new Set();
-
-      for (const field of flattenTypeFields(typeRow.fieldsJson)) {
-        expectedFieldKeys.add(field.key);
-        const actualDataType = columnMap.get(field.key);
-        const expectedDataType = getPassportFieldDataType(field);
-        if (!actualDataType) {
-          issues.push({ type: "missingColumn", field: field.key, expectedDataType });
-          continue;
-        }
-        const normalizedActual = actualDataType === "boolean" ? "boolean" : actualDataType === "jsonb" ? "jsonb" : "text";
-        if (normalizedActual !== expectedDataType) {
-          issues.push({ type: "columnTypeMismatch", field: field.key, expectedDataType, actualDataType });
-        }
-      }
-
-      for (const columnName of columnMap.keys()) {
-        if (livePassportSystemColumns.has(columnName) || expectedFieldKeys.has(columnName)) continue;
-        issues.push({ type: "extraColumn", field: columnName });
-      }
-
       if (repair && issues.some((issue) => issue.type === "missingColumn")) {
-        await createPassportTable(typeRow.typeName);
+        await createPassportTable(typeName);
       }
 
       results.push({
-        typeName: typeRow.typeName,
+        typeName,
         tableName: rawTableName,
-        schemaVersion: getTypeSchemaVersion(typeRow.fieldsJson),
+        schemaVersion: inspection.schemaVersion,
         status: issues.length ? "failed" : "ok",
         issues,
       });
@@ -405,6 +499,7 @@ function createSchemaStorageHelpers({
     buildPassportTypeSchemaChange,
     passportTypeHasStoredRecords,
     createPassportTable,
+    assertPassportTypeStorageReady,
     validatePassportTypeStorage,
     queryTableStats,
   };

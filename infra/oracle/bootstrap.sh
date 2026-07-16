@@ -5,11 +5,35 @@ APP_DIR="${APP_DIR:-/opt/dpp}"
 REPO_URL="${REPO_URL:-https://github.com/yashd810/Digital-Product-Passport.git}"
 BRANCH="${BRANCH:-main}"
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
-DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-all}"
+DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
 # bootstrap.sh is only for an intentionally new host. The flag is passed on the
 # command line, never stored in the production environment file, so routine
 # restarts cannot create a replacement database volume.
-INITIALIZE_POSTGRES_VOLUME="${DPP_INITIALIZE_POSTGRES_VOLUME:-true}"
+INITIALIZE_POSTGRES_VOLUME="${DPP_INITIALIZE_POSTGRES_VOLUME:-false}"
+
+if [ -z "$DEPLOY_TARGET" ]; then
+  echo "DPP_DEPLOY_TARGET is required. Use frontend, backend, or explicitly all for a single-host deployment."
+  exit 1
+fi
+
+case "$DEPLOY_TARGET" in
+  frontend|backend|all)
+    ;;
+  *)
+    echo "Unsupported DPP_DEPLOY_TARGET: $DEPLOY_TARGET"
+    echo "Use frontend, backend, or explicitly all for a single-host deployment."
+    exit 1
+    ;;
+esac
+
+case "$INITIALIZE_POSTGRES_VOLUME" in
+  true|false)
+    ;;
+  *)
+    echo "DPP_INITIALIZE_POSTGRES_VOLUME must be true or false when set."
+    exit 1
+    ;;
+esac
 
 if [ -L "$APP_DIR" ]; then
   echo "Refusing a symlinked application directory: $APP_DIR"

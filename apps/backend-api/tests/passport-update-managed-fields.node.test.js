@@ -7,6 +7,8 @@ const { updateEditablePassportUseCase } = require("../src/modules/passports/appl
 function createHarness() {
   let capturedUpdateData = null;
   const queries = [];
+  const storageReadinessCalls = [];
+  let ddlCalls = 0;
   const currentPassport = {
     id: 22,
     dppId: "dppRegularPatchTest",
@@ -38,7 +40,8 @@ function createHarness() {
       typeName: "exampleProductPassportV1",
       allowedKeys: new Set(["manufacturer"]),
     }),
-    createPassportTable: async () => {},
+    createPassportTable: async () => { ddlCalls += 1; },
+    assertPassportTypeStorageReady: async (typeName) => storageReadinessCalls.push(typeName),
     getTable: () => "exampleProductPassports",
     validGranularities: new Set(["model", "batch", "item"]),
     editableReleaseStatusesSql: "('draft', 'inRevision')",
@@ -79,6 +82,8 @@ function createHarness() {
   return {
     getCapturedUpdateData: () => capturedUpdateData,
     getQueries: () => queries,
+    getStorageReadinessCalls: () => storageReadinessCalls,
+    getDdlCalls: () => ddlCalls,
     updateEditablePassport,
   };
 }
@@ -124,4 +129,19 @@ test("regular passport updates scope the editable-record lookup to the route com
     /WHERE "dppId" = \$1\s+AND "companyId" = \$2\s+AND "releaseStatus" IN/
   );
   assert.deepEqual(getQueries()[0].params, ["dppRegularPatchTest", "7"]);
+});
+
+test("regular passport updates verify storage readiness without reconciling schema at request time", async () => {
+  const { getDdlCalls, getStorageReadinessCalls, updateEditablePassport } = createHarness();
+
+  await updateEditablePassport({
+    req: {
+      params: { companyId: "7", dppId: "dppRegularPatchTest" },
+      user: { userId: 9, companyId: 7, role: "companyAdmin" },
+      body: { passportType: "exampleProductPassportV1" },
+    },
+  });
+
+  assert.deepEqual(getStorageReadinessCalls(), ["exampleProductPassportV1"]);
+  assert.equal(getDdlCalls(), 0);
 });

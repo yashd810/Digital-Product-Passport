@@ -3,6 +3,11 @@
 const nodeCrypto = require("crypto");
 const canonicalizeJson = require("../../services/json-canonicalization");
 
+// PostgreSQL advisory-lock namespace for the per-company audit and anchor
+// chains. A transaction-scoped lock protects the empty-chain case as well as
+// the latest-row lookup, which row locks alone cannot protect.
+const auditChainLockNamespace = 18223;
+
 function buildAuditEventPayload({
   createdAt = null,
   companyId = null,
@@ -77,74 +82,102 @@ function buildHashPayloadVersion({
 }
 
 function createAuditServiceHelpers({ pool, logger }) {
-  async function logAudit(companyId, userId, action, tableName, passportDppId, oldData, newData, options = {}) {
-    try {
-      const createdAt = options.createdAt || new Date().toISOString();
-      const hashVersion = 2;
-      const previousHashRes = await pool.query(
-        `SELECT "eventHash"
-         FROM "auditLogs"
-         WHERE (
-           ($1::int IS NULL AND "companyId" IS NULL)
-           OR "companyId" = $1
-         )
-         ORDER BY id DESC
-         LIMIT 1`,
-        [companyId || null]
-      ).catch(() => ({ rows: [] }));
-      const previousEventHash = previousHashRes.rows[0]?.eventHash || null;
-      const actorIdentifier =
-        options.actorIdentifier
-        || options.globallyUniqueOperatorId
-        || options.globallyUniqueOperatorIdentifier
-        || options.operatorIdentifier
-        || options.economicOperatorId
-        || options.economicOperatorIdentifier
-        || (userId ? `user:${userId}` : null);
-      const payload = buildHashPayloadVersion({
-        hashVersion,
-        createdAt,
-        companyId: companyId || null,
-        userId: userId || null,
-        action,
-        tableName: tableName || null,
-        recordId: passportDppId || null,
-        oldData: oldData || null,
-        newData: newData || null,
-        actorIdentifier,
-        audience: options.audience || null,
-      });
-      const eventHash = computeHashChainValue(previousEventHash, payload);
+  function normalizeAuditCompanyId(companyId) {
+    const parsed = Number.parseInt(companyId, 10);
+    return Number.isFinite(parsed) ? parsed : -1;
+  }
 
-      await pool.query(
-        `INSERT INTO "auditLogs" (
-           "companyId","userId",action,"tableName","recordId","oldValues","newValues",
-           "actorIdentifier",audience,"previousEventHash","eventHash","createdAt","hashVersion"
-         )
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-        [
-          companyId || null,
-          userId || null,
-          action,
-          tableName,
-          passportDppId || null,
-          oldData ? JSON.stringify(oldData) : null,
-          newData ? JSON.stringify(newData) : null,
-          actorIdentifier,
-          options.audience || null,
-          previousEventHash,
-          eventHash,
-          createdAt,
-          hashVersion,
-        ]
+  async function withAuditChainTransaction(companyId, callback) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock($1::integer, $2::integer)",
+        [auditChainLockNamespace, normalizeAuditCompanyId(companyId)]
       );
-    } catch (e) {
-      logger.error("Audit log error (non-fatal):", e.message);
+      const result = await callback(client);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
     }
   }
 
-  async function verifyAuditLogChain(companyId = null) {
-    const result = await pool.query(
+  async function logAudit(companyId, userId, action, tableName, passportDppId, oldData, newData, options = {}) {
+    try {
+      await withAuditChainTransaction(companyId, async (client) => {
+        const createdAt = options.createdAt || new Date().toISOString();
+        const hashVersion = 2;
+        const previousHashRes = await client.query(
+          `SELECT "eventHash"
+           FROM "auditLogs"
+           WHERE (
+             ($1::int IS NULL AND "companyId" IS NULL)
+             OR "companyId" = $1
+           )
+           ORDER BY id DESC
+           LIMIT 1
+           FOR UPDATE`,
+          [companyId ?? null]
+        );
+        const previousEventHash = previousHashRes.rows[0]?.eventHash || null;
+        const actorIdentifier =
+          options.actorIdentifier
+          || options.globallyUniqueOperatorId
+          || options.globallyUniqueOperatorIdentifier
+          || options.operatorIdentifier
+          || options.economicOperatorId
+          || options.economicOperatorIdentifier
+          || (userId ? `user:${userId}` : null);
+        const payload = buildHashPayloadVersion({
+          hashVersion,
+          createdAt,
+          companyId: companyId ?? null,
+          userId: userId ?? null,
+          action,
+          tableName: tableName || null,
+          recordId: passportDppId || null,
+          oldData: oldData || null,
+          newData: newData || null,
+          actorIdentifier,
+          audience: options.audience || null,
+        });
+        const eventHash = computeHashChainValue(previousEventHash, payload);
+
+        await client.query(
+          `INSERT INTO "auditLogs" (
+             "companyId","userId",action,"tableName","recordId","oldValues","newValues",
+             "actorIdentifier",audience,"previousEventHash","eventHash","createdAt","hashVersion"
+           )
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          [
+            companyId ?? null,
+            userId ?? null,
+            action,
+            tableName,
+            passportDppId || null,
+            oldData ? JSON.stringify(oldData) : null,
+            newData ? JSON.stringify(newData) : null,
+            actorIdentifier,
+            options.audience || null,
+            previousEventHash,
+            eventHash,
+            createdAt,
+            hashVersion,
+          ]
+        );
+      });
+    } catch (e) {
+      logger.error("Audit log error:", e.message);
+      throw e;
+    }
+  }
+
+  async function verifyAuditLogChain(companyId = null, queryable = pool) {
+    const result = await queryable.query(
       `SELECT id, "companyId", "userId", action, "tableName", "recordId", "oldValues", "newValues",
               "actorIdentifier", audience, "previousEventHash", "eventHash", "createdAt", "hashVersion"
        FROM "auditLogs"
@@ -153,7 +186,7 @@ function createAuditServiceHelpers({ pool, logger }) {
          OR "companyId" = $1
        )
        ORDER BY id ASC`,
-      [companyId || null]
+      [companyId ?? null]
     );
 
     let previousHash = null;
@@ -198,9 +231,9 @@ function createAuditServiceHelpers({ pool, logger }) {
     };
   }
 
-  async function buildAuditLogRootSummary(companyId = null) {
-    const integrity = await verifyAuditLogChain(companyId);
-    const aggregate = await pool.query(
+  async function buildAuditLogRootSummary(companyId = null, queryable = pool) {
+    const integrity = await verifyAuditLogChain(companyId, queryable);
+    const aggregate = await queryable.query(
       `SELECT COUNT(*)::int AS "logCount",
               MIN(id) AS "firstLogId",
               MAX(id) AS "latestLogId",
@@ -210,12 +243,12 @@ function createAuditServiceHelpers({ pool, logger }) {
          ($1::int IS NULL AND "companyId" IS NULL)
          OR "companyId" = $1
        )`,
-      [companyId || null]
+      [companyId ?? null]
     );
 
     const row = aggregate.rows[0] || {};
     return {
-      companyId: companyId || null,
+      companyId: companyId ?? null,
       verified: integrity.verified,
       failures: integrity.failures,
       checkedEntries: integrity.checkedEntries,
@@ -238,8 +271,8 @@ function createAuditServiceHelpers({ pool, logger }) {
          OR "companyId" = $1
        )
        ORDER BY "anchoredAt" DESC, id DESC`,
-      [companyId || null]
-    ).catch(() => ({ rows: [] }));
+      [companyId ?? null]
+    );
     return result.rows;
   }
 
@@ -251,63 +284,66 @@ function createAuditServiceHelpers({ pool, logger }) {
     notes = null,
     metadata = {},
   } = {}) {
-    const summary = await buildAuditLogRootSummary(companyId);
-    const previousAnchorRes = await pool.query(
-      `SELECT "anchorHash"
-       FROM "auditLogAnchors"
-       WHERE (
-         ($1::int IS NULL AND "companyId" IS NULL)
-         OR "companyId" = $1
-       )
-       ORDER BY id DESC
-       LIMIT 1`,
-      [companyId || null]
-    ).catch(() => ({ rows: [] }));
+    return withAuditChainTransaction(companyId, async (client) => {
+      const summary = await buildAuditLogRootSummary(companyId, client);
+      const previousAnchorRes = await client.query(
+        `SELECT "anchorHash"
+         FROM "auditLogAnchors"
+         WHERE (
+           ($1::int IS NULL AND "companyId" IS NULL)
+           OR "companyId" = $1
+         )
+         ORDER BY id DESC
+         LIMIT 1
+         FOR UPDATE`,
+        [companyId ?? null]
+      );
 
-    const previousAnchorHash = previousAnchorRes.rows[0]?.anchorHash || null;
-    const anchorPayload = {
-      companyId: companyId || null,
-      logCount: summary.logCount,
-      firstLogId: summary.firstLogId,
-      latestLogId: summary.latestLogId,
-      rootEventHash: summary.latestEventHash || null,
-      anchorType: anchorType || "internalRecord",
-      anchorReference: anchorReference || null,
-      notes: notes || null,
-      metadata: metadata && typeof metadata === "object" ? metadata : {},
-      anchoredBy: anchoredBy || null,
-      verified: summary.verified,
-    };
-    const anchorHash = computeHashChainValue(previousAnchorHash, anchorPayload);
+      const previousAnchorHash = previousAnchorRes.rows[0]?.anchorHash || null;
+      const anchorPayload = {
+        companyId: companyId ?? null,
+        logCount: summary.logCount,
+        firstLogId: summary.firstLogId,
+        latestLogId: summary.latestLogId,
+        rootEventHash: summary.latestEventHash || null,
+        anchorType: anchorType || "internalRecord",
+        anchorReference: anchorReference || null,
+        notes: notes || null,
+        metadata: metadata && typeof metadata === "object" ? metadata : {},
+        anchoredBy: anchoredBy || null,
+        verified: summary.verified,
+      };
+      const anchorHash = computeHashChainValue(previousAnchorHash, anchorPayload);
 
-    const result = await pool.query(
-      `INSERT INTO "auditLogAnchors" (
-         "companyId", "logCount", "firstLogId", "latestLogId", "rootEventHash",
-         "previousAnchorHash", "anchorHash", "anchorType", "anchorReference",
-         notes, "metadataJson", "anchoredBy", "anchoredAt"
-       )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,NOW())
-       RETURNING *`,
-      [
-        companyId || null,
-        summary.logCount,
-        summary.firstLogId,
-        summary.latestLogId,
-        summary.latestEventHash || null,
-        previousAnchorHash,
-        anchorHash,
-        anchorType || "internalRecord",
-        anchorReference || null,
-        notes || null,
-        JSON.stringify(metadata && typeof metadata === "object" ? metadata : {}),
-        anchoredBy || null,
-      ]
-    );
+      const result = await client.query(
+        `INSERT INTO "auditLogAnchors" (
+           "companyId", "logCount", "firstLogId", "latestLogId", "rootEventHash",
+           "previousAnchorHash", "anchorHash", "anchorType", "anchorReference",
+           notes, "metadataJson", "anchoredBy", "anchoredAt"
+         )
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,NOW())
+         RETURNING *`,
+        [
+          companyId ?? null,
+          summary.logCount,
+          summary.firstLogId,
+          summary.latestLogId,
+          summary.latestEventHash || null,
+          previousAnchorHash,
+          anchorHash,
+          anchorType || "internalRecord",
+          anchorReference || null,
+          notes || null,
+          JSON.stringify(metadata && typeof metadata === "object" ? metadata : {}),
+          anchoredBy || null,
+        ]
+      );
 
-    return {
-      anchor: result.rows[0] || null,
-      summary,
-    };
+      return {
+        anchor: result.rows[0] || null,
+        summary,
+      };
+    });
   }
 
   async function createNotification(userId, type, title, message, passportDppId, actionUrl) {

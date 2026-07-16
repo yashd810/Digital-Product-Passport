@@ -108,7 +108,7 @@ module.exports = function registerPassportRoutes(app, {
   backupProviderService,
   buildExpandedPassportPayload,
   buildCanonicalPassportPayload,
-  createPassportTable = null
+  assertPassportTypeStorageReady
 }) {
   const insertPassportRegistry = (params = {}) => insertPassportRegistryWithClient({
     ...params,
@@ -200,7 +200,7 @@ module.exports = function registerPassportRoutes(app, {
     generateDppRecordId,
     normalizePassportRequestBody,
     getPassportTypeSchema,
-    createPassportTable,
+    assertPassportTypeStorageReady,
     getTable,
     normalizeInternalAliasIdValue,
     generateInternalAliasIdValue,
@@ -279,7 +279,7 @@ module.exports = function registerPassportRoutes(app, {
     requireEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
-    createPassportTable,
+    assertPassportTypeStorageReady,
     getTable,
     getWritablePassportColumns,
     getStoredPassportValues,

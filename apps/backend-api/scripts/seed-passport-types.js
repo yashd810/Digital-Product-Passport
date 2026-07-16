@@ -7,6 +7,7 @@ require("dotenv").config({
 });
 
 const { getPassportTypeModules } = require("../src/services/passport-module-registry");
+const { isSafePassportTypeName } = require("../src/shared/passports/passport-helpers");
 
 function getArgValue(args, prefix) {
   return (args.find((arg) => arg.startsWith(prefix)) || "").slice(prefix.length);
@@ -134,7 +135,7 @@ function validateDefinition(definition) {
   if (missing.length) {
     throw new Error(`Passport type module ${definition.moduleKey || definition.typeName || "<unknown>"} is missing: ${missing.join(", ")}`);
   }
-  if (!/^[a-z][A-Za-z0-9]{1,99}$/.test(definition.typeName)) {
+  if (!isSafePassportTypeName(definition.typeName)) {
     throw new Error(`Invalid typeName for module ${definition.moduleKey}: ${definition.typeName}`);
   }
   const sections = definition.fieldsJson?.sections;

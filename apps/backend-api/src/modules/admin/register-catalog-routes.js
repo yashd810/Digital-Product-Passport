@@ -7,6 +7,8 @@ const logger = require("../../services/logger");
 const { getPassportTypeModules } = require("../../services/passport-module-registry");
 const {
   flattenSchemaFieldsFromSections,
+  isSafePassportTypeName,
+  passportTypeNameMaxLength,
 } = require("../../shared/passports/passport-helpers");
 
 module.exports = function registerCatalogRoutes(app, deps) {
@@ -608,9 +610,9 @@ module.exports = function registerCatalogRoutes(app, deps) {
         return res.status(400).json({ error: "typeName, displayName, productCategory, and sections are required" });
       }
 
-      if (!/^[a-z][A-Za-z0-9]{1,99}$/.test(typeName)) {
+      if (!isSafePassportTypeName(typeName)) {
         return res.status(400).json({
-          error: "typeName must be camelCase letters/numbers, 2-100 chars, start with a lowercase letter"
+          error: `typeName must be camelCase letters/numbers, 2-${passportTypeNameMaxLength} chars, start with a lowercase letter`
         });
       }
 

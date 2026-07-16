@@ -172,6 +172,39 @@ test("all asset-management routes enforce the company entitlement before their h
   assert.match(invalidResponse.body.error, /positive integer/);
 });
 
+test("asset reads fail closed instead of remapping a PostgreSQL-truncated column name", async () => {
+  const longFieldKey = `a${"b".repeat(63)}`;
+  const truncatedColumnKey = longFieldKey.slice(0, 63);
+  const { routes } = createRouteHarness({
+    serviceOverrides: {
+      assertCompanyAssetPassportTypeAccess: async () => ({
+        typeName: "battery",
+        displayName: "Battery",
+      }),
+      getLatestCompanyPassports: async () => [{
+        [truncatedColumnKey]: "must-not-be-remapped",
+        isEditable: true,
+      }],
+      getAssetFieldMap: () => new Map([[
+        longFieldKey,
+        { key: longFieldKey, label: "Overlong field" },
+      ]]),
+    },
+  });
+  const route = routes.find((entry) => entry.method === "get" && entry.path.endsWith("/passports"));
+  assert.ok(route);
+
+  const response = createResponse();
+  await route.handlers.at(-1)({
+    params: { companyId: "7" },
+    query: { passportType: "battery" },
+  }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.error, "passportTypeInvalidStorageFieldKeys");
+  assert.match(response.body.detail, /cannot be safely mapped/);
+});
+
 test("asset push rejects browser-generated payloads and regenerates an internal payload from raw rows", async () => {
   let prepareInput = null;
   let executeInput = null;
@@ -445,6 +478,63 @@ test("asset execution accepts only an in-memory payload prepared by the service"
     }),
     /must be prepared by this service/
   );
+});
+
+test("asset writes verify storage readiness once instead of reconciling schema at runtime", async () => {
+  const readinessCalls = [];
+  let ddlCalls = 0;
+  const service = createAssetService({
+    pool: {
+      async query(sql) {
+        if (sql.includes("FROM companies c")) {
+          return {
+            rows: [{
+              id: 7,
+              defaultGranularity: "item",
+              allowGranularityOverride: false,
+              mintModelDids: true,
+              mintItemDids: true,
+            }],
+          };
+        }
+        throw new Error(`Unexpected query: ${sql}`);
+      },
+    },
+    getTable: () => '"batteryPassports"',
+    assertCompanyAssetPassportTypeAccess: async () => ({ typeName: "battery" }),
+    getAssetFieldMap: () => new Map(),
+    getLatestCompanyPassports: async () => [],
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
+    generateDppRecordId: () => "dppAssetStorageGuard",
+    generateInternalAliasIdValue: () => "asset-1",
+    isPlainObject: (value) => value !== null && typeof value === "object" && !Array.isArray(value),
+    assetMatchFields: new Set(["internalAliasId"]),
+    assetIgnoredSystemColumns: new Set(),
+    assertPassportTypeStorageReady: async (typeName) => {
+      readinessCalls.push(typeName);
+      const error = new Error("Passport storage is not provisioned");
+      error.code = "passportTypeStorageNotReady";
+      error.statusCode = 503;
+      throw error;
+    },
+    createPassportTable: async () => { ddlCalls += 1; },
+  });
+
+  const prepared = await service.prepareAssetPayload({
+    companyId: 7,
+    passportType: "battery",
+    records: [{ internalAliasId: "asset-1" }],
+  });
+
+  await assert.rejects(
+    () => service.executeAssetPush({
+      companyId: 7,
+      generatedPayload: prepared.generatedPayload,
+    }),
+    /Passport storage is not provisioned/
+  );
+  assert.deepEqual(readinessCalls, ["battery"]);
+  assert.equal(ddlCalls, 0);
 });
 
 test("scheduled jobs reject unsafe persisted credential fields before any outbound request", async () => {

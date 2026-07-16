@@ -1,9 +1,29 @@
 "use strict";
 
 const crypto = require("crypto");
+const net = require("node:net");
 
 function sha256Hex(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
+function normalizeIpAddress(value) {
+  const address = String(value || "").trim().toLowerCase();
+  return address.startsWith("::ffff:") ? address.slice("::ffff:".length) : address;
+}
+
+function isLoopbackAddress(value) {
+  const address = normalizeIpAddress(value);
+  if (address === "::1" || address === "0:0:0:0:0:0:0:1") return true;
+  return net.isIP(address) === 4 && address.startsWith("127.");
+}
+
+function isTrustedLoopbackRequest(req) {
+  // `req.ip` honors Express's one trusted proxy hop. Checking it prevents a
+  // public client forwarded by Caddy from being treated as local, while the
+  // socket check prevents a forwarded loopback value from granting access to
+  // a non-loopback peer.
+  return isLoopbackAddress(req.ip) && isLoopbackAddress(req.socket?.remoteAddress);
 }
 
 module.exports = function registerHealthRoutes(app, { pool, storageService }) {
@@ -12,7 +32,6 @@ module.exports = function registerHealthRoutes(app, { pool, storageService }) {
       await pool.query("SELECT 1");
       res.json({
         status: "OK",
-        architecture: "dynamic-per-company-tables",
         database: "connected",
         storage: "notChecked",
       });
@@ -26,21 +45,25 @@ module.exports = function registerHealthRoutes(app, { pool, storageService }) {
     }
   });
 
-  app.get("/health/storage", async (_req, res) => {
+  app.get("/health/storage", async (req, res) => {
+    if (!isTrustedLoopbackRequest(req)) {
+      return res.status(403).json({
+        status: "FORBIDDEN",
+        error: "Storage probe is restricted.",
+      });
+    }
+
     const provider = storageService?.provider || storageService?.name || "unknown";
     if (provider === "disabled") {
       return res.status(200).json({
         status: "OK",
         storage: "disabled",
-        provider,
       });
     }
     if (!storageService?.saveObject || !storageService?.fetchObject || !storageService?.deleteObject) {
       return res.status(503).json({
         status: "UNAVAILABLE",
-        storage: "unsupported",
-        provider,
-        error: "Storage probe requires save, fetch, and delete support.",
+        storage: "unavailable",
       });
     }
 
@@ -72,11 +95,8 @@ module.exports = function registerHealthRoutes(app, { pool, storageService }) {
       return res.json({
         status: "OK",
         storage: "ok",
-        provider,
-        storageKey: stored?.storageKey || probeKey,
-        sha256: expectedHash,
       });
-    } catch (error) {
+    } catch {
       try {
         if (stored?.storageKey || probeKey) {
           await storageService.deleteObject(stored?.storageKey || probeKey);
@@ -87,8 +107,6 @@ module.exports = function registerHealthRoutes(app, { pool, storageService }) {
       return res.status(503).json({
         status: "UNAVAILABLE",
         storage: "failed",
-        provider,
-        error: error.message || "Storage probe failed",
       });
     }
   });

@@ -23,5 +23,7 @@
 __API_HOST__ {
 	import production_tls_policy
 	import security_headers
+	@storageProbe path /health/storage
+	respond @storageProbe 404
 	reverse_proxy 127.0.0.1:3001
 }

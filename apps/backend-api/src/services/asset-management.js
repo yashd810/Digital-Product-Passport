@@ -38,7 +38,7 @@ module.exports = function createAssetService({
   generateInternalAliasIdValue,
   generateDppRecordId,
   productIdentifierService,
-  createPassportTable,
+  assertPassportTypeStorageReady,
   archivePassportSnapshot,
   isPlainObject,
   getValueAtPath,
@@ -774,6 +774,7 @@ module.exports = function createAssetService({
     if (!passportType) throw new Error("generated payload is missing passportType");
     if (!records.length) throw new Error("generated payload is empty");
 
+    await assertPassportTypeStorageReady(passportType);
     const tableName = getTable(passportType);
     const summary = {
       processed: records.length,
@@ -804,13 +805,6 @@ module.exports = function createAssetService({
           const normalizedProductId = normalizeInternalAliasIdValue(passportCreate.internalAliasId || item.internalAliasId);
           if (!normalizedProductId) {
             throw new Error("internalAliasId is required to create a passport");
-          }
-
-          if (typeof createPassportTable === "function") {
-            await createPassportTable(passportType, {
-              createdBy: userId,
-              eventType: "runtimeCreateReconcileTable",
-            });
           }
 
           const duplicate = await findExistingPassportByInternalAliasId({
