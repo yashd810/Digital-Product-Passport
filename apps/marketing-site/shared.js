@@ -140,7 +140,7 @@
       </div>
       <div class="footer-bottom">
         <p>© ${currentYear} ClarosDPP. All rights reserved. Registered in the European Union.</p>
-        <p>contact@example.com &nbsp;|&nbsp; +xx xxxx xxxx</p>
+        <p><a href="mailto:digitalproductpass@gmail.com">digitalproductpass@gmail.com</a> &nbsp;|&nbsp; +xx xxxx xxxx</p>
       </div>
     </div>
   </footer>`;
