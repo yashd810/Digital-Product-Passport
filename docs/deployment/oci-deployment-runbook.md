@@ -88,6 +88,21 @@ that is not group/world-readable and a pre-verified `known_hosts` file. Verify
 the OCI instance fingerprint in the OCI Console before adding it; do not rely on
 trust-on-first-use during production deployment.
 
+## Docker Build Toolchain
+
+Production deployments require the maintained Docker Buildx plugin. On Ubuntu
+24.04 OCI hosts, install the distribution-supported package once:
+
+```bash
+sudo apt-get install docker-buildx
+docker buildx version
+```
+
+The deployment helper refuses to use Compose's retired internal builder. It
+clears `COMPOSE_BAKE` rather than setting its deprecated `false` value and
+limits Compose engine operations to one at a time for the small Always Free
+hosts. Do not add `COMPOSE_BAKE=false` to a shell profile or host environment.
+
 On the deployment workstation, keep the private profiles together outside the
 repository at:
 

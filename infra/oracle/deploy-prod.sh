@@ -469,7 +469,14 @@ if [ "${#RECREATE_SERVICES[@]}" -gt 0 ]; then
   UP_ARGS+=(--force-recreate "${RECREATE_SERVICES[@]}")
 fi
 
-export COMPOSE_BAKE="${COMPOSE_BAKE:-false}"
+# The legacy internal Compose builder is being removed upstream. Always use the
+# maintained Buildx path, while serializing engine calls for OCI's small hosts.
+unset COMPOSE_BAKE
+export COMPOSE_PARALLEL_LIMIT=1
+if ! docker buildx version >/dev/null 2>&1; then
+  echo "Docker Buildx is required for production deployments. Install the supported docker-buildx plugin first."
+  exit 1
+fi
 
 wait_for_service_http() {
   local service_name="$1"

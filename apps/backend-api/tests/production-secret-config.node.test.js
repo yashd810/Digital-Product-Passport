@@ -138,6 +138,10 @@ test("production deployment fails closed rather than selecting a fresh database 
   assert.match(deployScript, /node scripts\/migrate-db\.js/);
   assert.doesNotMatch(deployScript, /npm run db:migrate/);
   assert.match(deployScript, /rm -sf backend-storage-init/);
+  assert.doesNotMatch(deployScript, /COMPOSE_BAKE=.*false/);
+  assert.match(deployScript, /unset COMPOSE_BAKE/);
+  assert.match(deployScript, /export COMPOSE_PARALLEL_LIMIT=1/);
+  assert.match(deployScript, /docker buildx version/);
 });
 
 function assertApplicationSecretOutput(values, { includesDbPassword }) {
