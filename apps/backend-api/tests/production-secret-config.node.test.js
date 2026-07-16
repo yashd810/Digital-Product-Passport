@@ -84,6 +84,7 @@ test("production deployment fails closed rather than selecting a fresh database 
   assert.match(deployScript, /DPP_INITIALIZE_POSTGRES_VOLUME=true/);
   assert.match(deployScript, /node scripts\/migrate-db\.js/);
   assert.doesNotMatch(deployScript, /npm run db:migrate/);
+  assert.match(deployScript, /rm -sf backend-storage-init/);
 });
 
 function assertApplicationSecretOutput(values, { includesDbPassword }) {

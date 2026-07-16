@@ -759,6 +759,12 @@ if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   echo "Running storage probe health check..."
   wait_for_http "http://127.0.0.1:${BACKEND_PORT:-3001}/health" "Backend health" 40 2
   wait_for_http "http://127.0.0.1:${BACKEND_PORT:-3001}/health/storage" "Backend storage probe" 40 2
+  # This is a one-shot permissions initializer, not a long-running service.
+  # Remove its completed container so the deployed project has no stopped
+  # Compose containers after a successful backend rollout.
+  if [ -n "$(DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps --all -q backend-storage-init)" ]; then
+    DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" rm -sf backend-storage-init
+  fi
 fi
 if [ "$DEPLOY_TARGET" = "frontend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   wait_for_container_health "frontend-app" "Frontend app" 50 2
