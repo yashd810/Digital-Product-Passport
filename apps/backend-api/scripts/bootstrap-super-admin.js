@@ -6,7 +6,9 @@
  *
  * Uses DB_* and PEPPER_V1 from the active environment, DOTENV_CONFIG_PATH, or
  * DPP_ENV_FILE. The default local profile is outside the repository.
- * Set ADMIN_EMAIL and ADMIN_PASSWORD explicitly.
+ * Set ADMIN_USERNAME (the email used to sign in) and ADMIN_PASSWORD explicitly.
+ * ADMIN_EMAIL is intentionally independent: it receives public contact-form
+ * notifications when that feature is configured.
  */
 const crypto = require("crypto");
 const fs = require("fs");
@@ -56,19 +58,21 @@ function requireEnv(name) {
   return value;
 }
 
-const pool = new Pool({
-  user: requireEnv("DB_USER"),
-  password: requireEnv("DB_PASSWORD"),
-  host: process.env.DB_HOST || "localhost",
-  port: process.env.DB_PORT || 5432,
-  database: requireEnv("DB_NAME"),
-});
+function createPool() {
+  return new Pool({
+    user: requireEnv("DB_USER"),
+    password: requireEnv("DB_PASSWORD"),
+    host: process.env.DB_HOST || "localhost",
+    port: process.env.DB_PORT || 5432,
+    database: requireEnv("DB_NAME"),
+  });
+}
 
 async function ensureSuperAdmin() {
-  const adminEmail = String(requireEnv("ADMIN_EMAIL")).trim().toLowerCase();
+  const adminUsername = String(requireEnv("ADMIN_USERNAME")).trim().toLowerCase();
   const adminPassword = requireEnv("ADMIN_PASSWORD");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
-    throw new Error("ADMIN_EMAIL must be a valid email address");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminUsername)) {
+    throw new Error("ADMIN_USERNAME must be a valid email address because email is the login identifier");
   }
   const passwordPolicyError = validatePasswordPolicy(adminPassword);
   if (passwordPolicyError) {
@@ -80,55 +84,59 @@ async function ensureSuperAdmin() {
     currentPepperVersion: Number.parseInt(process.env.CURRENT_PEPPER_VERSION || "1", 10),
   });
   const passwordHash = await passwordService.hashPassword(adminPassword);
+  const pool = createPool();
 
-  console.log(`Ensuring superAdmin user: ${adminEmail}`);
-  if (loadedEnvFile) {
-    console.log(`Loaded DB environment from: ${loadedEnvFile}`);
+  try {
+    console.log(`Ensuring superAdmin user: ${adminUsername}`);
+    if (loadedEnvFile) {
+      console.log(`Loaded DB environment from: ${loadedEnvFile}`);
+    }
+
+    const result = await pool.query(
+      `INSERT INTO users (
+         email,
+         "passwordHash",
+         "firstName",
+         "lastName",
+         "companyId",
+         role,
+         "isActive",
+         "pepperVersion",
+         "authSource",
+         "ssoOnly",
+         "sessionVersion",
+         "createdAt",
+         "updatedAt"
+       )
+       VALUES ($1, $2, $3, $4, NULL, 'superAdmin', true, $5, 'local', false, 1, NOW(), NOW())
+       ON CONFLICT (email) DO UPDATE
+         SET "passwordHash" = EXCLUDED."passwordHash",
+             "pepperVersion" = EXCLUDED."pepperVersion",
+             role = 'superAdmin',
+             "companyId" = NULL,
+             "isActive" = true,
+             "authSource" = 'local',
+             "ssoOnly" = false,
+             "sessionVersion" = COALESCE(users."sessionVersion", 1) + 1,
+             "updatedAt" = NOW()
+       RETURNING id, email, role, "isActive" AS "isActive", "companyId" AS "companyId"`,
+      [adminUsername, passwordHash.hash, "Digital Product", "Pass Admin", passwordHash.pepperVersion]
+    );
+
+    const admin = result.rows[0];
+    console.log(`Super admin ready: ${admin.email} (id: ${admin.id}, active: ${admin.isActive})`);
+
+    const countResult = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM users WHERE role = 'superAdmin' AND \"isActive\" = true"
+    );
+    console.log(`Active superAdmin users: ${countResult.rows[0]?.count || 0}`);
+  } finally {
+    await pool.end();
   }
-
-  const result = await pool.query(
-    `INSERT INTO users (
-       email,
-       "passwordHash",
-       "firstName",
-       "lastName",
-       "companyId",
-       role,
-       "isActive",
-       "pepperVersion",
-       "authSource",
-       "ssoOnly",
-       "sessionVersion",
-       "createdAt",
-       "updatedAt"
-     )
-     VALUES ($1, $2, $3, $4, NULL, 'superAdmin', true, $5, 'local', false, 1, NOW(), NOW())
-     ON CONFLICT (email) DO UPDATE
-       SET "passwordHash" = EXCLUDED."passwordHash",
-           "pepperVersion" = EXCLUDED."pepperVersion",
-           role = 'superAdmin',
-           "companyId" = NULL,
-           "isActive" = true,
-           "authSource" = 'local',
-           "ssoOnly" = false,
-           "sessionVersion" = COALESCE(users."sessionVersion", 1) + 1,
-           "updatedAt" = NOW()
-     RETURNING id, email, role, "isActive" AS "isActive", "companyId" AS "companyId"`,
-    [adminEmail, passwordHash.hash, "Digital Product", "Pass Admin", passwordHash.pepperVersion]
-  );
-
-  const admin = result.rows[0];
-  console.log(`Super admin ready: ${admin.email} (id: ${admin.id}, active: ${admin.isActive})`);
-
-  const countResult = await pool.query(
-    "SELECT COUNT(*)::int AS count FROM users WHERE role = 'superAdmin' AND \"isActive\" = true"
-  );
-  console.log(`Active superAdmin users: ${countResult.rows[0]?.count || 0}`);
 }
 
 ensureSuperAdmin()
   .catch((error) => {
     console.error("Error ensuring super admin:", error.message);
     process.exit(1);
-  })
-  .finally(() => pool.end());
+  });

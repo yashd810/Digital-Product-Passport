@@ -16,7 +16,7 @@ These live in `apps/backend-api/scripts/`.
 | Script | What it is for |
 | --- | --- |
 | `bootstrap-passport-modules.js` | seeds passport modules and optional company access setup |
-| `bootstrap-super-admin.js` | explicitly creates or rotates the bootstrap super admin from `ADMIN_EMAIL` and `ADMIN_PASSWORD` |
+| `bootstrap-super-admin.js` | explicitly creates or rotates the bootstrap super admin from `ADMIN_USERNAME` (the email used to sign in) and `ADMIN_PASSWORD`; `ADMIN_EMAIL` remains the independent public contact-notification recipient |
 | `seed-passport-types.js` | loads passport type definitions into the database |
 | `migrate-db.js` | runs database initialization/migration flow |
 | `check-syntax.js` | syntax verification for backend source files |

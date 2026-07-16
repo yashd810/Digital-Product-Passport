@@ -2,8 +2,9 @@
 
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
-const { execFileSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
@@ -11,6 +12,7 @@ const repoRoot = path.resolve(__dirname, "../../..");
 const templatePath = path.join(repoRoot, "infra/oracle/oci.env.example");
 const generatorPath = path.join(repoRoot, "infra/oracle/generate-env-secrets.sh");
 const deployScriptPath = path.join(repoRoot, "infra/oracle/deploy-prod.sh");
+const bootstrapSuperAdminPath = path.join(repoRoot, "apps/backend-api/scripts/bootstrap-super-admin.js");
 const productionComposePaths = [
   path.join(repoRoot, "docker/docker-compose.prod.backend.yml"),
   path.join(repoRoot, "docker/docker-compose.prod.yml"),
@@ -42,6 +44,57 @@ test("production environment template declares every required security variable"
     assert.equal(values.has(name), true, `missing ${name} from production template`);
     assert.match(values.get(name), /^REPLACE_/);
   }
+});
+
+test("production environment template keeps contact notification and login identities separate", () => {
+  const values = parseEnvLines(fs.readFileSync(templatePath, "utf8"));
+
+  assert.match(values.get("ADMIN_EMAIL"), /^REPLACE_WITH_CONTACT_/);
+  assert.match(values.get("ADMIN_USERNAME"), /^REPLACE_WITH_ADMIN_LOGIN_/);
+  assert.notEqual(values.get("ADMIN_USERNAME"), values.get("ADMIN_EMAIL"));
+});
+
+function runBootstrapSuperAdmin(overrides = {}) {
+  const env = {
+    PATH: process.env.PATH || "",
+    DPP_ENV_FILE: path.join(os.tmpdir(), "dpp-no-bootstrap-env-file"),
+    DB_USER: "test-user",
+    DB_PASSWORD: "test-password",
+    DB_NAME: "test-database",
+    ADMIN_PASSWORD: "not-used-before-identity-validation",
+    ...overrides,
+  };
+  for (const [name, value] of Object.entries(env)) {
+    if (value === undefined) delete env[name];
+  }
+
+  return spawnSync(process.execPath, [bootstrapSuperAdminPath], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    timeout: 5_000,
+    env,
+  });
+}
+
+test("bootstrap super-admin uses ADMIN_USERNAME independently from contact notifications", () => {
+  const missingUsername = runBootstrapSuperAdmin();
+  assert.equal(missingUsername.error, undefined);
+  assert.equal(missingUsername.status, 1);
+  assert.match(missingUsername.stderr, /Missing required environment variable: ADMIN_USERNAME/);
+
+  const invalidUsername = runBootstrapSuperAdmin({ ADMIN_USERNAME: "not-an-email" });
+  assert.equal(invalidUsername.error, undefined);
+  assert.equal(invalidUsername.status, 1);
+  assert.match(invalidUsername.stderr, /ADMIN_USERNAME must be a valid email address/);
+
+  const validLoginWithoutContactRecipient = runBootstrapSuperAdmin({
+    ADMIN_USERNAME: "login@example.test",
+    ADMIN_PASSWORD: "short",
+  });
+  assert.equal(validLoginWithoutContactRecipient.error, undefined);
+  assert.equal(validLoginWithoutContactRecipient.status, 1);
+  assert.match(validLoginWithoutContactRecipient.stderr, /ADMIN_PASSWORD is invalid:/);
+  assert.doesNotMatch(validLoginWithoutContactRecipient.stderr, /ADMIN_EMAIL/);
 });
 
 test("production environment template declares dedicated DB backup S3 configuration without enabling an incomplete backup job", () => {
