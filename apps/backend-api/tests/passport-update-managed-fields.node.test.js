@@ -6,6 +6,7 @@ const { updateEditablePassportUseCase } = require("../src/modules/passports/appl
 
 function createHarness() {
   let capturedUpdateData = null;
+  const queries = [];
   const currentPassport = {
     id: 22,
     dppId: "dppRegularPatchTest",
@@ -27,7 +28,10 @@ function createHarness() {
 
   const updateEditablePassport = updateEditablePassportUseCase({
     pool: {
-      query: async () => ({ rows: [currentPassport] }),
+      query: async (sql, params) => {
+        queries.push({ sql, params });
+        return { rows: [currentPassport] };
+      },
     },
     normalizePassportRequestBody: (body) => body || {},
     getPassportTypeSchema: async () => ({
@@ -74,6 +78,7 @@ function createHarness() {
 
   return {
     getCapturedUpdateData: () => capturedUpdateData,
+    getQueries: () => queries,
     updateEditablePassport,
   };
 }
@@ -101,4 +106,22 @@ test("regular passport update reconciles policy-owned fields from managed policy
   assert.equal(getCapturedUpdateData().contentSpecificationIds, JSON.stringify(["exampleProductDictionaryV1"]));
   assert.equal(result.passport.passportPolicyKey, "exampleProductDppV1");
   assert.equal(result.passport.contentSpecificationIds, JSON.stringify(["exampleProductDictionaryV1"]));
+});
+
+test("regular passport updates scope the editable-record lookup to the route company", async () => {
+  const { getQueries, updateEditablePassport } = createHarness();
+
+  await updateEditablePassport({
+    req: {
+      params: { companyId: "7", dppId: "dppRegularPatchTest" },
+      user: { userId: 9, companyId: 7, role: "companyAdmin" },
+      body: { passportType: "exampleProductPassportV1" },
+    },
+  });
+
+  assert.match(
+    getQueries()[0].sql,
+    /WHERE "dppId" = \$1\s+AND "companyId" = \$2\s+AND "releaseStatus" IN/
+  );
+  assert.deepEqual(getQueries()[0].params, ["dppRegularPatchTest", "7"]);
 });

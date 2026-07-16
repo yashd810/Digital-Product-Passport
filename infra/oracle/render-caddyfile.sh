@@ -34,6 +34,10 @@ read_env_var() {
   ' "$ENV_FILE"
 }
 
+lowercase_ascii() {
+  printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]'
+}
+
 is_valid_ipv4() {
   local value="$1"
   local IFS='.'
@@ -148,6 +152,7 @@ parse_ipv6_hextets() {
   local missing
   local index
   local left_count
+  local -a left_hextets=()
   local -a right_hextets=()
 
   IPV6_HEXTETS=()
@@ -171,11 +176,23 @@ parse_ipv6_hextets() {
     [[ "$right" != *"::"* ]] || return 1
     append_ipv6_hextets "$left" || return 1
     left_count="${#IPV6_HEXTETS[@]}"
+    for ((index = 0; index < left_count; index += 1)); do
+      left_hextets+=("${IPV6_HEXTETS[index]}")
+    done
     append_ipv6_hextets "$right" || return 1
-    right_hextets=("${IPV6_HEXTETS[@]:left_count}")
+    # Bash 3 collapses a quoted sliced array expansion into one element.
+    # Copy the halves explicitly so the validator behaves the same on macOS
+    # and the OCI host's newer Bash.
+    right_hextets=()
+    for ((index = left_count; index < ${#IPV6_HEXTETS[@]}; index += 1)); do
+      right_hextets+=("${IPV6_HEXTETS[index]}")
+    done
     missing=$((8 - left_count - ${#right_hextets[@]}))
     (( missing > 0 )) || return 1
-    IPV6_HEXTETS=("${IPV6_HEXTETS[@]:0:left_count}")
+    IPV6_HEXTETS=()
+    for ((index = 0; index < ${#left_hextets[@]}; index += 1)); do
+      IPV6_HEXTETS+=("${left_hextets[index]}")
+    done
     for ((index = 0; index < missing; index += 1)); do
       IPV6_HEXTETS+=(0)
     done
@@ -283,11 +300,11 @@ origin_host() {
       echo "$key must target a public DNS hostname or IP address" >&2
       exit 1
     fi
-    printf '[%s]\n' "${host,,}"
+    printf '[%s]\n' "$(lowercase_ascii "$host")"
     return
   fi
 
-  host="${authority,,}"
+  host="$(lowercase_ascii "$authority")"
   if [[ "$host" == *'['* || "$host" == *']'* || "$host" == .* || "$host" == *. || "$host" == *..* ]]; then
     echo "$key contains an invalid hostname" >&2
     exit 1

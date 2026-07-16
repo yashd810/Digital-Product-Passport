@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const registerAuthRoutes = require("../src/http/routes/auth");
 const registerCompanyRoutes = require("../src/http/routes/company");
+const registerAdminCompanyRoutes = require("../src/modules/admin/register-company-routes");
 
 function createRouteApp() {
   const routes = [];
@@ -117,4 +118,115 @@ test("passport template filtering uses the quoted canonical passport type column
   assert.equal(queries.length, 1);
   assert.match(queries[0].sql, /AND t\."passportType" = \$2/);
   assert.deepEqual(queries[0].params, ["7", "batteryPassportV1"]);
+});
+
+test("asset-management access changes require a super admin, strict booleans, and an audit event", async () => {
+  const { app, routes } = createRouteApp();
+  const queries = [];
+  const audits = [];
+  let released = false;
+  const authenticateToken = () => {};
+  const isSuperAdmin = () => {};
+  const client = {
+    async query(sql, params = []) {
+      queries.push({ sql, params });
+      if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [], rowCount: 0 };
+      if (sql.includes("UPDATE companies")) {
+        return {
+          rows: [{
+            id: 7,
+            companyName: "Example Manufacturer",
+            isActive: true,
+            assetManagementEnabled: false,
+            assetManagementRevokedAt: "2026-07-16T00:00:00.000Z",
+          }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes('UPDATE "assetManagementJobs"')) return { rows: [], rowCount: 2 };
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+    release() {
+      released = true;
+    },
+  };
+  registerAdminCompanyRoutes(app, {
+    pool: { connect: async () => client },
+    authenticateToken,
+    isSuperAdmin,
+    verifyPassword: noop,
+    logAudit: async (...args) => audits.push(args),
+    backupProviderService: null,
+    productIdentifierService: null,
+    getTable: noop,
+    ensureCompanyDppPolicy: noop,
+    getCompanyDppPolicy: noop,
+    validateCompanyDppPolicyInput: noop,
+    updateCompanyDppPolicy: noop,
+    storageService: null,
+    repoBaseDir: "/tmp",
+    filesBaseDir: "/tmp",
+    companyTrustLevels: new Set(),
+  });
+
+  const route = routes.find((entry) =>
+    entry.method === "patch" && entry.routePath === "/api/admin/companies/:companyId/asset-management"
+  );
+  assert.ok(route);
+  assert.deepEqual(route.handlers.slice(0, 2), [authenticateToken, isSuperAdmin]);
+  const handler = route.handlers.at(-1);
+  const response = {
+    statusCode: 200,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    },
+  };
+
+  await handler({
+    params: { companyId: "7" },
+    body: { enabled: false },
+    user: { userId: 99 },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.success, true);
+  assert.equal(response.body.company.assetManagementEnabled, false);
+  assert.equal(response.body.jobsDeactivated, 2);
+  assert.equal(released, true);
+  assert.deepEqual(audits, [[
+    7,
+    99,
+    "setAssetManagementEnabled",
+    "companies",
+    "7",
+    null,
+    { enabled: false, jobsDeactivated: 2 },
+  ]]);
+  assert.equal(queries.some(({ sql }) => sql.includes('UPDATE "assetManagementJobs"')), true);
+
+  const queryCount = queries.length;
+  const invalidResponse = {
+    statusCode: 200,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    },
+  };
+  await handler({
+    params: { companyId: "7" },
+    body: { enabled: "false" },
+    user: { userId: 99 },
+  }, invalidResponse);
+  assert.equal(invalidResponse.statusCode, 400);
+  assert.equal(invalidResponse.body.error, "enabled must be a boolean");
+  assert.equal(queries.length, queryCount);
 });

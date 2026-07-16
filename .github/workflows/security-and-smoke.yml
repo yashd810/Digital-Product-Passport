@@ -111,11 +111,16 @@ jobs:
           exit 1
       - name: Create ephemeral backend smoke secrets
         working-directory: ${{ github.workspace }}
+        env:
+          DPP_CI_ENV_DIR: ${{ runner.temp }}/dpp-env
         run: |
           umask 077
-          bash infra/oracle/generate-env-secrets.sh > docker/.env
+          install -d -m 700 "$DPP_CI_ENV_DIR"
+          bash infra/oracle/generate-env-secrets.sh > "$DPP_CI_ENV_DIR/local-compose.env"
+          chmod 600 "$DPP_CI_ENV_DIR/local-compose.env"
       - name: Boot backend and hit health endpoint
         env:
+          DPP_ENV_FILE: ${{ runner.temp }}/dpp-env/local-compose.env
           NODE_ENV: development
           PORT: 3001
           DB_HOST: 127.0.0.1
@@ -153,9 +158,12 @@ jobs:
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
       - name: Create safe compose env for CI
+        env:
+          DPP_CI_ENV_DIR: ${{ runner.temp }}/dpp-env
         run: |
           umask 077
-          cat > docker/.env <<'EOF'
+          install -d -m 700 "$DPP_CI_ENV_DIR"
+          cat > "$DPP_CI_ENV_DIR/local-compose.env" <<'EOF'
           NODE_ENV=development
           DB_NAME=dppSystem
           DB_USER=postgres
@@ -165,12 +173,13 @@ jobs:
           VITE_PUBLIC_VIEWER_URL=http://localhost:3004
           ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3004,http://localhost:8080
           EOF
-          bash infra/oracle/generate-env-secrets.sh >> docker/.env
-          chmod 600 docker/.env
-      - run: docker compose -f docker/docker-compose.yml --env-file docker/.env config -q
-      - run: DPP_ENV_FILE=../infra/oracle/oci.env.example docker compose -f docker/docker-compose.prod.yml --env-file infra/oracle/oci.env.example config -q
-      - run: DPP_ENV_FILE=../infra/oracle/oci.env.example docker compose -f docker/docker-compose.prod.backend.yml --env-file infra/oracle/oci.env.example config -q
-      - run: docker compose -f docker/docker-compose.prod.frontend.yml --env-file infra/oracle/oci.env.example config -q
+          bash infra/oracle/generate-env-secrets.sh >> "$DPP_CI_ENV_DIR/local-compose.env"
+          cp infra/oracle/oci.env.example "$DPP_CI_ENV_DIR/oci.env"
+          chmod 600 "$DPP_CI_ENV_DIR/local-compose.env" "$DPP_CI_ENV_DIR/oci.env"
+      - run: DPP_ENV_FILE="$RUNNER_TEMP/dpp-env/local-compose.env" docker compose -f docker/docker-compose.yml --env-file "$RUNNER_TEMP/dpp-env/local-compose.env" config -q
+      - run: DPP_ENV_FILE="$RUNNER_TEMP/dpp-env/oci.env" docker compose -f docker/docker-compose.prod.yml --env-file "$RUNNER_TEMP/dpp-env/oci.env" config -q
+      - run: DPP_ENV_FILE="$RUNNER_TEMP/dpp-env/oci.env" docker compose -f docker/docker-compose.prod.backend.yml --env-file "$RUNNER_TEMP/dpp-env/oci.env" config -q
+      - run: docker compose -f docker/docker-compose.prod.frontend.yml --env-file "$RUNNER_TEMP/dpp-env/oci.env" config -q
       - run: sh infra/oracle/check-edge-policy-config.sh
 
   ops-and-local-tools:

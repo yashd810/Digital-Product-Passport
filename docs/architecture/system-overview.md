@@ -37,7 +37,7 @@ The normal journey looks like this:
 | Public viewer | React 19, React Router, Vite |
 | Backend | Node.js, Express |
 | Database | PostgreSQL |
-| Files | Local filesystem in dev, storage abstraction for other providers |
+| Files | Storage abstraction; the current local profile disables file storage and production uses S3-compatible object storage |
 | Auth | Cookie-backed session behavior on the frontend, plus token and API-key support in the backend |
 
 ## What Is Product-Specific And What Is Generic

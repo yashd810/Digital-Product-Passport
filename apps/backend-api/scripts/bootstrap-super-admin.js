@@ -4,7 +4,8 @@
 /**
  * Create or rotate the one explicitly configured bootstrap super admin.
  *
- * Uses DB_* and PEPPER_V1 from the active environment or DOTENV_CONFIG_PATH.
+ * Uses DB_* and PEPPER_V1 from the active environment, DOTENV_CONFIG_PATH, or
+ * DPP_ENV_FILE. The default local profile is outside the repository.
  * Set ADMIN_EMAIL and ADMIN_PASSWORD explicitly.
  */
 const crypto = require("crypto");
@@ -39,21 +40,13 @@ function loadEnvFile(filePath) {
   return filePath;
 }
 
-function findRepoEnvFile() {
-  if (process.env.DOTENV_CONFIG_PATH) {
-    return process.env.DOTENV_CONFIG_PATH;
-  }
-
-  let current = __dirname;
-  while (current && current !== path.dirname(current)) {
-    const candidate = path.join(current, "docker", ".env");
-    if (fs.existsSync(candidate)) return candidate;
-    current = path.dirname(current);
-  }
-  return null;
+function findEnvironmentFile() {
+  const explicitPath = process.env.DOTENV_CONFIG_PATH || process.env.DPP_ENV_FILE;
+  if (explicitPath) return explicitPath;
+  return path.resolve(__dirname, "../../../../../env/local-compose.env");
 }
 
-const loadedEnvFile = loadEnvFile(findRepoEnvFile());
+const loadedEnvFile = loadEnvFile(findEnvironmentFile());
 
 function requireEnv(name) {
   const value = process.env[name];

@@ -3,10 +3,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="$ROOT_DIR/docker/docker-compose.yml"
-ENV_FILE="$ROOT_DIR/docker/.env"
+PROJECT_ROOT="$(cd "$ROOT_DIR/../.." && pwd)"
+ENV_DIR="${DPP_ENV_DIR:-$PROJECT_ROOT/env}"
+ENV_FILE="${DPP_ENV_FILE:-$ENV_DIR/local-compose.env}"
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "Missing local environment file: $ENV_FILE" >&2
+  echo "Create the private external environment directory and local-compose.env first." >&2
   exit 1
 fi
 
@@ -26,6 +29,6 @@ if [ "$ENV_MODE" != "600" ]; then
   exit 1
 fi
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config --quiet
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans --wait --wait-timeout "${LOCAL_STACK_WAIT_TIMEOUT:-180}"
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
+DPP_ENV_FILE="$ENV_FILE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config --quiet
+DPP_ENV_FILE="$ENV_FILE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans --wait --wait-timeout "${LOCAL_STACK_WAIT_TIMEOUT:-180}"
+DPP_ENV_FILE="$ENV_FILE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps

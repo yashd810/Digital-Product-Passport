@@ -24,6 +24,10 @@ file_owner() {
   fi
 }
 
+uppercase_ascii() {
+  printf '%s' "$1" | LC_ALL=C tr '[:lower:]' '[:upper:]'
+}
+
 prepare_deployment_lock() {
   local state_dir
   local expected_owner
@@ -126,7 +130,7 @@ require_non_placeholder_env_var() {
     echo "Missing required production env var: $key"
     exit 1
   fi
-  case "${value^^}" in
+  case "$(uppercase_ascii "$value")" in
     *REPLACE*|*CHANGE*|*YOUR_*)
       echo "Production env var $key must not use a placeholder"
       exit 1

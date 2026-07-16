@@ -1,3 +1,12 @@
+# Caddy terminates public TLS before this loopback-only container. Preserve its
+# trusted scheme signal, but only accept the two HTTP schemes and fall back to
+# the local connection scheme for direct/local development requests.
+map $http_x_forwarded_proto $dpp_forwarded_proto {
+  default $scheme;
+  "http" http;
+  "https" https;
+}
+
 server {
   listen 8080;
   server_name _;
@@ -19,7 +28,7 @@ server {
     proxy_set_header Host $proxy_host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Proto $dpp_forwarded_proto;
     proxy_set_header X-Forwarded-Host $host;
   }
 

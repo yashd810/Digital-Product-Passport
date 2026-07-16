@@ -96,7 +96,7 @@ semantic resources cannot be selected from different directory trees.
 
 Schema creation and idempotent startup migrations live in:
 
-- `apps/backend-api/src/db/init.js:202`
+- `apps/backend-api/src/db/init.js:82`
 
 ## Useful Commands
 

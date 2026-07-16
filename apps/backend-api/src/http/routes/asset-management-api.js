@@ -31,7 +31,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
   resolveAssetJobNextRunAt,
 }) {
   const routeBase = "/api/companies/:companyId/passport-data-management";
-  const getCompanyId = (req) => Number.parseInt(req.params.companyId, 10);
+  const getCompanyId = (req) => Number(req.params.companyId);
   const getUserId = (req) => req.user?.userId || req.user?.id || null;
   const toAssetJobResponse = (job) => {
     let sourceConfig = {};
@@ -59,15 +59,33 @@ module.exports = function registerAssetManagementApiRoutes(app, {
     };
   };
 
+  const requireAssetManagementEnabled = async (req, res, next) => {
+    const companyId = getCompanyId(req);
+    if (!Number.isSafeInteger(companyId) || companyId <= 0) {
+      return res.status(400).json({ error: "companyId must be a positive integer" });
+    }
+    try {
+      req.assetManagementCompany = await assertAssetManagementEnabled(companyId);
+      return next();
+    } catch (error) {
+      const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
+      return res.status(statusCode).json({
+        error: statusCode >= 500
+          ? "Failed to verify Passport Data Management access"
+          : (error.message || "Passport Data Management access is not allowed"),
+      });
+    }
+  };
+
   app.use(routeBase, (req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     next();
-  }, authenticateToken, checkCompanyAccess);
+  }, authenticateToken, checkCompanyAccess, requireAssetManagementEnabled);
 
   app.get(`${routeBase}/bootstrap`, publicReadRateLimit, async (req, res) => {
     try {
       const companyId = getCompanyId(req);
-      const company = await assertAssetManagementEnabled(companyId);
+      const company = req.assetManagementCompany || await assertAssetManagementEnabled(companyId);
 
       const types = await pool.query(
         `SELECT pt.id, pt."typeName", pt."displayName", pt."productCategory", pt."productIcon", pt."fieldsJson"

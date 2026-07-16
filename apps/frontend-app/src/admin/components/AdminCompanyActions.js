@@ -3,6 +3,10 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
+import {
+  getAssetManagementToggleState,
+  updateAssetManagementAccess,
+} from "../utils/assetManagementAccess";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -55,8 +59,14 @@ function AdminCompanyActions({
   const [policyLoading, setPolicyLoading] = useState(false);
   const [policySaving, setPolicySaving] = useState(false);
 
+  const [assetManagementTarget, setAssetManagementTarget] = useState(null);
+  const [assetManagementError, setAssetManagementError] = useState("");
+  const [assetManagementSaving, setAssetManagementSaving] = useState(false);
+
   const companyId = company?.id;
   const companyName = company?.companyName || `Company ${companyId || ""}`;
+  const assetManagementToggle = getAssetManagementToggleState(company);
+  const assetManagementTargetToggle = getAssetManagementToggleState(assetManagementTarget);
 
   const notify = (type, text) => {
     if (onMessage) onMessage(type, text);
@@ -76,7 +86,7 @@ function AdminCompanyActions({
     const menuWidth = 190;
     const spaceBelow = window.innerHeight - rect.bottom;
     const left = Math.max(4, rect.right - menuWidth);
-    if (spaceBelow < 260) {
+    if (spaceBelow < 320) {
       setKebabPos({ bottom: window.innerHeight - rect.top + 4, top: undefined, left });
     } else {
       setKebabPos({ top: rect.bottom + 4, bottom: undefined, left });
@@ -164,6 +174,48 @@ function AdminCompanyActions({
     setDeleteError("");
   };
 
+  const openAssetManagementToggle = () => {
+    closeMenu();
+    setAssetManagementTarget({ ...(company || {}), id: companyId, companyName });
+    setAssetManagementError("");
+  };
+
+  const confirmAssetManagementToggle = async (event) => {
+    event.preventDefault();
+    if (!assetManagementTarget) return;
+
+    const { nextEnabled } = getAssetManagementToggleState(assetManagementTarget);
+    try {
+      setAssetManagementSaving(true);
+      setAssetManagementError("");
+      const data = await updateAssetManagementAccess({
+        companyId: assetManagementTarget.id,
+        enabled: nextEnabled,
+        apiBase: api,
+      });
+      const updatedCompany = data.company || {
+        ...assetManagementTarget,
+        assetManagementEnabled: nextEnabled,
+      };
+      const jobsDeactivated = Number(data.jobsDeactivated) || 0;
+      const jobMessage = jobsDeactivated
+        ? ` Deactivated ${jobsDeactivated} scheduled job${jobsDeactivated === 1 ? "" : "s"}.`
+        : "";
+      notify(
+        "success",
+        nextEnabled
+          ? `Enabled Asset Management for ${assetManagementTarget.companyName}.`
+          : `Disabled Asset Management for ${assetManagementTarget.companyName}.${jobMessage}`
+      );
+      setAssetManagementTarget(null);
+      onCompanyUpdated?.(updatedCompany);
+    } catch (error) {
+      setAssetManagementError(error.message || "Failed to update Asset Management access");
+    } finally {
+      setAssetManagementSaving(false);
+    }
+  };
+
   const renderInlineActionButton = (action) => {
     if (action === "edit") {
       return (
@@ -188,6 +240,20 @@ function AdminCompanyActions({
           disabled={policyLoading || policySaving}
         >
           DPP Policy
+        </button>
+      );
+    }
+
+    if (action === "assetManagement") {
+      return (
+        <button
+          key="assetManagement"
+          type="button"
+          className="manage-btn manage-btn-secondary admin-company-action-inline-btn"
+          onClick={openAssetManagementToggle}
+          disabled={assetManagementSaving}
+        >
+          {assetManagementSaving ? "Updating…" : assetManagementToggle.actionLabel}
         </button>
       );
     }
@@ -280,6 +346,9 @@ function AdminCompanyActions({
           </button>
           <button className="menu-item" onClick={openPolicyEditor}>
             ⚙️ DPP Policy
+          </button>
+          <button className="menu-item" onClick={openAssetManagementToggle} disabled={assetManagementSaving}>
+            {assetManagementToggle.currentlyEnabled ? "⏹ Disable Asset Management" : "▶ Enable Asset Management"}
           </button>
           {!hideDeleteMenuItem && (
             <button className="menu-item menu-item-danger" onClick={openDeleteCompany} disabled={isDeleting}>
@@ -390,6 +459,43 @@ function AdminCompanyActions({
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {assetManagementTarget && (
+        <div className="apt-modal-overlay" onClick={() => !assetManagementSaving && setAssetManagementTarget(null)}>
+          <div className="apt-modal companies-delete-modal" onClick={(event) => event.stopPropagation()}>
+            <h3 className="apt-modal-title">{assetManagementTargetToggle.actionLabel}</h3>
+            <p className="apt-modal-warning apt-modal-warning-info">
+              {assetManagementTargetToggle.nextEnabled ? (
+                <>
+                  This lets <strong>{assetManagementTarget.companyName}</strong>{" "}use the Passport Data Management
+                  bulk-update workspace.
+                </>
+              ) : (
+                <>
+                  This immediately blocks new Passport Data Management requests for <strong>{assetManagementTarget.companyName}</strong>
+                  {" "}and deactivates its scheduled jobs. Re-enabling access does not restart those jobs automatically.
+                </>
+              )}
+            </p>
+            <form onSubmit={confirmAssetManagementToggle}>
+              {assetManagementError && <div className="alert alert-error admin-alert-inline-wide">{assetManagementError}</div>}
+              <div className="apt-modal-actions">
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  onClick={() => setAssetManagementTarget(null)}
+                  disabled={assetManagementSaving}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="apt-modal-confirm-btn" disabled={assetManagementSaving}>
+                  {assetManagementSaving ? "Updating…" : assetManagementTargetToggle.actionLabel}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

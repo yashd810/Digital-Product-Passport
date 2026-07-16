@@ -24,7 +24,7 @@ Backups in this system are not a side note. They are part of how released passpo
 
 Production storage and disaster-recovery checks are enforced in:
 
-- `apps/backend-api/src/bootstrap/runtime-config.js:158`
+- `apps/backend-api/src/bootstrap/runtime-config.js:396`
 
 ## Backup Credential Boundary
 

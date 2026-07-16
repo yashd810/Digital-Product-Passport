@@ -55,6 +55,16 @@ services:
       - localStorageData:/data
     restart: "no"
     network_mode: none
+    security_opt:
+      - no-new-privileges:true
+    # This one-shot initializer only needs to create/chown the shared data
+    # directories before the non-root API starts.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
 
   postgres:
     build:

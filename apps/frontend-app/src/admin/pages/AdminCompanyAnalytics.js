@@ -606,7 +606,7 @@ function AdminCompanyAnalytics() {
               company={currentCompany}
               hideKebabTrigger
               hideDeleteMenuItem
-              inlineActions={["edit"]}
+              inlineActions={["edit", "assetManagement"]}
               onCompanyDeleted={handleCompanyDeleted}
               onCompanyUpdated={handleCompanyUpdated}
               onMessage={flash}

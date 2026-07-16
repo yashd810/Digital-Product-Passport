@@ -13,7 +13,10 @@ const {
   encodePassportAttachmentAccessToken,
 } = require("../src/shared/repository/repository-file-links");
 
-dotenv.config({ path: path.resolve(__dirname, "../../../docker/.env"), quiet: true });
+dotenv.config({
+  path: process.env.DOTENV_CONFIG_PATH || process.env.DPP_ENV_FILE || path.resolve(__dirname, "../../../../../env/local-compose.env"),
+  quiet: true,
+});
 
 const typeName = "verificationProbe";
 const tableName = "\"verificationProbePassports\"";

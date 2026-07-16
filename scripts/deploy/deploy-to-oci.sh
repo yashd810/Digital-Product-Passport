@@ -6,10 +6,10 @@ set -euo pipefail
 umask 077
 
 # Configuration
-OCI_USER="${OCI_USER:-ubuntu}"
+OCI_USER="${OCI_USER:-}"
 OCI_IP="${OCI_IP:-}"
 SSH_KEY="${SSH_KEY:-}"
-SSH_KNOWN_HOSTS="${SSH_KNOWN_HOSTS:-${HOME:-}/.ssh/known_hosts}"
+SSH_KNOWN_HOSTS="${SSH_KNOWN_HOSTS:-}"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
@@ -25,6 +25,14 @@ TIMEOUT_SECONDS="${DPP_DEPLOY_TIMEOUT_SECONDS:-1800}"
 TIMEOUT_CMD=""
 REMOTE_DEPLOY_DIR=""
 REMOTE_DEPLOY_SCRIPT=""
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+PROJECT_ROOT="$(CDPATH= cd -- "$REPO_ROOT/../.." && pwd -P)"
+DEPLOY_CONFIG_FILE="${DPP_DEPLOY_CONFIG_FILE:-$PROJECT_ROOT/env/oci-deploy.env}"
+OCI_BACKEND_IP="${OCI_BACKEND_IP:-}"
+OCI_FRONTEND_IP="${OCI_FRONTEND_IP:-}"
+DEPLOY_REVISION=""
+SSH_TARGET=""
 
 quote_for_remote() {
     printf '%q' "$1"
@@ -54,6 +62,98 @@ require_private_key_file() {
     fi
 }
 
+require_trusted_known_hosts_file() {
+    local mode
+
+    if [ -L "$SSH_KNOWN_HOSTS" ] || [ ! -f "$SSH_KNOWN_HOSTS" ]; then
+        echo "❌ SSH_KNOWN_HOSTS must point to an existing non-symlinked trusted known_hosts file: $SSH_KNOWN_HOSTS"
+        echo "   Verify the OCI host key fingerprint in the OCI Console before adding it."
+        exit 1
+    fi
+
+    mode="$(file_mode "$SSH_KNOWN_HOSTS")"
+    if (( (8#$mode & 8#022) != 0 )); then
+        echo "❌ SSH_KNOWN_HOSTS must not be writable by group or others: $SSH_KNOWN_HOSTS (mode $mode)"
+        exit 1
+    fi
+}
+
+load_deploy_config() {
+    local mode line key value
+
+    if [ -L "$DEPLOY_CONFIG_FILE" ]; then
+        echo "❌ Deployment configuration must not be a symlink: $DEPLOY_CONFIG_FILE"
+        exit 1
+    fi
+    if [ ! -e "$DEPLOY_CONFIG_FILE" ]; then
+        if [ -n "${DPP_DEPLOY_CONFIG_FILE:-}" ]; then
+            echo "❌ DPP_DEPLOY_CONFIG_FILE does not exist: $DEPLOY_CONFIG_FILE"
+            exit 1
+        fi
+        return
+    fi
+    if [ ! -f "$DEPLOY_CONFIG_FILE" ]; then
+        echo "❌ Deployment configuration must be a regular file: $DEPLOY_CONFIG_FILE"
+        exit 1
+    fi
+
+    mode="$(file_mode "$DEPLOY_CONFIG_FILE")"
+    if (( (8#$mode & 8#077) != 0 )); then
+        echo "❌ Deployment configuration must have mode 600: $DEPLOY_CONFIG_FILE (mode $mode)"
+        exit 1
+    fi
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%$'\r'}"
+        case "$line" in
+            ''|'#'*) continue ;;
+        esac
+        case "$line" in
+            *=*) ;;
+            *)
+                echo "❌ Invalid deployment configuration line in $DEPLOY_CONFIG_FILE"
+                exit 1
+                ;;
+        esac
+        key="${line%%=*}"
+        value="${line#*=}"
+        case "$key" in
+            OCI_BACKEND_IP)
+                [ -n "$OCI_BACKEND_IP" ] || OCI_BACKEND_IP="$value"
+                ;;
+            OCI_FRONTEND_IP)
+                [ -n "$OCI_FRONTEND_IP" ] || OCI_FRONTEND_IP="$value"
+                ;;
+            OCI_USER)
+                [ -n "$OCI_USER" ] || OCI_USER="$value"
+                ;;
+            SSH_KEY)
+                [ -n "$SSH_KEY" ] || SSH_KEY="$value"
+                ;;
+            SSH_KNOWN_HOSTS)
+                [ -n "$SSH_KNOWN_HOSTS" ] || SSH_KNOWN_HOSTS="$value"
+                ;;
+            *)
+                echo "❌ Unsupported deployment configuration key: $key"
+                exit 1
+                ;;
+        esac
+    done < "$DEPLOY_CONFIG_FILE"
+}
+
+ssh_target_for_host() {
+    local user="$1"
+    local host="$2"
+
+    # scp requires brackets around IPv6 literals; SSH accepts the same target
+    # form. The input is validated before this helper is called.
+    if [[ "$host" == *:* ]]; then
+        printf '%s@[%s]' "$user" "$host"
+    else
+        printf '%s@%s' "$user" "$host"
+    fi
+}
+
 if ! [[ "$TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
     echo "❌ DPP_DEPLOY_TIMEOUT_SECONDS must be a positive integer."
     exit 1
@@ -63,12 +163,39 @@ if command -v timeout >/dev/null 2>&1; then
     TIMEOUT_CMD="timeout"
 fi
 
+load_deploy_config
+
+OCI_USER="${OCI_USER:-ubuntu}"
+SSH_KNOWN_HOSTS="${SSH_KNOWN_HOSTS:-${HOME:-}/.ssh/known_hosts}"
+
 if [ -z "$DEPLOY_TARGET" ]; then
     echo "❌ DPP_DEPLOY_TARGET is required. Use one of: frontend, backend, all"
     echo "Examples:"
     echo "  DPP_DEPLOY_TARGET=frontend OCI_IP=<frontend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
     echo "  DPP_DEPLOY_TARGET=backend OCI_IP=<backend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
     exit 1
+fi
+
+case "$DEPLOY_TARGET" in
+    frontend|backend|all) ;;
+    *)
+        echo "❌ Unsupported DPP_DEPLOY_TARGET: $DEPLOY_TARGET"
+        echo "Use one of: frontend, backend, all"
+        exit 1
+        ;;
+esac
+
+if [ -z "$OCI_IP" ]; then
+    case "$DEPLOY_TARGET" in
+        backend) OCI_IP="$OCI_BACKEND_IP" ;;
+        frontend) OCI_IP="$OCI_FRONTEND_IP" ;;
+        all)
+            if [ -n "$OCI_BACKEND_IP" ] || [ -n "$OCI_FRONTEND_IP" ]; then
+                echo "❌ The configured OCI hosts are split. Deploy backend and frontend separately."
+                exit 1
+            fi
+            ;;
+    esac
 fi
 
 if [ -z "$OCI_IP" ]; then
@@ -89,20 +216,26 @@ if ! [[ "$OCI_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
     exit 1
 fi
 
+if [ ! -d "$REPO_ROOT/.git" ]; then
+    echo "❌ Deployment must be launched from a Git checkout: $REPO_ROOT"
+    exit 1
+fi
+if [ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]; then
+    echo "❌ Refusing to deploy from a dirty checkout. Commit and push the intended revision first."
+    exit 1
+fi
+DEPLOY_REVISION="$(git -C "$REPO_ROOT" rev-parse --verify HEAD)"
+if ! [[ "$DEPLOY_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "❌ Could not determine a full Git commit ID for deployment."
+    exit 1
+fi
+SSH_TARGET="$(ssh_target_for_host "$OCI_USER" "$OCI_IP")"
+
 if [ -z "$SSH_KEY" ]; then
     echo "❌ SSH_KEY is required and must point to the OCI deployment private key."
     echo "Example: SSH_KEY=/secure/path/oci.key DPP_DEPLOY_TARGET=backend OCI_IP=<backend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
     exit 1
 fi
-
-case "$DEPLOY_TARGET" in
-    frontend|backend|all) ;;
-    *)
-        echo "❌ Unsupported DPP_DEPLOY_TARGET: $DEPLOY_TARGET"
-        echo "Use one of: frontend, backend, all"
-        exit 1
-        ;;
-esac
 
 echo "=================================="
 echo "🚀 DPP OCI Deployment Script"
@@ -112,30 +245,40 @@ echo "Configuration:"
 echo "  OCI IP: $OCI_IP"
 echo "  User: $OCI_USER"
 echo "  Deploy Target: $DEPLOY_TARGET"
+echo "  Deploy Config: $DEPLOY_CONFIG_FILE"
 echo "  Compose Project: ${COMPOSE_PROJECT_NAME:-auto-detect}"
 echo "  App Dir: $APP_DIR"
 echo "  Env File: $ENV_FILE"
 echo "  Timeout: ${TIMEOUT_SECONDS}s"
 echo "  Live Edge Check: ${SKIP_LIVE_EDGE_CHECK:-enabled}"
 echo "  Caddy Reload: ${SKIP_CADDY_RELOAD:-enabled}"
+echo "  Revision: $DEPLOY_REVISION"
 echo ""
 
 require_private_key_file
 
-if [ -L "$SSH_KNOWN_HOSTS" ] || [ ! -f "$SSH_KNOWN_HOSTS" ]; then
-    echo "❌ SSH_KNOWN_HOSTS must point to an existing non-symlinked trusted known_hosts file: $SSH_KNOWN_HOSTS"
-    echo "   Verify the OCI host key fingerprint in the OCI Console before adding it."
-    exit 1
-fi
+require_trusted_known_hosts_file
 
 echo "✅ SSH key and trusted host key file found"
 echo ""
 
 # Test SSH connection
 echo "🔌 Testing SSH connection..."
-SSH_OPTS=(-i "$SSH_KEY" -o UserKnownHostsFile="$SSH_KNOWN_HOSTS" -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=60)
+SSH_OPTS=(
+    -i "$SSH_KEY"
+    -o IdentitiesOnly=yes
+    -o UserKnownHostsFile="$SSH_KNOWN_HOSTS"
+    -o GlobalKnownHostsFile=/dev/null
+    -o StrictHostKeyChecking=yes
+    -o PreferredAuthentications=publickey
+    -o PasswordAuthentication=no
+    -o KbdInteractiveAuthentication=no
+    -o ConnectTimeout=10
+    -o BatchMode=yes
+    -o ServerAliveInterval=60
+)
 
-if $SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "echo 'SSH OK'" > /dev/null 2>&1; then
+if $SSH_CMD "${SSH_OPTS[@]}" "$SSH_TARGET" "echo 'SSH OK'" > /dev/null 2>&1; then
     echo "✅ SSH connection successful"
 else
     echo "❌ SSH connection failed to ${OCI_USER}@${OCI_IP}"
@@ -160,7 +303,7 @@ cleanup_deploy_artifacts() {
 
     trap - EXIT
     if [ -n "${REMOTE_DEPLOY_DIR:-}" ]; then
-        "$SSH_CMD" "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" \
+        "$SSH_CMD" "${SSH_OPTS[@]}" "$SSH_TARGET" \
             "rm -f -- $(quote_for_remote "$REMOTE_DEPLOY_SCRIPT"); rmdir -- $(quote_for_remote "$REMOTE_DEPLOY_DIR")" \
             >/dev/null 2>&1 || true
     fi
@@ -170,7 +313,7 @@ cleanup_deploy_artifacts() {
 trap cleanup_deploy_artifacts EXIT
 
 if ! REMOTE_DEPLOY_DIR="$(
-    "$SSH_CMD" "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" \
+    "$SSH_CMD" "${SSH_OPTS[@]}" "$SSH_TARGET" \
         "umask 077 && mktemp -d /tmp/dpp-deploy.XXXXXXXXXX"
 )"; then
     echo "❌ Failed to create a private remote deployment directory."
@@ -205,12 +348,18 @@ REPO="https://github.com/yashd810/Digital-Product-Passport.git"
 BRANCH="main"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:?DPP_DEPLOY_TARGET is required}"
 DEPLOY_USER="${DPP_DEPLOY_USER:?DPP_DEPLOY_USER is required}"
+DEPLOY_REVISION="${DPP_DEPLOY_REVISION:?DPP_DEPLOY_REVISION is required}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
 SKIP_LIVE_EDGE_CHECK="${DPP_SKIP_LIVE_EDGE_CHECK:-}"
 SKIP_CADDY_RELOAD="${DPP_SKIP_CADDY_RELOAD:-}"
 CADDYFILE="${DPP_CADDYFILE:-}"
 DEPLOY_TIMEOUT_SECONDS="${DPP_DEPLOY_TIMEOUT_SECONDS:-1800}"
+
+if ! [[ "$DEPLOY_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Refusing deployment with an invalid Git revision."
+    exit 1
+fi
 
 echo "📂 Checking application directory..."
 if [ -L "$APP_DIR" ]; then
@@ -225,15 +374,23 @@ if [ ! -d "$APP_DIR" ]; then
     cd "$APP_DIR"
     git sparse-checkout init --no-cone
     git sparse-checkout set '/*' '!/local-tools/'
-    git checkout "$BRANCH"
+    git fetch --no-tags origin "$BRANCH"
+    if ! git merge-base --is-ancestor "$DEPLOY_REVISION" "origin/$BRANCH"; then
+        echo "Requested deployment revision is not reachable from origin/$BRANCH."
+        exit 1
+    fi
+    git checkout --detach "$DEPLOY_REVISION"
 else
     echo "📥 Pulling latest changes..."
     cd "$APP_DIR"
     sudo git sparse-checkout init --no-cone
     sudo git sparse-checkout set '/*' '!/local-tools/'
-    sudo git fetch origin
-    sudo git checkout "$BRANCH"
-    sudo git pull --ff-only origin "$BRANCH"
+    sudo git fetch --no-tags origin "$BRANCH"
+    if ! sudo git merge-base --is-ancestor "$DEPLOY_REVISION" "origin/$BRANCH"; then
+        echo "Requested deployment revision is not reachable from origin/$BRANCH."
+        exit 1
+    fi
+    sudo git checkout --detach "$DEPLOY_REVISION"
     sudo git sparse-checkout reapply
 fi
 
@@ -286,7 +443,7 @@ chmod +x "$DEPLOY_SCRIPT"
 
 # Copy script to remote and execute
 echo "📤 Uploading deployment script..."
-if ! scp -q "${SSH_OPTS[@]}" "$DEPLOY_SCRIPT" "${OCI_USER}@${OCI_IP}:$REMOTE_DEPLOY_SCRIPT"; then
+if ! scp -q "${SSH_OPTS[@]}" "$DEPLOY_SCRIPT" "$SSH_TARGET:$REMOTE_DEPLOY_SCRIPT"; then
     echo "❌ Failed to upload deployment script."
     exit 1
 fi
@@ -301,6 +458,7 @@ chmod 600 "$DEPLOY_LOG"
 # Execute with timeout
 REMOTE_ENV="DPP_DEPLOY_TARGET=$(quote_for_remote "$DEPLOY_TARGET")"
 REMOTE_ENV="$REMOTE_ENV DPP_DEPLOY_USER=$(quote_for_remote "$OCI_USER")"
+REMOTE_ENV="$REMOTE_ENV DPP_DEPLOY_REVISION=$(quote_for_remote "$DEPLOY_REVISION")"
 if [ -n "$COMPOSE_PROJECT_NAME" ]; then
     REMOTE_ENV="$REMOTE_ENV COMPOSE_PROJECT_NAME=$(quote_for_remote "$COMPOSE_PROJECT_NAME")"
 fi
@@ -319,10 +477,10 @@ fi
 REMOTE_ENV="$REMOTE_ENV DPP_DEPLOY_TIMEOUT_SECONDS=$(quote_for_remote "$TIMEOUT_SECONDS")"
 set +e
 if [ -n "$TIMEOUT_CMD" ]; then
-    ($TIMEOUT_CMD $((TIMEOUT_SECONDS + 30)) $SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "$REMOTE_ENV bash $(quote_for_remote "$REMOTE_DEPLOY_SCRIPT")" 2>&1) | tee "$DEPLOY_LOG"
+    ($TIMEOUT_CMD $((TIMEOUT_SECONDS + 30)) $SSH_CMD "${SSH_OPTS[@]}" "$SSH_TARGET" "$REMOTE_ENV bash $(quote_for_remote "$REMOTE_DEPLOY_SCRIPT")" 2>&1) | tee "$DEPLOY_LOG"
 else
     echo "⚠️  Local timeout command not found; running SSH deployment without local timeout wrapper."
-    ($SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "$REMOTE_ENV bash $(quote_for_remote "$REMOTE_DEPLOY_SCRIPT")" 2>&1) | tee "$DEPLOY_LOG"
+    ($SSH_CMD "${SSH_OPTS[@]}" "$SSH_TARGET" "$REMOTE_ENV bash $(quote_for_remote "$REMOTE_DEPLOY_SCRIPT")" 2>&1) | tee "$DEPLOY_LOG"
 fi
 PIPE_CODES=("${PIPESTATUS[@]}")
 set -e

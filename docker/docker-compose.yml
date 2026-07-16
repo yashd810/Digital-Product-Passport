@@ -62,7 +62,7 @@ services:
     ports:
       - "127.0.0.1:${BACKEND_PORT:-3001}:3001"
     env_file:
-      - path: .env
+      - path: ${DPP_ENV_FILE:?DPP_ENV_FILE is required and must point to the external local environment file}
         required: true
     environment:
       NODE_ENV: development
@@ -111,6 +111,16 @@ services:
     volumes:
       - local_storage:/data
     network_mode: none
+    security_opt:
+      - no-new-privileges:true
+    # This one-shot initializer only needs to create/chown the shared data
+    # directories before the non-root API starts.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
 
   marketing-site:
     build:

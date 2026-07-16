@@ -138,6 +138,8 @@ module.exports = function registerCompanyRoutes(app, deps) {
                 "authorizedContactName",
                 "authorizedContactEmail",
                 "isActive",
+                "assetManagementEnabled",
+                "assetManagementRevokedAt",
                 "createdAt",
                 "updatedAt"
            FROM companies
@@ -331,6 +333,79 @@ module.exports = function registerCompanyRoutes(app, deps) {
       res.json({ success: true, policy: updatedPolicy });
     } catch (error) {
       res.status(400).json({ error: error.message || "Failed to update DPP policy" });
+    }
+  });
+
+  app.patch("/api/admin/companies/:companyId/asset-management", authenticateToken, isSuperAdmin, async (req, res) => {
+    const companyId = Number(req.params.companyId);
+    const enabled = req.body?.enabled;
+    if (!Number.isSafeInteger(companyId) || companyId <= 0) {
+      return res.status(400).json({ error: "Invalid company ID" });
+    }
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ error: "enabled must be a boolean" });
+    }
+
+    let client;
+    try {
+      client = await pool.connect();
+      await client.query("BEGIN");
+      const updated = await client.query(
+        `UPDATE companies
+            SET "assetManagementEnabled" = $1,
+                "assetManagementRevokedAt" = CASE WHEN $1 THEN NULL ELSE NOW() END,
+                "updatedAt" = NOW()
+          WHERE id = $2
+          RETURNING *`,
+        [enabled, companyId]
+      );
+      if (!updated.rows.length) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      let jobsDeactivated = 0;
+      if (!enabled) {
+        const jobs = await client.query(
+          `UPDATE "assetManagementJobs"
+              SET "isActive" = false,
+                  "nextRunAt" = NULL,
+                  "updatedAt" = NOW()
+            WHERE "companyId" = $1
+              AND "isActive" = true`,
+          [companyId]
+        );
+        jobsDeactivated = Number(jobs.rowCount) || 0;
+      }
+      await client.query("COMMIT");
+
+      const details = { enabled, jobsDeactivated };
+      await logAudit(
+        companyId,
+        req.user.userId,
+        "setAssetManagementEnabled",
+        "companies",
+        String(companyId),
+        null,
+        details
+      );
+      return res.json({
+        success: true,
+        company: mapCompanyRow(updated.rows[0]),
+        jobsDeactivated,
+      });
+    } catch (error) {
+      if (client) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          logger.error({ err: rollbackError, companyId }, "Failed to roll back Asset Management access update");
+        }
+      }
+      logger.error({ err: error, companyId }, "Failed to update Asset Management access");
+      return res.status(500).json({ error: "Failed to update Asset Management access" });
+    } finally {
+      client?.release();
     }
   });
 

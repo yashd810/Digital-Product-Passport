@@ -34,6 +34,10 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     resolveSecurityGroupApiKey,
   } = createApiKeyHelpers({ crypto });
 
+  async function resolveCompanyPassport(companyId, dppId) {
+    return resolveCompanyPreviewPassport({ companyId, passportKey: dppId });
+  }
+
   app.get("/api/companies/:companyId/passports/:passportKey/preview", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const { companyId, passportKey } = req.params;
@@ -224,6 +228,8 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
 
   app.get("/api/companies/:companyId/passports/:dppId/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
+      const resolved = await resolveCompanyPassport(req.params.companyId, req.params.dppId);
+      if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
       const editors = await listActiveEditSessions(req.params.dppId, req.user.userId);
       res.json({ editors, timeoutHours: editSessionTimeoutHours, serverTime: new Date().toISOString() });
     } catch {
@@ -237,13 +243,19 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       const { passportType } = req.body;
       if (!passportType) return res.status(400).json({ error: "passportType required" });
 
+      const resolved = await resolveCompanyPassport(companyId, dppId);
+      if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
+      if (String(passportType) !== String(resolved.passport.passportType)) {
+        return res.status(400).json({ error: "passportType does not match the passport" });
+      }
+
       await clearExpiredEditSessions();
       await pool.query(
         `INSERT INTO "passportEditSessions" ("passportDppId", "companyId", "passportType", "userId", "lastActivityAt", "updatedAt")
          VALUES ($1, $2, $3, $4, NOW(), NOW())
          ON CONFLICT ("passportDppId", "userId")
          DO UPDATE SET "companyId" = EXCLUDED."companyId", "passportType" = EXCLUDED."passportType", "lastActivityAt" = NOW(), "updatedAt" = NOW()`,
-        [dppId, companyId, passportType, req.user.userId]
+        [dppId, companyId, resolved.passport.passportType, req.user.userId]
       );
 
       const editors = await listActiveEditSessions(dppId, req.user.userId);
@@ -255,6 +267,8 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
 
   app.delete("/api/companies/:companyId/passports/:dppId/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
+      const resolved = await resolveCompanyPassport(req.params.companyId, req.params.dppId);
+      if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
       await pool.query(
         "DELETE FROM \"passportEditSessions\" WHERE \"passportDppId\" = $1 AND \"userId\" = $2",
         [req.params.dppId, req.user.userId]

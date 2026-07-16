@@ -92,10 +92,10 @@ function assertRequiredSecurityEnvironment({ logger }) {
 }
 
 function initEnvironment(serverDir) {
-  const explicitPath = process.env.DOTENV_CONFIG_PATH;
+  const explicitPath = process.env.DOTENV_CONFIG_PATH || process.env.DPP_ENV_FILE;
   if (process.env.NODE_ENV === "production" && !explicitPath) return;
   require("dotenv").config({
-    path: explicitPath || path.resolve(serverDir, "../../../docker/.env"),
+    path: explicitPath || path.resolve(serverDir, "../../../../../env/local-compose.env"),
     quiet: true,
   });
 }

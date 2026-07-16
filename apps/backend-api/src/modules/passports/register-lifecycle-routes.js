@@ -274,8 +274,14 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const tableName = getTable(passportType);
 
       const current = await pool.query(
-        `SELECT * FROM ${tableName} WHERE "dppId" = $1 AND "releaseStatus" = 'released' LIMIT 1`,
-        [dppId]
+        `SELECT *
+         FROM ${tableName}
+         WHERE "dppId" = $1
+           AND "companyId" = $2
+           AND "releaseStatus" = 'released'
+           AND "deletedAt" IS NULL
+         LIMIT 1`,
+        [dppId, companyId]
       );
       if (!current.rows.length) return res.status(404).json({ error: "Released passport not found" });
 

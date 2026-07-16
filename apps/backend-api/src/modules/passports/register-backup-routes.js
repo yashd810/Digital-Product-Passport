@@ -2,8 +2,6 @@ function registerBackupRoutes(app, deps) {
   const {
     backupProviderService,
     authenticateToken,
-    isSuperAdmin,
-    checkCompanyAccess,
     checkCompanyAdmin,
     logAudit,
     loadLatestLivePassport,
@@ -12,14 +10,23 @@ function registerBackupRoutes(app, deps) {
     getCompanyNameMap,
     replicatePassportToBackup,
   } = deps;
-  const backupAdminGuard = isSuperAdmin || checkCompanyAdmin;
-  const backupReadGuard = isSuperAdmin || checkCompanyAccess;
+  const backupAdminGuard = checkCompanyAdmin;
+  const backupReadGuard = checkCompanyAdmin;
+
+  function toBackupProviderResponse(provider) {
+    if (!provider) return null;
+    const { configJson, ...safeProvider } = provider;
+    const hasConfiguration = configJson && typeof configJson === "object" && !Array.isArray(configJson)
+      ? Object.keys(configJson).length > 0
+      : Boolean(configJson);
+    return { ...safeProvider, hasConfiguration };
+  }
 
   app.get("/api/companies/:companyId/backup-providers", authenticateToken, backupAdminGuard, async (req, res) => {
     try {
       if (!backupProviderService) return res.json([]);
       const providers = await backupProviderService.listProviders({ companyId: req.params.companyId });
-      res.json(providers);
+      res.json(providers.map(toBackupProviderResponse));
     } catch {
       res.status(500).json({ error: "Failed to fetch backup providers" });
     }
@@ -49,16 +56,19 @@ function registerBackupRoutes(app, deps) {
         null,
         { providerKey: provider.providerKey, providerType: provider.providerType }
       );
-      res.status(201).json(provider);
+      res.status(201).json(toBackupProviderResponse(provider));
     } catch (error) {
-      res.status(400).json({ error: error.message || "Failed to upsert backup provider" });
+      res.status(error.statusCode || 400).json({ error: error.message || "Failed to upsert backup provider" });
     }
   });
 
   app.delete("/api/companies/:companyId/backup-providers/:providerKey", authenticateToken, backupAdminGuard, async (req, res) => {
     try {
       if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
-      const provider = await backupProviderService.revokeProvider({ providerKey: req.params.providerKey });
+      const provider = await backupProviderService.revokeProvider({
+        companyId: req.params.companyId,
+        providerKey: req.params.providerKey,
+      });
       if (!provider) return res.status(404).json({ error: "Backup provider not found" });
       await logAudit(
         req.params.companyId,
@@ -69,7 +79,7 @@ function registerBackupRoutes(app, deps) {
         { providerKey: req.params.providerKey },
         { revoked: true }
       );
-      res.json({ success: true, provider });
+      res.json({ success: true, provider: toBackupProviderResponse(provider) });
     } catch {
       res.status(500).json({ error: "Failed to revoke backup provider" });
     }

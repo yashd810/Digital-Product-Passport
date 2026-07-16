@@ -5,9 +5,17 @@ Claros DPP is a multi-app Digital Product Passport platform for creating, managi
 ## Quick Start
 
 ```bash
-chmod 600 docker/.env
+PROJECT_FILES_DIR="$(cd ../.. && pwd)"
+chmod 700 "$PROJECT_FILES_DIR/env"
+chmod 600 "$PROJECT_FILES_DIR/env/local-compose.env"
 bash scripts/restart-local-stack.sh
 ```
+
+The local stack reads its private configuration from
+`/Users/yashdesai/Desktop/Digital Product Passport/Project Files/env/local-compose.env`,
+outside this Git checkout. Its current profile keeps application file storage
+disabled and has no S3 settings; S3 belongs only in the separate production
+profile.
 
 Local services:
 

@@ -23,11 +23,14 @@ The dashboard and public viewer proxy same-origin `/api` requests to
 the backend, so `VITE_API_URL` is intentionally empty in the local Compose
 build arguments.
 
-Run `bash scripts/restart-local-stack.sh` after source changes. It requires the
-untracked `docker/.env` file to have mode `600`, validates Compose, rebuilds,
-and waits for health checks. For remote testing, use a protected production
-edge or an authenticated SSH tunnel; local Compose deliberately does not expose
-an arbitrary LAN bind override.
+Run `bash scripts/restart-local-stack.sh` after source changes. It reads the
+external `env/local-compose.env` file under
+`/Users/yashdesai/Desktop/Digital Product Passport/Project Files/env`, requires
+it to be a regular non-symlinked mode-`600` file, validates Compose, rebuilds,
+and waits for health checks. The current local profile keeps application file
+storage disabled; do not add S3 object-storage settings to it. For remote
+testing, use a protected production edge or an authenticated SSH tunnel; local
+Compose deliberately does not expose an arbitrary LAN bind override.
 
 The API is the only service attached to both the application network and the
 internal database network. PostgreSQL is database-network-only, and the

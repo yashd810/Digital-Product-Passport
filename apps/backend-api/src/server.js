@@ -42,6 +42,7 @@ const { validatePasswordPolicy, hashSecret, hashOtpCode, generateOtpCode, passwo
 const createAuthMiddleware     = require("./http/middleware/auth");
 const { createRateLimiters, startRateLimitMaintenance } = require("./http/middleware/rate-limit");
 const createAssetService       = require("./services/asset-management");
+const { assertAssetManagementEntitlement } = require("./shared/assets/asset-management-entitlement");
 const createPassportService    = require("./services/passport-service");
 const createSemanticPassportExportService = require("./services/semantic-passport-export");
 const createSemanticModelRegistry         = require("./services/semantic-model-registry");
@@ -271,9 +272,7 @@ async function getCompanyAssetSettings(companyId) {
 
 async function assertAssetManagementEnabled(companyId) {
   const company = await getCompanyAssetSettings(companyId);
-  if (!company) { const e = new Error("Company not found"); e.statusCode = 404; throw e; }
-  if (company.isActive === false) { const e = new Error("Company is inactive"); e.statusCode = 403; throw e; }
-  return company;
+  return assertAssetManagementEntitlement(company);
 }
 
 async function assertCompanyAssetPassportTypeAccess(companyId, passportType) {

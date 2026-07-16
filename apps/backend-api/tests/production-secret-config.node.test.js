@@ -39,7 +39,7 @@ test("production environment template declares every required security variable"
   }
 });
 
-test("production environment template declares dedicated DB backup S3 configuration", () => {
+test("production environment template declares dedicated DB backup S3 configuration without enabling an incomplete backup job", () => {
   const values = parseEnvLines(fs.readFileSync(templatePath, "utf8"));
   for (const name of [
     "DB_BACKUP_ENABLED",
@@ -51,7 +51,7 @@ test("production environment template declares dedicated DB backup S3 configurat
   ]) {
     assert.equal(values.has(name), true, `missing ${name} from production template`);
   }
-  assert.equal(values.get("DB_BACKUP_ENABLED"), "true");
+  assert.equal(values.get("DB_BACKUP_ENABLED"), "false");
   assert.match(values.get("DB_BACKUP_S3_ENDPOINT"), /^https:\/\/YOUR_/);
   assert.match(values.get("DB_BACKUP_S3_ACCESS_KEY_ID"), /^REPLACE_/);
   assert.match(values.get("DB_BACKUP_S3_SECRET_ACCESS_KEY"), /^REPLACE_/);

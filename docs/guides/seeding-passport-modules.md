@@ -218,8 +218,13 @@ Important:
 From the repo root:
 
 ```bash
-DPP_DEPLOY_TARGET=backend OCI_IP=<backend-oci-ip> bash scripts/deploy/deploy-to-oci.sh
+DPP_DEPLOY_TARGET=backend bash scripts/deploy/deploy-to-oci.sh
 ```
+
+The wrapper reads the backend host and SSH references from the external,
+mode-`600` `env/oci-deploy.env` profile. It parses the profile rather than
+sourcing it; use `infra/oracle/oci-deploy.env.example` as the template. An
+explicit `OCI_IP` remains available only as a one-off override.
 
 That deploy helper updates the repo on the OCI host under:
 

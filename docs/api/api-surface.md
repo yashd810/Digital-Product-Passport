@@ -30,9 +30,9 @@ If you are tracing a frontend request, first figure out which group it belongs t
 - `apps/backend-api/src/http/routes/company.js:1`
 - `apps/backend-api/src/http/routes/repository.js:1`
 - `apps/backend-api/src/http/routes/workflow.js:1`
-- `apps/backend-api/src/http/routes/passports.js:34`
-- `apps/backend-api/src/http/routes/passport-public.js:12`
-- `apps/backend-api/src/http/routes/dpp-api.js:26`
+- `apps/backend-api/src/http/routes/passports.js:32`
+- `apps/backend-api/src/http/routes/passport-public.js:15`
+- `apps/backend-api/src/http/routes/dpp-api.js:20`
 - `apps/backend-api/src/http/routes/dictionary.js:1`
 - `apps/backend-api/src/http/routes/admin.js:135`
 

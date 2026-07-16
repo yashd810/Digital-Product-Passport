@@ -117,6 +117,14 @@ async function initDb(pool, {
     )
   `);
   await pool.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS "assetManagementEnabled" BOOLEAN NOT NULL DEFAULT false
+  `);
+  await pool.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS "assetManagementRevokedAt" TIMESTAMPTZ
+  `);
+  await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS "idxCompaniesDidSlugUnique"
       ON companies("didSlug")
       WHERE "didSlug" IS NOT NULL

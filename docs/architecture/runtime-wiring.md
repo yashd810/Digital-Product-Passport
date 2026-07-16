@@ -23,8 +23,10 @@ The dashboard bootstraps in `apps/frontend-app/src/app/bootstrap/index.js:1`.
 Important behavior there:
 
 - the app wraps itself in `BrowserRouter`
-- global fetch is patched to include credentials by default
-- bad placeholder bearer tokens are stripped before sending requests
+- authenticated browser calls use `fetchWithAuth` in
+  `apps/frontend-app/src/shared/api/authHeaders.js:19`, which sends dashboard
+  cookies only to trusted API origins and omits them in the standalone public
+  viewer
 
 The main route map lives in `apps/frontend-app/src/app/containers/App.js:1`.
 
@@ -44,7 +46,7 @@ That file does four big jobs:
 
 1. loads environment and runtime paths
 2. creates Express, PostgreSQL, storage, auth, semantics, signing, and related services
-3. initializes schema through `apps/backend-api/src/db/init.js:202`
+3. initializes schema through `apps/backend-api/src/db/init.js:82`
 4. registers route groups through `apps/backend-api/src/bootstrap/register-routes.js:17`
 
 ## Backend Route Groups
@@ -67,9 +69,9 @@ The route registration file wires these HTTP surfaces:
 
 ## How Public Viewer Wiring Works
 
-The standalone public viewer starts in `apps/public-passport-viewer/src/bootstrap/index.js:1` and routes in `apps/public-passport-viewer/src/containers/PublicViewerApp.js:19`.
+The standalone public viewer starts in `apps/public-passport-viewer/src/bootstrap/index.js:1` and routes in `apps/public-passport-viewer/src/containers/PublicViewerApp.js:18`.
 
-It does not duplicate the full dashboard codebase. Instead, it imports the shared viewer UI from `apps/frontend-app/src/passport-viewer/...` through the `@frontend` alias configured in `apps/public-passport-viewer/vite.config.js:30`.
+It does not duplicate the full dashboard codebase. Instead, it imports the shared viewer UI from `apps/frontend-app/src/passport-viewer/...` through the `@frontend` alias configured in `apps/public-passport-viewer/vite.config.js:37`.
 
 ## Docker Wiring
 

@@ -43,6 +43,10 @@ read_env_var() {
   ' "$ENV_FILE"
 }
 
+uppercase_ascii() {
+  printf '%s' "$1" | LC_ALL=C tr '[:lower:]' '[:upper:]'
+}
+
 require_db_backup_env_var() {
   local key="$1"
   local value
@@ -51,7 +55,7 @@ require_db_backup_env_var() {
     echo "Missing required DB backup environment variable: $key"
     exit 1
   fi
-  case "${value^^}" in
+  case "$(uppercase_ascii "$value")" in
     *REPLACE*|*CHANGE*|*YOUR_*)
       echo "DB backup environment variable must not use a placeholder: $key"
       exit 1

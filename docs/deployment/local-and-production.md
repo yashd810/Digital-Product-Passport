@@ -9,6 +9,27 @@ There are two main ways to run the app documented in this repo:
 
 The files are related, but they are not the same thing.
 
+## External Environment Profiles
+
+All live environment files live outside the repository in:
+
+`/Users/yashdesai/Desktop/Digital Product Passport/Project Files/env`
+
+Keep that directory mode `700` and each profile a regular, non-symlinked
+mode-`600` file. It is intentionally not part of Git.
+
+| Profile | Purpose | Storage boundary |
+| --- | --- | --- |
+| `local-compose.env` | Inputs for `scripts/restart-local-stack.sh` and local Compose | PostgreSQL uses Docker-managed storage; the current profile disables application file storage and must not configure S3. |
+| `production.env` | Protected source profile for production application configuration | Application file storage uses the configured S3-compatible object store. |
+| `oci-deploy.env` | OCI target addresses, user, and local SSH file paths | Deployment connection metadata only; never application secrets. |
+
+`scripts/deploy/deploy-to-oci.sh` loads `oci-deploy.env` automatically from the
+external directory. It parses only its documented literal key/value entries and
+never sources the file as shell code. Copy
+`infra/oracle/oci-deploy.env.example` to that directory and set mode `600`.
+Shell variables remain available for one-off overrides.
+
 ## Local Stack
 
 Main file:
@@ -23,14 +44,17 @@ Current local behavior:
 - public viewer serves on port `3004`
 - marketing site serves on port `8080`
 - PostgreSQL runs on `5432`
-- PostgreSQL and backend local storage use Docker-managed named volumes
+- PostgreSQL uses a Docker-managed named volume; Compose also mounts a
+  pre-provisioned local-storage volume, but the current profile sets
+  `STORAGE_PROVIDER=disabled`
 - all published ports bind to `127.0.0.1` only
 - dashboard and viewer images use same-origin `/api` proxies rather than baking
   a direct local backend URL into browser assets
 
 Rebuild the local stack after source changes with
-`bash scripts/restart-local-stack.sh`. The script requires the untracked
-`docker/.env` to be a regular mode-`600` file and waits for service health.
+`bash scripts/restart-local-stack.sh`. The script reads the external
+`env/local-compose.env`, requires it to be a regular mode-`600` file, and waits
+for service health.
 For live source iteration, run the individual app commands from the repository
 instead of mounting source trees into containers.
 
@@ -51,7 +75,12 @@ Current production-style behavior:
 - backend uses `/data` mounted storage
 - `backend-storage-init` prepares `/data` directories for the non-root backend user before startup
 - PostgreSQL and local storage use named external volumes
-- the host environment file must be a regular mode-`600` file outside the repo
+- `env/production.env` is the protected production source profile and contains
+  the S3-compatible application-storage configuration; do not copy those values
+  into `env/local-compose.env`
+- the OCI host uses its own root-owned `/etc/dpp/dpp.env`, a regular mode-`600`
+  file outside the repository, populated deliberately from the intended
+  production configuration
 - production secrets must be independently generated; use
   `bash infra/oracle/generate-env-secrets.sh` to produce the required 256-bit
   values and matching P-256 signing pair
@@ -64,7 +93,7 @@ Current production-style behavior:
 
 Backend production guardrails are enforced in:
 
-- `apps/backend-api/src/bootstrap/runtime-config.js:142`
+- `apps/backend-api/src/bootstrap/runtime-config.js:364`
 
 That file checks:
 

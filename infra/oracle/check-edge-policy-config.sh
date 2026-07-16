@@ -27,6 +27,16 @@ check_caddyfile_template() {
     echo "FAIL: $file does not set X-Content-Type-Options at the edge"
     exit 1
   fi
+
+  if ! grep -q 'X-Frame-Options' "$file"; then
+    echo "FAIL: $file does not set X-Frame-Options at the edge"
+    exit 1
+  fi
+
+  if ! grep -q 'Permissions-Policy' "$file"; then
+    echo "FAIL: $file does not set Permissions-Policy at the edge"
+    exit 1
+  fi
 }
 
 check_api_security_headers() {

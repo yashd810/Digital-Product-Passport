@@ -9,13 +9,13 @@ The backend stores two kinds of things:
 
 PostgreSQL holds users, companies, passport registry records, passport types, workflow state, notifications, repository metadata, and more.
 
-Files such as repository uploads and passport-related files are stored through the storage service. In local development that is usually the local filesystem. In other environments it can be an object-storage provider.
+Files such as repository uploads and passport-related files are stored through the storage service. Local development can use the local filesystem when explicitly enabled; the current external local profile disables application file storage. Production uses the configured S3-compatible object-storage provider.
 
 ## Current Schema Source Of Truth
 
 The database initializer is:
 
-- `apps/backend-api/src/db/init.js:202`
+- `apps/backend-api/src/db/init.js:82`
 
 It is idempotent, which means startup can safely re-run the same schema setup logic.
 
@@ -44,7 +44,7 @@ That means the schema is partly fixed and partly generated from passport type de
 
 Runtime path derivation is in:
 
-- `apps/backend-api/src/bootstrap/runtime-config.js:12`
+- `apps/backend-api/src/bootstrap/runtime-config.js:103`
 
 Important directories:
 

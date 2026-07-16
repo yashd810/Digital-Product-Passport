@@ -81,9 +81,12 @@ function createWorkflowHelpers({
 
     const pRes = await pool.query(
       `SELECT * FROM ${tableName}
-       WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
+       WHERE "dppId" = $1
+         AND "companyId" = $2
+         AND "releaseStatus" IN ${editableReleaseStatusesSql}
+         AND "deletedAt" IS NULL
        ORDER BY "versionNumber" DESC LIMIT 1`,
-      [dppId]
+      [dppId, companyId]
     );
     if (!pRes.rows.length) throw new Error("Editable passport not found");
     const passport = normalizePassportRow(pRes.rows[0]);
@@ -102,8 +105,10 @@ function createWorkflowHelpers({
       await client.query("BEGIN");
       await client.query(
         `UPDATE ${tableName} SET "releaseStatus" = 'inReview', "updatedAt" = NOW()
-         WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql}`,
-        [dppId]
+         WHERE "dppId" = $1
+           AND "companyId" = $2
+           AND "releaseStatus" IN ${editableReleaseStatusesSql}`,
+        [dppId, companyId]
       );
 
       wfRes = await client.query(
@@ -138,8 +143,9 @@ function createWorkflowHelpers({
       `SELECT *
        FROM ${tableName}
        WHERE "dppId" = $1
+         AND "companyId" = $2
        ORDER BY "versionNumber" DESC LIMIT 1`,
-      [dppId]
+      [dppId, companyId]
     );
     if (updatedRes.rows.length) {
       await runBestEffort("Workflow archive after submit error", async () => archivePassportSnapshot({

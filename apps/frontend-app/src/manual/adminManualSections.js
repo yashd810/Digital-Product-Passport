@@ -167,7 +167,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         ],
       },
       facts: [
-        { label: "Policy endpoint", value: "GET, PUT, PATCH /api/admin/companies/:id/dpp-policy" },
+        { label: "Policy endpoint", value: "GET, PUT /api/admin/companies/:id/dpp-policy" },
         { label: "Compliance identity endpoint", value: "GET/POST /api/companies/:companyId/compliance-identity" },
         { label: "Facility endpoint", value: "POST /api/companies/:companyId/facilities" },
         { label: "DID surfaces", value: "/.well-known/did.json, /did/company/:slug/did.json, /did/:passportType/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json, and /resolve?did=..." },

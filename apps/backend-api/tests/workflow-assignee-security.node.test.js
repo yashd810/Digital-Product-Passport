@@ -66,3 +66,32 @@ test("workflow submission rejects malformed assignee IDs before any database que
     /reviewerId must be a valid user identifier/
   );
 });
+
+test("workflow submission scopes passport state changes to the supplied company", async () => {
+  const queries = [];
+  const helpers = createWorkflowHelper({
+    async query(sql, values) {
+      queries.push({ sql, values });
+      if (sql.includes("FROM users")) return { rows: [{ id: 10 }] };
+      return { rows: [] };
+    },
+  });
+
+  await assert.rejects(
+    helpers.submitPassportToWorkflow({
+      companyId: 7,
+      dppId: "company-b-passport",
+      passportType: "test",
+      userId: 10,
+      reviewerId: 10,
+    }),
+    /Editable passport not found/
+  );
+
+  assert.equal(queries.length, 2);
+  assert.match(
+    queries[1].sql,
+    /WHERE "dppId" = \$1\s+AND "companyId" = \$2\s+AND "releaseStatus" IN/
+  );
+  assert.deepEqual(queries[1].values, ["company-b-passport", 7]);
+});

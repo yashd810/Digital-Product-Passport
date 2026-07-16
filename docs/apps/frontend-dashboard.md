@@ -18,7 +18,7 @@ It includes:
 ## Entry Points
 
 - `apps/frontend-app/src/app/bootstrap/index.js:1`
-- `apps/frontend-app/src/app/containers/App.js:82`
+- `apps/frontend-app/src/app/containers/App.js:77`
 
 ## Main Frontend Areas
 
@@ -35,7 +35,7 @@ It includes:
 
 ## Route Shape
 
-The route map is centralized in `apps/frontend-app/src/app/containers/App.js:107`.
+The route map is centralized in `apps/frontend-app/src/app/containers/App.js:102`.
 
 Important route families:
 
@@ -45,7 +45,8 @@ Important route families:
 - `/create/:passportType`
 - `/edit/:dppId`
 - `/dictionary/:family/:version`
-- `/dpp/...` and `/p/...` viewer/redirect routes
+- `/dpp/preview/...` protected preview routes; canonical public `/dpp/...`
+  routes are served by the standalone viewer
 
 ## Theme, Auth, And Fetch Behavior
 

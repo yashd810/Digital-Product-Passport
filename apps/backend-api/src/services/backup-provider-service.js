@@ -1584,6 +1584,12 @@ module.exports = function createBackupProviderService({
     if (!normalizedKey) {
       throw new Error("providerKey is required");
     }
+    const normalizedCompanyId = companyId === null || companyId === undefined || companyId === ""
+      ? null
+      : Number.parseInt(companyId, 10);
+    if (normalizedCompanyId !== null && !Number.isFinite(normalizedCompanyId)) {
+      throw new Error("companyId must be a valid integer");
+    }
 
     const result = await pool.query(
       `INSERT INTO "backupServiceProviders" (
@@ -1602,9 +1608,10 @@ module.exports = function createBackupProviderService({
          "configJson" = EXCLUDED."configJson",
          "isActive" = EXCLUDED."isActive",
          "updatedAt" = NOW()
+       WHERE "backupServiceProviders"."companyId" IS NOT DISTINCT FROM EXCLUDED."companyId"
        RETURNING *`,
       [
-      companyId ? Number.parseInt(companyId, 10) : null,
+      normalizedCompanyId,
       normalizedKey,
       normalizeText(providerType, "ociObjectStorage"),
       normalizeText(displayName, normalizedKey),
@@ -1617,7 +1624,11 @@ module.exports = function createBackupProviderService({
 
     );
     const row = result.rows[0] || null;
-    if (!row) return null;
+    if (!row) {
+      const error = new Error("providerKey is already assigned to another company");
+      error.statusCode = 409;
+      throw error;
+    }
     return {
       id: row.id,
       companyId: row.companyId,
@@ -1634,14 +1645,23 @@ module.exports = function createBackupProviderService({
     };
   }
 
-  async function revokeProvider({ providerKey }) {
+  async function revokeProvider({ providerKey, companyId = null }) {
+    const normalizedKey = normalizeText(providerKey);
+    if (!normalizedKey) throw new Error("providerKey is required");
+    const normalizedCompanyId = companyId === null || companyId === undefined || companyId === ""
+      ? null
+      : Number.parseInt(companyId, 10);
+    if (normalizedCompanyId !== null && !Number.isFinite(normalizedCompanyId)) {
+      throw new Error("companyId must be a valid integer");
+    }
     const result = await pool.query(
       `UPDATE "backupServiceProviders"
        SET "isActive" = false,
            "updatedAt" = NOW()
        WHERE "providerKey" = $1
+         AND "companyId" IS NOT DISTINCT FROM $2
        RETURNING *`,
-      [providerKey]
+      [normalizedKey, normalizedCompanyId]
     );
     const row = result.rows[0] || null;
     if (!row) return null;

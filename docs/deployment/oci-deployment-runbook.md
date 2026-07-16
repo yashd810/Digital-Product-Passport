@@ -88,6 +88,24 @@ that is not group/world-readable and a pre-verified `known_hosts` file. Verify
 the OCI instance fingerprint in the OCI Console before adding it; do not rely on
 trust-on-first-use during production deployment.
 
+On the deployment workstation, keep the private profiles together outside the
+repository at:
+
+`/Users/yashdesai/Desktop/Digital Product Passport/Project Files/env`
+
+Use `production.env` as the protected production-configuration source. It is
+the only workstation profile that holds the S3-compatible application-storage
+configuration; local Compose intentionally uses `local-compose.env` and its
+Docker-managed volumes instead. Reconcile the intended production values into
+the backend host's `/etc/dpp/dpp.env` deliberately; do not replace that host
+file blindly because it contains host-specific database and application
+secrets.
+
+Keep `oci-deploy.env` in the same external directory with mode `600`. Copy
+`infra/oracle/oci-deploy.env.example` as its template. The deployment wrapper
+parses only its documented literal deployment keys and never sources it as shell
+code; it contains OCI addressing and local SSH paths, not application secrets.
+
 ## Public Marketing Content Preflight
 
 Before a frontend or all-in-one production deployment, replace the real public
@@ -133,26 +151,28 @@ ssh -i "$SSH_KEY" -o UserKnownHostsFile="$SSH_KNOWN_HOSTS" \
   'cd /opt/dpp && git log -1 --oneline && sudo docker ps --format "{{.Names}}\t{{.Ports}}"'
 ```
 
-3. Deploy the backend host first:
+3. Deploy the backend host first. With the default external
+   `env/oci-deploy.env` profile in place, no host address or private-key path
+   needs to be placed on the command line:
 
 ```bash
-SSH_KEY=<path-to-private-key> SSH_KNOWN_HOSTS=<verified-known-hosts-file> \
-  DPP_DEPLOY_TARGET=backend OCI_IP=<backend-host-ip> \
-  bash scripts/deploy/deploy-to-oci.sh
+DPP_DEPLOY_TARGET=backend bash scripts/deploy/deploy-to-oci.sh
 ```
 
 4. Deploy the frontend host second:
 
 ```bash
-SSH_KEY=<path-to-private-key> SSH_KNOWN_HOSTS=<verified-known-hosts-file> \
-  DPP_DEPLOY_TARGET=frontend OCI_IP=<frontend-host-ip> \
-  bash scripts/deploy/deploy-to-oci.sh
+DPP_DEPLOY_TARGET=frontend bash scripts/deploy/deploy-to-oci.sh
 ```
 
 The deploy helper pulls `main`, reuses `COMPOSE_PROJECT_NAME` from
 `/etc/dpp/dpp.env`, runs `docker compose up --build -d`, reloads Caddy, and
 performs local and public health checks. Do not run with a different compose
-project name unless you are deliberately creating a separate environment.
+project name unless you are deliberately creating a separate environment. For
+split hosts, it intentionally requires separate `backend` and `frontend`
+deployments rather than treating the two hosts as one `all` target. Explicit
+shell variables can be used for a one-off override, but never source the private
+deployment profile into a shell.
 
 For backend deployments, the helper also verifies the named local-storage and
 Postgres Docker volumes exist before compose starts. It prepares

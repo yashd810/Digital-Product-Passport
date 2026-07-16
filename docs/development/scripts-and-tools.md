@@ -52,11 +52,20 @@ Examples:
 - `infra/oracle/generate-env-secrets.sh`
 - `infra/oracle/check-marketing-public-content.sh`
 
-`restart-local-stack.sh` requires the local `docker/.env` to be an untracked
-regular file with mode `600`, validates Compose, recreates changed services, and
-waits for health checks. The OCI helpers require a private key that is not
-group/world-readable and a pre-verified `SSH_KNOWN_HOSTS` file; they do not
-accept a first-seen production host key.
+`restart-local-stack.sh` reads the external
+`/Users/yashdesai/Desktop/Digital Product Passport/Project Files/env/local-compose.env`
+file. It requires a regular mode-`600` file, validates Compose, recreates
+changed services, and waits for health checks. Local Compose uses Docker-managed
+storage volumes, so S3 settings belong only in the external `production.env`
+profile.
+
+`deploy-to-oci.sh` automatically reads the external mode-`600`
+`env/oci-deploy.env` file for OCI host addresses, user, and local SSH paths. It
+parses a fixed list of literal key/value pairs rather than sourcing shell code;
+use `infra/oracle/oci-deploy.env.example` as the non-secret template. The OCI
+helpers require a private key that is not group/world-readable and a
+pre-verified `SSH_KNOWN_HOSTS` file; they do not accept a first-seen production
+host key.
 
 `generate-env-secrets.sh --bootstrap` prints distinct 256-bit values, including
 `DB_PASSWORD`, and a matching P-256 signing pair for a new protected production

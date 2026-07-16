@@ -86,8 +86,12 @@ function updateEditablePassportUseCase(deps) {
 
     const current = await pool.query(
       `SELECT * FROM ${tableName}
-       WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL LIMIT 1`,
-      [dppId]
+       WHERE "dppId" = $1
+         AND "companyId" = $2
+         AND "releaseStatus" IN ${editableReleaseStatusesSql}
+         AND "deletedAt" IS NULL
+       LIMIT 1`,
+      [dppId, companyId]
     );
     if (!current.rows.length) throw Object.assign(new Error("Passport not found or not editable."), { statusCode: 404 });
 

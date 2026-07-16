@@ -120,6 +120,58 @@ test("asset-job response DTO exposes only validated configuration and requires a
   });
 });
 
+test("all asset-management routes enforce the company entitlement before their handlers", async () => {
+  const enabledCompany = { id: 7, isActive: true, assetManagementEnabled: true };
+  let checkedCompanyId = null;
+  const { routes } = createRouteHarness({
+    serviceOverrides: {
+      assertAssetManagementEnabled: async (companyId) => {
+        checkedCompanyId = companyId;
+        return enabledCompany;
+      },
+    },
+  });
+  const routeMiddleware = routes.find((entry) => entry.method === "use");
+  assert.ok(routeMiddleware);
+  const requireAssetManagementEnabled = routeMiddleware.handlers.at(-1);
+
+  const request = { params: { companyId: "7" } };
+  let nextCalled = false;
+  await requireAssetManagementEnabled(request, createResponse(), () => {
+    nextCalled = true;
+  });
+
+  assert.equal(checkedCompanyId, 7);
+  assert.strictEqual(request.assetManagementCompany, enabledCompany);
+  assert.equal(nextCalled, true);
+
+  const deniedError = Object.assign(
+    new Error("Passport Data Management is not enabled for this company"),
+    { statusCode: 403, code: "assetManagementDisabled" }
+  );
+  const deniedHarness = createRouteHarness({
+    serviceOverrides: {
+      assertAssetManagementEnabled: async () => {
+        throw deniedError;
+      },
+    },
+  });
+  const deniedMiddleware = deniedHarness.routes.find((entry) => entry.method === "use").handlers.at(-1);
+  const deniedResponse = createResponse();
+  await deniedMiddleware({ params: { companyId: "7" } }, deniedResponse, () => {
+    throw new Error("disabled asset management must not continue to the route handler");
+  });
+  assert.equal(deniedResponse.statusCode, 403);
+  assert.equal(deniedResponse.body.error, deniedError.message);
+
+  const invalidResponse = createResponse();
+  await requireAssetManagementEnabled({ params: { companyId: "7-not-a-company" } }, invalidResponse, () => {
+    throw new Error("invalid company IDs must not continue to the route handler");
+  });
+  assert.equal(invalidResponse.statusCode, 400);
+  assert.match(invalidResponse.body.error, /positive integer/);
+});
+
 test("asset push rejects browser-generated payloads and regenerates an internal payload from raw rows", async () => {
   let prepareInput = null;
   let executeInput = null;
@@ -407,4 +459,70 @@ test("scheduled jobs reject unsafe persisted credential fields before any outbou
     }),
     /credentialRef/
   );
+});
+
+test("entitlement revocation disables an in-flight scheduled job instead of rescheduling it", async () => {
+  const queries = [];
+  const deniedError = Object.assign(
+    new Error("Passport Data Management is not enabled for this company"),
+    { statusCode: 403, code: "assetManagementDisabled" }
+  );
+  const pool = {
+    async query(sql, params = []) {
+      queries.push({ sql, params });
+      if (sql.includes('UPDATE "assetManagementJobs"')) return { rows: [], rowCount: 1 };
+      if (sql.includes('INSERT INTO "assetManagementRuns"')) {
+        return { rows: [{ id: 91, createdAt: "2026-01-01T00:00:00.000Z" }] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+  const service = createAssetService({
+    pool,
+    assertAssetManagementEnabled: async () => {
+      throw deniedError;
+    },
+    isPlainObject: (value) => value !== null && typeof value === "object" && !Array.isArray(value),
+  });
+
+  const result = await service.runAssetManagementJob({
+    id: 12,
+    companyId: 7,
+    passportType: "battery",
+    sourceKind: "manual",
+    optionsJson: {},
+    isActive: true,
+    startAt: "2026-01-01T00:00:00.000Z",
+    intervalMinutes: 60,
+  }, "scheduled");
+
+  assert.equal(result.status, "disabled");
+  const jobUpdate = queries.find(({ sql }) => sql.includes('UPDATE "assetManagementJobs"'));
+  assert.ok(jobUpdate);
+  assert.equal(jobUpdate.params[0], 12);
+  assert.equal(jobUpdate.params[1], "disabled");
+  assert.equal(jobUpdate.params[3], null);
+  assert.equal(jobUpdate.params[4], false);
+  const runInsert = queries.find(({ sql }) => sql.includes('INSERT INTO "assetManagementRuns"'));
+  assert.ok(runInsert);
+  assert.equal(runInsert.params[5], "disabled");
+});
+
+test("scheduler selects only jobs belonging to active, enabled companies", async () => {
+  const queries = [];
+  const service = createAssetService({
+    pool: {
+      async query(sql) {
+        queries.push(sql);
+        return { rows: [] };
+      },
+    },
+  });
+
+  await service.processDueAssetJobs();
+
+  assert.equal(queries.length, 1);
+  assert.match(queries[0], /JOIN companies c ON c\.id = j\."companyId"/);
+  assert.match(queries[0], /c\."isActive" = true/);
+  assert.match(queries[0], /c\."assetManagementEnabled" = true/);
 });

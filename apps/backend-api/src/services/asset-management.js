@@ -1181,7 +1181,10 @@ module.exports = function createAssetService({
         result: pushResult
       };
     } catch (error) {
-      const nextRunAt = job.isActive ?
+      const entitlementRevoked = error?.code === "assetManagementDisabled"
+        || error?.code === "assetManagementCompanyInactive"
+        || error?.code === "assetManagementCompanyNotFound";
+      const nextRunAt = job.isActive && !entitlementRevoked ?
       resolveAssetJobNextRunAt({
         startAt: job.startAt || new Date(),
         intervalMinutes: job.intervalMinutes,
@@ -1193,14 +1196,15 @@ module.exports = function createAssetService({
         await pool.query(
           `UPDATE "assetManagementJobs"
            SET "lastRunAt" = NOW(),
-               "lastStatus" = 'failed',
-               "lastSummary" = $2,
-               "nextRunAt" = $3,
-               "isActive" = $4,
+               "lastStatus" = $2,
+               "lastSummary" = $3,
+               "nextRunAt" = $4,
+               "isActive" = $5,
                "updatedAt" = NOW()
            WHERE id = $1`,
           [
           job.id,
+          entitlementRevoked ? "disabled" : "failed",
           JSON.stringify({ error: error.message }),
           nextRunAt,
           nextRunAt ? true : false]
@@ -1214,14 +1218,14 @@ module.exports = function createAssetService({
         passportType: job.passportType,
         triggerType,
         sourceKind: job.sourceKind,
-        status: "failed",
+        status: entitlementRevoked ? "disabled" : "failed",
         summary: { error: error.message },
         requestJson: { options },
         generatedJson: null
       });
 
       return {
-        status: "failed",
+        status: entitlementRevoked ? "disabled" : "failed",
         run,
         error
       };
@@ -1233,12 +1237,15 @@ module.exports = function createAssetService({
     assetSchedulerBusy = true;
     try {
       const dueJobs = await pool.query(
-        `SELECT *
-         FROM "assetManagementJobs"
-         WHERE "isActive" = true
-           AND "nextRunAt" IS NOT NULL
-           AND "nextRunAt" <= NOW()
-         ORDER BY "nextRunAt" ASC
+        `SELECT j.*
+         FROM "assetManagementJobs" j
+         JOIN companies c ON c.id = j."companyId"
+         WHERE j."isActive" = true
+           AND c."isActive" = true
+           AND c."assetManagementEnabled" = true
+           AND j."nextRunAt" IS NOT NULL
+           AND j."nextRunAt" <= NOW()
+         ORDER BY j."nextRunAt" ASC
          LIMIT 10`
       );
 

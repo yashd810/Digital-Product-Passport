@@ -2,7 +2,8 @@
 
 const path = require("path");
 require("dotenv").config({
-  path: process.env.DOTENV_CONFIG_PATH || path.resolve(__dirname, "../../../docker/.env"),
+  path: process.env.DOTENV_CONFIG_PATH || process.env.DPP_ENV_FILE || path.resolve(__dirname, "../../../../../env/local-compose.env"),
+  quiet: true,
 });
 
 const { Pool } = require("pg");
