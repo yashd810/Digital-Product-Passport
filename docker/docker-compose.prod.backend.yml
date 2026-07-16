@@ -103,10 +103,13 @@ services:
 
 volumes:
   localStorageData:
-    name: "${LOCAL_STORAGE_VOLUME_NAME:-dppLocalStorageData}"
+    # Production volume identities are deliberately required. Falling back to a
+    # default here can attach a new empty volume after an environment-file
+    # mistake and make persistent data appear to have been wiped.
+    name: "${LOCAL_STORAGE_VOLUME_NAME:?LOCAL_STORAGE_VOLUME_NAME is required}"
     external: true
   postgresData:
-    name: "${POSTGRES_VOLUME_NAME:-dppPostgresData}"
+    name: "${POSTGRES_VOLUME_NAME:?POSTGRES_VOLUME_NAME is required}"
     external: true
 
 networks:

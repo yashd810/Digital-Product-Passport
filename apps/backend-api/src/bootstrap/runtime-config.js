@@ -338,8 +338,8 @@ function assertDatabaseName({ logger }) {
 function deriveRuntimeFlags() {
   const isProduction = process.env.NODE_ENV === "production";
   const runSchemaMigrations =
-    String(process.env.RUN_SCHEMA_MIGRATIONS || "").trim().toLowerCase() === "true"
-    || (!isProduction && String(process.env.RUN_SCHEMA_MIGRATIONS || "").trim().toLowerCase() !== "false");
+    !isProduction
+    && String(process.env.RUN_SCHEMA_MIGRATIONS || "").trim().toLowerCase() !== "false";
 
   const envAllowedOrigins = (process.env.ALLOWED_ORIGINS || "")
     .split(",")
@@ -366,6 +366,14 @@ function assertRequiredProductionEnvironment({ isProduction, logger }) {
   assertRequiredRuntimeOrigins({ isProduction, logger });
   assertCookieConfiguration({ logger });
   if (!isProduction) return;
+
+  if (String(process.env.RUN_SCHEMA_MIGRATIONS || "false").trim().toLowerCase() !== "false") {
+    logger.error(
+      { env: "RUN_SCHEMA_MIGRATIONS" },
+      "Production startup migrations are disabled; run the explicit db:migrate command during a controlled deployment."
+    );
+    process.exit(1);
+  }
 
   const requiredEnvVars = [
     "DB_HOST",

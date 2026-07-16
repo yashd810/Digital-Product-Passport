@@ -10,6 +10,11 @@ const test = require("node:test");
 const repoRoot = path.resolve(__dirname, "../../..");
 const templatePath = path.join(repoRoot, "infra/oracle/oci.env.example");
 const generatorPath = path.join(repoRoot, "infra/oracle/generate-env-secrets.sh");
+const deployScriptPath = path.join(repoRoot, "infra/oracle/deploy-prod.sh");
+const productionComposePaths = [
+  path.join(repoRoot, "docker/docker-compose.prod.backend.yml"),
+  path.join(repoRoot, "docker/docker-compose.prod.yml"),
+];
 
 function parseEnvLines(content) {
   return new Map(
@@ -55,6 +60,28 @@ test("production environment template declares dedicated DB backup S3 configurat
   assert.match(values.get("DB_BACKUP_S3_ENDPOINT"), /^https:\/\/YOUR_/);
   assert.match(values.get("DB_BACKUP_S3_ACCESS_KEY_ID"), /^REPLACE_/);
   assert.match(values.get("DB_BACKUP_S3_SECRET_ACCESS_KEY"), /^REPLACE_/);
+});
+
+test("production environment template fixes data-volume identities and disables startup migrations", () => {
+  const values = parseEnvLines(fs.readFileSync(templatePath, "utf8"));
+
+  assert.equal(values.get("COMPOSE_PROJECT_NAME"), "dpp");
+  assert.match(values.get("LOCAL_STORAGE_VOLUME_NAME"), /^[A-Za-z0-9][A-Za-z0-9_.-]*$/);
+  assert.match(values.get("POSTGRES_VOLUME_NAME"), /^[A-Za-z0-9][A-Za-z0-9_.-]*$/);
+  assert.equal(values.get("RUN_SCHEMA_MIGRATIONS"), "false");
+});
+
+test("production deployment fails closed rather than selecting a fresh database volume", () => {
+  for (const composePath of productionComposePaths) {
+    const compose = fs.readFileSync(composePath, "utf8");
+    assert.match(compose, /\$\{LOCAL_STORAGE_VOLUME_NAME:\?LOCAL_STORAGE_VOLUME_NAME is required\}/);
+    assert.match(compose, /\$\{POSTGRES_VOLUME_NAME:\?POSTGRES_VOLUME_NAME is required\}/);
+  }
+
+  const deployScript = fs.readFileSync(deployScriptPath, "utf8");
+  assert.match(deployScript, /require_exact_env_value "RUN_SCHEMA_MIGRATIONS" "false"/);
+  assert.match(deployScript, /Refusing deployment: expected PostgreSQL data volume is missing/);
+  assert.match(deployScript, /DPP_INITIALIZE_POSTGRES_VOLUME=true/);
 });
 
 function assertApplicationSecretOutput(values, { includesDbPassword }) {

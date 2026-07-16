@@ -68,6 +68,10 @@ const allowedUpperSnakeStringTokens = new Set([
   "CURRENT_TIMESTAMP",
   "IEC_61406_TRIANGLE",
   "LIMIT_FILE_SIZE",
+  // Production Compose owns these volume identifiers outside the Node runtime;
+  // tests assert their fail-closed deployment contract.
+  "LOCAL_STORAGE_VOLUME_NAME",
+  "POSTGRES_VOLUME_NAME",
   "QR_CODE_MODEL_2",
   "TG_OP",
   "TG_TABLE_NAME",

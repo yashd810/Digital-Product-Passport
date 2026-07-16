@@ -30,5 +30,8 @@ if [ "$ENV_MODE" != "600" ]; then
 fi
 
 DPP_ENV_FILE="$ENV_FILE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config --quiet
-DPP_ENV_FILE="$ENV_FILE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans --wait --wait-timeout "${LOCAL_STACK_WAIT_TIMEOUT:-180}"
+# Do not force-recreate PostgreSQL during an ordinary local restart. The named
+# volume is durable either way, but retaining the existing container removes a
+# needless initialization path and makes the persistence boundary explicit.
+DPP_ENV_FILE="$ENV_FILE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build --remove-orphans --wait --wait-timeout "${LOCAL_STACK_WAIT_TIMEOUT:-180}"
 DPP_ENV_FILE="$ENV_FILE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps

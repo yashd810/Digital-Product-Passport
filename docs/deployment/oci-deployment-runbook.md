@@ -106,6 +106,36 @@ Keep `oci-deploy.env` in the same external directory with mode `600`. Copy
 parses only its documented literal deployment keys and never sources it as shell
 code; it contains OCI addressing and local SSH paths, not application secrets.
 
+## PostgreSQL Persistence And First Bootstrap
+
+Set `COMPOSE_PROJECT_NAME`, `POSTGRES_VOLUME_NAME`, and
+`LOCAL_STORAGE_VOLUME_NAME` once in both the protected `production.env` source
+profile and the backend host's `/etc/dpp/dpp.env`. These are stable data
+identities, not deployment defaults. A normal deployment refuses to create a
+missing PostgreSQL volume, preventing a typo or a changed Compose project from
+silently selecting an empty database.
+
+Keep `RUN_SCHEMA_MIGRATIONS=false` for normal production operation. For a
+deliberate first database initialization or an approved fresh-data reset, run
+the deployment helper once with its one-time volume-initialization flag:
+
+```bash
+cd /opt/dpp
+sudo env DPP_ENV_FILE=/etc/dpp/dpp.env DPP_DEPLOY_TARGET=backend \
+  DPP_INITIALIZE_POSTGRES_VOLUME=true ./infra/oracle/deploy-prod.sh
+```
+
+When and only when the named PostgreSQL volume did not exist, that explicit
+flag creates it, starts PostgreSQL, runs `npm run db:migrate` once, and then
+starts the normal backend with startup migrations disabled. The flag is a
+shell-only maintenance action; do not add it to `/etc/dpp/dpp.env`.
+
+Do not use `docker compose down -v`, `docker volume rm`, or
+`DPP_INITIALIZE_POSTGRES_VOLUME=true` in routine operation. Those actions are
+only for an explicitly approved data reset. Container restarts, Docker daemon
+restarts, and normal `docker compose up --force-recreate` retain the named
+external PostgreSQL volume.
+
 ## Public Marketing Content Preflight
 
 Before a frontend or all-in-one production deployment, replace the real public

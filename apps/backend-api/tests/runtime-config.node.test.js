@@ -7,6 +7,7 @@ const {
   assertDatabaseName,
   assertProductionStorageReadiness,
   assertRequiredProductionEnvironment,
+  deriveRuntimeFlags,
 } = require("../src/bootstrap/runtime-config");
 
 function generateEscapedP256KeyPair() {
@@ -42,6 +43,7 @@ const requiredProductionEnv = {
   SESSION_COOKIE_NAME: "",
   ASSET_SOURCE_ALLOWED_HOSTS: "erp.example.com",
   OAUTH_ALLOW_INSECURE_HTTP: "",
+  RUN_SCHEMA_MIGRATIONS: "false",
 };
 
 const validStorageConfig = {
@@ -114,6 +116,19 @@ function captureProductionGuard(overrides = {}) {
 test("production environment guard accepts public HTTPS app and API URLs", () => {
   const result = captureProductionGuard();
   assert.equal(result.exited, false);
+});
+
+test("production environment guard rejects automatic schema migration on container startup", () => {
+  const result = captureProductionGuard({ RUN_SCHEMA_MIGRATIONS: "true" });
+  assert.equal(result.exited, true);
+  assert.equal(result.code, 1);
+  assert.equal(result.errors[0][0].env, "RUN_SCHEMA_MIGRATIONS");
+});
+
+test("runtime flags never enable startup schema migration in production", () => {
+  withEnv({ NODE_ENV: "production", RUN_SCHEMA_MIGRATIONS: "true" }, () => {
+    assert.equal(deriveRuntimeFlags().runSchemaMigrations, false);
+  });
 });
 
 test("security environment guard fails closed outside production", () => {

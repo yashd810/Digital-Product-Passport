@@ -75,6 +75,10 @@ Current production-style behavior:
 - backend uses `/data` mounted storage
 - `backend-storage-init` prepares `/data` directories for the non-root backend user before startup
 - PostgreSQL and local storage use named external volumes
+- production fixes `COMPOSE_PROJECT_NAME`, `POSTGRES_VOLUME_NAME`, and
+  `LOCAL_STORAGE_VOLUME_NAME` in its protected environment file; do not rename
+  either volume after initialization because that would select a different,
+  empty data store
 - `env/production.env` is the protected production source profile and contains
   the S3-compatible application-storage configuration; do not copy those values
   into `env/local-compose.env`
@@ -86,6 +90,9 @@ Current production-style behavior:
   values and matching P-256 signing pair
 - production PostgreSQL receives only its database name, user, and password;
   it does not load the full DPP environment file
+- normal production starts use `RUN_SCHEMA_MIGRATIONS=false` and only verify the
+  schema; run `npm run db:migrate` explicitly during a controlled upgrade or
+  first bootstrap rather than on every container restart
 - enabled host-level DB backups require a dedicated S3-compatible credential
   and backup bucket, separate from application file storage
 

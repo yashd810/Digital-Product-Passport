@@ -5,6 +5,8 @@ APP_DIR="${APP_DIR:-/opt/dpp}"
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 LOCK_FILE=""
+INITIALIZE_POSTGRES_VOLUME="${DPP_INITIALIZE_POSTGRES_VOLUME:-false}"
+POSTGRES_VOLUME_WAS_CREATED=false
 
 file_mode() {
   local file="$1"
@@ -153,6 +155,27 @@ require_boolean_env_var() {
   esac
 }
 
+require_exact_env_value() {
+  local key="$1"
+  local expected="$2"
+  local value
+  value="$(read_env_var "$key")"
+  if [ "$value" != "$expected" ]; then
+    echo "Production env var $key must be $expected"
+    exit 1
+  fi
+}
+
+require_docker_volume_name_env() {
+  local key="$1"
+  local value
+  value="$(read_env_var "$key")"
+  if ! [[ "$value" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+    echo "Production env var $key must be a Docker volume name"
+    exit 1
+  fi
+}
+
 require_distinct_secret_env_vars() {
   local first="$1"
   local second="$2"
@@ -240,6 +263,15 @@ if ! command -v flock >/dev/null 2>&1; then
   echo "flock is required to prevent concurrent deployments."
   exit 1
 fi
+
+case "$INITIALIZE_POSTGRES_VOLUME" in
+  true|false)
+    ;;
+  *)
+    echo "DPP_INITIALIZE_POSTGRES_VOLUME must be true or false when set"
+    exit 1
+    ;;
+esac
 
 prepare_deployment_lock
 
@@ -351,6 +383,9 @@ case "$DEPLOY_TARGET" in
     require_env_var "DB_USER"
     require_secret_env_var "DB_PASSWORD"
     require_env_var "DB_NAME"
+    require_exact_env_value "RUN_SCHEMA_MIGRATIONS" "false"
+    require_docker_volume_name_env "LOCAL_STORAGE_VOLUME_NAME"
+    require_docker_volume_name_env "POSTGRES_VOLUME_NAME"
     require_env_var "ALLOWED_ORIGINS"
     require_https_url_env "APP_URL"
     require_https_url_env "SERVER_URL"
@@ -648,6 +683,26 @@ ensure_docker_volume() {
   echo "Created fresh $label volume: $name"
 }
 
+ensure_postgres_volume() {
+  local name="$1"
+
+  if docker volume inspect "$name" >/dev/null 2>&1; then
+    echo "Using existing PostgreSQL data volume: $name"
+    return 0
+  fi
+
+  if [ "$INITIALIZE_POSTGRES_VOLUME" != "true" ]; then
+    echo "Refusing deployment: expected PostgreSQL data volume is missing: $name"
+    echo "A normal deployment never creates an empty database volume."
+    echo "For a deliberate first bootstrap or approved reset only, rerun with DPP_INITIALIZE_POSTGRES_VOLUME=true."
+    exit 1
+  fi
+
+  docker volume create "$name" >/dev/null
+  POSTGRES_VOLUME_WAS_CREATED=true
+  echo "Created approved fresh PostgreSQL data volume: $name"
+}
+
 prepare_local_storage_volume() {
   local name="$1"
   local mountpoint
@@ -665,42 +720,33 @@ prepare_local_storage_volume() {
   echo "Prepared local storage volume directories for container user: $name"
 }
 
-EXPLICIT_POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-}"
-if [ -z "$EXPLICIT_POSTGRES_VOLUME_NAME" ]; then
-  EXPLICIT_POSTGRES_VOLUME_NAME="$(read_env_var POSTGRES_VOLUME_NAME)"
-fi
-
 echo "Deploying target=$DEPLOY_TARGET compose=$COMPOSE_FILE project=$COMPOSE_PROJECT_NAME remove_orphans=$REMOVE_ORPHANS"
 validate_caddy_template
 
 if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   CURRENT_POSTGRES_VOLUMES="$(
     docker volume ls --format '{{.Name}}' 2>/dev/null \
-      | grep -E '(^|[_-])(postgresData)$' \
+      | grep -Ei '(postgresData|postgres_data|postgres-data)$' \
       || true
   )"
   if [ -n "$CURRENT_POSTGRES_VOLUMES" ]; then
     echo "Detected postgres volumes:"
     echo "$CURRENT_POSTGRES_VOLUMES" | sed 's/^/  - /'
   fi
-  POSTGRES_VOLUME_COUNT="$(printf '%s\n' "$CURRENT_POSTGRES_VOLUMES" | sed '/^$/d' | wc -l | tr -d ' ')"
-  if [ "${POSTGRES_VOLUME_COUNT:-0}" -gt 1 ] && [ -z "$EXPLICIT_POSTGRES_VOLUME_NAME" ]; then
-    echo "Refusing deployment: multiple postgresData-style volumes were detected, but POSTGRES_VOLUME_NAME is not set."
-    echo "Set POSTGRES_VOLUME_NAME in $ENV_FILE to the exact live volume you intend to use before deploying."
-    echo "This guard prevents Docker Compose from attaching a fresh database volume by accident."
-    exit 1
-  fi
-
-  LOCAL_STORAGE_VOLUME_NAME="${LOCAL_STORAGE_VOLUME_NAME:-$(read_env_var LOCAL_STORAGE_VOLUME_NAME)}"
-  LOCAL_STORAGE_VOLUME_NAME="${LOCAL_STORAGE_VOLUME_NAME:-dppLocalStorageData}"
-  POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-$(read_env_var POSTGRES_VOLUME_NAME)}"
-  POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-dppPostgresData}"
+  LOCAL_STORAGE_VOLUME_NAME="$(read_env_var LOCAL_STORAGE_VOLUME_NAME)"
+  POSTGRES_VOLUME_NAME="$(read_env_var POSTGRES_VOLUME_NAME)"
   ensure_docker_volume "$LOCAL_STORAGE_VOLUME_NAME" "local storage"
-  ensure_docker_volume "$POSTGRES_VOLUME_NAME" "PostgreSQL data"
+  ensure_postgres_volume "$POSTGRES_VOLUME_NAME"
   prepare_local_storage_volume "$LOCAL_STORAGE_VOLUME_NAME"
 fi
 
 DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" config --quiet
+if [ "$POSTGRES_VOLUME_WAS_CREATED" = "true" ]; then
+  echo "Bootstrapping the approved fresh PostgreSQL volume with one explicit schema migration..."
+  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up --build -d postgres
+  wait_for_container_health "postgres" "PostgreSQL" 40 2
+  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --no-deps --build backend-api npm run db:migrate
+fi
 if [ "$DEPLOY_TARGET" = "frontend" ]; then
   deploy_frontend_sequentially
 else
