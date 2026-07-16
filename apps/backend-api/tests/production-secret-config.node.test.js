@@ -17,6 +17,7 @@ const productionComposePaths = [
   path.join(repoRoot, "docker/docker-compose.prod.backend.yml"),
   path.join(repoRoot, "docker/docker-compose.prod.yml"),
 ];
+const frontendComposePath = path.join(repoRoot, "docker/docker-compose.prod.frontend.yml");
 
 function parseEnvLines(content) {
   return new Map(
@@ -142,6 +143,24 @@ test("production deployment fails closed rather than selecting a fresh database 
   assert.match(deployScript, /unset COMPOSE_BAKE/);
   assert.match(deployScript, /export COMPOSE_PARALLEL_LIMIT=1/);
   assert.match(deployScript, /docker buildx version/);
+  assert.match(deployScript, /docker buildx bake --load -f - "\$service_name"/);
+  assert.match(deployScript, /UP_ARGS=\(up --no-build/);
+  assert.doesNotMatch(deployScript, /up --build/);
+});
+
+test("production Compose files use explicit image identities for sequential Buildx loads", () => {
+  const backendCompose = fs.readFileSync(productionComposePaths[0], "utf8");
+  const allInOneCompose = fs.readFileSync(productionComposePaths[1], "utf8");
+  const frontendCompose = fs.readFileSync(frontendComposePath, "utf8");
+
+  for (const compose of [backendCompose, allInOneCompose]) {
+    assert.match(compose, /backend-api:\n    image: dpp-backend-api:latest/);
+  }
+  for (const compose of [frontendCompose, allInOneCompose]) {
+    assert.match(compose, /frontend-app:\n    image: dpp-frontend-app:latest/);
+    assert.match(compose, /public-passport-viewer:\n    image: dpp-public-passport-viewer:latest/);
+    assert.match(compose, /marketing-site:\n    image: dpp-marketing-site:latest/);
+  }
 });
 
 function assertApplicationSecretOutput(values, { includesDbPassword }) {

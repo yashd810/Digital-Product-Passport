@@ -450,7 +450,7 @@ if [ "$REMOVE_ORPHANS" = "true" ]; then
   ORPHAN_ARGS=(--remove-orphans)
 fi
 
-UP_ARGS=(up --build -d "${ORPHAN_ARGS[@]}")
+UP_ARGS=(up --no-build -d "${ORPHAN_ARGS[@]}")
 RECREATE_SERVICES=()
 
 case "$DEPLOY_TARGET" in
@@ -493,14 +493,41 @@ wait_for_service_http() {
   esac
 }
 
+build_service_image() {
+  local service_name="$1"
+
+  echo "Building service image sequentially with Buildx: $service_name"
+  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" config --format json \
+    | docker buildx bake --load -f - "$service_name"
+}
+
+build_target_images_sequentially() {
+  local services=()
+  local service_name
+
+  case "$DEPLOY_TARGET" in
+    backend)
+      services=(postgres backend-api)
+      ;;
+    frontend)
+      services=(frontend-app public-passport-viewer marketing-site)
+      ;;
+    all)
+      services=(postgres backend-api frontend-app public-passport-viewer marketing-site)
+      ;;
+  esac
+
+  for service_name in "${services[@]}"; do
+    build_service_image "$service_name"
+  done
+}
+
 deploy_frontend_sequentially() {
   local services=(frontend-app public-passport-viewer marketing-site)
   local service
   for service in "${services[@]}"; do
-    echo "Building service sequentially: $service"
-    DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build "$service"
     echo "Recreating service sequentially: $service"
-    DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-deps --force-recreate "$service"
+    DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --no-deps --force-recreate "$service"
     wait_for_container_health "$service" "$service container" 50 2
     wait_for_service_http "$service"
     sleep 2
@@ -748,13 +775,14 @@ if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
 fi
 
 DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" config --quiet
+build_target_images_sequentially
 if [ "$POSTGRES_VOLUME_WAS_CREATED" = "true" ]; then
   echo "Bootstrapping the approved fresh PostgreSQL volume with one explicit schema migration..."
-  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up --build -d postgres
+  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up --no-build -d postgres
   wait_for_container_health "postgres" "PostgreSQL" 40 2
   # The production image intentionally removes npm after installing runtime
   # dependencies, so invoke the checked-in migration entry point with Node.
-  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --no-deps --build backend-api node scripts/migrate-db.js
+  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --no-deps --no-build backend-api node scripts/migrate-db.js
 fi
 if [ "$DEPLOY_TARGET" = "frontend" ]; then
   deploy_frontend_sequentially

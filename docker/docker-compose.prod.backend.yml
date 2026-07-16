@@ -1,5 +1,6 @@
 services:
   backend-api:
+    image: dpp-backend-api:latest
     build:
       context: ..
       dockerfile: apps/backend-api/Dockerfile

@@ -1,5 +1,6 @@
 services:
   frontend-app:
+    image: dpp-frontend-app:latest
     build:
       context: ..
       dockerfile: apps/frontend-app/Dockerfile
@@ -27,6 +28,7 @@ services:
       - ALL
 
   public-passport-viewer:
+    image: dpp-public-passport-viewer:latest
     build:
       context: ..
       dockerfile: apps/public-passport-viewer/Dockerfile
@@ -54,6 +56,7 @@ services:
       - ALL
 
   backend-api:
+    image: dpp-backend-api:latest
     build:
       context: ..
       dockerfile: apps/backend-api/Dockerfile
@@ -121,6 +124,7 @@ services:
       - FOWNER
 
   marketing-site:
+    image: dpp-marketing-site:latest
     build:
       context: ..
       dockerfile: apps/marketing-site/Dockerfile
