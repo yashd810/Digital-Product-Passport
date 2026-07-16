@@ -745,7 +745,9 @@ if [ "$POSTGRES_VOLUME_WAS_CREATED" = "true" ]; then
   echo "Bootstrapping the approved fresh PostgreSQL volume with one explicit schema migration..."
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up --build -d postgres
   wait_for_container_health "postgres" "PostgreSQL" 40 2
-  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --no-deps --build backend-api npm run db:migrate
+  # The production image intentionally removes npm after installing runtime
+  # dependencies, so invoke the checked-in migration entry point with Node.
+  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --no-deps --build backend-api node scripts/migrate-db.js
 fi
 if [ "$DEPLOY_TARGET" = "frontend" ]; then
   deploy_frontend_sequentially

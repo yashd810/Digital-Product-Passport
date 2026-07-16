@@ -91,8 +91,9 @@ Current production-style behavior:
 - production PostgreSQL receives only its database name, user, and password;
   it does not load the full DPP environment file
 - normal production starts use `RUN_SCHEMA_MIGRATIONS=false` and only verify the
-  schema; run `npm run db:migrate` explicitly during a controlled upgrade or
-  first bootstrap rather than on every container restart
+  schema; run `node scripts/migrate-db.js` explicitly inside the backend
+  container during a controlled upgrade or first bootstrap rather than on every
+  container restart
 - enabled host-level DB backups require a dedicated S3-compatible credential
   and backup bucket, separate from application file storage
 

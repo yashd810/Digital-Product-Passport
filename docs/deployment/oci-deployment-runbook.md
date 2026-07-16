@@ -126,7 +126,7 @@ sudo env DPP_ENV_FILE=/etc/dpp/dpp.env DPP_DEPLOY_TARGET=backend \
 ```
 
 When and only when the named PostgreSQL volume did not exist, that explicit
-flag creates it, starts PostgreSQL, runs `npm run db:migrate` once, and then
+flag creates it, starts PostgreSQL, runs `node scripts/migrate-db.js` once, and then
 starts the normal backend with startup migrations disabled. The flag is a
 shell-only maintenance action; do not add it to `/etc/dpp/dpp.env`.
 
@@ -237,11 +237,11 @@ On the backend host:
 ```bash
 cd /opt/dpp
 sudo docker compose -p dpp -f docker/docker-compose.prod.backend.yml \
-  --env-file /etc/dpp/dpp.env exec -T backend-api npm run db:migrate
+  --env-file /etc/dpp/dpp.env exec -T backend-api node scripts/migrate-db.js
 sudo docker compose -p dpp -f docker/docker-compose.prod.backend.yml \
-  --env-file /etc/dpp/dpp.env exec -T backend-api npm run check:passport-storage
+  --env-file /etc/dpp/dpp.env exec -T backend-api node scripts/check-passport-storage.js
 sudo docker compose -p dpp -f docker/docker-compose.prod.backend.yml \
-  --env-file /etc/dpp/dpp.env exec -T backend-api npm run verify:live-confidentiality
+  --env-file /etc/dpp/dpp.env exec -T backend-api node scripts/verify-live-confidentiality.js
 ```
 
 Check external port exposure from your workstation:

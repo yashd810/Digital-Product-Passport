@@ -82,6 +82,8 @@ test("production deployment fails closed rather than selecting a fresh database 
   assert.match(deployScript, /require_exact_env_value "RUN_SCHEMA_MIGRATIONS" "false"/);
   assert.match(deployScript, /Refusing deployment: expected PostgreSQL data volume is missing/);
   assert.match(deployScript, /DPP_INITIALIZE_POSTGRES_VOLUME=true/);
+  assert.match(deployScript, /node scripts\/migrate-db\.js/);
+  assert.doesNotMatch(deployScript, /npm run db:migrate/);
 });
 
 function assertApplicationSecretOutput(values, { includesDbPassword }) {
