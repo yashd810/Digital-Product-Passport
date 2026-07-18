@@ -847,7 +847,7 @@ if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   # dependencies, so invoke the checked-in migration entry point with Node.
   # This is deliberately part of a controlled deployment, never application
   # startup: ordinary restarts retain the existing schema and data unchanged.
-  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --no-deps --no-build backend-api node scripts/migrate-db.js
+  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --no-deps backend-api node scripts/migrate-db.js
 fi
 if [ "$DEPLOY_TARGET" = "frontend" ]; then
   deploy_frontend_sequentially
