@@ -10,6 +10,7 @@ test("public snapshots allowlist metadata and explicitly public schema fields", 
   const snapshot = buildPublicPassportSnapshot(
     {
       dppId: "dpp-1",
+      guid: "retired-guid",
       companyId: 7,
       internalAliasId: "private-alias",
       modelName: "Public model",
@@ -39,6 +40,7 @@ test("public snapshots allowlist metadata and explicitly public schema fields", 
   );
 
   assert.equal(snapshot.dppId, "dpp-1");
+  assert.equal(snapshot.guid, undefined);
   assert.equal(snapshot.modelName, "Public model");
   assert.equal(snapshot.publicField, "public-value");
   assert.equal(snapshot.restrictedField, undefined);

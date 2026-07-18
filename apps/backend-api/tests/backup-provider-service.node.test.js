@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const test = require("node:test");
 const createBackupProviderService = require("../src/services/backup-provider-service");
 
@@ -13,20 +14,24 @@ test("implicit env backup provider is normalized before passport replication", a
   const previousEnabled = process.env.BACKUP_PROVIDER_ENABLED;
   const previousKey = process.env.BACKUP_PROVIDER_KEY;
   const previousPrefix = process.env.BACKUP_PROVIDER_OBJECT_PREFIX;
+  const previousSupportsPublicHandover = process.env.BACKUP_PROVIDER_SUPPORTS_PUBLIC_HANDOVER;
 
   process.env.BACKUP_PROVIDER_ENABLED = "true";
   process.env.BACKUP_PROVIDER_KEY = "oci-test";
   process.env.BACKUP_PROVIDER_OBJECT_PREFIX = "custom-prefix";
+  delete process.env.BACKUP_PROVIDER_SUPPORTS_PUBLIC_HANDOVER;
 
   t.after(() => {
     restoreEnv("BACKUP_PROVIDER_ENABLED", previousEnabled);
     restoreEnv("BACKUP_PROVIDER_KEY", previousKey);
     restoreEnv("BACKUP_PROVIDER_OBJECT_PREFIX", previousPrefix);
+    restoreEnv("BACKUP_PROVIDER_SUPPORTS_PUBLIC_HANDOVER", previousSupportsPublicHandover);
   });
 
   let replicationParams = null;
   let savedObject = null;
   let savedPayload = null;
+  let applicationStorageWrites = 0;
   const pool = {
     async query(sql, params = []) {
       if (sql.includes("FROM \"backupServiceProviders\"")) return { rows: [] };
@@ -45,7 +50,14 @@ test("implicit env backup provider is normalized before passport replication", a
     },
   };
   const storageService = {
-    provider: "local",
+    provider: "s3",
+    async saveObject() {
+      applicationStorageWrites += 1;
+      throw new Error("Application storage must never receive backup writes");
+    },
+  };
+  const backupStorageService = {
+    provider: "backup-s3",
     async saveObject(input) {
       savedObject = input;
       savedPayload = JSON.parse(input.buffer.toString("utf8"));
@@ -56,6 +68,7 @@ test("implicit env backup provider is normalized before passport replication", a
   const service = createBackupProviderService({
     pool,
     storageService,
+    backupStorageService,
     apiOrigin: "https://api.example.test",
     buildCanonicalPassportPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
@@ -89,6 +102,9 @@ test("implicit env backup provider is normalized before passport replication", a
   });
 
   assert.equal(result.success, true);
+  const [implicitProvider] = await service.listProviders({ companyId: 7 });
+  assert.equal(implicitProvider.supportsPublicHandover, false);
+  assert.equal(applicationStorageWrites, 0);
   assert.equal(replicationParams[1], "oci-test");
   assert.equal(replicationParams[6], "alias-1");
   assert.equal(replicationParams[10], "synced");
@@ -99,7 +115,7 @@ test("implicit env backup provider is normalized before passport replication", a
   assert.equal(savedPayload.publicRowData.unknownColumn, undefined);
 });
 
-test("backup provider queries use quoted canonical schema columns", async () => {
+test("backup provider queries use quoted canonical schema columns and expose no automatic handover API", async () => {
   const queries = [];
   const pool = {
     async query(sql) {
@@ -113,20 +129,11 @@ test("backup provider queries use quoted canonical schema columns", async () => 
     buildCanonicalPassportPayload: () => ({}),
   });
 
-  const previousAutoHandover = process.env.BACKUP_PUBLIC_HANDOVER_AUTO_ENABLE;
-  process.env.BACKUP_PUBLIC_HANDOVER_AUTO_ENABLE = "true";
-  try {
-    await service.listProviders({ companyId: 7 });
-    await service.ensureAutomaticPublicHandover({ passportDppId: "dpp-1", internalAliasId: "alias-1" });
-  } finally {
-    restoreEnv("BACKUP_PUBLIC_HANDOVER_AUTO_ENABLE", previousAutoHandover);
-  }
+  await service.listProviders({ companyId: 7 });
 
   assert.match(queries[0], /"isBackupProvider" = true/);
   assert.match(queries[0], /"isActive" = true/);
-  assert.match(queries[1], /"replicationStatus" = 'synced'/);
-  assert.match(queries[1], /"verificationStatus" = 'verified'/);
-  assert.match(queries[1], /"internalAliasId" AS "internalAliasId"/);
+  assert.equal(service.ensureAutomaticPublicHandover, undefined);
 });
 
 test("public handover rows expose camelCase fields expected by callers", async () => {
@@ -173,4 +180,59 @@ test("public handover rows expose camelCase fields expected by callers", async (
   assert.equal(handover.handoverStatus, "active");
   assert.equal(handover.verificationStatus, "verified");
   assert.deepEqual(handover.publicRowData, { dppId: "dpp-1" });
+});
+
+test("backup verification reads the provider-scoped backup store rather than application storage", async () => {
+  const payload = {
+    passport: { digitalProductPassportId: "dpp-1" },
+    source: { passportDppId: "dpp-1" },
+    documentation: {},
+  };
+  const serializedPayload = JSON.stringify(payload);
+  const expectedHash = crypto.createHash("sha256").update(serializedPayload).digest("hex");
+  const backupReads = [];
+  let applicationStorageReads = 0;
+  let verificationUpdate = null;
+  const service = createBackupProviderService({
+    pool: {
+      async query(sql, params = []) {
+        if (sql.includes("SELECT id, \"passportDppId\", \"payloadHash\", \"storageKey\"")) {
+          return {
+            rows: [{
+              id: 42,
+              passportDppId: "dpp-1",
+              payloadHash: expectedHash,
+              storageKey: "backup-provider/company-7/passport-dpp-1/v1/releasedCurrent.json",
+            }],
+          };
+        }
+        if (sql.includes("UPDATE \"passportBackupReplications\"")) {
+          verificationUpdate = params;
+          return { rows: [{ id: params[0], verificationStatus: params[1] }] };
+        }
+        return { rows: [] };
+      },
+    },
+    storageService: {
+      async fetchObject() {
+        applicationStorageReads += 1;
+        throw new Error("Application storage must never verify backup objects");
+      },
+    },
+    backupStorageService: {
+      provider: "backup-s3",
+      async fetchObject(storageKey) {
+        backupReads.push(storageKey);
+        return { arrayBuffer: async () => Buffer.from(serializedPayload, "utf8") };
+      },
+    },
+    buildCanonicalPassportPayload: () => ({}),
+  });
+
+  const result = await service.verifyReplications({ companyId: 7, passportDppId: "dpp-1" });
+
+  assert.equal(result.success, true);
+  assert.equal(applicationStorageReads, 0);
+  assert.deepEqual(backupReads, ["backup-provider/company-7/passport-dpp-1/v1/releasedCurrent.json"]);
+  assert.deepEqual(verificationUpdate.slice(0, 2), [42, "verified"]);
 });

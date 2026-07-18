@@ -502,10 +502,11 @@ module.exports = function registerAuthRoutes(app, {
     try {
       if (!oauthService?.isEnabled) return res.status(404).json({ error: "SSO is not configured" });
       const redirectTo = String(req.query.next || "").trim();
-      const authUrl = await oauthService.beginLogin(req.params.providerKey, req, redirectTo);
+      const authUrl = await oauthService.beginLogin(req.params.providerKey, res, redirectTo);
       res.redirect(authUrl);
     } catch (e) {
-      res.status(400).json({ error: e.message || "Failed to start SSO login" });
+      logger.warn({ err: e, providerKey: req.params.providerKey }, "Failed to start SSO login");
+      res.status(400).json({ error: "Failed to start SSO login" });
     }
   });
 
@@ -515,8 +516,9 @@ module.exports = function registerAuthRoutes(app, {
       const redirectUrl = await oauthService.handleCallback(req.params.providerKey, req, res);
       res.redirect(redirectUrl);
     } catch (e) {
+      logger.warn({ err: e, providerKey: req.params.providerKey }, "SSO login callback failed");
       const appUrl = getAppOrigin();
-      res.redirect(`${appUrl}/login?error=${encodeURIComponent(e.message || "SSO login failed")}`);
+      res.redirect(`${appUrl}/login?error=${encodeURIComponent("SSO login failed")}`);
     }
   });
 

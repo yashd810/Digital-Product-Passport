@@ -27,17 +27,62 @@ function createProviderEnv(overrides = {}) {
 
 const publicDnsLookup = async () => [{ address: "93.184.216.34", family: 4 }];
 
-function createOauthTestService({ jwt, fetchImpl, dnsLookup = publicDnsLookup } = {}) {
+function createOauthTransactionPool(delegate = { query: async () => ({ rows: [] }) }) {
+  const transactions = new Map();
+  return {
+    transactions,
+    async query(sql, params = []) {
+      if (sql.includes('DELETE FROM "oauthLoginTransactions" WHERE "expiresAt" <= NOW()')) {
+        return { rows: [] };
+      }
+      if (sql.includes('INSERT INTO "oauthLoginTransactions"')) {
+        transactions.set(params[0], {
+          providerKey: params[1],
+          nonce: params[2],
+          codeVerifier: params[3],
+          redirectTo: params[4],
+          bindingHash: params[5],
+        });
+        return { rows: [] };
+      }
+      if (sql.includes('DELETE FROM "oauthLoginTransactions"') && sql.includes('"bindingHash" = $2')) {
+        const transaction = transactions.get(params[0]);
+        if (!transaction || transaction.bindingHash !== params[1] || transaction.providerKey !== params[2]) {
+          return { rows: [] };
+        }
+        transactions.delete(params[0]);
+        return { rows: [transaction] };
+      }
+      return delegate.query(sql, params);
+    },
+  };
+}
+
+function seedOauthTransaction(pool, {
+  state = "s".repeat(43),
+  bindingToken = "b".repeat(43),
+  providerKey = "test",
+  nonce = "nonce-1",
+  codeVerifier = "verifier-1",
+  redirectTo = "/",
+} = {}) {
+  const stateHash = crypto.createHash("sha256").update(state).digest("hex");
+  const bindingHash = crypto.createHash("sha256").update(bindingToken).digest("hex");
+  pool.transactions.set(stateHash, { providerKey, nonce, codeVerifier, redirectTo, bindingHash });
+  return { state, bindingToken };
+}
+
+function createOauthTestService({ jwt, fetchImpl, dnsLookup = publicDnsLookup, pool } = {}) {
   return createOauthService({
     jwt: jwt || {
-      sign: () => "state-token",
       verify: () => ({}),
       decode: () => null,
     },
-    pool: { query: async () => ({ rows: [] }) },
-    jwtSecret: "state-secret",
+    pool: pool || createOauthTransactionPool(),
     generateToken: () => "session-token",
     setAuthCookie: () => {},
+    setOauthTransactionCookie: () => {},
+    clearOauthTransactionCookie: () => {},
     cache: { wrap: async (_key, _ttl, loader) => loader() },
     hashPassword: async () => ({ hash: "hash" }),
     fetchImpl: fetchImpl || (async () => ({ ok: false, json: async () => ({}) })),
@@ -163,6 +208,109 @@ test("OAuth discovery fetches refuse redirects", async (t) => {
   assert.equal(requestOptions?.redirect, "error");
 });
 
+test("OAuth login transactions are opaque, browser-bound, and consumed only once", async (t) => {
+  const previousProviderEnv = process.env.OAUTH_PROVIDERS_JSON;
+  const previousAppUrl = process.env.APP_URL;
+  const previousServerUrl = process.env.SERVER_URL;
+  process.env.OAUTH_PROVIDERS_JSON = createProviderEnv();
+  process.env.APP_URL = "https://app.example";
+  process.env.SERVER_URL = "https://api.example";
+  t.after(() => restoreEnv("OAUTH_PROVIDERS_JSON", previousProviderEnv));
+  t.after(() => restoreEnv("APP_URL", previousAppUrl));
+  t.after(() => restoreEnv("SERVER_URL", previousServerUrl));
+
+  const pool = createOauthTransactionPool();
+  let browserBinding = null;
+  let clearedTransactions = 0;
+  let fetches = 0;
+  const service = createOauthService({
+    jwt: { verify: () => ({}), decode: () => null },
+    pool,
+    generateToken: () => "session-token",
+    setAuthCookie: () => {},
+    setOauthTransactionCookie: (_res, value) => { browserBinding = value; },
+    clearOauthTransactionCookie: () => { clearedTransactions += 1; },
+    cache: { wrap: async (_key, _ttl, loader) => loader() },
+    hashPassword: async () => ({ hash: "hash" }),
+    dnsLookup: publicDnsLookup,
+    fetchImpl: async (url) => {
+      fetches += 1;
+      const href = String(url);
+      if (href.includes(".well-known/openid-configuration")) {
+        return {
+          ok: true,
+          json: async () => ({
+            issuer: "https://issuer.example",
+            authorization_endpoint: "https://issuer.example/authorize",
+            token_endpoint: "https://issuer.example/token",
+            jwks_uri: "https://issuer.example/jwks",
+          }),
+        };
+      }
+      return { ok: false, json: async () => ({}) };
+    },
+  });
+
+  const authUrl = new URL(await service.beginLogin("test", {}, "/dashboard/acme/overview"));
+  const state = authUrl.searchParams.get("state");
+  assert.match(state, /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(state.includes("."), false);
+  assert.match(browserBinding, /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(pool.transactions.size, 1);
+  assert.doesNotMatch(authUrl.toString(), /codeVerifier|redirectTo|state-secret/);
+
+  const fetchesAfterStart = fetches;
+  await assert.rejects(
+    service.handleCallback("test", {
+      query: { code: "code-1", state },
+      headers: { cookie: `oauth_transaction=${"a".repeat(43)}` },
+    }, {}),
+    /Invalid or expired SSO login transaction/
+  );
+  assert.equal(fetches, fetchesAfterStart);
+  assert.equal(pool.transactions.size, 1);
+  assert.equal(clearedTransactions, 0);
+
+  await assert.rejects(
+    service.handleCallback("test", {
+      query: { code: "code-1", state },
+      headers: { cookie: `oauth_transaction=${browserBinding}` },
+    }, {}),
+    /Token exchange failed for test/
+  );
+  assert.equal(pool.transactions.size, 0);
+  assert.equal(clearedTransactions, 1);
+
+  const fetchesAfterConsumption = fetches;
+  await assert.rejects(
+    service.handleCallback("test", {
+      query: { code: "code-1", state },
+      headers: { cookie: `oauth_transaction=${browserBinding}` },
+    }, {}),
+    /Invalid or expired SSO login transaction/
+  );
+  assert.equal(fetches, fetchesAfterConsumption);
+});
+
+test("OAuth callback for a different provider cannot consume a login transaction", async (t) => {
+  const previousProviderEnv = process.env.OAUTH_PROVIDERS_JSON;
+  process.env.OAUTH_PROVIDERS_JSON = createProviderEnv();
+  t.after(() => restoreEnv("OAUTH_PROVIDERS_JSON", previousProviderEnv));
+
+  const pool = createOauthTransactionPool();
+  const { state, bindingToken } = seedOauthTransaction(pool, { providerKey: "other" });
+  const service = createOauthTestService({ pool });
+
+  await assert.rejects(
+    service.handleCallback("test", {
+      query: { code: "code-1", state },
+      headers: { cookie: `oauth_transaction=${bindingToken}` },
+    }, {}),
+    /Invalid or expired SSO login transaction/
+  );
+  assert.equal(pool.transactions.size, 1);
+});
+
 test("Pinned OAuth requests use the vetted address and reject redirect responses", async () => {
   let lookupResult = null;
   const requestFactory = (options, onResponse) => {
@@ -205,17 +353,14 @@ test("OAuth rejects malicious discovery metadata before posting a client secret"
   t.after(() => restoreEnv("SERVER_URL", previousServerUrl));
 
   const calls = [];
+  const pool = createOauthTransactionPool();
+  const { state, bindingToken } = seedOauthTransaction(pool);
   const service = createOauthTestService({
     jwt: {
-      sign: () => "state-token",
-      verify: () => ({
-        provider: "test",
-        nonce: "nonce-1",
-        codeVerifier: "verifier-1",
-        redirectTo: "/",
-      }),
+      verify: () => ({}),
       decode: () => null,
     },
+    pool,
     fetchImpl: async (url, options) => {
       calls.push({ url: String(url), options });
       return {
@@ -231,7 +376,10 @@ test("OAuth rejects malicious discovery metadata before posting a client secret"
   });
 
   await assert.rejects(
-    service.handleCallback("test", { query: { code: "code-1", state: "state-token" } }, {}),
+    service.handleCallback("test", {
+      query: { code: "code-1", state },
+      headers: { cookie: `oauth_transaction=${bindingToken}` },
+    }, {}),
     /token endpoint is not in this provider's allowed endpoint origins/
   );
   assert.equal(calls.length, 1);
@@ -251,12 +399,14 @@ test("OAuth rejects private discovery token endpoints before posting a client se
   t.after(() => restoreEnv("SERVER_URL", previousServerUrl));
 
   const calls = [];
+  const pool = createOauthTransactionPool();
+  const { state, bindingToken } = seedOauthTransaction(pool);
   const service = createOauthTestService({
     jwt: {
-      sign: () => "state-token",
-      verify: () => ({ provider: "test", nonce: "nonce-1", codeVerifier: "verifier-1", redirectTo: "/" }),
+      verify: () => ({}),
       decode: () => null,
     },
+    pool,
     fetchImpl: async (url, options) => {
       calls.push({ url: String(url), options });
       return {
@@ -272,7 +422,10 @@ test("OAuth rejects private discovery token endpoints before posting a client se
   });
 
   await assert.rejects(
-    service.handleCallback("test", { query: { code: "code-1", state: "state-token" } }, {}),
+    service.handleCallback("test", {
+      query: { code: "code-1", state },
+      headers: { cookie: `oauth_transaction=${bindingToken}` },
+    }, {}),
     /token endpoint must use a public hostname/
   );
   assert.equal(calls.length, 1);
@@ -334,7 +487,7 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
   });
 
   const queries = [];
-  const pool = {
+  const queryPool = {
     async query(sql, params) {
       queries.push({ sql, params });
       if (sql.includes("FROM \"userIdentities\"")) return { rows: [] };
@@ -355,17 +508,10 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
       return { rows: [] };
     },
   };
+  const pool = createOauthTransactionPool(queryPool);
   const jwt = {
     decode: () => ({ header: { kid: "kid-1", alg: "RS256" } }),
-    verify(token) {
-      if (token === "state-token") {
-        return {
-          provider: "test",
-          nonce: "nonce-1",
-          codeVerifier: "verifier-1",
-          redirectTo: "/dashboard/acme/overview",
-        };
-      }
+    verify() {
       return {
         sub: "subject-1",
         email: "sso@example.com",
@@ -376,15 +522,17 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
   };
 
   let cookieToken = null;
+  let clearedTransactions = 0;
   const service = createOauthService({
     jwt,
     pool,
-    jwtSecret: "state-secret",
     generateToken: (user) => {
       assert.equal(user.id, 42);
       return "session-token";
     },
     setAuthCookie: (_res, token) => { cookieToken = token; },
+    setOauthTransactionCookie: () => {},
+    clearOauthTransactionCookie: () => { clearedTransactions += 1; },
     cache: { wrap: async (_key, _ttl, loader) => loader() },
     hashPassword: async () => {
       throw new Error("hashPassword should not be called for auto-linked users");
@@ -393,10 +541,14 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
     fetchImpl: global.fetch,
   });
 
+  const { state, bindingToken } = seedOauthTransaction(pool, {
+    redirectTo: "/dashboard/acme/overview",
+  });
   const redirectUrl = await service.handleCallback(
     "test",
     {
-      query: { code: "code-1", state: "state-token" },
+      query: { code: "code-1", state },
+      headers: { cookie: `oauth_transaction=${bindingToken}` },
       protocol: "https",
       get: () => "api.example",
     },
@@ -404,6 +556,7 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
   );
 
   assert.equal(cookieToken, "session-token");
+  assert.equal(clearedTransactions, 1);
   assert.match(redirectUrl, /^https:\/\/app\.example\/oauth\/callback\?next=/);
   assert.ok(queries.some(({ sql }) => sql.includes("INSERT INTO \"userIdentities\"")));
 });

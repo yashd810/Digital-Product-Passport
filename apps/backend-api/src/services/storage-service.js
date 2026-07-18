@@ -5,6 +5,9 @@ const fs = require("fs");
 const path = require("path");
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getApiOrigin } = require("../shared/security/configured-origin");
+const {
+  readBackupProviderObjectStorageConfigFromEnvironment,
+} = require("../shared/backups/backup-provider-object-storage-config");
 const logger = require("./logger");
 
 function normalizeBaseUrl(value) {
@@ -174,7 +177,8 @@ function createS3StorageService(options) {
     accessKeyId,
     secretAccessKey,
     forcePathStyle,
-    serverBaseUrl
+    serverBaseUrl,
+    providerName = "s3",
   } = options;
 
   if (!endpoint || !bucket || !region || !accessKeyId || !secretAccessKey) {
@@ -223,7 +227,8 @@ function createS3StorageService(options) {
   }
 
   return {
-    name: "s3",
+    name: providerName,
+    provider: providerName,
     isLocal: false,
     async saveObject({ key, buffer, contentType, cacheControl }) {
       await s3.send(new PutObjectCommand({
@@ -234,7 +239,7 @@ function createS3StorageService(options) {
         CacheControl: cacheControl
       }));
       return {
-        provider: "s3",
+        provider: providerName,
         storageKey: key,
         path: null,
         url: appPublicBase ? joinUrl(appPublicBase, `/storage/${key}`) : null,
@@ -261,6 +266,37 @@ function createS3StorageService(options) {
     getPublicUrl(storageKey) {
       return appPublicBase ? joinUrl(appPublicBase, `/storage/${storageKey}`) : null;
     }
+  };
+}
+
+function isEnabledEnvironmentFlag(value) {
+  return ["true", "1", "yes", "on"].includes(String(value || "").trim().toLowerCase());
+}
+
+function createBackupProviderStorageService() {
+  const enabled = isEnabledEnvironmentFlag(process.env.BACKUP_PROVIDER_ENABLED);
+  const required = isEnabledEnvironmentFlag(process.env.BACKUP_PROVIDER_REQUIRED);
+  if (required && !enabled) {
+    throw new Error("BACKUP_PROVIDER_REQUIRED requires BACKUP_PROVIDER_ENABLED=true");
+  }
+
+  if (!enabled) {
+    return {
+      ...createDisabledStorageService(),
+      name: "backup-s3-disabled",
+      provider: "backup-s3-disabled",
+      isBackupProviderStorage: true,
+    };
+  }
+
+  const config = readBackupProviderObjectStorageConfigFromEnvironment();
+  return {
+    ...createS3StorageService({
+      ...config,
+      serverBaseUrl: "",
+      providerName: "backup-s3",
+    }),
+    isBackupProviderStorage: true,
   };
 }
 
@@ -369,3 +405,5 @@ function createStorageService(options) {
 }
 
 module.exports = createStorageService;
+module.exports.createBackupProviderStorageService = createBackupProviderStorageService;
+module.exports.createS3StorageService = createS3StorageService;

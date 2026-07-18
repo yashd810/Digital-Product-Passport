@@ -106,70 +106,102 @@ function createAuditServiceHelpers({ pool, logger }) {
     }
   }
 
+  async function appendAuditLog(client, companyId, userId, action, tableName, passportDppId, oldData, newData, options = {}) {
+    if (!options.auditChainLockHeld) {
+      await client.query(
+        "SELECT pg_advisory_xact_lock($1::integer, $2::integer)",
+        [auditChainLockNamespace, normalizeAuditCompanyId(companyId)]
+      );
+    }
+
+    const createdAt = options.createdAt || new Date().toISOString();
+    const hashVersion = 2;
+    const previousHashRes = await client.query(
+      `SELECT "eventHash"
+       FROM "auditLogs"
+       WHERE (
+         ($1::int IS NULL AND "companyId" IS NULL)
+         OR "companyId" = $1
+       )
+       ORDER BY id DESC
+       LIMIT 1
+       FOR UPDATE`,
+      [companyId ?? null]
+    );
+    const previousEventHash = previousHashRes.rows[0]?.eventHash || null;
+    const actorIdentifier =
+      options.actorIdentifier
+      || options.globallyUniqueOperatorId
+      || options.globallyUniqueOperatorIdentifier
+      || options.operatorIdentifier
+      || options.economicOperatorId
+      || options.economicOperatorIdentifier
+      || (userId ? `user:${userId}` : null);
+    const payload = buildHashPayloadVersion({
+      hashVersion,
+      createdAt,
+      companyId: companyId ?? null,
+      userId: userId ?? null,
+      action,
+      tableName: tableName || null,
+      recordId: passportDppId || null,
+      oldData: oldData || null,
+      newData: newData || null,
+      actorIdentifier,
+      audience: options.audience || null,
+    });
+    const eventHash = computeHashChainValue(previousEventHash, payload);
+
+    await client.query(
+      `INSERT INTO "auditLogs" (
+         "companyId","userId",action,"tableName","recordId","oldValues","newValues",
+         "actorIdentifier",audience,"previousEventHash","eventHash","createdAt","hashVersion"
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [
+        companyId ?? null,
+        userId ?? null,
+        action,
+        tableName,
+        passportDppId || null,
+        oldData ? JSON.stringify(oldData) : null,
+        newData ? JSON.stringify(newData) : null,
+        actorIdentifier,
+        options.audience || null,
+        previousEventHash,
+        eventHash,
+        createdAt,
+        hashVersion,
+      ]
+    );
+  }
+
   async function logAudit(companyId, userId, action, tableName, passportDppId, oldData, newData, options = {}) {
     try {
-      await withAuditChainTransaction(companyId, async (client) => {
-        const createdAt = options.createdAt || new Date().toISOString();
-        const hashVersion = 2;
-        const previousHashRes = await client.query(
-          `SELECT "eventHash"
-           FROM "auditLogs"
-           WHERE (
-             ($1::int IS NULL AND "companyId" IS NULL)
-             OR "companyId" = $1
-           )
-           ORDER BY id DESC
-           LIMIT 1
-           FOR UPDATE`,
-          [companyId ?? null]
-        );
-        const previousEventHash = previousHashRes.rows[0]?.eventHash || null;
-        const actorIdentifier =
-          options.actorIdentifier
-          || options.globallyUniqueOperatorId
-          || options.globallyUniqueOperatorIdentifier
-          || options.operatorIdentifier
-          || options.economicOperatorId
-          || options.economicOperatorIdentifier
-          || (userId ? `user:${userId}` : null);
-        const payload = buildHashPayloadVersion({
-          hashVersion,
-          createdAt,
-          companyId: companyId ?? null,
-          userId: userId ?? null,
+      if (options.client) {
+        return await appendAuditLog(
+          options.client,
+          companyId,
+          userId,
           action,
-          tableName: tableName || null,
-          recordId: passportDppId || null,
-          oldData: oldData || null,
-          newData: newData || null,
-          actorIdentifier,
-          audience: options.audience || null,
-        });
-        const eventHash = computeHashChainValue(previousEventHash, payload);
-
-        await client.query(
-          `INSERT INTO "auditLogs" (
-             "companyId","userId",action,"tableName","recordId","oldValues","newValues",
-             "actorIdentifier",audience,"previousEventHash","eventHash","createdAt","hashVersion"
-           )
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-          [
-            companyId ?? null,
-            userId ?? null,
-            action,
-            tableName,
-            passportDppId || null,
-            oldData ? JSON.stringify(oldData) : null,
-            newData ? JSON.stringify(newData) : null,
-            actorIdentifier,
-            options.audience || null,
-            previousEventHash,
-            eventHash,
-            createdAt,
-            hashVersion,
-          ]
+          tableName,
+          passportDppId,
+          oldData,
+          newData,
+          options
         );
-      });
+      }
+      return await withAuditChainTransaction(companyId, async (client) => appendAuditLog(
+        client,
+        companyId,
+        userId,
+        action,
+        tableName,
+        passportDppId,
+        oldData,
+        newData,
+        { ...options, auditChainLockHeld: true }
+      ));
     } catch (e) {
       logger.error("Audit log error:", e.message);
       throw e;

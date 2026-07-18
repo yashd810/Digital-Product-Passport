@@ -178,7 +178,16 @@ async function initDb(pool, {
   `);
 
   await pool.query(`
-    CREATE INDEX IF NOT EXISTS "idxDppSubjectRegistryGuid"
+    DO $$
+    BEGIN
+      IF to_regclass('public."idxDppSubjectRegistryGuid"') IS NOT NULL
+         AND to_regclass('public."idxDppSubjectRegistryDppId"') IS NULL THEN
+        ALTER INDEX "idxDppSubjectRegistryGuid" RENAME TO "idxDppSubjectRegistryDppId";
+      END IF;
+    END $$;
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS "idxDppSubjectRegistryDppId"
       ON "dppSubjectRegistry"("passportDppId")
   `);
   await pool.query(`
@@ -203,7 +212,16 @@ async function initDb(pool, {
   `);
 
   await pool.query(`
-    CREATE INDEX IF NOT EXISTS "idxDppRegistryRegistrationsGuid"
+    DO $$
+    BEGIN
+      IF to_regclass('public."idxDppRegistryRegistrationsGuid"') IS NOT NULL
+         AND to_regclass('public."idxDppRegistryRegistrationsDppId"') IS NULL THEN
+        ALTER INDEX "idxDppRegistryRegistrationsGuid" RENAME TO "idxDppRegistryRegistrationsDppId";
+      END IF;
+    END $$;
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS "idxDppRegistryRegistrationsDppId"
       ON "dppRegistryRegistrations"("passportDppId")
   `);
   await pool.query(`
@@ -367,14 +385,26 @@ async function initDb(pool, {
       CREATE INDEX IF NOT EXISTS "idxBackupPublicHandoversProduct"
         ON "backupPublicHandovers"("internalAliasId", "handoverStatus", "activatedAt" DESC, id DESC)
     `);
-    await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS "idxBackupPublicHandoversActivePassport"
-        ON "backupPublicHandovers"("passportDppId")
-        WHERE "handoverStatus" = 'active'
-    `);
-
+   await pool.query(`
+     CREATE UNIQUE INDEX IF NOT EXISTS "idxBackupPublicHandoversActivePassport"
+       ON "backupPublicHandovers"("passportDppId")
+       WHERE "handoverStatus" = 'active'
+   `);
+  // The retired automatic handover path wrote this exact note with no actor.
+  // Retire only those legacy rows; explicitly activated handovers are preserved.
+  // The active-status predicate makes this safe to run repeatedly.
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS "userIdentities" (
+    UPDATE "backupPublicHandovers"
+       SET "handoverStatus" = 'inactive',
+           "deactivatedAt" = NOW(),
+           "updatedAt" = NOW()
+     WHERE "handoverStatus" = 'active'
+       AND "activatedBy" IS NULL
+       AND notes = 'Automatically activated from verified backup replication because the economic operator is inactive.'
+  `);
+
+ await pool.query(`
+   CREATE TABLE IF NOT EXISTS "userIdentities" (
       id               SERIAL PRIMARY KEY,
       "userId"          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       "providerKey"     VARCHAR(100) NOT NULL,
@@ -392,6 +422,25 @@ async function initDb(pool, {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS "idxUserIdentitiesUser"
       ON "userIdentities"("userId")
+  `);
+
+  // Server-side, one-time SSO transactions. State and browser-binding values are
+  // hashed, so OAuth query parameters and cookies are never persisted verbatim.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "oauthLoginTransactions" (
+      "stateHash"    CHAR(64) PRIMARY KEY,
+      "providerKey"  VARCHAR(100) NOT NULL,
+      nonce          VARCHAR(128) NOT NULL,
+      "codeVerifier" VARCHAR(128) NOT NULL,
+      "redirectTo"   TEXT NOT NULL,
+      "bindingHash"  CHAR(64) NOT NULL,
+      "expiresAt"    TIMESTAMPTZ NOT NULL,
+      "createdAt"    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS "idxOauthLoginTransactionsExpiry"
+      ON "oauthLoginTransactions"("expiresAt")
   `);
 
 
@@ -1030,9 +1079,18 @@ async function initDb(pool, {
     `);
 
     await pool.query(`
-      CREATE INDEX IF NOT EXISTS "idxPassportHistoryVisibilityGuid"
+      DO $$
+      BEGIN
+        IF to_regclass('public."idxPassportHistoryVisibilityGuid"') IS NOT NULL
+           AND to_regclass('public."idxPassportHistoryVisibilityDppId"') IS NULL THEN
+          ALTER INDEX "idxPassportHistoryVisibilityGuid" RENAME TO "idxPassportHistoryVisibilityDppId";
+        END IF;
+      END $$;
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS "idxPassportHistoryVisibilityDppId"
         ON "passportHistoryVisibility"("passportDppId", "versionNumber" DESC)
-  `);
+    `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "passportArchives" (
@@ -1054,7 +1112,16 @@ async function initDb(pool, {
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS "idxPassportArchivesCompany" ON "passportArchives"("companyId")`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS "idxPassportArchivesGuid"    ON "passportArchives"("dppId")`);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF to_regclass('public."idxPassportArchivesGuid"') IS NOT NULL
+         AND to_regclass('public."idxPassportArchivesDppId"') IS NULL THEN
+        ALTER INDEX "idxPassportArchivesGuid" RENAME TO "idxPassportArchivesDppId";
+      END IF;
+    END $$;
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS "idxPassportArchivesDppId"   ON "passportArchives"("dppId")`);
   await pool.query(`CREATE INDEX IF NOT EXISTS "idxPassportArchivesLineage" ON "passportArchives"("lineageId")`);
 
   // Ensure shared passport tables exist for all passport types.
@@ -1121,7 +1188,16 @@ async function initDb(pool, {
   `);
 
   await pool.query(`
-    CREATE INDEX IF NOT EXISTS "idxPassportAttachmentsGuid"
+    DO $$
+    BEGIN
+      IF to_regclass('public."idxPassportAttachmentsGuid"') IS NOT NULL
+         AND to_regclass('public."idxPassportAttachmentsDppId"') IS NULL THEN
+        ALTER INDEX "idxPassportAttachmentsGuid" RENAME TO "idxPassportAttachmentsDppId";
+      END IF;
+    END $$;
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS "idxPassportAttachmentsDppId"
       ON "passportAttachments"("passportDppId")
   `);
   await pool.query(`

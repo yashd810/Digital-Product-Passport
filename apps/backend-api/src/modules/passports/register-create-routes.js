@@ -1,6 +1,10 @@
 "use strict";
 
-const { handleRouteError } = require("../../shared/http/error-response");
+const {
+  getSafeErrorMessage,
+  getSafeErrorStatus,
+  handleRouteError,
+} = require("../../shared/http/error-response");
 const { createValidationMiddleware } = require("../../shared/validation/request-schema");
 const { createDraftPassportUseCase } = require("./application/create-passport");
 
@@ -82,8 +86,12 @@ module.exports = function registerCreateRoutes(app, deps) {
       res.status(201).json({ success: true, passport: created.passport });
     } catch (error) {
       logger.error({ err: error, invalidFieldKeys: error?.invalidFieldKeys }, "Create passport error");
-      if (error?.payload) {
-        return res.status(error.statusCode || 500).json({ error: error.message, ...error.payload });
+      const statusCode = getSafeErrorStatus(error);
+      if (error?.payload && statusCode < 500) {
+        return res.status(statusCode).json({
+          error: getSafeErrorMessage(error, "Failed to create passport"),
+          ...error.payload,
+        });
       }
       return handleRouteError(res, error, "Failed to create passport");
     }
@@ -138,13 +146,14 @@ module.exports = function registerCreateRoutes(app, deps) {
           });
           created += 1;
         } catch (error) {
-          const isDuplicate = error.statusCode === 409;
+          const statusCode = getSafeErrorStatus(error);
+          const isDuplicate = statusCode === 409;
           results.push({
             index,
             internalAliasId: error.normalizedProductId || undefined,
             success: false,
-            ...(error.invalidFieldKeys && !isDuplicate ? { fields: error.invalidFieldKeys } : {}),
-            error: error.message,
+            ...(statusCode < 500 && error.invalidFieldKeys && !isDuplicate ? { fields: error.invalidFieldKeys } : {}),
+            error: getSafeErrorMessage(error, "Failed to create passport."),
           });
           if (isDuplicate) {
             skipped += 1;

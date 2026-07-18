@@ -106,3 +106,34 @@ test("audit failures roll back and propagate instead of creating a new chain roo
   assert.equal(statements.includes("ROLLBACK"), true);
   assert.equal(released, true);
 });
+
+test("release transactions can append audit events on their existing database client", async () => {
+  const statements = [];
+  let poolConnectCalled = false;
+  const client = {
+    async query(sql) {
+      statements.push(sql);
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+      if (sql.includes('SELECT "eventHash"')) return { rows: [] };
+      if (sql.includes('INSERT INTO "auditLogs"')) return { rows: [] };
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+  const helpers = createAuditServiceHelpers({
+    pool: {
+      async connect() {
+        poolConnectCalled = true;
+        throw new Error("nested audit transaction must not be opened");
+      },
+    },
+    logger: { error() {} },
+  });
+
+  await helpers.logAudit(17, 1, "release", "passports", "dpp-1", null, {
+    releaseStatus: "released",
+  }, { client });
+
+  assert.equal(poolConnectCalled, false);
+  assert.equal(statements.some((sql) => sql.includes("pg_advisory_xact_lock")), true);
+  assert.equal(statements.some((sql) => sql.includes('INSERT INTO "auditLogs"')), true);
+});

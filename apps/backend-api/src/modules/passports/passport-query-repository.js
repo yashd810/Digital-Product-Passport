@@ -13,15 +13,13 @@ function createPassportQueryRepository({
     companyId,
     internalAliasId,
     excludeDppId = null,
-    excludeGuid = null,
     excludeLineageId = null,
   }) {
     if (!internalAliasId) return null;
     const params = [companyId, internalAliasId];
     let exclusionSql = "";
-    const resolvedExcludeDppId = excludeDppId || excludeGuid || null;
-    if (resolvedExcludeDppId) {
-      params.push(resolvedExcludeDppId);
+    if (excludeDppId) {
+      params.push(excludeDppId);
       exclusionSql += ` AND "dppId" <> $${params.length}`;
     }
     if (excludeLineageId) {

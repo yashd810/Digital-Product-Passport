@@ -34,6 +34,26 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     resolveSecurityGroupApiKey,
   } = createApiKeyHelpers({ crypto });
 
+  function sendPreviewRouteError(res, error, fallbackMessage) {
+    if (error?.code === "ambiguousProductId") {
+      return res.status(409).json({ error: "Passport identifier is ambiguous" });
+    }
+    return res.status(500).json({ error: fallbackMessage });
+  }
+
+  function sendPreviewUnlockRouteError(res, error) {
+    if (error?.code === "ambiguousProductId") {
+      return res.status(409).json({ error: "Passport identifier is ambiguous" });
+    }
+    if (error?.statusCode === 400 && error?.message === "API key is required") {
+      return res.status(400).json({ error: "API key is required" });
+    }
+    if (error?.statusCode === 401 && error?.message === "Invalid or revoked API key") {
+      return res.status(401).json({ error: "Invalid or revoked API key" });
+    }
+    return res.status(500).json({ error: "Failed to unlock passport preview" });
+  }
+
   async function resolveCompanyPassport(companyId, dppId) {
     return resolveCompanyPreviewPassport({ companyId, passportKey: dppId });
   }
@@ -134,8 +154,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
         }),
       });
     } catch (error) {
-      if (error.code === "ambiguousProductId") return res.status(409).json({ error: error.message });
-      res.status(500).json({ error: "Failed to fetch passport preview" });
+      return sendPreviewRouteError(res, error, "Failed to fetch passport preview");
     }
   });
 
@@ -219,10 +238,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
         },
       });
     } catch (error) {
-      if (error.code === "ambiguousProductId") return res.status(409).json({ error: error.message });
-      res.status(error.statusCode || 500).json({
-        error: error.statusCode ? error.message : "Failed to unlock passport preview",
-      });
+      return sendPreviewUnlockRouteError(res, error);
     }
   });
 

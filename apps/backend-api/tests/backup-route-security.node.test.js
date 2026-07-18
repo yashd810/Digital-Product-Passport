@@ -78,6 +78,39 @@ test("backup provider APIs do not return stored provider configuration", async (
   assert.equal(response.body[0].hasConfiguration, true);
 });
 
+test("backup replication responses redact nested provider failure details", async () => {
+  const sensitiveError = "S3 upload failed for https://object.example.test with secret=backup-secret";
+  const { routes } = registerHarness({
+    backupProviderService: {},
+    loadLatestLivePassport: async () => ({ dppId: "dpp-1", companyId: 7 }),
+    replicatePassportToBackup: async () => ({
+      success: false,
+      results: [{
+        replicationStatus: "failed",
+        errorMessage: sensitiveError,
+        documentation: {
+          attachmentCopies: [{ backupCopy: { error: sensitiveError } }],
+        },
+      }],
+    }),
+    logAudit: async () => {},
+  });
+  const route = routes.find((entry) => entry.method === "post" && entry.routePath.endsWith("/backup-replications"));
+  assert.ok(route);
+
+  const response = createResponse();
+  await route.handlers.at(-1)({
+    params: { companyId: "7", dppId: "dpp-1" },
+    body: { passportType: "battery" },
+    user: { userId: 12 },
+  }, response);
+
+  assert.equal(response.statusCode, 202);
+  assert.equal(JSON.stringify(response.body).includes(sensitiveError), false);
+  assert.equal(response.body.results[0].errorMessage, "Backup operation failed.");
+  assert.equal(response.body.results[0].documentation.attachmentCopies[0].backupCopy.error, "Backup operation failed.");
+});
+
 test("backup provider writes and revocations are atomically scoped to the owning company", async () => {
   const queries = [];
   const service = createBackupProviderService({

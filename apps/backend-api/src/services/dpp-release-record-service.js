@@ -117,7 +117,11 @@ async function recordSignedDppRelease(pool, {
     sigData
   });
 
-  return storeDppReleaseRecord(pool, {
+  if (!signatureId) {
+    throw new Error("Failed to persist the passport signature for this release");
+  }
+
+  const releaseRecord = await storeDppReleaseRecord(pool, {
     dppId: passportDppId,
     companyId,
     releasedByUserId,
@@ -128,6 +132,10 @@ async function recordSignedDppRelease(pool, {
     releaseNote,
     releasedAt: sigData.releasedAt
   });
+  if (!releaseRecord) {
+    throw new Error("Failed to persist the signed passport release record");
+  }
+  return releaseRecord;
 }
 
 module.exports = {

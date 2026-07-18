@@ -28,6 +28,29 @@ Production storage and disaster-recovery checks are enforced in:
 
 ## Backup Credential Boundary
 
+Application-level passport, document, access-control, and audit-anchor
+replication uses a dedicated backup-provider S3 client. When
+`BACKUP_PROVIDER_ENABLED=true`, configure these values in the protected
+production profile: `BACKUP_PROVIDER_ENDPOINT`, `BACKUP_PROVIDER_REGION`,
+`BACKUP_PROVIDER_BUCKET`, `BACKUP_PROVIDER_ACCESS_KEY_ID`,
+`BACKUP_PROVIDER_SECRET_ACCESS_KEY`, and `BACKUP_PROVIDER_FORCE_PATH_STYLE`.
+
+That bucket and credential material must be different from
+`STORAGE_S3_BUCKET`, `STORAGE_S3_ACCESS_KEY_ID`, and
+`STORAGE_S3_SECRET_ACCESS_KEY`, which are reserved for application files. The
+runtime and deployment guards reject a missing, placeholder, or reused
+application-storage value. Backup writes and verification reads use only the
+backup-provider client; they never fall back to application file storage.
+
+## Public Handover Boundary
+
+Backup replication does not automatically publish a passport. A public request
+can read only a handover that an authenticated company administrator explicitly
+activated after the operator became inactive and the replication was verified.
+That activation is audited. Set `BACKUP_PROVIDER_SUPPORTS_PUBLIC_HANDOVER=true`
+only after approving the provider for this exceptional continuity role; implicit
+environment providers default to `false`.
+
 When `DB_BACKUP_ENABLED=true`, configure all five dedicated values:
 `DB_BACKUP_S3_ENDPOINT`, `DB_BACKUP_S3_REGION`, `DB_BACKUP_S3_BUCKET`,
 `DB_BACKUP_S3_ACCESS_KEY_ID`, and `DB_BACKUP_S3_SECRET_ACCESS_KEY`.

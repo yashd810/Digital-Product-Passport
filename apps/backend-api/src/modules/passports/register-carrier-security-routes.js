@@ -9,6 +9,10 @@ const {
 } = require("../../shared/passports/passport-helpers");
 const { getApiOrigin } = require("../../shared/security/configured-origin");
 const { normalizeSafeImageReference } = require("../../shared/passports/passport-uri");
+const {
+  getSafeErrorMessage,
+  getSafeErrorStatus,
+} = require("../../shared/http/error-response");
 
 function createRouteError(message, statusCode = 400) {
   return Object.assign(new Error(message), { statusCode });
@@ -26,14 +30,14 @@ function normalizeDynamicValueEntries(updates, dynamicFieldKeys) {
     .map(([fieldKey]) => fieldKey)
     .filter((fieldKey) => !/^[a-z][A-Za-z0-9]{0,99}$/.test(fieldKey));
   if (invalidKeys.length) {
-    throw createRouteError(`Invalid dynamic field key(s): ${invalidKeys.join(", ")}`);
+    throw createRouteError("Invalid dynamic field key");
   }
 
   const nonDynamicKeys = entries
     .map(([fieldKey]) => fieldKey)
     .filter((fieldKey) => !dynamicFieldKeys.has(fieldKey));
   if (nonDynamicKeys.length) {
-    throw createRouteError(`Field(s) are not configured as dynamic: ${nonDynamicKeys.join(", ")}`);
+    throw createRouteError("One or more fields are not configured as dynamic");
   }
 
   return entries.map(([fieldKey, value]) => {
@@ -193,6 +197,13 @@ function registerCarrierSecurityRoutes(app, deps) {
   function securityGroupReadLimiter(req, res, next) {
     if (!getSecurityGroupKeyFromRequest(req)) return next();
     return publicUnlockRateLimit(req, res, next);
+  }
+
+  function sendDynamicValueRouteError(res, error, fallbackMessage) {
+    const statusCode = getSafeErrorStatus(error);
+    return res.status(statusCode).json({
+      error: getSafeErrorMessage(error, fallbackMessage),
+    });
   }
 
   async function getAuthorizedDynamicFieldKeys(req, passportContext) {
@@ -438,9 +449,7 @@ function registerCarrierSecurityRoutes(app, deps) {
         values: secureDynamicLinks(await loadLatestDynamicValues(dppId, allowedFieldKeys), dppId),
       });
     } catch (error) {
-      return res.status(error.statusCode || 500).json({
-        error: error.statusCode ? error.message : "Failed to fetch dynamic values",
-      });
+      return sendDynamicValueRouteError(res, error, "Failed to fetch dynamic values");
     }
   });
 
@@ -465,9 +474,7 @@ function registerCarrierSecurityRoutes(app, deps) {
         ),
       });
     } catch (error) {
-      res.status(error.statusCode || 500).json({
-        error: error.statusCode ? error.message : "Failed to fetch history",
-      });
+      return sendDynamicValueRouteError(res, error, "Failed to fetch history");
     }
   });
 
@@ -538,9 +545,7 @@ function registerCarrierSecurityRoutes(app, deps) {
 
       res.json({ success: true, updated: entries.map(([fieldKey]) => fieldKey) });
     } catch (error) {
-      res.status(error.statusCode || 500).json({
-        error: error.statusCode ? error.message : "Failed to update dynamic values",
-      });
+      return sendDynamicValueRouteError(res, error, "Failed to update dynamic values");
     }
   });
 
@@ -562,9 +567,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       });
       res.json({ success: true, updated: entries.map(([fieldKey]) => fieldKey) });
     } catch (error) {
-      res.status(error.statusCode || 500).json({
-        error: error.statusCode ? error.message : "Failed to update dynamic values",
-      });
+      return sendDynamicValueRouteError(res, error, "Failed to update dynamic values");
     }
   });
 }

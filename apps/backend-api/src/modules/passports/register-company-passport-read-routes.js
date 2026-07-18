@@ -3,6 +3,7 @@
 const {
   flattenSchemaFieldsFromSections,
 } = require("../../shared/passports/passport-helpers");
+const { getSafeErrorMessage } = require("../../shared/http/error-response");
 
 module.exports = function registerCompanyPassportReadRoutes(app, deps) {
   const {
@@ -148,7 +149,12 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
             results.push({ dppId: dppId || undefined, internalAliasId: internalAliasId || undefined, _status: "notFound" });
           }
         } catch (error) {
-          results.push({ dppId: dppId || undefined, internalAliasId: internalAliasId || undefined, _status: "error", error: error.message });
+          results.push({
+            dppId: dppId || undefined,
+            internalAliasId: internalAliasId || undefined,
+            _status: "error",
+            error: getSafeErrorMessage(error, "Failed to fetch passport"),
+          });
         }
       }
 

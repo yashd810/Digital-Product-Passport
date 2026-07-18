@@ -4,6 +4,8 @@ const {
   flattenSchemaFieldsFromSections,
   joinQuotedSqlIdentifiers,
 } = require("../../shared/passports/passport-helpers");
+const { getSafeErrorMessage } = require("../../shared/http/error-response");
+const { releasePassportAtomically } = require("./release-passport-transaction");
 
 module.exports = function registerBulkLifecycleRoutes(app, deps) {
   const {
@@ -223,9 +225,13 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
                 detailMessage = detailMessage ? `${detailMessage} Submitted to workflow.` : "Revision created and submitted to workflow.";
               } catch (workflowError) {
                 detailStatus = "revised";
+                const workflowMessage = getSafeErrorMessage(
+                  workflowError,
+                  "Workflow submission could not be completed."
+                );
                 detailMessage = detailMessage
-                  ? `${detailMessage} Workflow submission failed: ${workflowError.message}`
-                  : `Revision created, but workflow submission failed: ${workflowError.message}`;
+                  ? `${detailMessage} Workflow submission failed: ${workflowMessage}`
+                  : `Revision created, but workflow submission failed: ${workflowMessage}`;
               }
             }
 
@@ -238,7 +244,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             revised += 1;
             await insertBatchItem(detailStatus, detailMessage, sourceVersion, newVersion);
           } catch (error) {
-            const message = error.message || "Bulk revise failed for this passport.";
+            const message = getSafeErrorMessage(error, "Bulk revise failed for this passport.");
             details.push({ dppId, passportType, status: "failed", sourceVersionNumber: source.versionNumber || null, message });
             failed += 1;
             await insertBatchItem("failed", message, source.versionNumber || null, null);
@@ -305,58 +311,34 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           }
           const compliance = await evaluateCompliance(currentPassport, passportType);
 
-          await archivePassportSnapshot({
-            passport: currentPassport,
-            passportType,
-            archivedBy: userId,
-            actorIdentifier: getActorIdentifier(req.user),
-            snapshotReason: "beforeBulkRelease",
-          });
-          const result = await pool.query(
-            `UPDATE ${tableName} SET "releaseStatus" = 'released', "updatedAt" = NOW()
-             WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
-             RETURNING *`,
-            [dppId, companyId]
-          );
-          if (!result.rows.length) {
-            details.push({ dppId, status: "skipped", message: "Not found or already released" });
-            skipped += 1;
-            continue;
-          }
-          const releasedRow = result.rows[0];
-          await archivePassportSnapshot({
-            passport: releasedRow,
-            passportType,
-            archivedBy: userId,
-            actorIdentifier: getActorIdentifier(req.user),
-            snapshotReason: "afterBulkRelease",
-          });
-
           const typeRes = await pool.query('SELECT * FROM "passportTypes" WHERE "typeName" = $1', [passportType]);
-          const sigData = await signPassport({ ...releasedRow, passportType }, typeRes.rows[0] || null);
-          if (sigData) {
-            await recordSignedDppRelease(pool, {
-              passportDppId: dppId,
-              companyId,
-              releasedByUserId: userId,
-              releasedByEmail: req.user.email,
-              versionNumber: releasedRow.versionNumber,
-              sigData,
-              releaseNote: item?.releaseNote || null,
-            });
-            await logAudit(companyId, userId, "signPassport", "passportSignatures", dppId, null, {
-              versionNumber: releasedRow.versionNumber,
-              signingKeyId: sigData.keyId,
-              signatureAlgorithm: sigData.signatureAlgorithm,
-              source: "bulkRelease",
-            }, {
-              actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || req.user.email || `user:${req.user.userId}`,
-              audience: "economicOperator",
-            });
-          }
-
-          await markOlderVersionsObsolete(tableName, dppId, releasedRow.versionNumber, passportType);
-          await logAudit(companyId, userId, "release", tableName, dppId, { releaseStatus: "draftOrInRevision" }, { releaseStatus: "released" });
+          const { released: releasedRow } = await releasePassportAtomically({
+            pool,
+            tableName,
+            dppId,
+            companyId,
+            passportType,
+            userId,
+            releasedByEmail: req.user.email,
+            actorIdentifier: getActorIdentifier(req.user),
+            editableReleaseStatusesSql,
+            typeDef: typeRes.rows[0] || null,
+            releaseNote: item?.releaseNote || null,
+            source: "bulkRelease",
+            signPassport,
+            recordSignedDppRelease,
+            logAudit,
+            archivePassportSnapshot,
+            markOlderVersionsObsolete,
+          });
+          await replicatePassportToBackup({
+            passport: { ...releasedRow, passportType },
+            passportType,
+            reason: "bulkRelease",
+            snapshotScope: "releasedCurrent",
+          }).catch((error) => {
+            logger.warn({ err: error, dppId, passportType, reason: "bulkRelease" }, "Failed to replicate bulk released passport to backup");
+          });
           details.push({
             dppId,
             status: "released",
@@ -370,7 +352,16 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           });
           released += 1;
         } catch (error) {
-          details.push({ dppId, status: "failed", message: error.message });
+          if (error?.statusCode === 404) {
+            details.push({ dppId, status: "skipped", message: "Not found or already released" });
+            skipped += 1;
+            continue;
+          }
+          details.push({
+            dppId,
+            status: "failed",
+            message: getSafeErrorMessage(error, "Bulk release failed for this passport."),
+          });
           failed += 1;
         }
       }
@@ -378,7 +369,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       res.json({ summary: { released, skipped, failed, total: items.length }, details });
     } catch (error) {
       logger.error("Bulk release error:", error.message);
-      res.status(500).json({ error: "Bulk release failed", detail: error.message });
+      res.status(500).json({ error: "Bulk release failed" });
     }
   });
 

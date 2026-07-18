@@ -1,5 +1,7 @@
 "use strict";
 
+const { getSafeErrorMessage } = require("../../shared/http/error-response");
+
 module.exports = function registerDeleteRoutes(app, deps) {
   const {
     pool,
@@ -250,7 +252,12 @@ module.exports = function registerDeleteRoutes(app, deps) {
           details.push({ dppId: matchedGuid, internalAliasId: internalAliasId || undefined, status: "deleted" });
           deleted += 1;
         } catch (error) {
-          details.push({ dppId: dppId || undefined, internalAliasId: internalAliasId || undefined, status: "failed", error: error.message });
+          details.push({
+            dppId: dppId || undefined,
+            internalAliasId: internalAliasId || undefined,
+            status: "failed",
+            error: getSafeErrorMessage(error, "Bulk delete failed for this passport."),
+          });
           failed += 1;
         }
       }
@@ -258,7 +265,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
       res.json({ summary: { deleted, skipped, failed, total: identifiers.length }, details });
     } catch (error) {
       logger.error("Bulk DELETE error:", error.message);
-      res.status(500).json({ error: "Bulk delete failed", detail: error.message });
+      res.status(500).json({ error: "Bulk delete failed" });
     }
   });
 };

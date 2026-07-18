@@ -20,6 +20,12 @@ const productionComposePaths = [
   path.join(repoRoot, "docker/docker-compose.prod.yml"),
 ];
 const frontendComposePath = path.join(repoRoot, "docker/docker-compose.prod.frontend.yml");
+const securityWorkflowPath = path.join(repoRoot, ".github/workflows/security-and-smoke.yml");
+const composePaths = [
+  path.join(repoRoot, "docker/docker-compose.yml"),
+  ...productionComposePaths,
+  frontendComposePath,
+];
 
 function parseEnvLines(content) {
   return new Map(
@@ -191,6 +197,37 @@ test("production Compose files use explicit image identities for sequential Buil
     assert.match(compose, /public-passport-viewer:\n    image: dpp-public-passport-viewer:latest/);
     assert.match(compose, /marketing-site:\n    image: dpp-marketing-site:latest/);
   }
+});
+
+test("every locally-built Compose service is configured to build instead of pulling an image", () => {
+  for (const composePath of composePaths) {
+    const compose = fs.readFileSync(composePath, "utf8");
+    const serviceStarts = [...compose.matchAll(/^  ([A-Za-z0-9_-]+):\n/gm)];
+    const buildServiceBlocks = serviceStarts
+      .map((match, index) => ({
+        name: match[1],
+        block: compose.slice(match.index, serviceStarts[index + 1]?.index),
+      }))
+      .filter(({ block }) => /^    build:/m.test(block));
+
+    assert.ok(buildServiceBlocks.length > 0, `${path.basename(composePath)} must define locally-built services`);
+    for (const { name, block } of buildServiceBlocks) {
+      assert.match(
+        block,
+        /^    pull_policy: build$/m,
+        `${path.basename(composePath)} service ${name} must not pull a registry image`
+      );
+    }
+  }
+});
+
+test("security workflow retains code-change triggers and provides manual plus weekly scans", () => {
+  const workflow = fs.readFileSync(securityWorkflowPath, "utf8");
+
+  assert.match(workflow, /^  push:/m);
+  assert.match(workflow, /^  pull_request:/m);
+  assert.match(workflow, /^  workflow_dispatch:/m);
+  assert.match(workflow, /^  schedule:\n    - cron: "\d+ \d+ \* \* [0-6]"$/m);
 });
 
 function assertApplicationSecretOutput(values, { includesDbPassword }) {

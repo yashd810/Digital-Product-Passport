@@ -1,5 +1,6 @@
 "use strict";
 
+const crypto = require("crypto");
 const logger = require("../../services/logger");
 
 const envInt = (name, fallback) => {
@@ -68,6 +69,11 @@ async (req, res, next) => {
   }
 };
 
+const hashRateLimitIdentity = (value) => crypto
+  .createHash("sha256")
+  .update(String(value || ""))
+  .digest("base64url");
+
 async function cleanupExpiredRateLimits(pool) {
   const result = await pool.query(
     `DELETE FROM "requestRateLimits"
@@ -125,6 +131,37 @@ const createRateLimiters = (pool) => {
       limit: envInt("rateLimitPasswordResetMax", 5),
       windowMs: envInt("rateLimitPasswordResetWindowMs", 15 * 60 * 1000),
       message: "Too many password reset attempts. Please wait a few minutes and try again."
+    }),
+
+    // Contact submissions can cause email delivery, so they have their own
+    // limits rather than sharing the comparatively permissive public-read
+    // budget. Sender and configured-recipient identities are hashed before
+    // persistence to avoid retaining mailbox addresses in rate-limit rows.
+    contactIpRateLimit: rateLimit({
+      key: (req) => `contact-ip:${String(req.ip || "unknown")}`,
+      limit: envInt("rateLimitContactIpMax", 3),
+      windowMs: envInt("rateLimitContactIpWindowMs", 15 * 60 * 1000),
+      message: "Too many contact requests. Please wait before trying again."
+    }),
+
+    contactEmailRateLimit: rateLimit({
+      key: (req) => {
+        const email = String(req.contactSubmission?.email || "").trim().toLowerCase();
+        return email ? `contact-email:${hashRateLimitIdentity(email)}` : "";
+      },
+      limit: envInt("rateLimitContactEmailMax", 2),
+      windowMs: envInt("rateLimitContactEmailWindowMs", 60 * 60 * 1000),
+      message: "Too many contact requests for this email address. Please try again later."
+    }),
+
+    contactRecipientRateLimit: rateLimit({
+      key: () => {
+        const recipient = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+        return recipient ? `contact-recipient:${hashRateLimitIdentity(recipient)}` : "";
+      },
+      limit: envInt("rateLimitContactRecipientMax", 30),
+      windowMs: envInt("rateLimitContactRecipientWindowMs", 60 * 60 * 1000),
+      message: "The contact form is temporarily busy. Please try again later."
     }),
 
     publicReadRateLimit: rateLimit({

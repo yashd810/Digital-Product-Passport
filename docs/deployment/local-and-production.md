@@ -99,6 +99,9 @@ Current production-style behavior:
   container restart
 - enabled host-level DB backups require a dedicated S3-compatible credential
   and backup bucket, separate from application file storage
+- enabled application backup replication requires dedicated
+  `BACKUP_PROVIDER_*` S3-compatible storage and never falls back to
+  `STORAGE_S3_*` application-file storage
 
 ## Environment Notes
 

@@ -1,6 +1,10 @@
 "use strict";
 
 const { createValidationMiddleware } = require("../../shared/validation/request-schema");
+const {
+  getSafeErrorMessage,
+  getSafeErrorStatus,
+} = require("../../shared/http/error-response");
 const { createIntegrationCompanySlugResolver } = require("../../shared/http/integration-company-resolver");
 const { createDppUseCase } = require("./application/create-dpp");
 const { updateDppUseCase } = require("./application/update-dpp");
@@ -91,8 +95,11 @@ module.exports = function registerMutationRoutes(app, deps) {
       const result = await createDpp({ req });
       return res.status(result.statusCode).json(result.body);
     } catch (e) {
-      if (e.statusCode) {
-        return res.status(e.statusCode).json(e.payload ? { error: e.message, ...e.payload } : { error: e.message });
+      const statusCode = getSafeErrorStatus(e);
+      if (statusCode < 500) {
+        return res.status(statusCode).json(e.payload
+          ? { error: getSafeErrorMessage(e, "Invalid DPP create request"), ...e.payload }
+          : { error: getSafeErrorMessage(e, "Invalid DPP create request") });
       }
       logger.error({ err: e }, "[Standards DPP create API]");
       return res.status(500).json({ error: "Failed to create DPP" });
@@ -120,8 +127,9 @@ module.exports = function registerMutationRoutes(app, deps) {
       const result = await updateDpp({ req, res });
       return res.status(result.statusCode).json(result.body);
     } catch (e) {
-      if (e.statusCode) {
-        return res.status(e.statusCode).json({ error: e.message });
+      const statusCode = getSafeErrorStatus(e);
+      if (statusCode < 500) {
+        return res.status(statusCode).json({ error: getSafeErrorMessage(e, "Invalid DPP update request") });
       }
       if (e.code === "ambiguousDppId") {
         return res.status(409).json({ error: "ambiguousDppId" });

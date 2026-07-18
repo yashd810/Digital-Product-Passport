@@ -11,6 +11,10 @@ const {
   mapPassportTypeRow,
 } = require("../../shared/passports/passport-helpers");
 const { createApiKeyHelpers } = require("../../modules/passports/api-key-helpers");
+const {
+  getSafeErrorMessage,
+  getSafeErrorStatus,
+} = require("../../shared/http/error-response");
 
 module.exports = function registerPassportPublicRoutes(app, {
   pool,
@@ -555,17 +559,17 @@ module.exports = function registerPassportPublicRoutes(app, {
     return "Verification failed";
   }
 
-  async function loadPublicPassportByGuid(dppId, { versionNumber = null } = {}) {
-    const normalizedGuid = String(dppId || "").trim();
-    if (!normalizedGuid) return null;
+  async function loadPublicPassportByDppId(dppId, { versionNumber = null } = {}) {
+    const normalizedDppId = String(dppId || "").trim();
+    if (!normalizedDppId) return null;
 
     const handoverLoaded = await loadBackupHandoverPassport({
-      passportDppId: normalizedGuid,
+      passportDppId: normalizedDppId,
       versionNumber,
     });
     if (handoverLoaded) return handoverLoaded;
 
-    const resolved = await resolvePublicPassportByDppId(normalizedGuid, { versionNumber });
+    const resolved = await resolvePublicPassportByDppId(normalizedDppId, { versionNumber });
     let passport = resolved?.passport || null;
 
     if (!passport && versionNumber === null) {
@@ -574,7 +578,7 @@ module.exports = function registerPassportPublicRoutes(app, {
          FROM "passportRegistry"
          WHERE "dppId" = $1
          LIMIT 1`,
-        [normalizedGuid]
+        [normalizedDppId]
       );
       if (!registryRes.rows.length) return null;
 
@@ -588,7 +592,7 @@ module.exports = function registerPassportPublicRoutes(app, {
            AND "releaseStatus" IN ('released', 'obsolete')
          ORDER BY "versionNumber" DESC, "updatedAt" DESC
          LIMIT 1`,
-        [normalizedGuid]
+        [normalizedDppId]
       );
       if (liveRes.rows.length) {
         passport = { ...normalizePassportRow(liveRes.rows[0]), passportType };
@@ -605,7 +609,7 @@ module.exports = function registerPassportPublicRoutes(app, {
              AND pa."releaseStatus" IN ('released', 'obsolete')
            ORDER BY pa."versionNumber" DESC, pa."archivedAt" DESC
            LIMIT 1`,
-          [normalizedGuid, passportType]
+          [normalizedDppId, passportType]
         );
         if (archiveRes.rows.length) {
           const rowData = typeof archiveRes.rows[0].rowData === "string" ?
@@ -629,10 +633,10 @@ module.exports = function registerPassportPublicRoutes(app, {
   }
 
   async function loadPublicVerificationContext(dppId, { versionNumber = null } = {}) {
-    const loaded = await loadPublicPassportByGuid(dppId, { versionNumber });
+    const loaded = await loadPublicPassportByDppId(dppId, { versionNumber });
     if (!loaded?.passport) return null;
 
-    const passportDppId = loaded.passport.dppId || loaded.passport.guid || dppId;
+    const passportDppId = loaded.passport.dppId || dppId;
     const sanitizedPassport = securePublicRepositoryLinks(
       await stripRestrictedFieldsForPublicView(loaded.passport, getPassportType(loaded.passport)),
       passportDppId
@@ -670,7 +674,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   function buildPublicVerificationPayload(verificationContext) {
     const { passport, company, sanitizedPassport, signatureRow, verifyResult } = verificationContext;
-    const passportDppId = passport.dppId || passport.guid || null;
+    const passportDppId = passport.dppId || null;
     const dppUrl = buildPublicPassportUrl(sanitizedPassport, company?.companyName || "");
     const signatureUrl = didService.buildApiUrl(`/api/public/passports/${passportDppId}/signature`);
     const canonicalDppJsonUrl = didService.buildApiUrl(`/api/public/passports/${passportDppId}`);
@@ -707,16 +711,10 @@ module.exports = function registerPassportPublicRoutes(app, {
   }) {
     if (!backupProviderService?.getActivePublicHandover) return null;
 
-    let handover = await backupProviderService.getActivePublicHandover({
+    const handover = await backupProviderService.getActivePublicHandover({
       passportDppId,
       versionNumber,
     });
-    if (!handover && backupProviderService?.ensureAutomaticPublicHandover) {
-      handover = await backupProviderService.ensureAutomaticPublicHandover({
-        passportDppId,
-        versionNumber,
-      });
-    }
     if (!handover) return null;
 
     const rawRow = typeof handover.publicRowData === "string" ?
@@ -726,7 +724,6 @@ module.exports = function registerPassportPublicRoutes(app, {
     const passport = {
       ...normalizePassportRow(rawRow || {}),
       dppId: rawRow?.dppId || handover.passportDppId,
-      guid: rawRow?.guid || rawRow?.dppId || handover.passportDppId,
       lineageId: rawRow?.lineageId || handover.lineageId || handover.passportDppId,
       companyId: rawRow?.companyId || handover.companyId,
       passportType: rawRow?.passportType || handover.passportType,
@@ -864,7 +861,7 @@ module.exports = function registerPassportPublicRoutes(app, {
     return null;
   }
 
-  // ─── BY GUID (public, canonical JSON by default) ────────────────────────
+  // ─── BY DPP ID (public, canonical JSON by default) ──────────────────────
 
   async function handleCanonicalPassportRequest(req, res) {
     try {
@@ -872,7 +869,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       if (req.query.version && (!Number.isInteger(versionNumber) || versionNumber < 1)) {
         return res.status(400).json({ error: "version must be a positive integer" });
       }
-      const loaded = await loadPublicPassportByGuid(req.params.dppId, { versionNumber });
+      const loaded = await loadPublicPassportByDppId(req.params.dppId, { versionNumber });
       if (!loaded?.passport) return res.status(404).json({ error: "Passport not found" });
 
       const sanitizedPassport = await stripRestrictedFieldsForPublicView(
@@ -950,11 +947,14 @@ module.exports = function registerPassportPublicRoutes(app, {
 
       return res.json(canonicalPayload);
     } catch (error) {
-      if (error.statusCode) {
-        return res.status(error.statusCode).json({ error: error.message });
+      const statusCode = getSafeErrorStatus(error);
+      if (statusCode < 500) {
+        return res.status(statusCode).json({
+          error: getSafeErrorMessage(error, "Passport not found"),
+        });
       }
       logger.error({ err: error }, "Public passport fetch error");
-      return res.status(500).json({ error: "Failed to fetch passport" });
+      return res.status(statusCode).json({ error: "Failed to fetch passport" });
     }
   }
 
@@ -962,7 +962,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   app.get("/api/public/passports/:dppId/history", publicReadRateLimit, securityGroupReadLimiter, async (req, res) => {
     try {
-      const loaded = await loadPublicPassportByGuid(req.params.dppId);
+      const loaded = await loadPublicPassportByDppId(req.params.dppId);
       if (!loaded?.passport) return res.status(404).json({ error: "Passport not found" });
 
       let allowedRestrictedFieldKeys = [];
@@ -997,8 +997,9 @@ module.exports = function registerPassportPublicRoutes(app, {
 
       res.json(historyPayload);
     } catch (error) {
-      res.status(error.statusCode || 500).json({
-        error: error.statusCode ? error.message : "Failed to fetch passport history",
+      const statusCode = getSafeErrorStatus(error);
+      res.status(statusCode).json({
+        error: getSafeErrorMessage(error, "Failed to fetch passport history"),
       });
     }
   });

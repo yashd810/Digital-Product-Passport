@@ -337,15 +337,26 @@ function createArchiveHistoryHelpers({
     }));
   }
 
-  async function markOlderVersionsObsolete(tableName, dppId, newVersionNumber, passportType = null) {
+  async function markOlderVersionsObsolete(
+    tableName,
+    dppId,
+    newVersionNumber,
+    passportType = null,
+    {
+      client = pool,
+      failOnError = false,
+      archivedBy = null,
+      actorIdentifier = null,
+    } = {}
+  ) {
     try {
-      const lineageRes = await pool.query(
+      const lineageRes = await client.query(
         `SELECT "lineageId" FROM ${tableName} WHERE "dppId" = $1 LIMIT 1`, [dppId]
       );
       if (!lineageRes.rows.length) return;
       const lineageId = lineageRes.rows[0].lineageId;
       const resolvedPassportType = passportType || tableName.replace(/^passports_/, "");
-      const affectedRes = await pool.query(
+      const affectedRes = await client.query(
         `SELECT *
          FROM ${tableName}
          WHERE "lineageId" = $1
@@ -358,10 +369,13 @@ function createArchiveHistoryHelpers({
         await archivePassportSnapshots({
           passports: affectedRes.rows,
           passportType: resolvedPassportType,
+          archivedBy,
+          actorIdentifier,
           snapshotReason: "beforeMarkObsolete",
+          client,
         });
       }
-      await pool.query(
+      await client.query(
         `UPDATE ${tableName}
          SET "releaseStatus" = 'obsolete', "updatedAt" = NOW()
          WHERE "lineageId" = $1
@@ -371,7 +385,7 @@ function createArchiveHistoryHelpers({
          RETURNING *`,
         [lineageId, newVersionNumber]
       );
-      const updatedRes = await pool.query(
+      const updatedRes = await client.query(
         `SELECT *
          FROM ${tableName}
          WHERE "lineageId" = $1
@@ -384,10 +398,14 @@ function createArchiveHistoryHelpers({
         await archivePassportSnapshots({
           passports: updatedRes.rows,
           passportType: resolvedPassportType,
+          archivedBy,
+          actorIdentifier,
           snapshotReason: "afterMarkObsolete",
+          client,
         });
       }
     } catch (e) {
+      if (failOnError) throw e;
       logger.error("Mark obsolete error (non-fatal):", e.message);
     }
   }

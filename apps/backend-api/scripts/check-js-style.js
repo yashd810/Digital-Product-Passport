@@ -110,7 +110,11 @@ const envTokens = new Set();
 
 for (const file of legacyScanFiles) {
   const source = fs.readFileSync(file, "utf8");
-  for (const match of source.matchAll(/\b(?:process\.env|import\.meta\.env)\.([A-Z][A-Z0-9_]+)\b/g)) {
+  // Some small configuration readers accept an injected `environment` object
+  // for deterministic tests. Treat its explicit uppercase properties as
+  // environment tokens just like process.env, without exempting ordinary
+  // application identifiers from the style scan.
+  for (const match of source.matchAll(/\b(?:process\.env|import\.meta\.env|environment)\.([A-Z][A-Z0-9_]+)\b/g)) {
     envTokens.add(match[1]);
   }
   for (const match of source.matchAll(/\brequireEnv\(\s*(["`])([A-Z][A-Z0-9_]+)\1\s*\)/g)) {

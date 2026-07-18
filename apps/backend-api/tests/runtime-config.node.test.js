@@ -66,6 +66,19 @@ const validDbBackupConfig = {
   DB_BACKUP_S3_SECRET_ACCESS_KEY: "database-backup-secret-key",
 };
 
+const validBackupProviderStorageConfig = {
+  BACKUP_PROVIDER_ENABLED: "true",
+  BACKUP_PROVIDER_REQUIRED: "true",
+  BACKUP_PROVIDER_KEY: "oci-backup-provider",
+  BACKUP_PROVIDER_OBJECT_PREFIX: "backup-provider",
+  BACKUP_PROVIDER_ENDPOINT: "https://backup-storage.example.com",
+  BACKUP_PROVIDER_REGION: "eu-frankfurt-1",
+  BACKUP_PROVIDER_BUCKET: "dpp-prod-backups",
+  BACKUP_PROVIDER_ACCESS_KEY_ID: "backup-provider-access-key",
+  BACKUP_PROVIDER_SECRET_ACCESS_KEY: "backup-provider-secret-key",
+  BACKUP_PROVIDER_FORCE_PATH_STYLE: "true",
+};
+
 function withEnv(overrides, fn) {
   const previous = {};
   const keys = new Set([...Object.keys(requiredProductionEnv), ...Object.keys(overrides)]);
@@ -362,6 +375,62 @@ test("production storage guard rejects DB backup credentials or buckets shared w
       );
     });
   }
+});
+
+test("production storage guard requires complete, explicitly enabled provider-scoped backup storage", () => {
+  withEnv({
+    ...validStorageConfig,
+    ...validBackupProviderStorageConfig,
+    BACKUP_PROVIDER_ENDPOINT: undefined,
+  }, () => {
+    assert.throws(
+      () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
+      /BACKUP_PROVIDER_ENDPOINT/
+    );
+  });
+});
+
+test("production storage guard accepts isolated application backup-provider storage", () => {
+  withEnv({
+    ...validStorageConfig,
+    ...validBackupProviderStorageConfig,
+  }, () => {
+    assert.doesNotThrow(() => {
+      assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } });
+    });
+  });
+});
+
+test("production storage guard rejects backup-provider bucket or credential material shared with application storage", () => {
+  for (const [key, duplicateValue] of [
+    ["BACKUP_PROVIDER_BUCKET", validStorageConfig.STORAGE_S3_BUCKET],
+    ["BACKUP_PROVIDER_ACCESS_KEY_ID", validStorageConfig.STORAGE_S3_ACCESS_KEY_ID],
+    ["BACKUP_PROVIDER_SECRET_ACCESS_KEY", validStorageConfig.STORAGE_S3_SECRET_ACCESS_KEY],
+  ]) {
+    withEnv({
+      ...validStorageConfig,
+      ...validBackupProviderStorageConfig,
+      [key]: duplicateValue,
+    }, () => {
+      assert.throws(
+        () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
+        /Backup-provider storage must use separate bucket and credential material/
+      );
+    });
+  }
+});
+
+test("production storage guard rejects a required backup provider that is disabled", () => {
+  withEnv({
+    ...validStorageConfig,
+    BACKUP_PROVIDER_ENABLED: "false",
+    BACKUP_PROVIDER_REQUIRED: "true",
+  }, () => {
+    assert.throws(
+      () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
+      /BACKUP_PROVIDER_ENABLED=true/
+    );
+  });
 });
 
 test("production storage guard rejects a non-boolean DB backup enablement value", () => {

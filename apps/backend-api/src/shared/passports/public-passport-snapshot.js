@@ -6,7 +6,6 @@ const {
 
 const publicMetadataKeys = new Set([
   "dppId",
-  "guid",
   "lineageId",
   "passportType",
   "modelName",

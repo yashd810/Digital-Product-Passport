@@ -169,7 +169,11 @@ function CompanyProfile({ companyId, user }) {
                   <li>RPO target: {backupPolicy.rpoMinutes} minutes</li>
                   <li>RTO target: {backupPolicy.rtoHours} hours</li>
                   <li>Backup provider required: {backupPolicy.backupProviderRequired ? "Yes" : "No"}</li>
-                  <li>Automatic public handover: {backupPolicy.automaticPublicHandoverEnabled ? "Enabled" : "Disabled"}</li>
+                  <li>
+                    Public handover: {backupPolicy.publicHandoverActivation === "explicitAdminOnly" ?
+                      "Explicit administrator activation required" :
+                      "Unavailable"}
+                  </li>
                 </ul>
               </div>
             )}

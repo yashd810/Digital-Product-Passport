@@ -187,9 +187,11 @@ module.exports = function registerRepositoryRoutes(app, {
         res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
       } catch (e) {
         if (e.code === "storageDisabled") {
-          return res.status(503).json({ error: e.message });
+          return res.status(503).json({ error: "File storage is unavailable" });
         }
-        if (e.code === "invalidFileSignature") return res.status(400).json({ error: e.message });
+        if (e.code === "invalidFileSignature") {
+          return res.status(400).json({ error: "Uploaded file type does not match its contents" });
+        }
         if (e.code === "LIMIT_FILE_SIZE") {
           return res.status(413).json({ error: "File too large. Max 50 MB." });
         }
@@ -341,11 +343,13 @@ module.exports = function registerRepositoryRoutes(app, {
         res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
       } catch (e) {
         if (e.code === "storageDisabled") {
-          return res.status(503).json({ error: e.message });
+          return res.status(503).json({ error: "File storage is unavailable" });
         }
-        if (e.code === "invalidFileSignature") return res.status(400).json({ error: e.message });
+        if (e.code === "invalidFileSignature") {
+          return res.status(400).json({ error: "Uploaded file type does not match its contents" });
+        }
         logger.error("Company symbol upload error:", e.message);
-        res.status(500).json({ error: e.message || "Upload failed" });
+        res.status(500).json({ error: "Upload failed" });
       }
     }
   );

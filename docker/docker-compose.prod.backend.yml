@@ -4,6 +4,7 @@ services:
     build:
       context: ..
       dockerfile: apps/backend-api/Dockerfile
+    pull_policy: build
     ports:
       - "127.0.0.1:${BACKEND_PORT:-3001}:3001"
     env_file:
@@ -71,6 +72,7 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/postgres/Dockerfile
+    pull_policy: build
     image: dpp-postgres:18.4-trixie-gosu1.19-go1.26.5
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"

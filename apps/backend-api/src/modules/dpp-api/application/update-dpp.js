@@ -191,7 +191,7 @@ function updateDppUseCase(deps) {
         tableName: editable.tableName,
         companyId: editable.passport.companyId,
         internalAliasId: nextProductId,
-        excludeGuid: editable.passport.dppId,
+        excludeDppId: editable.passport.dppId,
         excludeLineageId: editable.passport.lineageId,
       });
       if (existingByProductId) {

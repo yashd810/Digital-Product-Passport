@@ -47,7 +47,7 @@ function buildCanonicalIdentityBundle({
 } = {}) {
   const stableId = normalizeStableIdValue(
     didService,
-    passport?.lineageId || passport?.dppId || passport?.guid || null
+    passport?.lineageId || passport?.dppId || null
   );
   const resolvedGranularity = normalizeGranularityValue(
     didService,
@@ -114,7 +114,6 @@ function buildCanonicalIdentityBundle({
   const digitalProductPassportId =
     dppDid
     || passport?.dppId
-    || passport?.guid
     || null;
 
   return {

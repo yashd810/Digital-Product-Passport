@@ -34,7 +34,7 @@ apps/backend-api/
     ├── bootstrap/        # environment, HTTP setup, route registration
     ├── db/               # schema setup and migrations
     ├── http/             # route files and middleware
-    ├── infrastructure/   # storage, signing, email, OAuth, logging, semantics, backup
+    ├── infrastructure/   # low-level adapters (currently PostgreSQL transaction handling)
     ├── modules/          # feature-level route helpers by domain
     ├── services/         # core service implementations
     └── shared/           # shared helpers used across backend layers

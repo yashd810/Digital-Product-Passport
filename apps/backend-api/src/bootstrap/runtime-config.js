@@ -6,6 +6,10 @@ const crypto = require("crypto");
 const net = require("net");
 const { isPrivateOrReservedHostname, normalizeHostname } = require("../shared/security/network-address");
 const { normalizeConfiguredOrigin } = require("../shared/security/configured-origin");
+const {
+  backupProviderS3EnvNames,
+  readBackupProviderObjectStorageConfigFromEnvironment,
+} = require("../shared/backups/backup-provider-object-storage-config");
 
 const requiredSecurityEnvVars = [
   "JWT_SECRET",
@@ -405,6 +409,8 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
   if (!isProduction) return;
 
   const storageProvider = String(process.env.STORAGE_PROVIDER || "local").trim().toLowerCase();
+  const backupProviderEnabledValue = String(process.env.BACKUP_PROVIDER_ENABLED || "").trim().toLowerCase();
+  const backupProviderRequiredValue = String(process.env.BACKUP_PROVIDER_REQUIRED || "").trim().toLowerCase();
   const backupProviderEnabled = toBooleanEnv(process.env.BACKUP_PROVIDER_ENABLED, false);
   const backupProviderRequired = toBooleanEnv(process.env.BACKUP_PROVIDER_REQUIRED, false);
   const dbBackupEnabledValue = String(process.env.DB_BACKUP_ENABLED || "").trim().toLowerCase();
@@ -425,6 +431,15 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
   if (dbBackupEnabledValue && !["true", "false"].includes(dbBackupEnabledValue)) {
     logger.error({ value: dbBackupEnabledValue }, "DB_BACKUP_ENABLED must be true or false");
     throw new Error("[PRODUCTION] DB_BACKUP_ENABLED must be true or false.");
+  }
+  for (const [name, value] of [
+    ["BACKUP_PROVIDER_ENABLED", backupProviderEnabledValue],
+    ["BACKUP_PROVIDER_REQUIRED", backupProviderRequiredValue],
+  ]) {
+    if (value && !["true", "false"].includes(value)) {
+      logger.error({ env: name }, "Backup-provider enablement flags must be true or false");
+      throw new Error(`[PRODUCTION] ${name} must be true or false.`);
+    }
   }
 
   for (const key of [
@@ -482,8 +497,32 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
   if (backupProviderRequired && !backupProviderEnabled) {
     missing.push("BACKUP_PROVIDER_ENABLED=true");
   }
-  if (backupProviderEnabled && !process.env.BACKUP_PROVIDER_OBJECT_PREFIX) {
-    missing.push("BACKUP_PROVIDER_OBJECT_PREFIX");
+  if (backupProviderEnabled) {
+    for (const key of [...backupProviderS3EnvNames, "BACKUP_PROVIDER_OBJECT_PREFIX"]) {
+      if (!String(process.env[key] || "").trim()) missing.push(key);
+    }
+  }
+
+  if (backupProviderEnabled && !missing.length) {
+    let backupProviderStorage;
+    try {
+      backupProviderStorage = readBackupProviderObjectStorageConfigFromEnvironment();
+    } catch (error) {
+      logger.error({ env: "BACKUP_PROVIDER_*" }, "Backup-provider S3 configuration is invalid");
+      throw new Error(`[PRODUCTION] ${error.message}`);
+    }
+
+    const duplicatedBackupProviderValues = [
+      ["BACKUP_PROVIDER_BUCKET", "STORAGE_S3_BUCKET", backupProviderStorage.bucket],
+      ["BACKUP_PROVIDER_ACCESS_KEY_ID", "STORAGE_S3_ACCESS_KEY_ID", backupProviderStorage.accessKeyId],
+      ["BACKUP_PROVIDER_SECRET_ACCESS_KEY", "STORAGE_S3_SECRET_ACCESS_KEY", backupProviderStorage.secretAccessKey],
+    ].filter(([, storageKey, backupValue]) => backupValue === String(process.env[storageKey] || "").trim());
+    if (duplicatedBackupProviderValues.length) {
+      const duplicatedNames = duplicatedBackupProviderValues
+        .map(([backupKey, storageKey]) => `${backupKey}/${storageKey}`);
+      logger.error({ duplicated: duplicatedNames }, "Backup-provider storage must use a separate bucket and credential material");
+      throw new Error(`[PRODUCTION] Backup-provider storage must use separate bucket and credential material: ${duplicatedNames.join(", ")}`);
+    }
   }
 
   if (missing.length) {

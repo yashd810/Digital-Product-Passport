@@ -150,19 +150,6 @@ const renderContactSubmissionBody = ({
   <p style="white-space:pre-wrap">${escapeHtml(message)}</p>
 `;
 
-const renderContactConfirmationBody = ({ firstName, lastName, email, company, sector, message }) => `
-  <p>Hello ${escapeHtml(firstName)},</p>
-  <p>Thanks for reaching out. We received your message and will review it shortly.</p>
-  ${renderInfoTable([
-    { label: "Name", value: `${firstName || ""} ${lastName || ""}`.trim() },
-    { label: "Email", value: email },
-    { label: "Company", value: company },
-    { label: "Sector", value: sector },
-  ])}
-  <p>If you need to add anything, just reply to this email and we’ll pick it up.</p>
-  <p style="white-space:pre-wrap"><strong>Your message:</strong><br>${escapeHtml(message)}</p>
-`;
-
 const renderPasswordResetBody = ({ email, resetUrl }) => `
   <p>We received a request to reset the password for <strong>${escapeHtml(email)}</strong>.</p>
   <div class="cta-wrap"><a href="${safeHttpUrl(resetUrl)}" class="cta-btn">🔐 Reset Password →</a></div>
@@ -241,7 +228,6 @@ module.exports = {
   sendOtpEmail,
   renderInfoTable,
   renderContactSubmissionBody,
-  renderContactConfirmationBody,
   renderPasswordResetBody,
   renderCompanyInvitationBody,
   escapeHtml,

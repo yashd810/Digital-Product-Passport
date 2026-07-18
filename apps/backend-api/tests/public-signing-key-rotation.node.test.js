@@ -8,7 +8,7 @@ const http = require("node:http");
 
 const registerPassportPublicRoutes = require("../src/http/routes/passport-public");
 
-function registerTestRoutes(app, { activeKey, historicalKeys }) {
+function registerTestRoutes(app, { activeKey, historicalKeys, backupProviderService = {} }) {
   const passThrough = (_req, _res, next) => next();
   const pool = {
     async query(sql) {
@@ -17,6 +17,9 @@ function registerTestRoutes(app, { activeKey, historicalKeys }) {
       }
       if (sql.includes('FROM "passportSigningKeys"')) {
         return { rows: historicalKeys };
+      }
+      if (sql.includes('FROM "passportRegistry"')) {
+        return { rows: [] };
       }
       throw new Error(`Unexpected query: ${sql}`);
     },
@@ -40,7 +43,7 @@ function registerTestRoutes(app, { activeKey, historicalKeys }) {
     buildSemanticPassportJsonExport: () => ({}),
     buildCanonicalPassportPayload: () => ({}),
     buildExpandedPassportPayload: () => ({}),
-    backupProviderService: {},
+    backupProviderService,
     signingService: {
       getSigningKey: () => ({ keyId: activeKey.keyId }),
       getSigningTrustMetadata: () => ({ issuerDid: "did:web:api.example.test" }),
@@ -107,4 +110,35 @@ test("public signing key discovery retains verification material across rotation
       createdAt: key.createdAt,
     })));
   });
+});
+
+test("public passport requests never trigger automatic backup-handover activation", async () => {
+  const activeKey = {
+    keyId: "active-key",
+    publicKey: "public-key-active",
+    algorithm: "ES256",
+    algorithmVersion: "ES256",
+    createdAt: "2026-07-10T10:00:00.000Z",
+  };
+  let automaticActivationCalls = 0;
+  const app = express();
+  registerTestRoutes(app, {
+    activeKey,
+    historicalKeys: [activeKey],
+    backupProviderService: {
+      async getActivePublicHandover() {
+        return null;
+      },
+      async ensureAutomaticPublicHandover() {
+        automaticActivationCalls += 1;
+        throw new Error("A public request must not mutate backup handover state");
+      },
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(baseUrl + "/api/public/passports/dpp-1");
+    assert.equal(response.status, 404);
+  });
+  assert.equal(automaticActivationCalls, 0);
 });

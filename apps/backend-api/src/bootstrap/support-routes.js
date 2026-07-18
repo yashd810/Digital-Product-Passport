@@ -6,9 +6,13 @@ const {
 const {
   getEmailFromAddress,
   renderContactSubmissionBody,
-  renderContactConfirmationBody,
 } = require("../services/email");
 const { resolveExistingContainedPath } = require("../shared/storage/path-containment");
+const {
+  discardContactHoneypot,
+  isValidContactEmail,
+  validateContactSubmission,
+} = require("../shared/http/contact-request");
 
 const normalizeHeaderText = (value) => String(value ?? "").replace(/[\r\n]+/g, " ").trim();
 
@@ -38,6 +42,9 @@ function registerSupportRoutes(app, deps) {
     normalizeStorageRequestKey,
     isPassportStorageKey,
     publicReadRateLimit,
+    contactIpRateLimit,
+    contactEmailRateLimit,
+    contactRecipientRateLimit,
     createTransporter,
     brandedEmail,
   } = deps;
@@ -187,77 +194,41 @@ function registerSupportRoutes(app, deps) {
     return servePassportAttachment(req, res);
   });
 
-  app.post("/api/contact", publicReadRateLimit, async (req, res) => {
-    try {
-      const {
-        firstName,
-        lastName,
-        email,
-        company,
-        sector,
-        serviceInterest,
-        deadline,
-        message,
-        howFound,
-      } = req.body || {};
-
-      if (!firstName || !lastName || !email || !message) {
-        return res.status(400).json({ error: "firstName, lastName, email, and message are required" });
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return res.status(400).json({ error: "Invalid email address" });
-      }
-
-      const normalizedContact = {
-        firstName: String(firstName).trim(),
-        lastName: String(lastName).trim(),
-        email: String(email).trim(),
-        company: company ? String(company).trim() : "",
-        sector: sector ? String(sector).trim() : "",
-        serviceInterest: serviceInterest ? String(serviceInterest).trim() : "",
-        deadline: deadline ? String(deadline).trim() : "",
-        howFound: howFound ? String(howFound).trim() : "",
-        message: String(message).trim(),
-      };
-      const fromAddress = getEmailFromAddress();
-
-      const transporter = createTransporter();
-      const adminEmail = process.env.ADMIN_EMAIL;
-      if (adminEmail) {
-        try {
-          await transporter.sendMail({
-            from: `"Digital Product Passport Platform Contact" <${fromAddress}>`,
-            to: adminEmail,
-            replyTo: email,
-            subject: `New Contact Form Submission — ${normalizeHeaderText(firstName)} ${normalizeHeaderText(lastName)}`,
-            html: brandedEmail({
-              preheader: "New contact form submission",
-              bodyHtml: renderContactSubmissionBody(normalizedContact),
-            }),
-          });
-        } catch (adminMailError) {
-          logger.error({ err: adminMailError }, "[Contact] Failed to send admin notification");
+  app.post(
+    "/api/contact",
+    contactIpRateLimit,
+    validateContactSubmission,
+    discardContactHoneypot,
+    contactEmailRateLimit,
+    contactRecipientRateLimit,
+    async (req, res) => {
+      try {
+        const normalizedContact = req.contactSubmission;
+        const adminEmail = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+        if (!isValidContactEmail(adminEmail)) {
+          logger.error("[Contact] ADMIN_EMAIL is not configured with a valid mailbox");
+          return res.status(503).json({ error: "Contact form is temporarily unavailable. Please email us directly." });
         }
-      } else {
-        logger.warn("ADMIN_EMAIL not configured - contact form submission not forwarded");
-      }
 
-      await transporter.sendMail({
-        from: `"Digital Product Passport Platform Contact" <${fromAddress}>`,
-        to: email,
-        replyTo: adminEmail || fromAddress,
-        subject: "We received your message — Digital Product Passport Platform",
-        html: brandedEmail({
-          preheader: "Thanks for contacting the Digital Product Passport Platform",
-          bodyHtml: renderContactConfirmationBody(normalizedContact),
-        }),
-      });
-      res.json({ ok: true });
-    } catch (error) {
-      logger.error({ err: error }, "[Contact] Failed to send contact email");
-      res.status(500).json({ error: "Failed to send message. Please email us directly." });
+        const fromAddress = getEmailFromAddress();
+        const transporter = createTransporter();
+        await transporter.sendMail({
+          from: `"Digital Product Passport Platform Contact" <${fromAddress}>`,
+          to: adminEmail,
+          replyTo: normalizedContact.email,
+          subject: `New Contact Form Submission — ${normalizeHeaderText(normalizedContact.firstName)} ${normalizeHeaderText(normalizedContact.lastName)}`,
+          html: brandedEmail({
+            preheader: "New contact form submission",
+            bodyHtml: renderContactSubmissionBody(normalizedContact),
+          }),
+        });
+        res.json({ ok: true });
+      } catch (error) {
+        logger.error({ err: error }, "[Contact] Failed to send contact email");
+        res.status(500).json({ error: "Failed to send message. Please email us directly." });
+      }
     }
-  });
+  );
 }
 
 module.exports = {

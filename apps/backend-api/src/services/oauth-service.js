@@ -33,6 +33,8 @@ const oauthFetchTimeoutMs = Math.min(
 const oauthDnsLookupTimeoutMs = 5000;
 const maxOauthProviderEndpointOrigins = 16;
 const maxOauthResponseBytes = 1024 * 1024;
+const oauthTransactionTtlSeconds = 10 * 60;
+const oauthTransactionCookieName = "oauth_transaction";
 
 function isExplicitLoopbackHost(hostname) {
   const normalized = normalizeHostname(hostname);
@@ -368,6 +370,29 @@ function sha256Base64Url(value) {
   return crypto.createHash("sha256").update(String(value || "")).digest("base64url");
 }
 
+function sha256Hex(value) {
+  return crypto.createHash("sha256").update(String(value || "")).digest("hex");
+}
+
+function isOpaqueTransactionToken(value) {
+  return /^[A-Za-z0-9_-]{43,128}$/.test(String(value || ""));
+}
+
+function readRequestCookie(req, name) {
+  const cookieHeader = String(req?.headers?.cookie || "");
+  for (const part of cookieHeader.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 1) continue;
+    if (part.slice(0, separator).trim() !== name) continue;
+    try {
+      return decodeURIComponent(part.slice(separator + 1).trim());
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+
 function normalizeRedirectPath(redirectTo, fallback = "/") {
   const raw = String(redirectTo || "").trim();
   if (!raw) return fallback;
@@ -379,9 +404,10 @@ function normalizeRedirectPath(redirectTo, fallback = "/") {
 function createOauthService({
   jwt,
   pool,
-  jwtSecret,
   generateToken,
   setAuthCookie,
+  setOauthTransactionCookie,
+  clearOauthTransactionCookie,
   cache,
   hashPassword,
   dnsLookup = dns.lookup,
@@ -394,6 +420,9 @@ function createOauthService({
   }
   if (pinnedRequestFactory !== null && typeof pinnedRequestFactory !== "function") {
     throw new Error("OAuth pinned request factory must be a function");
+  }
+  if (typeof setOauthTransactionCookie !== "function" || typeof clearOauthTransactionCookie !== "function") {
+    throw new Error("OAuth transaction cookies must be configured");
   }
 
   const rawProviders = parseJsonEnv("OAUTH_PROVIDERS_JSON", []);
@@ -527,21 +556,36 @@ function createOauthService({
     }));
   }
 
-  function signState(payload) {
-    return jwt.sign(payload, jwtSecret, {
-      algorithm: "HS256",
-      expiresIn: "10m",
-      issuer: "dpp-api",
-      audience: "dpp-oauth-state",
-    });
+  async function createLoginTransaction({ provider, nonce, codeVerifier, redirectTo, state, bindingToken }) {
+    await pool.query('DELETE FROM "oauthLoginTransactions" WHERE "expiresAt" <= NOW()');
+    await pool.query(
+      `INSERT INTO "oauthLoginTransactions"
+        ("stateHash", "providerKey", nonce, "codeVerifier", "redirectTo", "bindingHash", "expiresAt")
+       VALUES ($1, $2, $3, $4, $5, $6, NOW() + ($7::INTEGER * INTERVAL '1 second'))`,
+      [
+        sha256Hex(state),
+        provider.key,
+        nonce,
+        codeVerifier,
+        redirectTo,
+        sha256Hex(bindingToken),
+        oauthTransactionTtlSeconds,
+      ]
+    );
   }
 
-  function verifyState(token) {
-    return jwt.verify(token, jwtSecret, {
-      algorithms: ["HS256"],
-      issuer: "dpp-api",
-      audience: "dpp-oauth-state",
-    });
+  async function consumeLoginTransaction({ providerKey, state, bindingToken }) {
+    if (!isOpaqueTransactionToken(state) || !isOpaqueTransactionToken(bindingToken)) return null;
+    const result = await pool.query(
+      `DELETE FROM "oauthLoginTransactions"
+        WHERE "stateHash" = $1
+          AND "bindingHash" = $2
+          AND "providerKey" = $3
+          AND "expiresAt" > NOW()
+        RETURNING "providerKey", nonce, "codeVerifier", "redirectTo"`,
+      [sha256Hex(state), sha256Hex(bindingToken), providerKey]
+    );
+    return result.rows[0] || null;
   }
 
   async function exchangeCode(provider, metadata, code, redirectUri, codeVerifier) {
@@ -699,15 +743,20 @@ function createOauthService({
     return user;
   }
 
-  function buildAuthUrl(provider, metadata, _req, redirectTo = "") {
+  async function buildAuthUrl(provider, metadata, res, redirectTo = "") {
     const nonce = crypto.randomUUID();
     const codeVerifier = crypto.randomBytes(48).toString("base64url");
-    const state = signState({
-      provider: provider.key,
+    const state = crypto.randomBytes(32).toString("base64url");
+    const bindingToken = crypto.randomBytes(32).toString("base64url");
+    await createLoginTransaction({
+      provider,
       nonce,
       codeVerifier,
       redirectTo: normalizeRedirectPath(redirectTo, "/"),
+      state,
+      bindingToken,
     });
+    setOauthTransactionCookie(res, bindingToken);
     const redirectUri = `${getApiOrigin()}/api/auth/sso/${provider.key}/callback`;
     const params = new URLSearchParams({
       client_id: provider.clientId,
@@ -722,11 +771,11 @@ function createOauthService({
     return `${metadata.authorization_endpoint}?${params.toString()}`;
   }
 
-  async function beginLogin(providerKey, req, redirectTo) {
+  async function beginLogin(providerKey, res, redirectTo) {
     const provider = getProvider(providerKey);
     if (!provider) throw new Error("Unknown SSO provider");
     const metadata = await getProviderMetadata(provider);
-    return buildAuthUrl(provider, metadata, req, redirectTo);
+    return buildAuthUrl(provider, metadata, res, redirectTo);
   }
 
   async function handleCallback(providerKey, req, res) {
@@ -735,33 +784,41 @@ function createOauthService({
     const code = String(req.query.code || "");
     const state = String(req.query.state || "");
     if (!code || !state) throw new Error("Missing authorization code or state");
-    const statePayload = verifyState(state);
-    if (statePayload.provider !== provider.key) throw new Error("Invalid SSO state");
-    const metadata = await getProviderMetadata(provider);
-    const redirectUri = `${getApiOrigin()}/api/auth/sso/${provider.key}/callback`;
-    const tokenSet = await exchangeCode(provider, metadata, code, redirectUri, statePayload.codeVerifier);
-    const claims = await validateIdToken(provider, metadata, tokenSet, statePayload.nonce);
-    const profile = await hydrateProfile(provider, metadata, tokenSet, claims);
-    const user = await resolveUserForOauth(provider, profile);
+    const bindingToken = readRequestCookie(req, oauthTransactionCookieName);
+    const transaction = await consumeLoginTransaction({ providerKey: provider.key, state, bindingToken });
+    if (!transaction) {
+      throw new Error("Invalid or expired SSO login transaction");
+    }
 
-    await pool.query(
-      'UPDATE users SET "lastLoginAt" = NOW(), "updatedAt" = NOW() WHERE id = $1',
-      [user.id]
-    ).catch((error) => {
-      logger.warn({ err: error, userId: user.id, providerKey: provider.key }, "Failed to update OAuth last login timestamp");
-    });
+    try {
+      const metadata = await getProviderMetadata(provider);
+      const redirectUri = `${getApiOrigin()}/api/auth/sso/${provider.key}/callback`;
+      const tokenSet = await exchangeCode(provider, metadata, code, redirectUri, transaction.codeVerifier);
+      const claims = await validateIdToken(provider, metadata, tokenSet, transaction.nonce);
+      const profile = await hydrateProfile(provider, metadata, tokenSet, claims);
+      const user = await resolveUserForOauth(provider, profile);
 
-    const sessionToken = generateToken(user, undefined, undefined, undefined, undefined, {
-      amr: ["sso"],
-    });
-    setAuthCookie(res, sessionToken);
+      await pool.query(
+        'UPDATE users SET "lastLoginAt" = NOW(), "updatedAt" = NOW() WHERE id = $1',
+        [user.id]
+      ).catch((error) => {
+        logger.warn({ err: error, userId: user.id, providerKey: provider.key }, "Failed to update OAuth last login timestamp");
+      });
 
-    const appBase = getAppOrigin();
-    const defaultRedirectPath = user.role === "superAdmin"
-      ? "/admin"
-      : buildDashboardPath({ companyId: user.companyId, subpath: "overview" });
-    const redirectPath = normalizeRedirectPath(statePayload.redirectTo, defaultRedirectPath);
-    return `${appBase}/oauth/callback?next=${encodeURIComponent(redirectPath)}`;
+      const sessionToken = generateToken(user, undefined, undefined, undefined, undefined, {
+        amr: ["sso"],
+      });
+      setAuthCookie(res, sessionToken);
+
+      const appBase = getAppOrigin();
+      const defaultRedirectPath = user.role === "superAdmin"
+        ? "/admin"
+        : buildDashboardPath({ companyId: user.companyId, subpath: "overview" });
+      const redirectPath = normalizeRedirectPath(transaction.redirectTo, defaultRedirectPath);
+      return `${appBase}/oauth/callback?next=${encodeURIComponent(redirectPath)}`;
+    } finally {
+      clearOauthTransactionCookie(res);
+    }
   }
 
   return {

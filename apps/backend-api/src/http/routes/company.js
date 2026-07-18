@@ -21,6 +21,7 @@ const {
   resolveCsvImportField,
 } = require("../../modules/passports/import-field-guardrails");
 const { normalizeSafeImageReference } = require("../../shared/passports/passport-uri");
+const { getSafeErrorMessage } = require("../../shared/http/error-response");
 
 module.exports = function registerCompanyRoutes(app, {
   pool,
@@ -691,7 +692,7 @@ module.exports = function registerCompanyRoutes(app, {
                 failed++;continue;
               }
               const existingByProductId = await findExistingPassportByInternalAliasId({
-                tableName, companyId, internalAliasId: normalizedProductId, excludeGuid: incomingGuid
+                tableName, companyId, internalAliasId: normalizedProductId, excludeDppId: incomingGuid
               });
               if (existingByProductId) {
                 details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
@@ -795,7 +796,7 @@ module.exports = function registerCompanyRoutes(app, {
           }
         } catch (e) {
           logger.error("Upsert CSV row error:", e.message);
-          details.push({ status: "failed", error: e.message });
+          details.push({ status: "failed", error: getSafeErrorMessage(e, "Failed to import passport") });
           failed++;
         }
       }
@@ -888,7 +889,7 @@ module.exports = function registerCompanyRoutes(app, {
                 failed++;continue;
               }
               const existingByProductId = await findExistingPassportByInternalAliasId({
-                tableName, companyId, internalAliasId: normalizedProductId, excludeGuid: incomingGuid
+                tableName, companyId, internalAliasId: normalizedProductId, excludeDppId: incomingGuid
               });
               if (existingByProductId) {
                 details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
@@ -995,7 +996,11 @@ module.exports = function registerCompanyRoutes(app, {
           }
         } catch (e) {
           logger.error("Upsert JSON item error:", e.message);
-          details.push({ dppId: incomingGuid, status: "failed", error: e.message });
+          details.push({
+            dppId: incomingGuid,
+            status: "failed",
+            error: getSafeErrorMessage(e, "Failed to import passport"),
+          });
           failed++;
         }
       }

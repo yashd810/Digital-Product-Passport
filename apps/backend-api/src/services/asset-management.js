@@ -24,6 +24,7 @@ const {
   normalizeStoredAssetSourceConfig,
 } = require("../shared/assets/asset-source-config");
 const { quoteSqlIdentifier } = require("../shared/passports/passport-helpers");
+const { getSafeErrorMessage } = require("../shared/http/error-response");
 
 module.exports = function createAssetService({
   pool,
@@ -436,7 +437,7 @@ module.exports = function createAssetService({
       companyId,
       passportType: typeSchema.typeName
     });
-    const currentByGuid = new Map(currentRows.map((row) => [row.dppId, row]));
+    const currentByDppId = new Map(currentRows.map((row) => [row.dppId, row]));
     const currentByProductId = new Map(
       currentRows.
       filter((row) => normalizeInternalAliasIdValue(row.internalAliasId)).
@@ -464,32 +465,32 @@ module.exports = function createAssetService({
         return;
       }
 
-      const matchGuid = String(rawRecord.matchDppId || rawRecord.matchGuid || rawRecord.dppId || rawRecord.guid || "").trim();
+      const matchDppId = String(rawRecord.matchDppId || rawRecord.dppId || "").trim();
       const matchProductId = normalizeInternalAliasIdValue(
         rawRecord.matchProductId !== undefined ?
           rawRecord.matchProductId :
-          !matchGuid ? rawRecord.internalAliasId : ""
+          !matchDppId ? rawRecord.internalAliasId : ""
       );
 
-      if (!matchGuid && !matchProductId) {
+      if (!matchDppId && !matchProductId) {
         details.push({
           rowIndex: index + 1,
           status: "failed",
-          error: "Each asset row needs dppId, guid, matchDppId, matchGuid, internalAliasId, or matchProductId"
+          error: "Each asset row needs dppId, matchDppId, internalAliasId, or matchProductId"
         });
         summary.failed += 1;
         return;
       }
 
-      const matchedRow = matchGuid ?
-      currentByGuid.get(matchGuid) :
+      const matchedRow = matchDppId ?
+      currentByDppId.get(matchDppId) :
       currentByProductId.get(matchProductId);
 
       if (!matchedRow) {
         if (!createIfNotExists) {
           details.push({
             rowIndex: index + 1,
-            dppId: matchGuid || undefined,
+            dppId: matchDppId || undefined,
             internalAliasId: matchProductId || undefined,
             status: "skipped",
             reason: "No matching passport was found"
@@ -501,7 +502,7 @@ module.exports = function createAssetService({
         if (!matchProductId) {
           details.push({
             rowIndex: index + 1,
-            dppId: matchGuid || undefined,
+            dppId: matchDppId || undefined,
             status: "failed",
             error: "A new passport needs internalAliasId or matchProductId so a draft can be created"
           });
@@ -555,7 +556,7 @@ module.exports = function createAssetService({
         try {
           effectiveGranularity = resolveGranularityForCreate(companyPolicy, requestedGranularity);
         } catch (error) {
-          errors.push(error.message);
+          errors.push(getSafeErrorMessage(error, "Invalid granularity option."));
         }
 
         if (errors.length) {
@@ -630,7 +631,7 @@ module.exports = function createAssetService({
         const fieldDef = fieldMap.get(key);
 
           if (fieldDef) {
-            if (key === "internalAliasId" && !matchGuid && !nextProductIdProvided) return;
+            if (key === "internalAliasId" && !matchDppId && !nextProductIdProvided) return;
             const coerced = coerceAssetFieldValue(fieldDef, value);
           if (!coerced.ok) {
             errors.push(coerced.error);
@@ -679,8 +680,8 @@ module.exports = function createAssetService({
           if (duplicate && duplicate.dppId !== matchedRow.dppId) {
             errors.push(`Serial Number "${normalizedNextProductId}" already belongs to another passport`);
           }
-          const reservedGuid = batchProductIds.get(normalizedNextProductId);
-          if (reservedGuid && reservedGuid !== matchedRow.dppId) {
+          const reservedDppId = batchProductIds.get(normalizedNextProductId);
+          if (reservedDppId && reservedDppId !== matchedRow.dppId) {
             errors.push(`Serial Number "${normalizedNextProductId}" is assigned twice in this batch`);
           } else {
             batchProductIds.set(normalizedNextProductId, matchedRow.dppId);
@@ -721,9 +722,9 @@ module.exports = function createAssetService({
         matchedReleaseStatus: matchedRow.releaseStatus,
         isEditable: matchedRow.isEditable,
         match: {
-          dppId: matchGuid || null,
+          dppId: matchDppId || null,
           internalAliasId: matchProductId || null,
-          matchedBy: matchGuid ? "dppId" : "internalAliasId"
+          matchedBy: matchDppId ? "dppId" : "internalAliasId"
         },
         passportUpdate,
         dynamicValues
@@ -788,14 +789,14 @@ module.exports = function createAssetService({
 
     for (const item of records) {
       const action = String(item.action || (item.passportCreate ? "create" : "update")).trim().toLowerCase();
-      const matchedGuid = String(item.matchedDppId || "").trim();
+      const matchedDppId = String(item.matchedDppId || "").trim();
       const generatedDppId = String(item.generatedDppId || "").trim();
       const passportUpdate = isPlainObject(item.passportUpdate) ? { ...item.passportUpdate } : {};
       const passportCreate = isPlainObject(item.passportCreate) ? { ...item.passportCreate } : {};
       const dynamicValues = isPlainObject(item.dynamicValues) ? { ...item.dynamicValues } : {};
       const detail = {
         rowIndex: item.rowIndex,
-        dppId: matchedGuid || generatedDppId || undefined,
+        dppId: matchedDppId || generatedDppId || undefined,
         passportFields: Object.keys(action === "create" ? passportCreate : passportUpdate),
         dynamicFields: Object.keys(dynamicValues)
       };
@@ -926,7 +927,7 @@ module.exports = function createAssetService({
                AND "deletedAt" IS NULL
              ORDER BY "versionNumber" DESC
              LIMIT 1`,
-            [matchedGuid, companyId]
+            [matchedDppId, companyId]
           );
 
           if (!editable.rows.length) {
@@ -943,7 +944,7 @@ module.exports = function createAssetService({
                 tableName,
                 companyId,
                 internalAliasId: normalizeInternalAliasIdValue(passportUpdate.internalAliasId),
-                excludeGuid: matchedGuid
+                excludeDppId: matchedDppId
               });
               if (duplicate) {
                 throw new Error(`Serial Number "${passportUpdate.internalAliasId}" already belongs to another passport`);
@@ -963,7 +964,7 @@ module.exports = function createAssetService({
                 userId,
                 "assetUpdate",
                 tableName,
-                matchedGuid,
+                matchedDppId,
                 null,
                 { source, fieldsUpdated: updatedFields }
               );
@@ -985,7 +986,7 @@ module.exports = function createAssetService({
             await pool.query(
               `INSERT INTO "passportDynamicValues" ("passportDppId", "fieldKey", value, "updatedAt")
                VALUES ($1, $2, $3, NOW())`,
-              [matchedGuid, fieldKey, toDynamicStoredValue(value)]
+              [matchedDppId, fieldKey, toDynamicStoredValue(value)]
             );
           }
           await logAudit(
@@ -993,7 +994,7 @@ module.exports = function createAssetService({
             userId,
             "assetDynamicPush",
             "passportDynamicValues",
-            matchedGuid,
+            matchedDppId,
             null,
             { source, fieldsUpdated: dynamicEntries.map(([fieldKey]) => fieldKey) }
           );
@@ -1016,7 +1017,7 @@ module.exports = function createAssetService({
         details.push({
           ...detail,
           status: "failed",
-          error: error.message
+          error: getSafeErrorMessage(error, "Unable to apply this passport data change.")
         });
       }
     }
@@ -1175,9 +1176,11 @@ module.exports = function createAssetService({
         result: pushResult
       };
     } catch (error) {
+      logger.error({ err: error, jobId: job.id || null, companyId: job.companyId }, "Asset management job failed");
       const entitlementRevoked = error?.code === "assetManagementDisabled"
         || error?.code === "assetManagementCompanyInactive"
         || error?.code === "assetManagementCompanyNotFound";
+      const failureMessage = getSafeErrorMessage(error, "Asset job failed.");
       const nextRunAt = job.isActive && !entitlementRevoked ?
       resolveAssetJobNextRunAt({
         startAt: job.startAt || new Date(),
@@ -1199,7 +1202,7 @@ module.exports = function createAssetService({
           [
           job.id,
           entitlementRevoked ? "disabled" : "failed",
-          JSON.stringify({ error: error.message }),
+          JSON.stringify({ error: failureMessage }),
           nextRunAt,
           nextRunAt ? true : false]
 
@@ -1213,7 +1216,7 @@ module.exports = function createAssetService({
         triggerType,
         sourceKind: job.sourceKind,
         status: entitlementRevoked ? "disabled" : "failed",
-        summary: { error: error.message },
+        summary: { error: failureMessage },
         requestJson: { options },
         generatedJson: null
       });

@@ -292,6 +292,37 @@ test("asset-job response refuses invalid persisted configuration without exposin
   assert.equal(JSON.stringify(response.body).includes(credential), false);
 });
 
+test("asset job responses redact stored and newly raised internal failure details", async () => {
+  const sensitiveError = "connection to postgres://asset:secret@database.internal/dppSystem failed";
+  const { routes } = createRouteHarness({
+    jobOverrides: {
+      lastSummary: { error: sensitiveError },
+    },
+    serviceOverrides: {
+      runAssetManagementJob: async () => ({
+        error: new Error(sensitiveError),
+        run: { id: 73, summaryJson: { error: sensitiveError } },
+      }),
+    },
+  });
+
+  const jobsRoute = routes.find((entry) => entry.method === "get" && entry.path.endsWith("/jobs"));
+  assert.ok(jobsRoute);
+  const jobsResponse = createResponse();
+  await jobsRoute.handlers.at(-1)({ params: { companyId: "7" } }, jobsResponse);
+  assert.equal(JSON.stringify(jobsResponse.body).includes(sensitiveError), false);
+  assert.equal(jobsResponse.body.jobs[0].lastSummary.error, "Asset job failed.");
+
+  const runRoute = routes.find((entry) => entry.method === "post" && entry.path.endsWith("/jobs/:jobId/run"));
+  assert.ok(runRoute);
+  const runResponse = createResponse();
+  await runRoute.handlers.at(-1)({ params: { companyId: "7", jobId: "12" } }, runResponse);
+  assert.equal(runResponse.statusCode, 500);
+  assert.equal(JSON.stringify(runResponse.body).includes(sensitiveError), false);
+  assert.equal(runResponse.body.error, "Asset job failed.");
+  assert.equal(runResponse.body.run.summaryJson.error, "Asset job failed.");
+});
+
 test("one-time source fetch carries its company context to credential checks", async () => {
   const { routes, getSourceFetchOptions } = createRouteHarness();
   const route = routes.find((entry) => entry.method === "post" && entry.path.endsWith("/source/fetch"));

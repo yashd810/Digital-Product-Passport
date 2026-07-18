@@ -1037,8 +1037,8 @@ function createCanonicalPassportSerializer({
       ? passport.uniqueProductIdentifier
       : null;
     const uniqueProductIdentifier = derivedProductIdentifierDid || (businessIdentifier ? storedProductIdentifier : null) || null;
-    const storedPassportIdentifier = isUriLikeValue(passport?.dppId || passport?.guid)
-      ? (passport?.dppId || passport?.guid)
+    const storedPassportIdentifier = isUriLikeValue(passport?.dppId)
+      ? passport.dppId
       : null;
     const digitalProductPassportId = dppDid || storedPassportIdentifier || canonicalIdentity.digitalProductPassportId || null;
     const lastUpdate = toIsoTimestamp(passport.updatedAt || passport.createdAt);
@@ -1065,7 +1065,7 @@ function createCanonicalPassportSerializer({
     const extensions = buildPlatformExtensions({
       passportType,
       versionNumber: resolvedVersionNumber,
-      internalId: passport?.dppId || passport?.guid || null,
+      internalId: passport?.dppId || null,
     });
     if (extensions?.platform) {
       extensions.platform.validation = summarizeValidationIssues(validationIssues);

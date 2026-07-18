@@ -1,3 +1,8 @@
+const {
+  getSafeErrorMessage,
+  getSafeErrorStatus,
+} = require("../../shared/http/error-response");
+
 function registerBackupRoutes(app, deps) {
   const {
     backupProviderService,
@@ -12,6 +17,30 @@ function registerBackupRoutes(app, deps) {
   } = deps;
   const backupAdminGuard = checkCompanyAdmin;
   const backupReadGuard = checkCompanyAdmin;
+
+  const sendSafeRouteError = (res, error, fallbackMessage) => {
+    const statusCode = getSafeErrorStatus(error);
+    return res.status(statusCode).json({
+      error: getSafeErrorMessage(error, fallbackMessage),
+    });
+  };
+
+  const isPlainRecord = (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  };
+
+  const sanitizeBackupFailureData = (value) => {
+    if (Array.isArray(value)) return value.map(sanitizeBackupFailureData);
+    if (!isPlainRecord(value)) return value;
+    return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [
+      key,
+      key === "error" || key === "errorMessage"
+        ? (nestedValue ? "Backup operation failed." : nestedValue)
+        : sanitizeBackupFailureData(nestedValue),
+    ]));
+  };
 
   function toBackupProviderResponse(provider) {
     if (!provider) return null;
@@ -58,7 +87,7 @@ function registerBackupRoutes(app, deps) {
       );
       res.status(201).json(toBackupProviderResponse(provider));
     } catch (error) {
-      res.status(error.statusCode || 400).json({ error: error.message || "Failed to upsert backup provider" });
+      return sendSafeRouteError(res, error, "Failed to upsert backup provider");
     }
   });
 
@@ -92,7 +121,7 @@ function registerBackupRoutes(app, deps) {
         companyId: req.params.companyId,
         passportDppId: req.params.dppId,
       });
-      res.json(replications);
+      res.json(sanitizeBackupFailureData(replications));
     } catch {
       res.status(500).json({ error: "Failed to fetch backup replications" });
     }
@@ -171,19 +200,20 @@ function registerBackupRoutes(app, deps) {
 
       return res.status(201).json({
         success: true,
-        handover,
+        handover: sanitizeBackupFailureData(handover),
       });
     } catch (error) {
-      const message = error.message || "Failed to activate backup public handover";
-      if (
-        message.includes("inactive")
-        || message.includes("verified backup replication")
-        || message.includes("required")
-        || message.includes("Company not found")
-      ) {
-        return res.status(409).json({ error: message });
+      const message = String(error?.message || "");
+      if (new Set([
+        "Company not found",
+        "Backup public handover can only be activated when the economic operator is inactive",
+        "A verified backup replication that supports public handover is required",
+      ]).has(message)) {
+        return res.status(409).json({
+          error: "A backup public handover requires an inactive operator and a verified backup replication.",
+        });
       }
-      return res.status(500).json({ error: message });
+      return sendSafeRouteError(res, error, "Failed to activate backup public handover");
     }
   });
 
@@ -222,7 +252,7 @@ function registerBackupRoutes(app, deps) {
 
       return res.json({
         success: true,
-        handover,
+        handover: sanitizeBackupFailureData(handover),
       });
     } catch {
       return res.status(500).json({ error: "Failed to deactivate backup public handover" });
@@ -260,7 +290,7 @@ function registerBackupRoutes(app, deps) {
         { passportType, resultCount: result.results?.length || 0 }
       );
 
-      res.status(202).json(result);
+      res.status(202).json(sanitizeBackupFailureData(result));
     } catch {
       res.status(500).json({ error: "Failed to replicate passport backup" });
     }
@@ -294,9 +324,12 @@ function registerBackupRoutes(app, deps) {
       );
 
       if (result.error) {
-        return res.status(404).json({ error: result.error, results: result.results || [] });
+        return res.status(404).json({
+          error: "Backup operation failed.",
+          results: sanitizeBackupFailureData(result.results || []),
+        });
       }
-      return res.status(result.success ? 200 : 207).json(result);
+      return res.status(result.success ? 200 : 207).json(sanitizeBackupFailureData(result));
     } catch {
       res.status(500).json({ error: "Failed to verify backup replications" });
     }

@@ -409,6 +409,28 @@ case "$DEPLOY_TARGET" in
     require_non_placeholder_env_var "STORAGE_S3_SECRET_ACCESS_KEY"
     require_secret_env_var "STORAGE_S3_SECRET_ACCESS_KEY"
 
+    require_boolean_env_var "BACKUP_PROVIDER_ENABLED"
+    require_boolean_env_var "BACKUP_PROVIDER_REQUIRED"
+    if [ "$(read_env_var BACKUP_PROVIDER_REQUIRED)" = "true" ] && [ "$(read_env_var BACKUP_PROVIDER_ENABLED)" != "true" ]; then
+      echo "BACKUP_PROVIDER_REQUIRED=true requires BACKUP_PROVIDER_ENABLED=true"
+      exit 1
+    fi
+    if [ "$(read_env_var BACKUP_PROVIDER_ENABLED)" = "true" ]; then
+      require_non_placeholder_env_var "BACKUP_PROVIDER_KEY"
+      require_non_placeholder_env_var "BACKUP_PROVIDER_OBJECT_PREFIX"
+      require_https_url_env "BACKUP_PROVIDER_ENDPOINT"
+      require_non_placeholder_env_var "BACKUP_PROVIDER_ENDPOINT"
+      require_non_placeholder_env_var "BACKUP_PROVIDER_REGION"
+      require_non_placeholder_env_var "BACKUP_PROVIDER_BUCKET"
+      require_non_placeholder_env_var "BACKUP_PROVIDER_ACCESS_KEY_ID"
+      require_non_placeholder_env_var "BACKUP_PROVIDER_SECRET_ACCESS_KEY"
+      require_secret_env_var "BACKUP_PROVIDER_SECRET_ACCESS_KEY"
+      require_boolean_env_var "BACKUP_PROVIDER_FORCE_PATH_STYLE"
+      require_distinct_env_vars "BACKUP_PROVIDER_BUCKET" "STORAGE_S3_BUCKET"
+      require_distinct_env_vars "BACKUP_PROVIDER_ACCESS_KEY_ID" "STORAGE_S3_ACCESS_KEY_ID"
+      require_distinct_env_vars "BACKUP_PROVIDER_SECRET_ACCESS_KEY" "STORAGE_S3_SECRET_ACCESS_KEY"
+    fi
+
     require_boolean_env_var "DB_BACKUP_ENABLED"
     if [ "$(read_env_var DB_BACKUP_ENABLED)" = "true" ]; then
       require_https_url_env "DB_BACKUP_S3_ENDPOINT"

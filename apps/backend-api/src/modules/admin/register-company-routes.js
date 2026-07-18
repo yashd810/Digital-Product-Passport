@@ -73,6 +73,11 @@ module.exports = function registerCompanyRoutes(app, deps) {
     };
   }
 
+  function parseCompanyId(value) {
+    const companyId = Number(value);
+    return Number.isSafeInteger(companyId) && companyId > 0 ? companyId : null;
+  }
+
   app.post("/api/admin/companies", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const companyIdentity = normalizeCompanyIdentity(req.body || {});
@@ -210,27 +215,30 @@ module.exports = function registerCompanyRoutes(app, deps) {
 
   app.get("/api/admin/companies/:companyId/backup-policy", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
+      const companyId = parseCompanyId(req.params.companyId);
+      if (companyId === null) return res.status(400).json({ error: "Invalid company ID" });
       if (!backupProviderService?.getContinuityPolicy) {
         return res.status(503).json({ error: "Backup provider service is unavailable" });
       }
-      const policy = backupProviderService.getContinuityPolicy({ companyId: req.params.companyId });
+      const policy = backupProviderService.getContinuityPolicy({ companyId });
       return res.json(policy);
-    } catch {
+    } catch (error) {
+      logger.error({ err: error }, "Failed to fetch backup continuity policy");
       return res.status(500).json({ error: "Failed to fetch backup continuity policy" });
     }
   });
 
   app.get("/api/admin/companies/:companyId/backup-continuity-evidence", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
+      const companyId = parseCompanyId(req.params.companyId);
+      if (companyId === null) return res.status(400).json({ error: "Invalid company ID" });
       if (!backupProviderService?.getContinuityEvidence) {
         return res.status(503).json({ error: "Backup provider service is unavailable" });
       }
-      const evidence = await backupProviderService.getContinuityEvidence({ companyId: req.params.companyId });
+      const evidence = await backupProviderService.getContinuityEvidence({ companyId });
       return res.json(evidence);
     } catch (error) {
-      if ((error.message || "").includes("companyId")) {
-        return res.status(400).json({ error: error.message });
-      }
+      logger.error({ err: error }, "Failed to fetch backup continuity evidence");
       return res.status(500).json({ error: "Failed to fetch backup continuity evidence" });
     }
   });
@@ -275,8 +283,8 @@ module.exports = function registerCompanyRoutes(app, deps) {
 
   app.get("/api/admin/companies/:id/dpp-policy", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
-      const companyId = parseInt(req.params.id, 10);
-      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+      const companyId = parseCompanyId(req.params.id);
+      if (companyId === null) return res.status(400).json({ error: "Invalid company ID" });
 
       const company = await pool.query(
         `SELECT id, "companyName"
@@ -294,16 +302,26 @@ module.exports = function registerCompanyRoutes(app, deps) {
         ...policy
       });
     } catch (error) {
-      logger.error("DPP policy fetch error:", error.message);
+      logger.error({ err: error }, "DPP policy fetch error");
       res.status(500).json({ error: "Failed to fetch DPP policy" });
     }
   });
 
   app.put("/api/admin/companies/:id/dpp-policy", authenticateToken, isSuperAdmin, async (req, res) => {
-    try {
-      const companyId = parseInt(req.params.id, 10);
-      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+    const companyId = parseCompanyId(req.params.id);
+    if (companyId === null) return res.status(400).json({ error: "Invalid company ID" });
 
+    let updates;
+    try {
+      updates = validateCompanyDppPolicyInput(req.body || {});
+    } catch {
+      return res.status(400).json({ error: "Invalid DPP policy update" });
+    }
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: "No policy fields supplied" });
+    }
+
+    try {
       const company = await pool.query(
         `SELECT id
          FROM companies
@@ -314,11 +332,6 @@ module.exports = function registerCompanyRoutes(app, deps) {
       if (!company.rows.length) return res.status(404).json({ error: "Company not found" });
 
       await ensureCompanyDppPolicy(companyId);
-      const updates = validateCompanyDppPolicyInput(req.body || {});
-      if (!Object.keys(updates).length) {
-        return res.status(400).json({ error: "No policy fields supplied" });
-      }
-
       const updatedPolicy = await updateCompanyDppPolicy(companyId, updates);
       await logAudit(
         companyId,
@@ -332,7 +345,8 @@ module.exports = function registerCompanyRoutes(app, deps) {
 
       res.json({ success: true, policy: updatedPolicy });
     } catch (error) {
-      res.status(400).json({ error: error.message || "Failed to update DPP policy" });
+      logger.error({ err: error, companyId }, "DPP policy update error");
+      res.status(500).json({ error: "Failed to update DPP policy" });
     }
   });
 

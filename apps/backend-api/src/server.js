@@ -138,7 +138,7 @@ const assetIgnoredSystemColumns = new Set([
   "deletedAt", "releaseStatus", "versionNumber", "isEditable", "fieldLabel",
   "createdByEmail", "firstName", "lastName",
 ]);
-const assetMatchFields = new Set(["dppId", "matchDppId", "guid", "matchGuid", "internalAliasId", "matchProductId", "nextProductId"]);
+const assetMatchFields = new Set(["dppId", "matchDppId", "internalAliasId", "matchProductId", "nextProductId"]);
 const assetErpPresets = [
   {
     key: "genericRest", label: "Generic REST",
@@ -162,7 +162,7 @@ const assetErpPresets = [
   },
   {
     key: "siemensTeamcenterItems", label: "Siemens Teamcenter Items",
-    description: "Teamcenter item feed with product ID matching and optional GUID mapping.",
+    description: "Teamcenter item feed with product ID matching and optional DPP ID mapping.",
     sourceConfig: { method: "GET", recordPath: "items", fieldMap: { itemId: "internalAliasId", uid: "dppId", objectName: "modelName" } },
   },
 ];
@@ -233,6 +233,26 @@ const clearAuthCookie = (res) => res.setHeader(
   "Set-Cookie",
   serializeCookie(sessionCookieName, "", { ...authCookieOptions, maxAge: 0, expires: new Date(0) })
 );
+const appendSetCookie = (res, cookie) => {
+  const existing = res.getHeader("Set-Cookie");
+  const values = Array.isArray(existing) ? existing : (existing ? [existing] : []);
+  res.setHeader("Set-Cookie", [...values, cookie]);
+};
+const oauthTransactionCookieOptions = {
+  httpOnly: true,
+  secure: cookieSecure,
+  sameSite: "lax",
+  path: "/api/auth/sso/",
+  maxAge: 10 * 60 * 1000,
+};
+const setOauthTransactionCookie = (res, token) => appendSetCookie(
+  res,
+  serializeCookie("oauth_transaction", token, oauthTransactionCookieOptions)
+);
+const clearOauthTransactionCookie = (res) => appendSetCookie(
+  res,
+  serializeCookie("oauth_transaction", "", { ...oauthTransactionCookieOptions, maxAge: 0, expires: new Date(0) })
+);
 
 // ─── SHARED SERVICES ────────────────────────────────────────────────────────
 const cache = createCacheService();
@@ -244,7 +264,7 @@ const storageService = createStorageService({
   serverBaseUrl: runtimeApiOrigin,
 });
 const oauthService = createOauthService({
-  jwt, pool, jwtSecret, generateToken, setAuthCookie, cache, hashPassword,
+  jwt, pool, generateToken, setAuthCookie, setOauthTransactionCookie, clearOauthTransactionCookie, cache, hashPassword,
 });
 
 // ─── AUTH MIDDLEWARE ─────────────────────────────────────────────────────────
@@ -258,6 +278,7 @@ const {
   authRateLimit, otpRateLimit, passwordResetRateLimit, publicReadRateLimit,
   publicHeavyRateLimit, publicUnlockRateLimit,
   integrationWriteRateLimit, assetWriteRateLimit, assetSourceFetchRateLimit,
+  contactIpRateLimit, contactEmailRateLimit, contactRecipientRateLimit,
 } = createRateLimiters(pool);
 const rateLimitMaintenanceTimer = startRateLimitMaintenance(pool);
 
@@ -623,6 +644,9 @@ registerSupportRoutes(app, {
   normalizeStorageRequestKey,
   isPassportStorageKey,
   publicReadRateLimit,
+  contactIpRateLimit,
+  contactEmailRateLimit,
+  contactRecipientRateLimit,
   createTransporter,
   brandedEmail,
   renderInfoTable,

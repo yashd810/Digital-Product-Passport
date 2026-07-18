@@ -5,6 +5,9 @@ const fs = require("fs");
 const path = require("path");
 const logger = require("./logger");
 const {
+  createBackupProviderStorageService,
+} = require("./storage-service");
+const {
   buildPublicPassportSnapshot,
 } = require("../shared/passports/public-passport-snapshot");
 const {
@@ -93,10 +96,16 @@ function normalizeProviderRecord(provider = {}) {
 
 module.exports = function createBackupProviderService({
   pool,
-  storageService,
+  storageService: applicationStorageService,
+  backupStorageService = null,
   buildCanonicalPassportPayload,
   apiOrigin = null,
 }) {
+  // Application-file storage is intentionally read-only from this service. A
+  // backup replication must use the separately-scoped backup storage client
+  // for every write and verification read.
+  const providerStorageService = backupStorageService || createBackupProviderStorageService();
+
   function parseStoredJson(value, fallback = null) {
     if (value === null || value === undefined || value === "") return fallback;
     if (typeof value === "object" && !Buffer.isBuffer(value)) return value;
@@ -109,10 +118,6 @@ module.exports = function createBackupProviderService({
 
   function isBackupProviderRequired() {
     return toBoolean(process.env.BACKUP_PROVIDER_REQUIRED, false);
-  }
-
-  function isAutomaticPublicHandoverEnabled() {
-    return toBoolean(process.env.BACKUP_PUBLIC_HANDOVER_AUTO_ENABLE, true);
   }
 
   function getContinuityPolicy({ companyId = null } = {}) {
@@ -159,7 +164,7 @@ module.exports = function createBackupProviderService({
       },
       backupProviderEnabled: toBoolean(process.env.BACKUP_PROVIDER_ENABLED, false),
       backupProviderRequired: isBackupProviderRequired(),
-      automaticPublicHandoverEnabled: isAutomaticPublicHandoverEnabled(),
+      publicHandoverActivation: "explicitAdminOnly",
       evidenceSource: "applicationPolicy",
     };
   }
@@ -258,11 +263,13 @@ module.exports = function createBackupProviderService({
       displayName: normalizeText(process.env.BACKUP_PROVIDER_DISPLAY_NAME, "OCI Object Storage Backup"),
       objectPrefix: normalizeObjectPrefix(process.env.BACKUP_PROVIDER_OBJECT_PREFIX),
       publicBaseUrl: normalizeText(process.env.BACKUP_PROVIDER_PUBLIC_BASE_URL, ""),
-      supportsPublicHandover: toBoolean(process.env.BACKUP_PROVIDER_SUPPORTS_PUBLIC_HANDOVER, true),
+      // An implicit environment provider must never make a backup publicly
+      // available unless its operator has explicitly opted into that role.
+      supportsPublicHandover: toBoolean(process.env.BACKUP_PROVIDER_SUPPORTS_PUBLIC_HANDOVER, false),
       configJson: {
-        region: normalizeText(process.env.BACKUP_PROVIDER_REGION || process.env.STORAGE_S3_REGION, ""),
-        bucket: normalizeText(process.env.BACKUP_PROVIDER_BUCKET || process.env.STORAGE_S3_BUCKET, ""),
-        endpoint: normalizeText(process.env.BACKUP_PROVIDER_ENDPOINT || process.env.STORAGE_S3_ENDPOINT, ""),
+        region: normalizeText(process.env.BACKUP_PROVIDER_REGION, ""),
+        bucket: normalizeText(process.env.BACKUP_PROVIDER_BUCKET, ""),
+        endpoint: normalizeText(process.env.BACKUP_PROVIDER_ENDPOINT, ""),
         mode: "implicitEnv"
       },
       isActive: true,
@@ -460,8 +467,8 @@ module.exports = function createBackupProviderService({
   }
 
   async function readAttachmentBuffer(attachment) {
-    if (attachment?.storageKey && storageService?.fetchObject) {
-      const objectResponse = await storageService.fetchObject(attachment.storageKey);
+    if (attachment?.storageKey && applicationStorageService?.fetchObject) {
+      const objectResponse = await applicationStorageService.fetchObject(attachment.storageKey);
       return Buffer.from(await objectResponse.arrayBuffer());
     }
     if (attachment?.filePath) {
@@ -478,16 +485,16 @@ module.exports = function createBackupProviderService({
       if (!roots.includes(resolved)) roots.push(resolved);
     };
 
-    if (typeof storageService?.getLocalAbsolutePath === "function") {
+    if (typeof applicationStorageService?.getLocalAbsolutePath === "function") {
       try {
-        addRoot(storageService.getLocalAbsolutePath(""));
+        addRoot(applicationStorageService.getLocalAbsolutePath(""));
       } catch {
         // Ignore storage providers that cannot expose a local root.
       }
     }
-    addRoot(storageService?.filesBaseDir);
-    addRoot(storageService?.repoBaseDir);
-    addRoot(storageService?.uploadsBaseDir);
+    addRoot(applicationStorageService?.filesBaseDir);
+    addRoot(applicationStorageService?.repoBaseDir);
+    addRoot(applicationStorageService?.uploadsBaseDir);
     return roots;
   }
 
@@ -538,7 +545,7 @@ module.exports = function createBackupProviderService({
       try {
         const buffer = await readAttachmentBuffer(attachment);
         if (buffer) {
-          const copied = await storageService.saveObject({
+          const copied = await providerStorageService.saveObject({
             key: buildAttachmentStorageKey({ provider, passport, attachment, fallbackFieldKey: attachment.fieldKey }),
             buffer,
             contentType: attachment.mimeType || "application/octet-stream",
@@ -806,7 +813,7 @@ module.exports = function createBackupProviderService({
       });
 
       let replicationStatus = "synced";
-      let storageProvider = storageService?.provider || storageService?.name || null;
+      let storageProvider = providerStorageService?.provider || providerStorageService?.name || null;
       let storageKey = null;
       let publicUrl = null;
       let errorMessage = null;
@@ -815,10 +822,10 @@ module.exports = function createBackupProviderService({
         if (documentation.mandatoryBackupSatisfied === false) {
           throw new Error(`Mandatory document backup is incomplete for field(s): ${documentation.mandatoryCopyFailures.join(", ")}`);
         }
-        if (!storageService?.saveObject) {
+        if (!providerStorageService?.saveObject) {
           throw new Error("Configured storage service does not support backup writes");
         }
-        const stored = await storageService.saveObject({
+        const stored = await providerStorageService.saveObject({
           key: buildStorageKey({ provider, passport, snapshotScope }),
           buffer: Buffer.from(JSON.stringify(envelope, null, 2), "utf8"),
           contentType: "application/json",
@@ -909,10 +916,10 @@ module.exports = function createBackupProviderService({
       let errorMessage = null;
 
       try {
-        if (!storageService?.saveObject) {
+        if (!providerStorageService?.saveObject) {
           throw new Error("Configured storage service does not support backup writes");
         }
-        const stored = await storageService.saveObject({
+        const stored = await providerStorageService.saveObject({
           key: buildAccessControlEventStorageKey({ provider, companyId, eventType, severity }),
           buffer: Buffer.from(JSON.stringify(envelope, null, 2), "utf8"),
           contentType: "application/json",
@@ -931,7 +938,7 @@ module.exports = function createBackupProviderService({
         severity: envelope.severity,
         revocationMode: envelope.revocationMode,
         replicationStatus: replicationStatus,
-        storageProvider: storageService?.provider || storageService?.name || null,
+        storageProvider: providerStorageService?.provider || providerStorageService?.name || null,
         storageKey: storageKey,
         publicUrl: publicUrl,
         errorMessage: errorMessage,
@@ -980,10 +987,10 @@ module.exports = function createBackupProviderService({
       let errorMessage = null;
 
       try {
-        if (!storageService?.saveObject) {
+        if (!providerStorageService?.saveObject) {
           throw new Error("Configured storage service does not support backup writes");
         }
-        const stored = await storageService.saveObject({
+        const stored = await providerStorageService.saveObject({
           key: buildAuditAnchorStorageKey({ provider, companyId, anchorId: anchor?.id }),
           buffer: Buffer.from(JSON.stringify(envelope, null, 2), "utf8"),
           contentType: "application/json",
@@ -1002,7 +1009,7 @@ module.exports = function createBackupProviderService({
         anchorId: anchor?.id || null,
         rootEventHash: anchor?.rootEventHash || summary?.latestEventHash || null,
         replicationStatus: replicationStatus,
-        storageProvider: storageService?.provider || storageService?.name || null,
+        storageProvider: providerStorageService?.provider || providerStorageService?.name || null,
         storageKey: storageKey,
         publicUrl: publicUrl,
         errorMessage: errorMessage,
@@ -1056,7 +1063,7 @@ module.exports = function createBackupProviderService({
         }
         continue;
       }
-      const objectResponse = await storageService.fetchObject(storageKey);
+      const objectResponse = await providerStorageService.fetchObject(storageKey);
       const buffer = Buffer.from(await objectResponse.arrayBuffer());
       const actualHash = normalizeHash(sha256Hex(buffer));
       if (expectedHash !== actualHash) {
@@ -1066,7 +1073,7 @@ module.exports = function createBackupProviderService({
   }
 
   async function verifyReplicationRecord(row) {
-    if (!storageService?.fetchObject) {
+    if (!providerStorageService?.fetchObject) {
       return updateVerificationResult({
         id: row.id,
         verificationStatus: "failed",
@@ -1082,7 +1089,7 @@ module.exports = function createBackupProviderService({
     }
 
     try {
-      const objectResponse = await storageService.fetchObject(row.storageKey);
+      const objectResponse = await providerStorageService.fetchObject(row.storageKey);
       const buffer = Buffer.from(await objectResponse.arrayBuffer());
       const parsed = JSON.parse(buffer.toString("utf8"));
       const verifiedPayloadHash = computeEnvelopeHash(parsed);
@@ -1435,93 +1442,6 @@ module.exports = function createBackupProviderService({
     return mapPublicHandoverRow(row);
   }
 
-  async function ensureAutomaticPublicHandover({
-    passportDppId = null,
-    internalAliasId = null,
-    versionNumber = null,
-  }) {
-    if (!isAutomaticPublicHandoverEnabled()) return null;
-    if (!passportDppId && !internalAliasId) return null;
-
-    const filters = ["\"replicationStatus\" = 'synced'", "\"verificationStatus\" = 'verified'"];
-    const params = [];
-
-    if (passportDppId) {
-      params.push(normalizeText(passportDppId));
-      filters.push(`"passportDppId" = $${params.length}`);
-    }
-    if (internalAliasId) {
-      params.push(normalizeText(internalAliasId));
-      filters.push(`"internalAliasId" = $${params.length}`);
-    }
-    if (versionNumber !== null && versionNumber !== undefined) {
-      params.push(Number.parseInt(versionNumber, 10) || 1);
-      filters.push(`"versionNumber" = $${params.length}`);
-    }
-
-    const replicationResult = await pool.query(
-      `SELECT id,
-              "backupProviderId" AS "backupProviderId",
-              "backupProviderKey" AS "backupProviderKey",
-              "passportDppId" AS "passportDppId",
-              "lineageId" AS "lineageId",
-              "companyId" AS "companyId",
-              "passportType" AS "passportType",
-              "internalAliasId" AS "internalAliasId",
-              "versionNumber" AS "versionNumber",
-              "publicUrl" AS "publicUrl",
-              "verificationStatus" AS "verificationStatus",
-              "payloadJson" AS "payloadJson",
-              "updatedAt" AS "updatedAt"
-       FROM "passportBackupReplications"
-       WHERE ${filters.join(" AND ")}
-       ORDER BY "updatedAt" DESC, id DESC
-       LIMIT 10`,
-      params
-    ).catch(() => ({ rows: [] }));
-
-    for (const replication of replicationResult.rows) {
-      const existing = await getActivePublicHandover({
-        companyId: replication.companyId,
-        passportDppId: replication.passportDppId,
-      });
-      if (existing) return existing;
-
-      const companyResult = await pool.query(
-        `SELECT id, "companyName" AS "companyName", "isActive" AS "isActive"
-         FROM companies
-         WHERE id = $1
-         LIMIT 1`,
-        [replication.companyId]
-      ).catch(() => ({ rows: [] }));
-      const company = companyResult.rows[0] || null;
-      if (!company || company.isActive !== false) continue;
-
-      const payloadJson = parseStoredJson(replication.payloadJson, {});
-      const publicRowData = payloadJson?.publicRowData && typeof payloadJson.publicRowData === "object"
-        ? payloadJson.publicRowData
-        : null;
-      const payloadSource = payloadJson?.source && typeof payloadJson.source === "object" ? payloadJson.source : {};
-      if (!publicRowData) continue;
-
-      return activatePublicHandover({
-        companyId: replication.companyId,
-        passportDppId: replication.passportDppId,
-        lineageId: replication.lineageId || payloadSource.lineageId || replication.passportDppId,
-        passportType: replication.passportType || payloadSource.passportType,
-        internalAliasId: replication.internalAliasId || publicRowData.internalAliasId,
-        versionNumber: replication.versionNumber || payloadSource.versionNumber || 1,
-        publicRowData,
-        publicCompanyName: company.companyName || "",
-        activatedBy: null,
-        actorIdentifier: "system:auto-backup-handover",
-        notes: "Automatically activated from verified backup replication because the economic operator is inactive.",
-      });
-    }
-
-    return null;
-  }
-
   async function verifyReplications({
     companyId,
     passportDppId,
@@ -1684,7 +1604,6 @@ module.exports = function createBackupProviderService({
   return {
     activatePublicHandover,
     deactivatePublicHandover,
-    ensureAutomaticPublicHandover,
     findLatestVerifiedPublicReplication,
     getActivePublicHandover,
     getContinuityEvidence,

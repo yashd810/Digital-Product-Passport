@@ -4,6 +4,10 @@ const {
   flattenSchemaFieldsFromSections,
   mapPassportTypeRow,
 } = require("../../shared/passports/passport-helpers");
+const {
+  getSafeErrorMessage,
+  getSafeErrorStatus,
+} = require("../../shared/http/error-response");
 
 module.exports = function registerApiKeyRoutes(app, deps) {
   const {
@@ -318,11 +322,14 @@ module.exports = function registerApiKeyRoutes(app, deps) {
 
       res.status(201).json({ ...mapApiKeyRow(result.rows[0]), key: rawKey });
     } catch (error) {
-      if (error.statusCode) {
-        return res.status(error.statusCode).json({ error: error.message });
+      const statusCode = getSafeErrorStatus(error);
+      if (statusCode < 500) {
+        return res.status(statusCode).json({
+          error: getSafeErrorMessage(error, "Failed to create security group"),
+        });
       }
       logger.error({ err: error }, "Create security group error");
-      return res.status(500).json({ error: "Failed to create security group" });
+      return res.status(statusCode).json({ error: "Failed to create security group" });
     }
   });
 

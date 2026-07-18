@@ -41,7 +41,6 @@ test("email service loads its backend-owned stylesheet outside Docker", () => {
 test("email body renderers escape request-derived text and reject unsafe links", () => {
   const {
     renderContactSubmissionBody,
-    renderContactConfirmationBody,
     renderPasswordResetBody,
     renderCompanyInvitationBody,
   } = require("../src/services/email");
@@ -49,7 +48,6 @@ test("email body renderers escape request-derived text and reject unsafe links",
 
   for (const html of [
     renderContactSubmissionBody({ firstName: unsafe, email: unsafe, message: unsafe }),
-    renderContactConfirmationBody({ firstName: unsafe, email: unsafe, message: unsafe }),
     renderPasswordResetBody({ email: unsafe, resetUrl: "javascript:alert(1)" }),
     renderCompanyInvitationBody({
       inviterName: unsafe,

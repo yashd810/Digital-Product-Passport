@@ -6,6 +6,10 @@ const {
   toPublicAssetSourceConfig,
 } = require("../../shared/assets/asset-source-config");
 const { isSafePassportStorageFieldKey } = require("../../shared/passports/passport-helpers");
+const {
+  getSafeErrorMessage,
+  getSafeErrorStatus,
+} = require("../../shared/http/error-response");
 
 module.exports = function registerAssetManagementApiRoutes(app, {
   pool,
@@ -34,6 +38,28 @@ module.exports = function registerAssetManagementApiRoutes(app, {
   const routeBase = "/api/companies/:companyId/passport-data-management";
   const getCompanyId = (req) => Number(req.params.companyId);
   const getUserId = (req) => req.user?.userId || req.user?.id || null;
+  const sendSafeRouteError = (res, error, fallbackMessage) => {
+    const statusCode = getSafeErrorStatus(error);
+    return res.status(statusCode).json({
+      error: getSafeErrorMessage(error, fallbackMessage),
+    });
+  };
+  const sanitizeAssetFailureSummary = (summary) => {
+    if (!summary || typeof summary !== "object" || Array.isArray(summary)) return null;
+    if (!Object.prototype.hasOwnProperty.call(summary, "error")) return summary;
+    return { ...summary, error: "Asset job failed." };
+  };
+  const sanitizeAssetRunResponse = (run) => {
+    if (!run || typeof run !== "object" || Array.isArray(run)) return run;
+    const safeRun = { ...run };
+    if (Object.prototype.hasOwnProperty.call(safeRun, "summaryJson")) {
+      safeRun.summaryJson = sanitizeAssetFailureSummary(safeRun.summaryJson);
+    }
+    if (Object.prototype.hasOwnProperty.call(safeRun, "lastSummary")) {
+      safeRun.lastSummary = sanitizeAssetFailureSummary(safeRun.lastSummary);
+    }
+    return safeRun;
+  };
   const toAssetJobResponse = (job) => {
     let sourceConfig = {};
     try {
@@ -54,7 +80,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       nextRunAt: job.nextRunAt,
       lastRunAt: job.lastRunAt,
       lastStatus: job.lastStatus,
-      lastSummary: job.lastSummary,
+      lastSummary: sanitizeAssetFailureSummary(job.lastSummary),
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     };
@@ -69,12 +95,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       req.assetManagementCompany = await assertAssetManagementEnabled(companyId);
       return next();
     } catch (error) {
-      const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
-      return res.status(statusCode).json({
-        error: statusCode >= 500
-          ? "Failed to verify Passport Data Management access"
-          : (error.message || "Passport Data Management access is not allowed"),
-      });
+      return sendSafeRouteError(res, error, "Failed to verify Passport Data Management access");
     }
   };
 
@@ -170,11 +191,13 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       });
     } catch (error) {
       logger.error("Passport data load error:", error.message);
-      const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
-      res.status(statusCode).json({
-        error: statusCode === 500 ? "Failed to load passports for Passport Data Management" : error.code,
-        detail: statusCode === 500 ? undefined : error.message,
-      });
+      if (error?.code === "passportTypeInvalidStorageFieldKeys") {
+        return res.status(503).json({
+          error: "passportTypeInvalidStorageFieldKeys",
+          detail: "Passport type storage cannot be safely mapped.",
+        });
+      }
+      return sendSafeRouteError(res, error, "Failed to load passports for Passport Data Management");
     }
   });
 
@@ -188,7 +211,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       res.json(fetched);
     } catch (error) {
       logger.error("Passport data source fetch error:", error.message);
-      res.status(400).json({ error: error.message || "Failed to fetch ERP/API records" });
+      return sendSafeRouteError(res, error, "Failed to fetch ERP/API records");
     }
   });
 
@@ -204,7 +227,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       res.json(payload);
     } catch (error) {
       logger.error("Passport data preview error:", error.message);
-      res.status(400).json({ error: error.message || "Failed to generate Passport Data Management preview" });
+      return sendSafeRouteError(res, error, "Failed to generate Passport Data Management preview");
     }
   });
 
@@ -257,7 +280,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       });
     } catch (error) {
       logger.error("Passport data push error:", error.message);
-      res.status(400).json({ error: error.message || "Failed to apply passport data changes" });
+      return sendSafeRouteError(res, error, "Failed to apply passport data changes");
     }
   });
 
@@ -332,7 +355,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       res.status(201).json({ job: toAssetJobResponse(inserted.rows[0]) });
     } catch (error) {
       logger.error("Passport data job create error:", error.message);
-      res.status(400).json({ error: error.message || "Failed to save Passport Data Management job" });
+      return sendSafeRouteError(res, error, "Failed to save Passport Data Management job");
     }
   });
 
@@ -413,7 +436,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       res.json({ job: toAssetJobResponse(updated.rows[0]) });
     } catch (error) {
       logger.error("Passport data job update error:", error.message);
-      res.status(400).json({ error: error.message || "Failed to update Passport Data Management job" });
+      return sendSafeRouteError(res, error, "Failed to update Passport Data Management job");
     }
   });
 
@@ -430,13 +453,17 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       const result = await runAssetManagementJob(job.rows[0], "manualJobRun", getUserId(req));
       if (result.error) {
-        return res.status(400).json({ error: result.error.message, run: result.run });
+        const statusCode = getSafeErrorStatus(result.error);
+        return res.status(statusCode).json({
+          error: getSafeErrorMessage(result.error, "Asset job failed."),
+          run: sanitizeAssetRunResponse(result.run),
+        });
       }
 
       res.json(result);
     } catch (error) {
       logger.error("Passport data job run error:", error.message);
-      res.status(400).json({ error: error.message || "Failed to run Passport Data Management job" });
+      return sendSafeRouteError(res, error, "Failed to run Passport Data Management job");
     }
   });
 
@@ -452,7 +479,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         [companyId, limit]
       );
 
-      res.json({ runs: runs.rows });
+      res.json({ runs: runs.rows.map(sanitizeAssetRunResponse) });
     } catch (error) {
       logger.error("Passport data run load error:", error.message);
       res.status(500).json({ error: "Failed to load Passport Data Management run history" });

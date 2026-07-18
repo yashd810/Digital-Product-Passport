@@ -251,7 +251,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       });
     } catch (error) {
       logger.error({ err: error }, "Super admin invite error");
-      res.status(500).json({ error: "Failed to send super admin invitation", detail: error.message });
+      res.status(500).json({ error: "Failed to send super admin invitation" });
     }
   });
 
@@ -330,7 +330,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       res.json({ success: true, message: `Invitation email sent to ${invite.email}` });
     } catch (error) {
       logger.error({ err: error }, "Super admin invite approval error");
-      res.status(500).json({ error: "Failed to approve super admin invitation", detail: error.message });
+      res.status(500).json({ error: "Failed to approve super admin invitation" });
     }
   });
 
@@ -363,7 +363,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       res.json({ success: true, message: `Invite request declined for ${result.rows[0].email}` });
     } catch (error) {
       logger.error({ err: error }, "Super admin invite decline error");
-      res.status(500).json({ error: "Failed to decline super admin invitation", detail: error.message });
+      res.status(500).json({ error: "Failed to decline super admin invitation" });
     }
   });
 

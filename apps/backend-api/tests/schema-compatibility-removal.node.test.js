@@ -35,6 +35,22 @@ test("company and identity mappings ignore the retired dppGranularity alias", ()
   assert.equal(identity.resolvedGranularity, "model");
 });
 
+test("canonical identity does not fall back to the retired guid alias", () => {
+  const identity = buildCanonicalIdentityBundle({
+    passport: { guid: "retired-guid-only" },
+    didService: {
+      normalizeGranularity: (value) => value,
+      normalizeStableId: (value) => value,
+      normalizeCompanySlug: (value) => value,
+      normalizePassportTypeSegment: (value) => value,
+      generateDppDid: () => null,
+    },
+  });
+
+  assert.equal(identity.stableId, null);
+  assert.equal(identity.digitalProductPassportId, null);
+});
+
 test("schema helpers reject retired groups instead of traversing them", () => {
   const canonicalSection = {
     key: "productIdentity",

@@ -3,6 +3,7 @@
 const cors = require("cors");
 const express = require("express");
 const helmet = require("helmet");
+const { contactRequestMaxBytes } = require("../shared/http/contact-request");
 
 function configureHttp(app, {
   allowedOriginSet,
@@ -99,9 +100,32 @@ function configureHttp(app, {
     next();
   });
 
+  const jsonContentTypes = ["application/json", "application/merge-patch+json"];
+  const contactJsonParser = express.json({
+    limit: contactRequestMaxBytes,
+    type: jsonContentTypes,
+  });
+  app.use((req, res, next) => {
+    if (req.method === "POST" && req.path === "/api/contact") {
+      return contactJsonParser(req, res, next);
+    }
+    return next();
+  });
+  app.use((error, req, res, next) => {
+    if (req.method === "POST" && req.path === "/api/contact") {
+      if (error?.type === "entity.too.large") {
+        return res.status(413).json({ error: "Contact request is too large" });
+      }
+      if (error?.type === "entity.parse.failed") {
+        return res.status(400).json({ error: "Invalid JSON request body" });
+      }
+    }
+    return next(error);
+  });
+
   app.use(express.json({
     limit: "10mb",
-    type: ["application/json", "application/merge-patch+json"],
+    type: jsonContentTypes,
   }));
 
   app.use((req, res, next) => {

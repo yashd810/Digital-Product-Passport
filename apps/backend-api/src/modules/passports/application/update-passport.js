@@ -164,7 +164,7 @@ function updateEditablePassportUseCase(deps) {
         tableName,
         companyId,
         internalAliasId: normalizedProductId,
-        excludeGuid: dppId,
+        excludeDppId: dppId,
         excludeLineageId: current.rows[0].lineageId,
       });
       if (existingByProductId) {

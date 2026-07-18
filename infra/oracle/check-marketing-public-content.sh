@@ -4,6 +4,24 @@ set -euo pipefail
 ROOT_DIR="${DPP_APP_DIR:-${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}}"
 MARKETING_DIR="$ROOT_DIR/apps/marketing-site"
 
+# This is deliberately an invocation-only escape hatch for a business owner
+# who explicitly accepts temporarily publishing known placeholder content. It
+# must never be placed in an application environment file. Normal deployments
+# remain fail-closed, and an invalid value is rejected instead of treated as an
+# implicit override.
+case "${DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT:-false}" in
+  false|"")
+    ;;
+  true)
+    echo "WARNING: deploying unverified public marketing content by explicit temporary override." >&2
+    exit 0
+    ;;
+  *)
+    echo "DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT must be true or false" >&2
+    exit 1
+    ;;
+esac
+
 if [ ! -d "$MARKETING_DIR" ]; then
   echo "Missing marketing-site directory: $MARKETING_DIR" >&2
   exit 1

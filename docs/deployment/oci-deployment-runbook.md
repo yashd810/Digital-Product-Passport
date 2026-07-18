@@ -168,6 +168,11 @@ details, legal dates, liability amount, governing law, or court location. The
 guard intentionally does not supply those facts; obtain them from the business
 and legal owner before deploying.
 
+If the business owner explicitly authorizes a short-lived exception, use the
+invocation-only `DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT=true` flag with a
+frontend deployment. It emits a warning and must not be stored in an env file;
+replace the placeholders and redeploy as soon as the facts are available.
+
 ## Application Secret Rotation
 
 For a new environment, generate the database password and application secrets

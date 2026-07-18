@@ -10,6 +10,10 @@ const {
   isSafePassportTypeName,
   passportTypeNameMaxLength,
 } = require("../../shared/passports/passport-helpers");
+const {
+  getSafeErrorMessage,
+  getSafeErrorStatus,
+} = require("../../shared/http/error-response");
 
 module.exports = function registerCatalogRoutes(app, deps) {
   const {
@@ -30,6 +34,13 @@ module.exports = function registerCatalogRoutes(app, deps) {
     storageService,
     getPassportTypeModules: listPassportTypeModules = getPassportTypeModules,
   } = deps;
+
+  const sendSafeRouteError = (res, error, fallbackMessage) => {
+    const statusCode = getSafeErrorStatus(error);
+    return res.status(statusCode).json({
+      error: getSafeErrorMessage(error, fallbackMessage),
+    });
+  };
 
   const mapPassportTypeRow = (row = {}) => ({
     id: row.id ?? null,
@@ -551,7 +562,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
       });
     } catch (error) {
       logger.error("Patch passport type error:", error.message);
-      res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : "Failed to update passport type" });
+      return sendSafeRouteError(res, error, "Failed to update passport type");
     }
   });
 
@@ -672,7 +683,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
     } catch (error) {
       if (error.code === "23505") return res.status(400).json({ error: "A passport type with this typeName already exists" });
       logger.error("Create passport type error:", error.message);
-      res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : "Failed to create passport type" });
+      return sendSafeRouteError(res, error, "Failed to create passport type");
     }
   });
 
@@ -771,11 +782,13 @@ module.exports = function registerCatalogRoutes(app, deps) {
       res.status(201).json(result.rows[0]);
     } catch (error) {
       if (error.code === "storageDisabled") {
-        return res.status(503).json({ error: error.message });
+        return res.status(503).json({ error: "File storage is unavailable" });
       }
-      if (error.code === "invalidFileSignature") return res.status(400).json({ error: error.message });
+      if (error.code === "invalidFileSignature") {
+        return res.status(400).json({ error: "Uploaded file type does not match its contents" });
+      }
       logger.error("Symbol upload error:", error.message);
-      res.status(500).json({ error: error.message || "Failed to upload symbol" });
+      return sendSafeRouteError(res, error, "Failed to upload symbol");
     }
   });
 

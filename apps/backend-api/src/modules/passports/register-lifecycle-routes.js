@@ -1,20 +1,15 @@
 "use strict";
 
 const {
-  flattenSchemaFieldsFromSections,
   joinQuotedSqlIdentifiers,
 } = require("../../shared/passports/passport-helpers");
 
 const { createValidationMiddleware } = require("../../shared/validation/request-schema");
-
-function getPublicAttachmentFieldKeys(typeDef) {
-  return flattenSchemaFieldsFromSections(typeDef?.fieldsJson?.sections || [])
-    .filter((field) =>
-      field?.key
-      && String(field.confidentiality || "").trim().toLowerCase() === "public"
-    )
-    .map((field) => field.key);
-}
+const { getSafeErrorMessage } = require("../../shared/http/error-response");
+const {
+  getPublicAttachmentFieldKeys,
+  releasePassportAtomically,
+} = require("./release-passport-transaction");
 
 module.exports = function registerLifecycleRoutes(app, deps) {
   const {
@@ -182,64 +177,26 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       const compliance = await evaluateCompliance(reconciledPassport, passportType);
 
-      const tableName = getTable(passportType);
-      await archivePassportSnapshot({
-        passport: reconciledPassport,
-        passportType,
-        archivedBy: req.user.userId,
-        actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "beforeRelease",
-      });
-      const result = await pool.query(
-        `UPDATE ${tableName} SET "releaseStatus" = 'released', "updatedAt" = NOW()
-         WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${editableReleaseStatusesSql}
-         RETURNING *`,
-        [dppId, companyId]
-      );
-      if (!result.rows.length) return res.status(404).json({ error: "Passport not found or already released" });
-      const released = result.rows[0];
-
-      await archivePassportSnapshot({
-        passport: released,
-        passportType,
-        archivedBy: req.user.userId,
-        actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "afterRelease",
-      });
-
       const typeDef = await complianceService.loadPassportTypeDefinition(passportType);
-      const sigData = await signPassport({ ...released, passportType }, typeDef || null);
-      if (sigData) {
-        await recordSignedDppRelease(pool, {
-          passportDppId: dppId,
-          companyId,
-          releasedByUserId: req.user.userId,
-          releasedByEmail: req.user.email,
-          versionNumber: released.versionNumber,
-          sigData,
-          releaseNote: req.body?.releaseNote || null,
-        });
-        await logAudit(companyId, req.user.userId, "signPassport", "passportSignatures", dppId, null, {
-          versionNumber: released.versionNumber,
-          signingKeyId: sigData.keyId,
-          signatureAlgorithm: sigData.signatureAlgorithm,
-        }, {
-          actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || req.user.email || `user:${req.user.userId}`,
-          audience: "economicOperator",
-        });
-      }
-
-      await markOlderVersionsObsolete(tableName, dppId, released.versionNumber, passportType);
-      const publicAttachmentFieldKeys = getPublicAttachmentFieldKeys(typeDef);
-      await pool.query(
-        `UPDATE "passportAttachments"
-         SET "isPublic" = ("fieldKey" = ANY($2::text[]))
-         WHERE "passportDppId" = $1`,
-        [dppId, publicAttachmentFieldKeys]
-      ).catch((error) => {
-        logger.warn({ err: error, dppId }, "Failed to synchronize passport attachment visibility after release");
+      const { released } = await releasePassportAtomically({
+        pool,
+        tableName: getTable(passportType),
+        dppId,
+        companyId,
+        passportType,
+        userId: req.user.userId,
+        releasedByEmail: req.user.email,
+        actorIdentifier: getActorIdentifier(req.user),
+        editableReleaseStatusesSql,
+        typeDef,
+        releaseNote: req.body?.releaseNote || null,
+        source: "release",
+        signPassport,
+        recordSignedDppRelease,
+        logAudit,
+        archivePassportSnapshot,
+        markOlderVersionsObsolete,
       });
-      await logAudit(companyId, req.user.userId, "release", tableName, dppId, { releaseStatus: "draftOrInRevision" }, { releaseStatus: "released" });
       await replicatePassportToBackup({
         passport: { ...released, passportType },
         passportType,
@@ -257,6 +214,9 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       });
     } catch (error) {
       logger.error({ err: error, dppId: req.params?.dppId, companyId: req.params?.companyId }, "Release passport error");
+      if (error?.statusCode === 404) {
+        return res.status(404).json({ error: "Passport not found or already released" });
+      }
       res.status(500).json({ error: "Failed to release passport" });
     }
   });
@@ -386,7 +346,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         tableName,
         companyId,
         internalAliasId: requestedProductId,
-        excludeGuid: dppId,
+        excludeDppId: dppId,
         excludeLineageId: src.lineageId,
       });
       if (existingByProductId) {
@@ -488,7 +448,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       });
     } catch (error) {
       logger.error("Granularity transition error:", error.message);
-      res.status(500).json({ error: "Failed to create granularity transition", detail: error.message });
+      res.status(500).json({ error: "Failed to create granularity transition" });
     }
   });
 
@@ -523,7 +483,11 @@ module.exports = function registerLifecycleRoutes(app, deps) {
           details.push({ dppId, status: "submitted" });
           submitted += 1;
         } catch (error) {
-          details.push({ dppId, status: "skipped", message: error.message });
+          details.push({
+            dppId,
+            status: "skipped",
+            message: getSafeErrorMessage(error, "Workflow submission could not be completed."),
+          });
           skipped += 1;
         }
       }
@@ -531,7 +495,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       res.json({ summary: { submitted, skipped, failed, total: items.length }, details });
     } catch (error) {
       logger.error("Bulk workflow error:", error.message);
-      res.status(500).json({ error: "Bulk workflow submit failed", detail: error.message });
+      res.status(500).json({ error: "Bulk workflow submit failed" });
     }
   });
 

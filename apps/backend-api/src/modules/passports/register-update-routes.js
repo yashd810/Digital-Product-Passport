@@ -1,6 +1,10 @@
 "use strict";
 
-const { handleRouteError } = require("../../shared/http/error-response");
+const {
+  getSafeErrorMessage,
+  getSafeErrorStatus,
+  handleRouteError,
+} = require("../../shared/http/error-response");
 const { createValidationMiddleware } = require("../../shared/validation/request-schema");
 const { quoteSqlIdentifier } = require("../../shared/passports/passport-helpers");
 const { updateEditablePassportUseCase } = require("./application/update-passport");
@@ -221,8 +225,12 @@ function registerUpdateRoutes(app, deps) {
       res.json(result);
     } catch (error) {
       logger.error({ err: error, companyId: req.params.companyId, dppId: req.params.dppId }, "PATCH /passports/:dppId error");
-      if (error?.payload) {
-        return res.status(error.statusCode || 500).json({ error: error.message, ...error.payload });
+      const statusCode = getSafeErrorStatus(error);
+      if (error?.payload && statusCode < 500) {
+        return res.status(statusCode).json({
+          error: getSafeErrorMessage(error, "Failed to update passport"),
+          ...error.payload,
+        });
       }
       return handleRouteError(res, error, "Failed to update passport");
     }
@@ -315,7 +323,7 @@ function registerUpdateRoutes(app, deps) {
               failed += 1;
               continue;
             }
-            const dup = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId, excludeGuid: matchedGuid, excludeLineageId: matchedLineageId });
+            const dup = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId, excludeDppId: matchedGuid, excludeLineageId: matchedLineageId });
             if (dup) {
               details.push({ dppId: matchedGuid, internalAliasId: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
               failed += 1;
@@ -384,7 +392,12 @@ function registerUpdateRoutes(app, deps) {
           updated += 1;
         } catch (error) {
           logger.error("Bulk PATCH item error:", error.message);
-          details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "failed", error: error.message });
+          details.push({
+            dppId: incomingGuid,
+            internalAliasId: normalizedProductId || undefined,
+            status: "failed",
+            error: getSafeErrorMessage(error, "Failed to update passport."),
+          });
           failed += 1;
         }
       }

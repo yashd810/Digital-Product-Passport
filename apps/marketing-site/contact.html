@@ -109,38 +109,38 @@
               <div class="form-row">
                 <div class="form-group">
                   <label for="first-name">First Name *</label>
-                  <input type="text" id="first-name" name="firstName" required aria-label="First Name" />
+                  <input type="text" id="first-name" name="firstName" required maxlength="80" aria-label="First Name" />
                 </div>
                 <div class="form-group">
                   <label for="last-name">Last Name *</label>
-                  <input type="text" id="last-name" name="lastName" required aria-label="Last Name" />
+                  <input type="text" id="last-name" name="lastName" required maxlength="80" aria-label="Last Name" />
                 </div>
               </div>
 
               <div class="form-group">
                 <label for="email">Email *</label>
-                <input type="email" id="email" name="email" required aria-label="Email" />
+                <input type="email" id="email" name="email" required maxlength="254" aria-label="Email" />
               </div>
 
               <div class="form-group">
                 <label for="company">Company Name</label>
-                <input type="text" id="company" name="company" aria-label="Company Name" />
+                <input type="text" id="company" name="company" maxlength="160" aria-label="Company Name" />
               </div>
 
               <div class="form-group">
                 <label for="sector">Industry / Product Category</label>
-                <input type="text" id="sector" name="sector" aria-label="Industry / Product Category" />
+                <input type="text" id="sector" name="sector" maxlength="120" aria-label="Industry / Product Category" />
               </div>
 
               <div class="form-group">
                 <label for="message">Tell Us About Your Needs *</label>
-                <textarea id="message" name="message" required aria-label="Tell Us About Your Needs"
+                <textarea id="message" name="message" required maxlength="4000" aria-label="Tell Us About Your Needs"
                 ></textarea>
               </div>
 
               <div class="form-group">
                 <label for="how-found">How did you hear about ClarosDPP?</label>
-                <input type="text" id="how-found" name="howFound" aria-label="How did you hear about ClarosDPP?" />
+                <input type="text" id="how-found" name="howFound" maxlength="200" aria-label="How did you hear about ClarosDPP?" />
               </div>
 
               <button type="submit" class="btn-submit" id="submit-btn">
@@ -234,6 +234,7 @@
         sector:          form.querySelector('#sector').value.trim(),
         message:         form.querySelector('#message').value.trim(),
         howFound:        form.querySelector('#how-found').value,
+        _gotcha:         form.querySelector('[name="_gotcha"]').value,
       };
 
       try {
