@@ -131,8 +131,10 @@ identities, not deployment defaults. A normal deployment refuses to create a
 missing PostgreSQL or local-storage volume, preventing a typo or a changed
 Compose project from silently selecting an empty store.
 
-Keep `RUN_SCHEMA_MIGRATIONS=false` for normal production operation. For a
-deliberate first database initialization or an approved fresh-data reset, run
+Keep `RUN_SCHEMA_MIGRATIONS=false` for normal production operation. Every
+controlled backend deployment runs the checked-in `node scripts/migrate-db.js`
+entry point once, before recreating the API; ordinary service restarts never run
+it. For a deliberate first database initialization or an approved fresh-data reset, run
 the deployment helper once with its one-time volume-initialization flags:
 
 ```bash

@@ -835,12 +835,18 @@ fi
 
 DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" config --quiet
 build_target_images_sequentially
-if [ "$POSTGRES_VOLUME_WAS_CREATED" = "true" ]; then
-  echo "Bootstrapping the approved fresh PostgreSQL volume with one explicit schema migration..."
+if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
+  if [ "$POSTGRES_VOLUME_WAS_CREATED" = "true" ]; then
+    echo "Bootstrapping the approved fresh PostgreSQL volume with one explicit schema migration..."
+  else
+    echo "Running the controlled schema migration for this backend deployment..."
+  fi
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up --no-build -d postgres
   wait_for_container_health "postgres" "PostgreSQL" 40 2
   # The production image intentionally removes npm after installing runtime
   # dependencies, so invoke the checked-in migration entry point with Node.
+  # This is deliberately part of a controlled deployment, never application
+  # startup: ordinary restarts retain the existing schema and data unchanged.
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --no-deps --no-build backend-api node scripts/migrate-db.js
 fi
 if [ "$DEPLOY_TARGET" = "frontend" ]; then
