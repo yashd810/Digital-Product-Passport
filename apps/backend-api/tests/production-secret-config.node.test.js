@@ -57,6 +57,17 @@ test("production environment template keeps contact notification and login ident
   assert.notEqual(values.get("ADMIN_USERNAME"), values.get("ADMIN_EMAIL"));
 });
 
+test("production environment template documents the required transactional email transport", () => {
+  const values = parseEnvLines(fs.readFileSync(templatePath, "utf8"));
+
+  assert.equal(values.get("EMAIL_HOST"), "smtp.example.com");
+  assert.equal(values.get("EMAIL_PORT"), "587");
+  assert.equal(values.get("EMAIL_SECURE"), "false");
+  assert.match(values.get("EMAIL_USER"), /^REPLACE_/);
+  assert.match(values.get("EMAIL_PASS"), /^REPLACE_/);
+  assert.match(values.get("EMAIL_FROM"), /^REPLACE_/);
+});
+
 function runBootstrapSuperAdmin(overrides = {}) {
   const env = {
     PATH: process.env.PATH || "",

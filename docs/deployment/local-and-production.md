@@ -88,6 +88,9 @@ Current production-style behavior:
 - production secrets must be independently generated; use
   `bash infra/oracle/generate-env-secrets.sh` to produce the required 256-bit
   values and matching P-256 signing pair
+- transactional email requires a working SMTP account and provider-specific app
+  password in the protected production environment; verify its connection
+  before enabling the public contact form or account-email workflows
 - production PostgreSQL receives only its database name, user, and password;
   it does not load the full DPP environment file
 - normal production starts use `RUN_SCHEMA_MIGRATIONS=false` and only verify the
