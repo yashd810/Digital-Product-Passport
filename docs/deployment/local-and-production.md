@@ -78,7 +78,9 @@ Current production-style behavior:
 - production fixes `COMPOSE_PROJECT_NAME`, `POSTGRES_VOLUME_NAME`, and
   `LOCAL_STORAGE_VOLUME_NAME` in its protected environment file; do not rename
   either volume after initialization because that would select a different,
-  empty data store
+  empty data store. Normal deployments refuse to create either missing volume;
+  a first bootstrap or explicitly approved reset must opt in with the matching
+  one-time initialization flag
 - `env/production.env` is the protected production source profile and contains
   the S3-compatible application-storage configuration; do not copy those values
   into `env/local-compose.env`

@@ -128,23 +128,25 @@ Set `COMPOSE_PROJECT_NAME`, `POSTGRES_VOLUME_NAME`, and
 `LOCAL_STORAGE_VOLUME_NAME` once in both the protected `production.env` source
 profile and the backend host's `/etc/dpp/dpp.env`. These are stable data
 identities, not deployment defaults. A normal deployment refuses to create a
-missing PostgreSQL volume, preventing a typo or a changed Compose project from
-silently selecting an empty database.
+missing PostgreSQL or local-storage volume, preventing a typo or a changed
+Compose project from silently selecting an empty store.
 
 Keep `RUN_SCHEMA_MIGRATIONS=false` for normal production operation. For a
 deliberate first database initialization or an approved fresh-data reset, run
-the deployment helper once with its one-time volume-initialization flag:
+the deployment helper once with its one-time volume-initialization flags:
 
 ```bash
 cd /opt/dpp
 sudo env DPP_ENV_FILE=/etc/dpp/dpp.env DPP_DEPLOY_TARGET=backend \
-  DPP_INITIALIZE_POSTGRES_VOLUME=true ./infra/oracle/deploy-prod.sh
+  DPP_INITIALIZE_POSTGRES_VOLUME=true \
+  DPP_INITIALIZE_LOCAL_STORAGE_VOLUME=true ./infra/oracle/deploy-prod.sh
 ```
 
-When and only when the named PostgreSQL volume did not exist, that explicit
-flag creates it, starts PostgreSQL, runs `node scripts/migrate-db.js` once, and then
-starts the normal backend with startup migrations disabled. The flag is a
-shell-only maintenance action; do not add it to `/etc/dpp/dpp.env`.
+When and only when a named persistent volume did not exist, its matching
+explicit flag creates it. A fresh PostgreSQL volume is started, receives one
+controlled `node scripts/migrate-db.js` run, and then the normal backend starts
+with startup migrations disabled. The flags are shell-only maintenance actions;
+do not add them to `/etc/dpp/dpp.env`.
 
 `bootstrap.sh` also requires an explicit `DPP_DEPLOY_TARGET`; it does not
 default to `all`. Use `backend` on the database/API host and `frontend` on the
@@ -153,10 +155,11 @@ prevents a bootstrap command from creating duplicate services on the split OCI
 hosts.
 
 Do not use `docker compose down -v`, `docker volume rm`, or
-`DPP_INITIALIZE_POSTGRES_VOLUME=true` in routine operation. Those actions are
-only for an explicitly approved data reset. Container restarts, Docker daemon
-restarts, and normal `docker compose up --force-recreate` retain the named
-external PostgreSQL volume.
+`DPP_INITIALIZE_POSTGRES_VOLUME=true`, or
+`DPP_INITIALIZE_LOCAL_STORAGE_VOLUME=true` in routine operation. Those actions
+are only for an explicitly approved data reset. Container restarts, Docker
+daemon restarts, and normal `docker compose up --force-recreate` retain the
+named external PostgreSQL and local-storage volumes.
 
 ## Public Marketing Content Preflight
 

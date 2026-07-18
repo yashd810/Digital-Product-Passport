@@ -6,6 +6,7 @@ ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 LOCK_FILE=""
 INITIALIZE_POSTGRES_VOLUME="${DPP_INITIALIZE_POSTGRES_VOLUME:-false}"
+INITIALIZE_LOCAL_STORAGE_VOLUME="${DPP_INITIALIZE_LOCAL_STORAGE_VOLUME:-false}"
 POSTGRES_VOLUME_WAS_CREATED=false
 
 file_mode() {
@@ -269,6 +270,15 @@ case "$INITIALIZE_POSTGRES_VOLUME" in
     ;;
   *)
     echo "DPP_INITIALIZE_POSTGRES_VOLUME must be true or false when set"
+    exit 1
+    ;;
+esac
+
+case "$INITIALIZE_LOCAL_STORAGE_VOLUME" in
+  true|false)
+    ;;
+  *)
+    echo "DPP_INITIALIZE_LOCAL_STORAGE_VOLUME must be true or false when set"
     exit 1
     ;;
 esac
@@ -746,7 +756,7 @@ run_live_edge_check() {
     "$APP_DIR/infra/oracle/check-live-edge.sh" "${LIVE_EDGE_TARGETS[@]}"
 }
 
-ensure_docker_volume() {
+ensure_local_storage_volume() {
   local name="$1"
   local label="$2"
 
@@ -755,8 +765,15 @@ ensure_docker_volume() {
     return 0
   fi
 
+  if [ "$INITIALIZE_LOCAL_STORAGE_VOLUME" != "true" ]; then
+    echo "Refusing deployment: expected local storage volume is missing: $name"
+    echo "A normal deployment never creates an empty local storage volume."
+    echo "For a deliberate first bootstrap or approved reset only, rerun with DPP_INITIALIZE_LOCAL_STORAGE_VOLUME=true."
+    exit 1
+  fi
+
   docker volume create "$name" >/dev/null
-  echo "Created fresh $label volume: $name"
+  echo "Created approved fresh $label volume: $name"
 }
 
 ensure_postgres_volume() {
@@ -811,7 +828,7 @@ if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   fi
   LOCAL_STORAGE_VOLUME_NAME="$(read_env_var LOCAL_STORAGE_VOLUME_NAME)"
   POSTGRES_VOLUME_NAME="$(read_env_var POSTGRES_VOLUME_NAME)"
-  ensure_docker_volume "$LOCAL_STORAGE_VOLUME_NAME" "local storage"
+  ensure_local_storage_volume "$LOCAL_STORAGE_VOLUME_NAME" "local storage"
   ensure_postgres_volume "$POSTGRES_VOLUME_NAME"
   prepare_local_storage_volume "$LOCAL_STORAGE_VOLUME_NAME"
 fi
