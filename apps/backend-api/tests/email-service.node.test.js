@@ -95,6 +95,44 @@ test("mail delivery has no provider or sender fallbacks", () => {
       user: "smtp-user",
       pass: "smtp-password",
       from: "noreply@example.test",
+      tls: {
+        minVersion: "TLSv1.2",
+        rejectUnauthorized: true,
+      },
+    });
+  });
+});
+
+test("mail delivery requires explicit transport settings and strict TLS", () => {
+  const { createTransporter, getEmailConfiguration, isEmailConfigured } = require("../src/services/email");
+  const validConfiguration = {
+    EMAIL_HOST: "smtp.example.test",
+    EMAIL_PORT: "587",
+    EMAIL_SECURE: "false",
+    EMAIL_USER: "smtp-user",
+    EMAIL_PASS: "smtp-password",
+    EMAIL_FROM: "noreply@example.test",
+  };
+
+  for (const overrides of [
+    { EMAIL_PORT: undefined },
+    { EMAIL_PORT: "587junk" },
+    { EMAIL_PORT: "0" },
+    { EMAIL_SECURE: undefined },
+    { EMAIL_SECURE: "sometimes" },
+  ]) {
+    withEmailEnv({ ...validConfiguration, ...overrides }, () => {
+      assert.equal(isEmailConfigured(), false);
+      assert.throws(() => getEmailConfiguration(), { code: "emailNotConfigured" });
+    });
+  }
+
+  withEmailEnv(validConfiguration, () => {
+    const transporter = createTransporter();
+    assert.equal(transporter.options.requireTLS, true);
+    assert.deepEqual(transporter.options.tls, {
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: true,
     });
   });
 });

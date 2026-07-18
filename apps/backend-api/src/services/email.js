@@ -60,11 +60,15 @@ function getEmailConfiguration() {
     throw emailConfigurationError("EMAIL_FROM must be a valid mailbox address");
   }
 
-  const port = Number.parseInt(String(process.env.EMAIL_PORT || "587"), 10);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  const portValue = String(process.env.EMAIL_PORT || "").trim();
+  if (!/^[1-9][0-9]*$/.test(portValue)) {
     throw emailConfigurationError("EMAIL_PORT must be a valid TCP port");
   }
-  const secureValue = String(process.env.EMAIL_SECURE || "false").trim().toLowerCase();
+  const port = Number(portValue);
+  if (!Number.isSafeInteger(port) || port > 65535) {
+    throw emailConfigurationError("EMAIL_PORT must be a valid TCP port");
+  }
+  const secureValue = String(process.env.EMAIL_SECURE || "").trim().toLowerCase();
   if (!['true', 'false'].includes(secureValue)) {
     throw emailConfigurationError("EMAIL_SECURE must be true or false");
   }
@@ -76,6 +80,10 @@ function getEmailConfiguration() {
     user,
     pass,
     from,
+    tls: {
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: true,
+    },
   };
 }
 
@@ -181,6 +189,7 @@ const createTransporter = () => {
     port: config.port,
     secure: config.secure,
     requireTLS: !config.secure,
+    tls: config.tls,
     auth: { user: config.user, pass: config.pass },
   });
 };
