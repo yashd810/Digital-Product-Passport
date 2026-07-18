@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   buildProductCategoryOptions,
+  resolveSystemHeaderEntries,
 } from "../admin/passport-types/builderHelpers";
 import {
   buildSemanticModelOptions,
@@ -25,6 +26,23 @@ import {
 } from "../shared/passports/passportSchemaUtils";
 
 describe("frontend modularity helpers", () => {
+  test("system-header entries resolve configured schema fields", () => {
+    const entries = resolveSystemHeaderEntries(
+      [{
+        key: "identification",
+        label: "Identification",
+        fields: [{ key: "serialNumber", label: "Serial number", type: "text", required: true }],
+      }],
+      { fieldMappings: [{ slotKey: "serial", sourceType: "field", fieldKey: "serialNumber" }] }
+    );
+
+    expect(entries.map((entry) => ({
+      slotKey: entry.slotKey,
+      fieldKey: entry.fieldKey,
+      required: entry.required,
+    }))).toEqual([{ slotKey: "serial", fieldKey: "serialNumber", required: true }]);
+  });
+
   test("dashboard retains only canonical CSV and public-viewer routes", () => {
     const appSource = readFileSync(
       new URL("../app/containers/App.js", import.meta.url),

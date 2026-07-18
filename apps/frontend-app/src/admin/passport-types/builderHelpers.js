@@ -1,4 +1,5 @@
 import { languages } from "../../app/providers/i18n";
+import { flattenSchemaFieldsFromSections } from "../../shared/passports/passportSchemaUtils";
 
 export const transLangs = languages.filter((language) => language.code !== "en");
 
