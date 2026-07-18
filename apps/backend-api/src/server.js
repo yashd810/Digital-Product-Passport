@@ -443,8 +443,8 @@ async function verifySchemaReady() {
     FROM companies
     LIMIT 1
   `);
-  const storageChecks = await validatePassportTypeStorage({ repair: false });
-  const unavailableStorage = storageChecks.filter((result) =>
+  const storageValidation = await validatePassportTypeStorage({ repair: false });
+  const unavailableStorage = storageValidation.results.filter((result) =>
     result.issues.some((issue) => issue.type !== "extraColumn")
   );
   if (unavailableStorage.length) {
