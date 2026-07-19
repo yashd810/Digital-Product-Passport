@@ -8,6 +8,10 @@ import {
   normalizeTableColumns,
   parseTableRows,
 } from "../../../shared/passports/tableSchemaUtils";
+import {
+  flattenSchemaFieldsFromSections,
+  normalizeSchemaSections,
+} from "../../../shared/passports/passportSchemaUtils";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import RepositoryPicker from "../../../passports/form/components/RepositoryPicker";
 import SymbolRepositoryPicker from "../../../passports/form/components/SymbolRepositoryPicker";
@@ -261,11 +265,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.fieldsJson?.sections) {
-          const s = {};
-          for (const sec of data.fieldsJson.sections) {
-            s[sec.key] = { label: sec.label, fields: sec.fields || [] };
-          }
-          setSections(s);
+          setSections(normalizeSchemaSections(data.fieldsJson.sections));
         } else {
           setSections(null);
         }
@@ -317,19 +317,12 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
     if (!passportType) return setError("Select a passport type");
     if (!name.trim())  return setError("Enter a template name");
 
-    // Build fields array from all sections
-    const fields = [];
-    if (sections) {
-      for (const sec of Object.values(sections)) {
-        for (const f of sec.fields) {
-          fields.push({
-            fieldKey:    f.key,
-            fieldValue:  fieldValues[f.key] ?? "",
-            isModelData: modelDataKeys.has(f.key),
-          });
-        }
-      }
-    }
+    // Preserve every field from the canonical section tree, including nested sections.
+    const fields = flattenSchemaFieldsFromSections(sections || []).map((field) => ({
+      fieldKey: field.key,
+      fieldValue: fieldValues[field.key] ?? "",
+      isModelData: modelDataKeys.has(field.key),
+    }));
 
     setSaving(true); setError("");
     try {
@@ -351,7 +344,45 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
     }
   };
 
-  const sectionKeys = sections ? Object.keys(sections) : [];
+  const renderTemplateSection = (section, depth = 0, path = []) => {
+    if (!section || typeof section !== "object") return null;
+    const childSections = Array.isArray(section.sections) ? section.sections : [];
+    const sectionLabel = section.label || section.name || section.key || "Untitled section";
+    const sectionKey = `${section.key || "section"}-${path.length}`;
+    const sectionPath = [...path, sectionKey];
+    const HeadingTag = depth === 0 ? "h4" : depth === 1 ? "h5" : "h6";
+
+    return (
+      <section key={sectionPath.join("/")} className={`tmpl-section tmpl-section-depth-${Math.min(depth, 3)}`}>
+        <HeadingTag className="tmpl-section-title">{sectionLabel}</HeadingTag>
+        {(Array.isArray(section.fields) ? section.fields : []).length > 0 && (
+          <div className="tmpl-fields-grid">
+            {(section.fields || []).filter((field) => field?.key).map((field) => (
+              <TemplateField
+                key={field.key}
+                field={field}
+                value={fieldValues[field.key] ?? ""}
+                isModelData={modelDataKeys.has(field.key)}
+                disabled={saving}
+                symbols={symbols}
+                onValueChange={(value) => setFieldValue(field.key, value)}
+                onModelDataToggle={(isModelData) => toggleModelData(field.key, isModelData)}
+                onOpenRepositoryPicker={() => setRepoPicker(field.key)}
+                onOpenSymbolPicker={() => setSymbolPicker(field.key)}
+              />
+            ))}
+          </div>
+        )}
+        {childSections.length > 0 && (
+          <div className="tmpl-section-children">
+            {childSections.map((child, childIndex) =>
+              renderTemplateSection(child, depth + 1, [...sectionPath, String(childIndex)])
+            )}
+          </div>
+        )}
+      </section>
+    );
+  };
 
   return (
     <div className="tmpl-editor">
@@ -408,30 +439,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
         {loadingFields && <div className="tmpl-loading">Loading fields…</div>}
 
         {/* Field sections */}
-        {sections && sectionKeys.map(sk => {
-          const sec = sections[sk];
-          return (
-            <div key={sk} className="tmpl-section">
-              <div className="tmpl-section-title">{sec.label}</div>
-              <div className="tmpl-fields-grid">
-                {sec.fields.map(f => (
-                  <TemplateField
-                    key={f.key}
-                    field={f}
-                    value={fieldValues[f.key] ?? ""}
-                    isModelData={modelDataKeys.has(f.key)}
-                    disabled={saving}
-                    symbols={symbols}
-                    onValueChange={val => setFieldValue(f.key, val)}
-                    onModelDataToggle={on => toggleModelData(f.key, on)}
-                    onOpenRepositoryPicker={() => setRepoPicker(f.key)}
-                    onOpenSymbolPicker={() => setSymbolPicker(f.key)}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
+        {sections && sections.map((section, index) => renderTemplateSection(section, 0, [String(index)]))}
 
         {passportType && !sections && !loadingFields && (
           <div className="tmpl-loading">No field definitions found for this passport type.</div>

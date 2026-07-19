@@ -41,6 +41,7 @@ import {
   syncSectionsWithSemanticModel,
   unlockModuleSection,
 } from "./AdminCreatePassportTypeHelpers";
+import { buildNestedSchemaReview, maxNestedSectionDepth } from "./nestedSchemaReview";
 import AdminSelectMenu from "../components/AdminSelectMenu";
 import { TypeIdentityCard } from "./TypeIdentityCard";
 import "../styles/AdminDashboard.css";
@@ -82,10 +83,10 @@ function flattenSectionTree(sections = []) {
   ]);
 }
 
-function flattenSectionTreeEntries(sections = [], depth = 0) {
+function flattenSectionTreeEntries(sections = [], depth = 0, parentPath = []) {
   return sections.flatMap((section) => [
-    { section, depth },
-    ...flattenSectionTreeEntries(getSectionChildren(section), depth + 1),
+    { section, depth, path: [...parentPath, section] },
+    ...flattenSectionTreeEntries(getSectionChildren(section), depth + 1, [...parentPath, section]),
   ]);
 }
 
@@ -568,10 +569,36 @@ function AdminCreatePassportType() {
   const addSection = () =>
     setSections(s => [...s, newSection("")]);
 
-  const removeSection = (id) =>
+  const addSubsection = (parentId) => {
+    const parentEntry = flattenSectionTreeEntries(sections)
+      .find(({ section }) => section.localId === parentId);
+    if (parentEntry && parentEntry.depth + 1 >= maxNestedSectionDepth) {
+      setInvalidFields([parentId]);
+      setError(`Passport types support at most ${maxNestedSectionDepth} nested section levels.`);
+      return;
+    }
+    setSections(s => mapSectionById(s, parentId, (section) =>
+      withSectionChildren(section, [...getSectionChildren(section), newSection("")])
+    ));
+  };
+
+  const removeSection = (id) => {
+    const target = flattenSectionTree(sections).find((section) => section.localId === id);
+    if (!target) return;
+    const subtreeSections = flattenSectionTree([target]);
+    const subtreeFieldCount = subtreeSections.reduce(
+      (count, section) => count + (section.fields || []).length,
+      0,
+    );
+    const targetLabel = target.label?.trim() || "this section";
+    const message = subtreeSections.length > 1 || subtreeFieldCount > 0
+      ? `Remove ${targetLabel} and its ${subtreeSections.length - 1} subsection${subtreeSections.length === 2 ? "" : "s"} and ${subtreeFieldCount} field${subtreeFieldCount === 1 ? "" : "s"}?`
+      : `Remove ${targetLabel}?`;
+    if (!window.confirm(message)) return;
     setSections(s => mapSectionTree(s, (sec) =>
       withSectionChildren(sec, getSectionChildren(sec).filter((child) => child.localId !== id))
     ).filter(sec => sec.localId !== id));
+  };
 
   const updateSection = (id, patch) =>
     setSections(s => mapSectionById(s, id, (sec) => {
@@ -959,6 +986,21 @@ function AdminCreatePassportType() {
 
     const { fieldKeyToId, cleanSections, payload } = buildSubmissionPayload();
 
+    const nestedSchemaReview = buildNestedSchemaReview({
+      sections,
+      moduleSections: selectedPassportModule?.fieldsJson?.sections ?? null,
+      sourceModuleKey,
+      systemHeader,
+    });
+    if (!nestedSchemaReview.valid) {
+      const firstIssue = nestedSchemaReview.errors[0];
+      setInvalidFields([
+        ...nestedSchemaReview.errors.map((item) => item.sectionId || item.fieldId).filter(Boolean),
+      ]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError(firstIssue?.message || "Fix the schema review issues before saving.");
+    }
+
     const canonicalSchemaIssues = getCanonicalSchemaIssues(sections);
     if (canonicalSchemaIssues.length) {
       setInvalidFields(canonicalSchemaIssues.map((issue) => issue.fieldId).filter(Boolean));
@@ -1078,6 +1120,13 @@ function AdminCreatePassportType() {
   };
 
   const selectedPassportModule = passportModules.find((moduleTemplate) => moduleTemplate.moduleKey === sourceModuleKey) || null;
+  const structureLocked = editMode || Boolean(sourceModuleKey);
+  const schemaReview = buildNestedSchemaReview({
+    sections,
+    moduleSections: selectedPassportModule?.fieldsJson?.sections ?? null,
+    sourceModuleKey,
+    systemHeader,
+  });
   const systemHeaderEntries = resolveSystemHeaderEntries(sections, systemHeader);
   const sectionEditorEntries = flattenSectionTreeEntries(sections);
   const sectionMoveOptions = flattenSectionTree(sections).map((sec) => ({
@@ -1148,11 +1197,11 @@ function AdminCreatePassportType() {
               <div>
                 <h3 className="acpt-card-title">Passport Module Source</h3>
                 <p className="acpt-builder-hint">
-                  Use a code-defined module as the canonical field library, then trim fields and decide required or optional for this passport type.
+                  Select the code-defined module that owns this passport type. Its fields, section order, and nested structure stay exact so the type can be verified against the module.
                 </p>
               </div>
               {selectedPassportModule && (
-                <span className="acpt-system-header-lock">Canonical fields locked</span>
+                <span className="acpt-system-header-lock">Canonical structure locked</span>
               )}
             </div>
             <div className="acpt-module-source-grid">
@@ -1246,30 +1295,44 @@ function AdminCreatePassportType() {
             <div>
               <h3 className="acpt-card-title">Field Builder</h3>
               <p className="acpt-builder-hint">
-                Organise fields into sections. Sections become tabs in the passport viewer.
+                Build a clear section tree. Subsections preserve their full path in forms, templates, exports, and the public viewer.
               </p>
             </div>
-            <div className="acpt-csv-actions">
-              <button type="button" className="acpt-csv-template-btn" onClick={downloadTemplate}
-                title="Download a sample CSV to use as a starting point">
-                ⬇ Template CSV
-              </button>
-              <label className="acpt-csv-import-btn" title="Import fields from a CSV file">
-                📥 Import CSV
-                <input type="file" accept=".csv" className="admin-hidden-input" onChange={handleCSVImport} />
-              </label>
-            </div>
+            {structureLocked ? (
+              <span className="acpt-system-header-lock">Structure locked by module</span>
+            ) : (
+              <div className="acpt-csv-actions">
+                <button type="button" className="acpt-csv-template-btn" onClick={downloadTemplate}
+                  title="Download a sample CSV to use as a starting point">
+                  ⬇ Template CSV
+                </button>
+                <label className="acpt-csv-import-btn" title="Import fields from a CSV file">
+                  📥 Import CSV
+                  <input type="file" accept=".csv" className="admin-hidden-input" onChange={handleCSVImport} />
+                </label>
+              </div>
+            )}
           </div>
           {csvError && (
             <div className="alert alert-error admin-alert-inline-wide">{csvError}</div>
           )}
-          <div className="acpt-csv-hint">
-            CSV format supports <strong>Field Label</strong>, <strong>Section</strong>, <strong>Type</strong>,
-            and <strong>Confidentiality</strong>. Importing replaces the current field builder.
-          </div>
+          {structureLocked ? (
+            <div className="acpt-csv-hint">
+              The registered module controls this tree. Use the local module generator to change sections or subsections, then select the updated module here.
+            </div>
+          ) : (
+            <div className="acpt-csv-hint">
+              CSV format supports <strong>Field Label</strong>, <strong>Section</strong>, <strong>Type</strong>,
+              and <strong>Confidentiality</strong>. Importing replaces the current field builder.
+            </div>
+          )}
 
-          {sectionEditorEntries.map(({ section, depth }, si) => (
-            <div key={section.localId} className={`acpt-section${depth ? " acpt-section-nested" : ""}`}>
+          {sectionEditorEntries.map(({ section, depth, path }, si) => (
+            <div
+              key={section.localId}
+              className={`acpt-section${depth ? " acpt-section-nested" : ""}`}
+              style={{ "--acpt-section-depth": depth }}
+            >
               <div className="acpt-section-head">
                 <button
                   type="button"
@@ -1280,7 +1343,15 @@ function AdminCreatePassportType() {
                   ▾
                 </button>
                 <div className="acpt-section-meta">
-                  <span className="acpt-section-num">{depth ? "Subsection" : "Section"} {si + 1} {section._collapsed && section.fields.length > 0 && <span className="acpt-section-field-count">· {section.fields.length} field{section.fields.length !== 1 ? "s" : ""}</span>}</span>
+                  <span className="acpt-section-num">
+                    {depth ? "Subsection" : "Section"} {si + 1}
+                    <span className="acpt-section-field-count"> · {countSectionFields(section)} field{countSectionFields(section) === 1 ? "" : "s"} in this branch</span>
+                  </span>
+                  {depth > 0 && (
+                    <div className="acpt-section-path" title="Nested section path">
+                      {path.map((item) => item.label?.trim() || item.key || "Untitled section").join(" › ")}
+                    </div>
+                  )}
                   <div className="acpt-section-name-row">
                     <input
                       type="text"
@@ -1288,6 +1359,7 @@ function AdminCreatePassportType() {
                       onChange={e => { updateSection(section.localId, { label: e.target.value }); setError(""); setInvalidFields([]); }}
                       placeholder="Section name, e.g. General"
                       className={`acpt-section-name-input${hasInvalid(section.localId) ? " acpt-input-error" : ""}`}
+                      disabled={structureLocked}
                     />
                     <div className="acpt-section-key-row">
                       <span className="acpt-key-label">key:</span>
@@ -1297,6 +1369,7 @@ function AdminCreatePassportType() {
                         onChange={e => { updateSection(section.localId, { key: e.target.value }); setSectionKeyManual(section.localId); }}
                         className="acpt-key-input acpt-mono"
                         placeholder="sectionKey"
+                        disabled={structureLocked}
                       />
                     </div>
                     <button
@@ -1316,6 +1389,16 @@ function AdminCreatePassportType() {
                         : "Select a semantic model above to enable model-specific dictionary mapping for this passport type."}
                     </span>
                   </div>
+                  {!structureLocked && (
+                    <button
+                      type="button"
+                      className="acpt-add-subsection-btn"
+                      onClick={() => addSubsection(section.localId)}
+                      title="Add a section inside this section"
+                    >
+                      + Add Subsection
+                    </button>
+                  )}
                   {section._i18nOpen && (
                     <div className="acpt-i18n-panel">
                       {transLangs.map(l => (
@@ -1335,9 +1418,9 @@ function AdminCreatePassportType() {
                     </div>
                   )}
                 </div>
-                {sectionEditorEntries.length > 1 && (
+                {!structureLocked && sectionEditorEntries.length > 1 && (
                   <button type="button" className="acpt-remove-btn"
-                    onClick={() => removeSection(section.localId)} title="Remove section">✕</button>
+                    onClick={() => removeSection(section.localId)} title="Remove this section and its whole subtree">✕</button>
                 )}
               </div>
 
@@ -1393,6 +1476,7 @@ function AdminCreatePassportType() {
                           onChange={e => { updateField(section.localId, field.localId, { label: e.target.value }); setError(""); setInvalidFields([]); }}
                           placeholder="Field label, e.g. Manufacturer"
                           className={`acpt-input acpt-field-label-input${hasInvalid(field.localId) ? " acpt-input-error" : ""}`}
+                          disabled={structureLocked}
                         />
                         {field.canonicalLocked && (
                           <div className="acpt-canonical-note">
@@ -1450,7 +1534,7 @@ function AdminCreatePassportType() {
                           className="acpt-move-btn"
                           onClick={() => { moveFieldWithinSection(section.localId, field.localId, "up"); setError(""); setInvalidFields([]); }}
                           title="Move field up"
-                          disabled={fi === 0}
+                          disabled={structureLocked || fi === 0}
                         >
                           ↑
                         </button>
@@ -1459,7 +1543,7 @@ function AdminCreatePassportType() {
                           className="acpt-move-btn"
                           onClick={() => { moveFieldWithinSection(section.localId, field.localId, "down"); setError(""); setInvalidFields([]); }}
                           title="Move field down"
-                          disabled={fi === section.fields.length - 1}
+                          disabled={structureLocked || fi === section.fields.length - 1}
                         >
                           ↓
                         </button>
@@ -1482,13 +1566,14 @@ function AdminCreatePassportType() {
                           menuClassName="acpt-select-menu acpt-select-menu-compact"
                           optionClassName="acpt-select-option"
                           title="Move field to another section"
-                          disabled={sectionMoveOptions.length < 2}
+                          disabled={structureLocked || sectionMoveOptions.length < 2}
                           ariaLabel="Move field to another section"
                         />
                       </div>
 
-                      <button type="button" className="acpt-remove-btn"
+                      {!structureLocked && <button type="button" className="acpt-remove-btn"
                         onClick={() => removeField(section.localId, field.localId)} title="Remove field">✕</button>
+                      }
                     </div>
 
                       <div className="acpt-field-top-row acpt-field-options-grid">
@@ -1853,17 +1938,98 @@ function AdminCreatePassportType() {
                   </div>
                 ))}
 
-                <button type="button" className="acpt-add-field-btn"
-                  onClick={() => addField(section.localId)}>
-                  + Add Field
-                </button>
+                {!structureLocked && (
+                  <button type="button" className="acpt-add-field-btn"
+                    onClick={() => addField(section.localId)}>
+                    + Add Field
+                  </button>
+                )}
               </div>}
             </div>
           ))}
 
-          <button type="button" className="acpt-add-section-btn" onClick={addSection}>
-            + Add Section
-          </button>
+          {!structureLocked && (
+            <button type="button" className="acpt-add-section-btn" onClick={addSection}>
+              + Add Section
+            </button>
+          )}
+        </div>
+
+        <div className="acpt-card acpt-schema-review-card">
+          <div className="acpt-builder-header">
+            <div>
+              <h3 className="acpt-card-title">Schema Review</h3>
+              <p className="acpt-builder-hint">
+                Review the exact hierarchy, field paths, and module match before saving. The server repeats these checks before it accepts the type.
+              </p>
+            </div>
+            <span className={`acpt-schema-review-status${schemaReview.valid ? " valid" : " invalid"}`}>
+              {schemaReview.valid ? "✓ Ready to save" : "Needs attention"}
+            </span>
+          </div>
+
+          <div className="acpt-schema-review-summary" aria-live="polite">
+            <span>{schemaReview.sectionCount} section{schemaReview.sectionCount === 1 ? "" : "s"}</span>
+            <span>{schemaReview.fieldCount} field{schemaReview.fieldCount === 1 ? "" : "s"}</span>
+            <span>{schemaReview.sectionCount ? `${schemaReview.maxDepth + 1} level${schemaReview.maxDepth === 0 ? "" : "s"}` : "No levels"}</span>
+            <span>{systemHeaderEntries.length} header mapping{systemHeaderEntries.length === 1 ? "" : "s"}</span>
+            {schemaReview.moduleChecked && <span>Module structure checked</span>}
+          </div>
+
+          {!schemaReview.valid && (
+            <div className="alert alert-error acpt-schema-review-issues" role="alert">
+              <strong>Fix these before saving:</strong>
+              <ul>
+                {schemaReview.errors.map((reviewIssue, index) => (
+                  <li key={`${reviewIssue.code}-${reviewIssue.sectionId || reviewIssue.fieldId || index}`}>
+                    {reviewIssue.message}
+                    {reviewIssue.pathLabel && <span className="acpt-schema-review-path"> ({reviewIssue.pathLabel})</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {schemaReview.warnings.length > 0 && (
+            <div className="alert alert-info acpt-schema-review-issues">
+              <ul>
+                {schemaReview.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+              </ul>
+            </div>
+          )}
+
+          <details className="acpt-schema-review-details" open>
+            <summary>Schema tree and field paths</summary>
+            <div className="acpt-schema-review-tree" role="tree" aria-label="Passport type schema tree">
+              {schemaReview.sectionEntries.map((entry) => {
+                const directFields = Array.isArray(entry.section.fields) ? entry.section.fields : [];
+                return (
+                  <div
+                    key={`${entry.path.map((pathEntry) => pathEntry.key).join("/")}-${entry.index}`}
+                    className="acpt-schema-review-section"
+                    style={{ "--acpt-review-depth": entry.depth }}
+                    role="treeitem"
+                    aria-level={entry.depth + 1}
+                  >
+                    <div className="acpt-schema-review-section-title">
+                      <strong>{entry.pathLabel}</strong>
+                      <code>{entry.section.key || "missing-key"}</code>
+                      <span>{directFields.length} direct field{directFields.length === 1 ? "" : "s"}</span>
+                    </div>
+                    {directFields.map((field) => (
+                      <div key={`${entry.section.localId || entry.section.key}-${field.localId || field.key}`} className="acpt-schema-review-field">
+                        <span>{field.label || "Unnamed field"}</span>
+                        <code>{field.key || "missing-key"}</code>
+                        <span>{field.type || "text"}</span>
+                        <span>{field.confidentiality || "public"}</span>
+                        <span className="acpt-schema-review-semantic">{field.semanticId || "No semantic ID"}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </details>
         </div>
 
         {/* ── Actions ── */}

@@ -267,6 +267,44 @@
 
 [data-theme="light"] .section-content { background: #ffffff; }
 
+/* Nested schema sections retain their hierarchy in passport forms. */
+.pf-schema-section-node {
+  min-width: 0;
+}
+
+.pf-schema-section-heading {
+  margin: 20px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 7px;
+  background: rgba(13, 181, 176, 0.06);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pf-schema-section-children {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+.pf-schema-section-depth-2 .pf-schema-section-heading,
+.pf-schema-section-depth-3 .pf-schema-section-heading {
+  background: rgba(13, 181, 176, 0.035);
+  font-size: 12px;
+}
+
+[data-theme="light"] .pf-schema-section-heading {
+  background: #f0faf6;
+  border-color: rgba(28, 55, 56, 0.18);
+  border-left-color: var(--accent);
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
@@ -884,6 +922,7 @@
   .edit-session-status     { align-self: flex-start; }
   .passport-identity-row   { grid-template-columns: 1fr; }
   .form-grid               { grid-template-columns: 1fr; gap: 10px; }
+  .pf-schema-section-children { padding-left: 10px; }
   .form-actions            { flex-direction: column; }
   .cancel-btn, .submit-btn { width: 100%; }
   .back-btn                { position: static; transform: none; margin-bottom: 10px; display: block; width: fit-content; }

@@ -20,6 +20,9 @@ const {
   __dirname,
   "../../apps/backend-api/src/shared/passports/passport-helpers"
 ));
+const {
+  getSectionTreeLimitError,
+} = require("./schema-limits");
 
 const port = Number.parseInt(process.env.PORT || "5055", 10);
 const appDir = __dirname;
@@ -308,16 +311,19 @@ function getSectionChildren(section) {
 }
 
 function assertCanonicalSections(sections = []) {
-  const visit = (sectionList) => {
-    for (const section of Array.isArray(sectionList) ? sectionList : []) {
-      if (!section || typeof section !== "object") continue;
-      if (Object.prototype.hasOwnProperty.call(section, "groups")) {
-        throw new Error('Passport module sections must use "sections"; the retired "groups" property is not supported.');
-      }
-      visit(section.sections);
+  const pending = Array.isArray(sections) ? [...sections] : [];
+  while (pending.length) {
+    const section = pending.pop();
+    if (!section || typeof section !== "object") continue;
+    if (Object.prototype.hasOwnProperty.call(section, "groups")) {
+      throw new Error('Passport module sections must use "sections"; the retired "groups" property is not supported.');
     }
-  };
-  visit(sections);
+    if (Array.isArray(section.sections)) {
+      for (let index = section.sections.length - 1; index >= 0; index -= 1) {
+        pending.push(section.sections[index]);
+      }
+    }
+  }
 }
 
 function flattenDraftSections(sections = []) {
@@ -759,6 +765,8 @@ function validateSpec(input) {
   if (Object.prototype.hasOwnProperty.call(input || {}, "groups")) {
     throw new Error('Passport module sections must use "sections"; the retired "groups" property is not supported.');
   }
+  const sectionTreeLimitError = getSectionTreeLimitError(input?.sections || []);
+  if (sectionTreeLimitError) throw new Error(sectionTreeLimitError);
   assertCanonicalSections(input?.sections || []);
   const module = input.module || {};
   const roles = input.roles || {};
@@ -892,6 +900,8 @@ function validateSpec(input) {
       },
     ];
   }
+  const normalizedSectionTreeLimitError = getSectionTreeLimitError(sections);
+  if (normalizedSectionTreeLimitError) throw new Error(normalizedSectionTreeLimitError);
   const sectionKeys = flattenDraftSections(sections).map((section) => section.key);
   const duplicateSection = sectionKeys.find((key, index) => sectionKeys.indexOf(key) !== index);
   if (duplicateSection) throw new Error(`Duplicate section key: ${duplicateSection}`);

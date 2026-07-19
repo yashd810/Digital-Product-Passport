@@ -126,7 +126,7 @@
             <button type="button" id="importFieldsCsv">Import CSV</button>
           </div>
         </div>
-        <p class="helper-copy">CSV headers match the editable fields below, and auto-filled metadata is omitted. Dropdown imports accept displayed names or stored values. UI type: text, textarea, boolean, date, datetime, url, file, symbol, table. Data type: string, decimal, integer, boolean, date, datetime, uri, array. Date-time rows are normalized to the datetime UI type. File fields use URI semantics. Table fields use array; their individual columns use scalar data types. Confidentiality: public or restricted.</p>
+        <p class="helper-copy">CSV headers match the editable fields below, and auto-filled metadata is omitted. Exports include Section path and Section key path as JSON arrays so nested sections round-trip exactly; keep both paths together and never use a &gt; or / separator. Paths support up to 32 section levels. Older flat CSV files without those two columns still import as top-level sections. Dropdown imports accept displayed names or stored values. UI type: text, textarea, boolean, date, datetime, url, file, symbol, table. Data type: string, decimal, integer, boolean, date, datetime, uri, array. Date-time rows are normalized to the datetime UI type. File fields use URI semantics. Table fields use array; their individual columns use scalar data types. Confidentiality: public or restricted.</p>
         <div class="fields-studio">
           <aside class="fields-explorer" aria-label="Sections and fields navigator">
             <div class="fields-explorer-head">
@@ -697,6 +697,8 @@
       </div>
     </template>
 
+    <script src="/schema-limits.js"></script>
+    <script src="/section-csv-paths.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

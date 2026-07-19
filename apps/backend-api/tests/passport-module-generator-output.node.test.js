@@ -8,6 +8,7 @@ const zlib = require("node:zlib");
 const {
   buildArtifacts,
   buildArtifactsZip,
+  validateSpec,
 } = require("../../../local-tools/passport-module-generator/server");
 
 const generatedPackagePath = "apps/backend-api/passport-modules/example-product-v1";
@@ -143,6 +144,30 @@ test("passport module generator rejects the retired groups schema alias", () => 
   assert.throws(
     () => buildArtifacts(rootAlias),
     /retired "groups" property is not supported/
+  );
+});
+
+test("passport module generator rejects overly deep schemas before normalizing them", () => {
+  const input = createGeneratorInput();
+  let current = input.sections[0];
+  current.fields = [];
+  for (let depth = 2; depth <= 33; depth += 1) {
+    const child = {
+      key: `section${depth}`,
+      label: `Section ${depth}`,
+      fields: [],
+    };
+    current.sections = [child];
+    current = child;
+  }
+  current.fields = [{
+    fieldLabel: "Model Identifier",
+    definition: "Identifies the product model.",
+  }];
+
+  assert.throws(
+    () => validateSpec(input),
+    /at most 32 nested section levels/
   );
 });
 

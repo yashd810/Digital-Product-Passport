@@ -1278,6 +1278,72 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       onChange={e => handleField(field.key,e.target.value)} />;
   };
 
+  const isVisibleSchemaField = (field) => (
+    Boolean(field?.key) &&
+    !reservedSystemFieldKeys.has(field.key) &&
+    shouldShowFieldForTemplateFilter(field)
+  );
+
+  const hasVisibleSchemaSectionContent = (section) => {
+    if (!section || typeof section !== "object") return false;
+    const hasVisibleFields = (Array.isArray(section.fields) ? section.fields : [])
+      .some(isVisibleSchemaField);
+    if (hasVisibleFields) return true;
+    return (Array.isArray(section.sections) ? section.sections : [])
+      .some(hasVisibleSchemaSectionContent);
+  };
+
+  const renderSchemaFields = (fields) => {
+    const visibleFields = (Array.isArray(fields) ? fields : []).filter(isVisibleSchemaField);
+    if (!visibleFields.length) return null;
+
+    return (
+      <div className="form-grid">
+        {visibleFields.map((field) => {
+          const isLocked = mode === "create" && modelDataKeys.has(field.key);
+          const needsInput = isTemplateCreateMode && !isLocked && isFieldUnfilled(field);
+          return (
+            <div key={field.key}
+              className={`form-group${field.type === "textarea" || field.type === "file" || field.rangeKind === "class" ? " full-width" : ""}${isLocked ? " form-group-locked" : ""}${needsInput ? " form-group-needs-input" : ""}`}>
+              {field.type !== "boolean" && (
+                <label htmlFor={field.type === "file" ? `f-${field.key}` : field.key}>
+                  {formatFieldLabelWithUnit(field.label, field)}
+                  {isLocked && <span className="pf-model-badge">📌 Model data</span>}
+                  {needsInput && <span className="pf-required-badge">Needs input</span>}
+                </label>
+              )}
+              {renderField(field)}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderSchemaSectionTree = (section, depth = 0, path = []) => {
+    if (!section || !hasVisibleSchemaSectionContent(section)) return null;
+
+    const childSections = Array.isArray(section.sections) ? section.sections : [];
+    const sectionLabel = section.label || section.name || section.key || "Untitled section";
+    const sectionKey = `${section.key || "section"}-${path.length}`;
+    const sectionPath = [...path, sectionKey];
+    const HeadingTag = depth === 1 ? "h3" : depth === 2 ? "h4" : "h5";
+
+    return (
+      <section key={sectionPath.join("/")} className={`pf-schema-section-node pf-schema-section-depth-${Math.min(depth, 3)}`}>
+        {depth > 0 && <HeadingTag className="pf-schema-section-heading">{sectionLabel}</HeadingTag>}
+        {renderSchemaFields(section.fields)}
+        {childSections.length > 0 && (
+          <div className="pf-schema-section-children">
+            {childSections.map((child, childIndex) =>
+              renderSchemaSectionTree(child, depth + 1, [...sectionPath, String(childIndex)])
+            )}
+          </div>
+        )}
+      </section>
+    );
+  };
+
   const getHeaderDisplayValue = (entry) => {
     const value = entry.sourceType === "managed"
       ? resolveManagedSystemHeaderValue(entry.managedKey, {
@@ -1515,9 +1581,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
             {sectionKeys.map(sk => {
               const section = sections[sk];
               const sectionContentId = `passport-section-${sk}`;
-              const visibleFields = flattenSchemaFieldsFromSections([section])
-                .filter((field) => field?.key && !reservedSystemFieldKeys.has(field.key))
-                .filter(shouldShowFieldForTemplateFilter);
+              const hasVisibleContent = hasVisibleSchemaSectionContent(section);
               return (
                 <div key={sk} className="form-section">
                   <button
@@ -1537,26 +1601,8 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
                           Upload official PDF documents. Stored securely and shown in the passport viewer.
                         </p>
                       )}
-                      {visibleFields.length > 0 ? (
-                      <div className="form-grid">
-                        {visibleFields.map(f => {
-                          const isLocked = mode === "create" && modelDataKeys.has(f.key);
-                          const needsInput = isTemplateCreateMode && !isLocked && isFieldUnfilled(f);
-                          return (
-                            <div key={f.key}
-                              className={`form-group${f.type==="textarea"||f.type==="file"||f.rangeKind==="class"?" full-width":""}${isLocked?" form-group-locked":""}${needsInput ? " form-group-needs-input" : ""}`}>
-                              {f.type !== "boolean" && (
-                                <label htmlFor={f.type==="file" ? `f-${f.key}` : f.key}>
-                                  {formatFieldLabelWithUnit(f.label, f)}
-                                  {isLocked && <span className="pf-model-badge">📌 Model data</span>}
-                                  {needsInput && <span className="pf-required-badge">Needs input</span>}
-                                </label>
-                              )}
-                              {renderField(f)}
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {hasVisibleContent ? (
+                        renderSchemaSectionTree(section, 0, [sk])
                       ) : (
                         <div className="pf-filter-empty-state">
                           No fields in this section match the current filter.

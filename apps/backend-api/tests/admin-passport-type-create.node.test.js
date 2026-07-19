@@ -85,10 +85,18 @@ async function invokeRoute(app, { method = "post", path, body = {}, params = {} 
   return res;
 }
 
-function createMockPool(calls, { registeredTypes = [] } = {}) {
+function createMockPool(calls, { registeredTypes = [], existingTypes = [] } = {}) {
   return {
     async query(sql, params = []) {
       calls.push({ sql, params });
+
+      if (sql.includes('SELECT * FROM "passportTypes" WHERE id = $1')) {
+        return { rows: existingTypes };
+      }
+
+      if (sql.includes('UPDATE "passportTypes" SET')) {
+        return { rows: existingTypes };
+      }
 
       if (sql.includes("INSERT INTO \"passportTypes\"")) {
         const fieldsJson = JSON.parse(params[5]);
@@ -146,6 +154,7 @@ function createModulePreviewFixture(overrides = {}) {
     fieldsJson: {
       sections: [{
         key: "deviceIdentity",
+        label: "Device Identity",
         fields: [{
           key: "modelIdentifier",
           label: "Model Identifier",
@@ -170,10 +179,51 @@ function createModulePreviewFixture(overrides = {}) {
   };
 }
 
-function createCatalogApp({ calls, createdTables, audits, registeredTypes = [], moduleDefinitions = [] }) {
+function createNestedModulePreviewFixture() {
+  const module = createModulePreviewFixture();
+  const field = ({ key, label, sectionKey }) => ({
+    key,
+    label,
+    type: "text",
+    canonicalLocked: true,
+    sourceModuleKey: module.moduleKey,
+    sourceModuleFieldKey: key,
+    semanticId: `https://example.test/dictionary/example-product/v1/terms/${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`,
+    elementIdPath: `${sectionKey}.${key}`,
+    objectType: "SingleValuedDataElement",
+    valueDataType: "String",
+  });
+  module.fieldsJson.sections = [
+    {
+      key: "identity",
+      label: "Identity",
+      fields: [field({ key: "modelIdentifier", label: "Model Identifier", sectionKey: "identity" })],
+    },
+    {
+      key: "composition",
+      label: "Composition",
+      fields: [],
+      sections: [{
+        key: "materials",
+        label: "Materials",
+        fields: [field({ key: "materialName", label: "Material Name", sectionKey: "composition.materials" })],
+      }],
+    },
+  ];
+  return module;
+}
+
+function createCatalogApp({
+  calls,
+  createdTables,
+  audits,
+  registeredTypes = [],
+  existingTypes = [],
+  moduleDefinitions = [],
+}) {
   const app = express();
   registerCatalogRoutes(app, {
-    pool: createMockPool(calls, { registeredTypes }),
+    pool: createMockPool(calls, { registeredTypes, existingTypes }),
     multer,
     authenticateToken: (req, _res, next) => {
       req.user = { userId: 99, role: "superAdmin" };
@@ -273,6 +323,139 @@ test("admin cannot create module passport type when field key differs from seman
   assert.equal(calls.some((call) => call.sql.includes("INSERT INTO \"passportTypes\"")), false);
   assert.deepEqual(createdTables, []);
   assert.equal(audits.length, 0);
+});
+
+test("admin accepts an unchanged nested module schema", async () => {
+  const calls = [];
+  const createdTables = [];
+  const audits = [];
+  const moduleDefinition = createNestedModulePreviewFixture();
+  const app = createCatalogApp({
+    calls,
+    createdTables,
+    audits,
+    moduleDefinitions: [moduleDefinition],
+  });
+
+  const response = await invokeRoute(app, {
+    path: "/api/admin/passport-types",
+    body: {
+      typeName: moduleDefinition.typeName,
+      displayName: moduleDefinition.displayName,
+      productCategory: moduleDefinition.productCategory,
+      productIcon: moduleDefinition.productIcon,
+      semanticModelKey: moduleDefinition.semanticModelKey,
+      sourceModule: moduleDefinition.moduleKey,
+      identity: moduleDefinition.fieldsJson.identity,
+      systemHeader: { section: { label: "Passport Header" } },
+      sections: JSON.parse(JSON.stringify(moduleDefinition.fieldsJson.sections)),
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(createdTables.length, 1);
+  assert.equal(audits.length, 1);
+});
+
+test("admin rejects reparented, reordered, and renamed nested module topology", async () => {
+  const moduleDefinition = createNestedModulePreviewFixture();
+  const createRequest = (sections) => ({
+    typeName: moduleDefinition.typeName,
+    displayName: moduleDefinition.displayName,
+    productCategory: moduleDefinition.productCategory,
+    productIcon: moduleDefinition.productIcon,
+    semanticModelKey: moduleDefinition.semanticModelKey,
+    sourceModule: moduleDefinition.moduleKey,
+    identity: moduleDefinition.fieldsJson.identity,
+    systemHeader: { section: { label: "Passport Header" } },
+    sections,
+  });
+  const createApp = () => createCatalogApp({
+    calls: [],
+    createdTables: [],
+    audits: [],
+    moduleDefinitions: [moduleDefinition],
+  });
+
+  const reparented = JSON.parse(JSON.stringify(moduleDefinition.fieldsJson.sections));
+  reparented[0].fields.push(reparented[1].sections[0].fields.pop());
+  const reparentedResponse = await invokeRoute(createApp(), {
+    path: "/api/admin/passport-types",
+    body: createRequest(reparented),
+  });
+  assert.equal(reparentedResponse.statusCode, 400);
+  assert.equal(
+    reparentedResponse.body.fields.some((issue) => issue.code === "moduleSectionFieldCountMismatch"),
+    true
+  );
+
+  const reordered = JSON.parse(JSON.stringify(moduleDefinition.fieldsJson.sections)).reverse();
+  const reorderedResponse = await invokeRoute(createApp(), {
+    path: "/api/admin/passport-types",
+    body: createRequest(reordered),
+  });
+  assert.equal(reorderedResponse.statusCode, 400);
+  assert.equal(
+    reorderedResponse.body.fields.some((issue) => issue.code === "moduleSectionKeyOrOrderMismatch"),
+    true
+  );
+
+  const renamed = JSON.parse(JSON.stringify(moduleDefinition.fieldsJson.sections));
+  renamed[1].sections[0].label = "Recycled Materials";
+  renamed[1].sections[0].fields[0].label = "Material Description";
+  const renamedResponse = await invokeRoute(createApp(), {
+    path: "/api/admin/passport-types",
+    body: createRequest(renamed),
+  });
+  assert.equal(renamedResponse.statusCode, 400);
+  assert.equal(
+    renamedResponse.body.fields.some((issue) => issue.code === "moduleSectionLabelMismatch"),
+    true
+  );
+  assert.equal(
+    renamedResponse.body.fields.some((issue) => issue.code === "moduleFieldLabelMismatch"),
+    true
+  );
+});
+
+test("metadata-only edits remain compatible with earlier module-backed schemas", async () => {
+  const calls = [];
+  const createdTables = [];
+  const audits = [];
+  const moduleDefinition = createNestedModulePreviewFixture();
+  const earlierSections = JSON.parse(JSON.stringify(moduleDefinition.fieldsJson.sections));
+  earlierSections[1].sections[0].label = "Earlier Materials Label";
+  const existingType = {
+    id: 501,
+    typeName: moduleDefinition.typeName,
+    displayName: moduleDefinition.displayName,
+    productCategory: moduleDefinition.productCategory,
+    productIcon: moduleDefinition.productIcon,
+    semanticModelKey: moduleDefinition.semanticModelKey,
+    fieldsJson: {
+      sourceModule: moduleDefinition.moduleKey,
+      identity: moduleDefinition.fieldsJson.identity,
+      sections: earlierSections,
+    },
+  };
+  const app = createCatalogApp({
+    calls,
+    createdTables,
+    audits,
+    existingTypes: [existingType],
+    moduleDefinitions: [moduleDefinition],
+  });
+
+  const response = await invokeRoute(app, {
+    method: "patch",
+    path: "/api/admin/passport-types/:id",
+    params: { id: "501" },
+    body: { displayName: "Updated display name" },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(createdTables.length, 0);
+  assert.equal(calls.some((call) => call.sql.includes('UPDATE "passportTypes" SET')), true);
 });
 
 test("admin can preview registered passport type modules before seeding", async () => {

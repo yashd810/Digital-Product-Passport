@@ -60,10 +60,12 @@ function AdminPassportTypeFields() {
   const sectionCount = countSchemaSections(sections);
   const renderSection = (section, depth = 0, path = []) => {
     const sectionKey = [...path, section.key || section.label || depth].join(".");
+    const sectionPath = [...path, section.label || section.key || `Section ${depth + 1}`];
     const childSections = section.sections || [];
     return (
       <div key={sectionKey} className={`apt-fv-section apt-fv-section-spaced apt-fv-section-depth-${Math.min(depth, 3)}`}>
         <div className="apt-fv-section-title apt-fv-section-title-strong">{section.label}</div>
+        <div className="apt-fv-section-path">{sectionPath.join(" › ")}</div>
         {(section.fields || []).length > 0 && (
           <table className="apt-fv-table apt-fv-table-full apt-fv-table-custom">
             <caption className="apt-sr-only">
@@ -90,7 +92,7 @@ function AdminPassportTypeFields() {
           </table>
         )}
         {childSections.map((child, childIndex) => (
-          renderSection(child, depth + 1, [...path, section.key || section.label || childIndex])
+          renderSection(child, depth + 1, [...path, section.label || section.key || childIndex])
         ))}
       </div>
     );

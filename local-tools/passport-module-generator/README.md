@@ -58,6 +58,17 @@ only that item, while section and field creation remain available in the fixed
 left pane. Auto-filled field and column metadata stays serialized even while its
 details group is closed.
 
+The Part 2 fields CSV preserves nested sections. Exports include **Section
+path** and **Section key path** cells as JSON string arrays, for example
+`["Product identity", "Materials"]` and `["productIdentity", "materials"]`.
+Keep both cells together: they make the hierarchy and every canonical section
+key explicit, so the same file can be exported and imported without flattening
+or guessing. Do not replace the arrays with `>` or `/` separators. Older CSV
+files that have only **Section label** remain supported and import as flat,
+top-level sections. Paths are capped at 32 levels, matching the runtime schema
+guardrail. Ambiguous paths, mismatched final labels, invalid keys, and reused
+section keys are rejected before the generator changes the draft.
+
 Classes and properties can be linked directly to the sections, fields, tables,
 and table columns defined in Part 2. A section link creates the class and its
 field properties; table fields create nested entry classes whose properties

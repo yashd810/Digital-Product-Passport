@@ -1,6 +1,7 @@
 "use strict";
 
 const { canonicalKeyFromSemanticId } = require("../../shared/passports/canonical-field-keys");
+const { getModuleTopologyIssues } = require("./passport-module-topology");
 
 const path = require("path");
 const logger = require("../../services/logger");
@@ -91,6 +92,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
     sections,
     identity = null,
     semanticGraph = null,
+    enforceModuleTopology = true,
   }) => {
     const moduleDefinition = getModuleDefinitionByKey(sourceModule);
     if (!moduleDefinition) {
@@ -114,6 +116,12 @@ module.exports = function registerCatalogRoutes(app, deps) {
     }
 
     const issues = [];
+    if (enforceModuleTopology) {
+      issues.push(...getModuleTopologyIssues({
+        canonicalSections: moduleDefinition.fieldsJson?.sections || [],
+        submittedSections: sections || [],
+      }));
+    }
     const canonicalSemanticGraph = moduleDefinition.fieldsJson?.semanticGraph || null;
     if (JSON.stringify(semanticGraph || null) !== JSON.stringify(canonicalSemanticGraph)) {
       issues.push({
@@ -490,12 +498,25 @@ module.exports = function registerCatalogRoutes(app, deps) {
       const values = [];
       let index = 1;
 
+      if (sections !== undefined) {
+        const sectionValidationError = validatePassportTypeSections(sections);
+        if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
+        const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections);
+        if (reservedFieldConflicts.length) {
+          return res.status(400).json({
+            error: "One or more fields duplicate reserved passport registry/header fields and do not need to be created again.",
+            fields: reservedFieldConflicts,
+          });
+        }
+      }
+
       const moduleValidation = validateModuleBackedPassportType({
         sourceModule: effectiveSourceModule,
         semanticModelKey: effectiveSemanticModelKey,
         sections: effectiveSections,
         identity: effectiveIdentity,
         semanticGraph: effectiveSemanticGraph,
+        enforceModuleTopology: sections !== undefined,
       });
       if (moduleValidation) return res.status(400).json(moduleValidation);
 
@@ -504,15 +525,6 @@ module.exports = function registerCatalogRoutes(app, deps) {
       if (productIcon !== undefined) { updates.push(`"productIcon" = $${index++}`); values.push(productIcon); }
       if (semanticModelKey !== undefined) { updates.push(`"semanticModelKey" = $${index++}`); values.push(semanticModelKey || null); }
       if (sections !== undefined) {
-        const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections);
-        if (reservedFieldConflicts.length) {
-          return res.status(400).json({
-            error: "One or more fields duplicate reserved passport registry/header fields and do not need to be created again.",
-            fields: reservedFieldConflicts
-          });
-        }
-        const sectionValidationError = validatePassportTypeSections(sections);
-        if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
         const schemaChange = buildPassportTypeSchemaChange({
           currentFieldsJson: currentType.fieldsJson || {},
           nextSections: sections,
@@ -627,16 +639,16 @@ module.exports = function registerCatalogRoutes(app, deps) {
         });
       }
 
+      const sectionValidationError = validatePassportTypeSections(sections);
+      if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
+
       const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections);
       if (reservedFieldConflicts.length) {
         return res.status(400).json({
           error: "One or more fields duplicate reserved passport registry/header fields and do not need to be created again.",
-          fields: reservedFieldConflicts
+          fields: reservedFieldConflicts,
         });
       }
-
-      const sectionValidationError = validatePassportTypeSections(sections);
-      if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
 
       const moduleValidation = validateModuleBackedPassportType({
         sourceModule,

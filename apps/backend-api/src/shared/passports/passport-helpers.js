@@ -142,24 +142,36 @@ const assertCanonicalSchemaSections = (sectionsOrSchema = []) => {
     throw new Error('Passport schemas must use "sections"; the retired "groups" property is not supported.');
   }
   const sections = Array.isArray(sectionsOrSchema) ? sectionsOrSchema : schema?.sections;
-  const visit = (sectionList) => {
-    for (const section of Array.isArray(sectionList) ? sectionList : []) {
-      if (!section || typeof section !== "object") continue;
-      if (Object.prototype.hasOwnProperty.call(section, "groups")) {
-        throw new Error('Passport schemas must use "sections"; the retired "groups" property is not supported.');
-      }
-      visit(section.sections);
+  // Schema sections are request-controlled data. Keep this check iterative so
+  // an excessively nested request cannot exhaust the JavaScript call stack
+  // before the route-level size/depth guards return a useful validation error.
+  const pending = Array.isArray(sections) ? [...sections] : [];
+  while (pending.length) {
+    const section = pending.pop();
+    if (!section || typeof section !== "object") continue;
+    if (Object.prototype.hasOwnProperty.call(section, "groups")) {
+      throw new Error('Passport schemas must use "sections"; the retired "groups" property is not supported.');
     }
-  };
-  visit(sections);
+    if (Array.isArray(section.sections)) {
+      for (let index = section.sections.length - 1; index >= 0; index -= 1) {
+        pending.push(section.sections[index]);
+      }
+    }
+  }
 };
 
 const walkSchemaSections = (sections = [], visitor, parentPath = []) => {
   if (!Array.isArray(sections) || typeof visitor !== "function") return;
-  sections.forEach((section, index) => {
-    if (!section || typeof section !== "object") return;
+  // Use an explicit stack rather than recursion. Route validators bound
+  // untrusted schemas, but this helper is also used when reading stored data.
+  const pending = sections
+    .map((section, index) => ({ section, index, parentPath }))
+    .reverse();
+  while (pending.length) {
+    const { section, index, parentPath: currentParentPath } = pending.pop();
+    if (!section || typeof section !== "object") continue;
     const sectionPath = [
-      ...parentPath,
+      ...currentParentPath,
       {
         key: section.key || "",
         label: section.label || section.name || section.key || `Section ${index + 1}`,
@@ -168,8 +180,15 @@ const walkSchemaSections = (sections = [], visitor, parentPath = []) => {
       },
     ];
     visitor(section, sectionPath);
-    walkSchemaSections(getSectionChildren(section), visitor, sectionPath);
-  });
+    const childSections = getSectionChildren(section);
+    for (let childIndex = childSections.length - 1; childIndex >= 0; childIndex -= 1) {
+      pending.push({
+        section: childSections[childIndex],
+        index: childIndex,
+        parentPath: sectionPath,
+      });
+    }
+  }
 };
 
 const flattenSchemaFieldsFromSections = (sections = []) => {

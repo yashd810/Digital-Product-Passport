@@ -2,6 +2,23 @@
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const schemaLimits = globalThis.PassportModuleSchemaLimits;
+if (!schemaLimits) {
+  throw new Error("The passport module schema limits helper did not load.");
+}
+const {
+  getSectionTreeLimitError,
+  passportModuleSchemaLimits,
+} = schemaLimits;
+const sectionCsvPaths = globalThis.PassportModuleSectionCsvPaths;
+if (!sectionCsvPaths) {
+  throw new Error("The section CSV path helper did not load.");
+}
+const {
+  buildSectionPathCells,
+  convertRowsToNestedSections,
+  normalizeSectionPathRow,
+} = sectionCsvPaths;
 
 const headerSlotDefinitions = [
   { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
@@ -234,6 +251,8 @@ const sample = {
 
 const fieldsCsvColumns = [
   "sectionLabel",
+  "sectionPath",
+  "sectionKeyPath",
   "fieldLabel",
   "fieldType",
   "definition",
@@ -249,6 +268,8 @@ const fieldsCsvColumns = [
 const fieldsCsvColumnLabels = {
   fieldLabel: "Label",
   sectionLabel: "Section label",
+  sectionPath: "Section path",
+  sectionKeyPath: "Section key path",
   fieldType: "UI type",
   definition: "Definition",
   dataType: "Data type",
@@ -265,6 +286,8 @@ const fieldsCsvColumnLabels = {
 const fieldsCsvColumnAliases = {
   fieldLabel: ["Field label", "Field name"],
   sectionLabel: ["Section"],
+  sectionPath: ["Section labels path"],
+  sectionKeyPath: ["Section keys path"],
   fieldType: ["Type", "Field type"],
   dataType: ["JSON type"],
   objectType: ["Object type", "Schema object type"],
@@ -342,7 +365,7 @@ const tableColumnCsvPropertyNameAliases = buildCsvColumnAliases(tableColumnCsvPr
 const draftStorageKey = "passport-module-generator:draft:v1";
 const sessionStorageKey = "passport-module-generator:session:v1";
 const maxFieldsCsvBytes = 2 * 1024 * 1024;
-const maxFieldsCsvRows = 5000;
+const maxFieldsCsvRows = passportModuleSchemaLimits.maxFields;
 let sessionSaveTimer = null;
 let syncingGraphSources = false;
 let graphSourceSyncTimer = null;
@@ -902,16 +925,27 @@ function revealSectionPath(sectionNode) {
 }
 
 function getSectionFieldCount(sectionNode) {
-  return getDirectFieldRows(sectionNode).length
-    + getDirectChildSections(sectionNode).reduce((total, child) => total + getSectionFieldCount(child), 0);
+  let count = 0;
+  const pending = [sectionNode];
+  while (pending.length) {
+    const current = pending.pop();
+    count += getDirectFieldRows(current).length;
+    getDirectChildSections(current).forEach((child) => pending.push(child));
+  }
+  return count;
 }
 
 function getSectionNodesDepthFirst(sectionNodes = getTopLevelSectionNodes()) {
   const nodes = [];
-  sectionNodes.forEach((sectionNode) => {
+  const pending = [...sectionNodes].reverse();
+  while (pending.length) {
+    const sectionNode = pending.pop();
     nodes.push(sectionNode);
-    nodes.push(...getSectionNodesDepthFirst(getDirectChildSections(sectionNode)));
-  });
+    getDirectChildSections(sectionNode)
+      .slice()
+      .reverse()
+      .forEach((child) => pending.push(child));
+  }
   return nodes;
 }
 
@@ -1387,23 +1421,35 @@ function serializeEditableTableColumns(columns = []) {
 
 function getFieldsCsvRowsFromSpec(spec = readSpec()) {
   const rows = [];
-  const visitSection = (section) => {
+  const visitSection = (section, parentLabels = [], parentKeys = []) => {
+    const sectionLabel = String(section.label || "").trim();
+    const sectionKey = String(section.key || "").trim() || camelCaseFromWords(sectionLabel);
+    const sectionPathCells = buildSectionPathCells({
+      labels: [...parentLabels, sectionLabel],
+      keys: [...parentKeys, sectionKey],
+      deriveSectionKey: camelCaseFromWords,
+    });
     (section.fields || []).forEach((field) => {
       rows.push({
-      fieldLabel: field.fieldLabel || "",
-      sectionLabel: section.label || "",
-      fieldType: field.fieldType || "text",
-      definition: field.definition || "",
-      dataType: field.dataType || defaultDataTypeForFieldType(field.fieldType || "text"),
-      unitLabel: field.unitLabel || "",
-      unitSymbol: field.unitSymbol || "",
-      confidentiality: field.confidentiality || "public",
-      queryable: field.queryable ? "true" : "false",
-      indexed: field.indexed ? "true" : "false",
-      tableColumns: field.fieldType === "table" ? serializeEditableTableColumns(field.tableColumns || []) : "",
+        fieldLabel: field.fieldLabel || "",
+        sectionLabel,
+        ...sectionPathCells,
+        fieldType: field.fieldType || "text",
+        definition: field.definition || "",
+        dataType: field.dataType || defaultDataTypeForFieldType(field.fieldType || "text"),
+        unitLabel: field.unitLabel || "",
+        unitSymbol: field.unitSymbol || "",
+        confidentiality: field.confidentiality || "public",
+        queryable: field.queryable ? "true" : "false",
+        indexed: field.indexed ? "true" : "false",
+        tableColumns: field.fieldType === "table" ? serializeEditableTableColumns(field.tableColumns || []) : "",
       });
     });
-    (section.sections || []).forEach(visitSection);
+    (section.sections || []).forEach((child) => visitSection(
+      child,
+      [...parentLabels, sectionLabel],
+      [...parentKeys, sectionKey]
+    ));
   };
   (spec.sections || []).forEach(visitSection);
   return rows;
@@ -1473,6 +1519,13 @@ function readFieldsCsvRows(text) {
       skippedRowCount += 1;
       continue;
     }
+    const normalizedSectionPath = normalizeSectionPathRow({
+      sectionLabel,
+      sectionPath: entry.sectionPath,
+      sectionKeyPath: entry.sectionKeyPath,
+      rowNumber,
+      deriveSectionKey: camelCaseFromWords,
+    });
     let fieldType = normalizeCsvOption(
       entry.fieldType,
       fieldTypeOptions,
@@ -1514,7 +1567,10 @@ function readFieldsCsvRows(text) {
     tableColumns = normalizeCsvTableColumns(tableColumns, rowNumber);
 
     parsedRows.push({
-      sectionLabel,
+      rowNumber,
+      sectionLabel: normalizedSectionPath.sectionLabel,
+      sectionPath: normalizedSectionPath.sectionPath,
+      sectionKeyPath: normalizedSectionPath.sectionKeyPath,
       field: {
         fieldLabel,
         fieldType,
@@ -1544,22 +1600,7 @@ function readFieldsCsvRows(text) {
 }
 
 function convertFieldsCsvRowsToSections(rows = []) {
-  const sectionsByKey = new Map();
-
-  for (const row of rows) {
-    const sectionLabel = row.sectionLabel;
-    const sectionKey = camelCaseFromWords(sectionLabel);
-    if (!sectionsByKey.has(sectionKey)) {
-      sectionsByKey.set(sectionKey, {
-        key: sectionKey,
-        label: sectionLabel,
-        fields: [],
-      });
-    }
-    sectionsByKey.get(sectionKey).fields.push(row.field);
-  }
-
-  return [...sectionsByKey.values()];
+  return convertRowsToNestedSections(rows);
 }
 
 function camelCaseFromWords(value) {
@@ -2136,6 +2177,49 @@ function syncTableConfigVisibility(row) {
   syncRoleOptions();
 }
 
+function getSectionNodeDepth(sectionNode) {
+  let depth = 0;
+  let current = sectionNode;
+  while (current?.matches?.(".section-card")) {
+    depth += 1;
+    current = current.parentElement?.closest(".section-card") || null;
+  }
+  return depth;
+}
+
+function canAddManualSection(parentSection, { addBlankField = true } = {}) {
+  if ($$(".section-card").length >= passportModuleSchemaLimits.maxSections) {
+    setMessage(`A passport module supports at most ${passportModuleSchemaLimits.maxSections} sections.`, "error");
+    return false;
+  }
+  const nextDepth = parentSection ? getSectionNodeDepth(parentSection) + 1 : 1;
+  if (nextDepth > passportModuleSchemaLimits.maxDepth) {
+    setMessage(
+      `A passport module supports at most ${passportModuleSchemaLimits.maxDepth} nested section levels.`,
+      "error"
+    );
+    return false;
+  }
+  if (addBlankField && $$(".field-row").length >= passportModuleSchemaLimits.maxFields) {
+    setMessage(`A passport module supports at most ${passportModuleSchemaLimits.maxFields} fields.`, "error");
+    return false;
+  }
+  return true;
+}
+
+function addManualSection(data = {}, options = {}) {
+  if (!canAddManualSection(options.parentSection, options)) return null;
+  return addSection(data, options);
+}
+
+function addManualField(sectionNode, data = {}, options = {}) {
+  if ($$(".field-row").length >= passportModuleSchemaLimits.maxFields) {
+    setMessage(`A passport module supports at most ${passportModuleSchemaLimits.maxFields} fields.`, "error");
+    return null;
+  }
+  return addField(sectionNode, data, options);
+}
+
 function addSection(data = {}, { afterSection = null, parentSection = null, addBlankField = true } = {}) {
   const template = $("#sectionTemplate");
   const node = template.content.firstElementChild.cloneNode(true);
@@ -2145,10 +2229,10 @@ function addSection(data = {}, { afterSection = null, parentSection = null, addB
   if (data.label) getSectionLabelInput(node).dataset.manual = "true";
   $("[data-add-field]", node).addEventListener("click", () => {
     const firstField = getDirectFieldRows(node)[0] || null;
-    focusFieldsElement(addField(node, {}, { beforeField: firstField }));
+    focusFieldsElement(addManualField(node, {}, { beforeField: firstField }));
   });
   $("[data-add-subsection]", node).addEventListener("click", () => {
-    focusFieldsElement(addSection({}, { parentSection: node, addBlankField: false }));
+    focusFieldsElement(addManualSection({}, { parentSection: node, addBlankField: false }));
   });
   getSectionLabelInput(node).addEventListener("input", renderFieldsExplorer);
   getSectionKeyInput(node).addEventListener("input", renderFieldsExplorer);
@@ -3904,16 +3988,17 @@ function assertCanonicalSectionsSpec(spec = {}) {
   if (Object.prototype.hasOwnProperty.call(spec, "groups")) {
     throw new Error('Passport module sections must use "sections"; the retired "groups" property is not supported.');
   }
-  const visit = (sections) => {
-    for (const section of Array.isArray(sections) ? sections : []) {
-      if (!section || typeof section !== "object") continue;
-      if (Object.prototype.hasOwnProperty.call(section, "groups")) {
-        throw new Error('Passport module sections must use "sections"; the retired "groups" property is not supported.');
-      }
-      visit(section.sections);
+  const pending = Array.isArray(spec.sections) ? [...spec.sections] : [];
+  while (pending.length) {
+    const section = pending.pop();
+    if (!section || typeof section !== "object") continue;
+    if (Object.prototype.hasOwnProperty.call(section, "groups")) {
+      throw new Error('Passport module sections must use "sections"; the retired "groups" property is not supported.');
     }
-  };
-  visit(spec.sections);
+    if (Array.isArray(section.sections)) {
+      section.sections.forEach((child) => pending.push(child));
+    }
+  }
 }
 
 function hydrateSectionDefaults(section, objectTypes = {}, valueDataTypes = {}) {
@@ -3968,6 +4053,8 @@ function readSpec() {
 }
 
 function loadSpec(spec) {
+  const sectionLimitsError = getSectionTreeLimitError(spec?.sections || []);
+  if (sectionLimitsError) throw new Error(sectionLimitsError);
   assertCanonicalSectionsSpec(spec);
   preservedRoleState = {
     ...(spec.roles || {}),
@@ -4136,6 +4223,8 @@ function downloadFieldsCsvTemplate() {
     {
       fieldLabel: "Manufacturer Name",
       sectionLabel: "Product Identity",
+      sectionPath: JSON.stringify(["Product Identity"]),
+      sectionKeyPath: JSON.stringify(["productIdentity"]),
       fieldType: "text",
       definition: "Name of the manufacturer responsible for placing the product on the market.",
       dataType: "string",
@@ -4148,7 +4237,9 @@ function downloadFieldsCsvTemplate() {
     },
     {
       fieldLabel: "Material Composition",
-      sectionLabel: "Material Data",
+      sectionLabel: "Composition",
+      sectionPath: JSON.stringify(["Material Data", "Composition"]),
+      sectionKeyPath: JSON.stringify(["materialData", "composition"]),
       fieldType: "table",
       definition: "Lists the component materials used in the product.",
       dataType: "array",
@@ -4178,13 +4269,17 @@ function downloadFieldsCsvTemplate() {
 }
 
 function exportFieldsCsv() {
-  const rows = getFieldsCsvRowsFromSpec();
-  if (!rows.length) {
-    setMessage("Add at least one field before exporting CSV.", "error");
-    return;
+  try {
+    const rows = getFieldsCsvRowsFromSpec();
+    if (!rows.length) {
+      setMessage("Add at least one field before exporting CSV.", "error");
+      return;
+    }
+    downloadTextFile("passport-module-fields.csv", buildFieldsCsvContent(rows), "text/csv;charset=utf-8");
+    setMessage(`Exported ${rows.length} field rows to CSV with section paths.`, "success");
+  } catch (error) {
+    setMessage(error.message, "error");
   }
-  downloadTextFile("passport-module-fields.csv", buildFieldsCsvContent(rows), "text/csv;charset=utf-8");
-  setMessage(`Exported ${rows.length} field rows to CSV.`, "success");
 }
 
 async function importFieldsCsvFile(file) {
@@ -4320,7 +4415,7 @@ $("#addSection").addEventListener("click", () => {
     ? selected.element
     : selected?.element.closest(".section-card");
   const parentSection = currentSection?.parentElement?.closest(".section-card") || null;
-  focusFieldsElement(addSection({}, { afterSection: currentSection, parentSection }));
+  focusFieldsElement(addManualSection({}, { afterSection: currentSection, parentSection }));
 });
 $("#addSubsection").addEventListener("click", () => {
   const selected = getSelectedFieldsItem();
@@ -4328,12 +4423,12 @@ $("#addSubsection").addEventListener("click", () => {
     ? selected.element
     : selected?.element.closest(".section-card");
   if (parentSection) {
-    focusFieldsElement(addSection({}, { parentSection, addBlankField: false }));
+    focusFieldsElement(addManualSection({}, { parentSection, addBlankField: false }));
     return;
   }
-  focusFieldsElement(addSection({}, { addBlankField: false }));
+  focusFieldsElement(addManualSection({}, { addBlankField: false }));
 });
-$("#addFirstSection").addEventListener("click", () => focusFieldsElement(addSection()));
+$("#addFirstSection").addEventListener("click", () => focusFieldsElement(addManualSection()));
 $("#addFieldToSelection").addEventListener("click", () => {
   const selected = getSelectedFieldsItem();
   const section = selected?.kind === "section"
@@ -4348,13 +4443,14 @@ $("#addFieldToSelection").addEventListener("click", () => {
     const firstField = selected?.kind === "section"
       ? getDirectFieldRows(section)[0] || null
       : null;
-    focusFieldsElement(addField(section, {}, {
+    focusFieldsElement(addManualField(section, {}, {
       afterField: currentField,
       beforeField: firstField,
     }));
     return;
   }
-  const newSection = addSection();
+  const newSection = addManualSection();
+  if (!newSection) return;
   const field = getDirectFieldRows(newSection)[0] || null;
   focusFieldsElement(field || newSection);
 });

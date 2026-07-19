@@ -6,6 +6,10 @@ import {
   resolveSystemHeaderEntries,
 } from "../admin/passport-types/builderHelpers";
 import {
+  buildNestedSchemaReview,
+  maxNestedSectionDepth,
+} from "../admin/passport-types/nestedSchemaReview";
+import {
   buildSemanticModelOptions,
   deriveSemanticTermDataType,
   formatSemanticModelLabel,
@@ -26,6 +30,91 @@ import {
 } from "../shared/passports/passportSchemaUtils";
 
 describe("frontend modularity helpers", () => {
+  test("nested schema review verifies exact module hierarchy and field paths", () => {
+    const moduleSections = [{
+      key: "identity",
+      label: "Identity",
+      fields: [{ key: "modelIdentifier", label: "Model identifier", type: "text" }],
+      sections: [{
+        key: "materials",
+        label: "Materials",
+        fields: [],
+        sections: [{
+          key: "recycledContent",
+          label: "Recycled content",
+          fields: [{ key: "recycledPercentage", label: "Recycled percentage", type: "text" }],
+        }],
+      }],
+    }];
+    const sections = [{
+      ...moduleSections[0],
+      localId: "identity",
+      fields: [{ ...moduleSections[0].fields[0], localId: "model", sourceModuleFieldKey: "modelIdentifier" }],
+      sections: [{
+        ...moduleSections[0].sections[0],
+        localId: "materials",
+        sections: [{
+          ...moduleSections[0].sections[0].sections[0],
+          localId: "recycled",
+          fields: [{
+            ...moduleSections[0].sections[0].sections[0].fields[0],
+            localId: "percentage",
+            sourceModuleFieldKey: "recycledPercentage",
+          }],
+        }],
+      }],
+    }];
+
+    const review = buildNestedSchemaReview({
+      sections,
+      moduleSections,
+      sourceModuleKey: "batteryModuleV1",
+      systemHeader: { fieldMappings: [{ slotKey: "model", sourceType: "field", fieldKey: "modelIdentifier" }] },
+    });
+
+    expect(review.valid).toBe(true);
+    expect(review.sectionCount).toBe(3);
+    expect(review.fieldEntries.map((entry) => entry.pathLabel)).toEqual([
+      "Identity",
+      "Identity › Materials › Recycled content",
+    ]);
+
+    const reparented = [{
+      ...sections[0],
+      sections: [],
+    }, sections[0].sections[0]];
+    const invalidReview = buildNestedSchemaReview({
+      sections: reparented,
+      moduleSections,
+      sourceModuleKey: "batteryModuleV1",
+    });
+    expect(invalidReview.valid).toBe(false);
+    expect(invalidReview.errors.map((entry) => entry.code)).toContain("moduleSectionCountMismatch");
+
+    const changedType = JSON.parse(JSON.stringify(sections));
+    changedType[0].fields[0].type = "boolean";
+    const changedTypeReview = buildNestedSchemaReview({
+      sections: changedType,
+      moduleSections,
+      sourceModuleKey: "batteryModuleV1",
+    });
+    expect(changedTypeReview.errors.map((entry) => entry.code)).toContain("moduleFieldTypeMismatch");
+  });
+
+  test("nested schema review bounds editor nesting to the server-supported depth", () => {
+    const root = { key: "section1", label: "Section 1", fields: [], sections: [] };
+    let current = root;
+    for (let index = 2; index <= maxNestedSectionDepth + 1; index += 1) {
+      const child = { key: `section${index}`, label: `Section ${index}`, fields: [], sections: [] };
+      current.sections = [child];
+      current = child;
+    }
+    current.fields = [{ key: "leafField", label: "Leaf field", type: "text" }];
+
+    const review = buildNestedSchemaReview({ sections: [root] });
+    expect(review.errors.map((entry) => entry.code)).toContain("sectionDepthExceeded");
+  });
+
   test("system-header entries resolve configured schema fields", () => {
     const entries = resolveSystemHeaderEntries(
       [{
