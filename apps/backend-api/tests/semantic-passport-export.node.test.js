@@ -55,6 +55,137 @@ function createEnergyRatingGraph() {
   };
 }
 
+function createNestedSectionTypeDefinition() {
+  const rootClassIri = "https://example.test/dictionary/custom-product/v3/classes/CustomProductPassport";
+  const performanceClassIri = "https://example.test/dictionary/custom-product/v3/classes/Performance";
+  const statusEnumIri = "https://example.test/dictionary/custom-product/v3/enums/LifecycleStatus";
+  const energyRatingSemanticId = "https://example.test/dictionary/custom-product/v3/terms/performance/energy-rating";
+  const lifecycleStatusSemanticId = "https://example.test/dictionary/custom-product/v3/terms/performance/lifecycle-status";
+  return {
+    typeName: "customProductPassportV3",
+    productCategory: "Custom Product",
+    semanticModelKey: "unregisteredNestedDictionaryV3",
+    fieldsJson: {
+      schemaVersion: 4,
+      sourceModule: "custom-product:v3",
+      moduleDigest: "sha256:module",
+      profileDigest: "sha256:profile",
+      profile: {
+        contractVersion: 1,
+        selectionMode: "explicit",
+        sourceModule: "custom-product:v3",
+        moduleDigest: "sha256:module",
+        profileDigest: "sha256:profile",
+        includedFields: [{ sourceModuleFieldKey: "energyRating" }, { sourceModuleFieldKey: "lifecycleStatus" }],
+      },
+      semanticProfile: {
+        schemaVersion: 1,
+        graphDigest: "sha256:graph",
+      },
+      semanticGraph: {
+        schemaVersion: 1,
+        rootClassKey: "customProductPassport",
+        classes: [
+          {
+            key: "customProductPassport",
+            label: "Custom Product Passport",
+            semanticId: rootClassIri,
+            root: true,
+            properties: [{
+              key: "performance",
+              label: "Performance",
+              semanticId: "https://example.test/dictionary/custom-product/v3/terms/performance",
+              domainClassKey: "customProductPassport",
+              domainClassIri: rootClassIri,
+              rangeKind: "class",
+              rangeClassKey: "performance",
+              relationshipType: "composition",
+              minCount: 0,
+              maxCount: 1,
+            }],
+          },
+          {
+            key: "performance",
+            label: "Performance",
+            semanticId: performanceClassIri,
+            properties: [
+              {
+                key: "energyRating",
+                label: "Energy Rating",
+                semanticId: energyRatingSemanticId,
+                domainClassKey: "performance",
+                domainClassIri: performanceClassIri,
+                rangeKind: "scalar",
+                dataType: "string",
+                minCount: 0,
+                maxCount: 1,
+              },
+              {
+                key: "lifecycleStatus",
+                label: "Lifecycle Status",
+                semanticId: lifecycleStatusSemanticId,
+                domainClassKey: "performance",
+                domainClassIri: performanceClassIri,
+                rangeKind: "enum",
+                rangeEnumKey: "lifecycleStatus",
+                minCount: 0,
+                maxCount: 1,
+              },
+            ],
+          },
+        ],
+        enums: [{
+          key: "lifecycleStatus",
+          label: "Lifecycle Status",
+          semanticId: statusEnumIri,
+          values: [{
+            key: "active",
+            label: "Active",
+            semanticId: `${statusEnumIri}/active`,
+          }],
+        }],
+      },
+      sections: [{
+        key: "performance",
+        label: "Performance",
+        fields: [
+          {
+            key: "energyRating",
+            label: "Energy Rating",
+            type: "text",
+            dataType: "string",
+            objectType: "SingleValuedDataElement",
+            valueDataType: "String",
+            semanticId: energyRatingSemanticId,
+            domainClassKey: "performance",
+            domainClassIri: performanceClassIri,
+            rangeKind: "scalar",
+            rangeIri: "http://www.w3.org/2001/XMLSchema#string",
+            minCount: 0,
+            maxCount: 1,
+          },
+          {
+            key: "lifecycleStatus",
+            label: "Lifecycle Status",
+            type: "select",
+            dataType: "string",
+            objectType: "SingleValuedDataElement",
+            valueDataType: "String",
+            semanticId: lifecycleStatusSemanticId,
+            domainClassKey: "performance",
+            domainClassIri: performanceClassIri,
+            rangeKind: "enum",
+            rangeEnumKey: "lifecycleStatus",
+            rangeIri: statusEnumIri,
+            minCount: 0,
+            maxCount: 1,
+          },
+        ],
+      }],
+    },
+  };
+}
+
 function createRegistryWithCustomDictionary() {
   const packagesDir = fs.mkdtempSync(path.join(os.tmpdir(), "semantic-export-models-"));
   const modelDir = path.join(packagesDir, "custom-product-v3");
@@ -184,7 +315,11 @@ test("semantic export supports arbitrary registered semantic models without cate
 
   try {
     const context = buildPassportJsonLdContext(typeDef);
-    assert.ok(context.includes("/dictionary/custom-product/v3/context.jsonld"));
+    assert.equal(context.includes("/dictionary/custom-product/v3/context.jsonld"), false);
+    assert.equal(
+      context.find((entry) => entry && typeof entry === "object" && entry.energyRating)?.energyRating?.["@id"],
+      "https://example.test/dictionary/custom-product/v3/terms/energy-rating"
+    );
 
     const exported = buildPassportJsonLdExport([
       {
@@ -200,9 +335,73 @@ test("semantic export supports arbitrary registered semantic models without cate
 
     assert.equal(exported.passportType, "customProductPassportV3");
     assert.equal(exported.semanticModel?.semanticModelKey, "customProductDictionaryV3");
-    assert.ok(exported["@context"].includes("/dictionary/custom-product/v3/context.jsonld"));
+    assert.equal(exported["@context"].includes("/dictionary/custom-product/v3/context.jsonld"), false);
+    assert.equal(
+      exported.semanticModel.contextUrl,
+      "/dictionary/custom-product/v3/context.jsonld"
+    );
     assert.equal(exported["@graph"][0].energyRating, "A");
   } finally {
     cleanup();
   }
+});
+
+test("semantic export uses immediate owner metadata for flat nested-section fields", () => {
+  const { buildPassportJsonLdContext, buildPassportJsonLdExport } = createExportService();
+  const typeDef = createNestedSectionTypeDefinition();
+  const context = buildPassportJsonLdContext(typeDef);
+  const inlineContext = context.find((entry) => (
+    entry && typeof entry === "object" && entry.energyRating
+  ));
+
+  assert.equal(
+    inlineContext.energyRating["@id"],
+    "https://example.test/dictionary/custom-product/v3/terms/performance/energy-rating"
+  );
+  assert.equal(
+    inlineContext.lifecycleStatus["@id"],
+    "https://example.test/dictionary/custom-product/v3/terms/performance/lifecycle-status"
+  );
+  assert.equal(inlineContext.lifecycleStatus["@type"], "@id");
+  assert.equal(
+    inlineContext.performance["@context"].energyRating["@id"],
+    inlineContext.energyRating["@id"]
+  );
+
+  const exported = buildPassportJsonLdExport([{
+    dppId: "dpp-nested-1",
+    passportType: "customProductPassportV3",
+    energyRating: "A",
+    excludedLegacyField: "must not leak",
+    fields: {
+      lifecycleStatus: "active",
+      excludedLegacyField: "must not leak",
+    },
+  }], "customProductPassportV3", { typeDef });
+
+  assert.equal(exported["@graph"][0].energyRating, "A");
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(exported["@graph"][0], "excludedLegacyField"),
+    false
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(exported["@graph"][0].fields, "excludedLegacyField"),
+    false
+  );
+  assert.deepEqual(exported["@graph"][0].fields.lifecycleStatus, {
+    "@id": "https://example.test/dictionary/custom-product/v3/enums/LifecycleStatus/active",
+  });
+  assert.deepEqual(exported.semanticProfile, {
+    typeName: "customProductPassportV3",
+    semanticModelKey: "unregisteredNestedDictionaryV3",
+    sourceModule: "custom-product:v3",
+    schemaVersion: 4,
+    profileDigest: "sha256:profile",
+    moduleDigest: "sha256:module",
+    graphDigest: "sha256:graph",
+    contractVersion: 1,
+    selectionMode: "explicit",
+    includedFieldCount: 2,
+    profilePath: "/api/passport-types/customProductPassportV3/semantic-profile",
+  });
 });

@@ -6,7 +6,11 @@ import {
   resolveSystemHeaderEntries,
 } from "../admin/passport-types/builderHelpers";
 import {
+  serializeCompositionMetadata,
+} from "../admin/passport-types/AdminCreatePassportTypeHelpers";
+import {
   buildNestedSchemaReview,
+  getSectionTreeEntries,
   maxNestedSectionDepth,
 } from "../admin/passport-types/nestedSchemaReview";
 import {
@@ -30,6 +34,30 @@ import {
 } from "../shared/passports/passportSchemaUtils";
 
 describe("frontend modularity helpers", () => {
+  test("admin serialization keeps generated semantic composition mappings", () => {
+    const generatedCompositionField = {
+      key: "materialComposition",
+      type: "objectList",
+      composition: true,
+      compositionLabelColumnKey: "materialName",
+      compositionValueColumnKey: "massPercent",
+    };
+
+    expect(serializeCompositionMetadata(generatedCompositionField)).toEqual({
+      composition: true,
+      compositionLabelColumnKey: "materialName",
+      compositionValueColumnKey: "massPercent",
+    });
+    expect(serializeCompositionMetadata({
+      ...generatedCompositionField,
+      type: "text",
+    })).toEqual({ composition: true });
+    expect(serializeCompositionMetadata({
+      ...generatedCompositionField,
+      composition: false,
+    })).toEqual({});
+  });
+
   test("nested schema review verifies exact module hierarchy and field paths", () => {
     const moduleSections = [{
       key: "identity",
@@ -113,6 +141,59 @@ describe("frontend modularity helpers", () => {
 
     const review = buildNestedSchemaReview({ sections: [root] });
     expect(review.errors.map((entry) => entry.code)).toContain("sectionDepthExceeded");
+  });
+
+  test("passport type sections use family-aware hierarchical numbering", () => {
+    const entries = getSectionTreeEntries([
+      {
+        key: "identity",
+        label: "Identity",
+        sections: [
+          {
+            key: "manufacturer",
+            label: "Manufacturer",
+            sections: [{ key: "address", label: "Address" }],
+          },
+          { key: "product", label: "Product" },
+        ],
+      },
+      { key: "sustainability", label: "Sustainability" },
+    ]);
+
+    expect(entries.map((entry) => entry.number)).toEqual([
+      "1",
+      "1.1",
+      "1.1.1",
+      "1.2",
+      "2",
+    ]);
+    expect(entries.map((entry) => entry.numberPath)).toEqual([
+      [1],
+      [1, 1],
+      [1, 1, 1],
+      [1, 2],
+      [2],
+    ]);
+  });
+
+  test("passport type back controls use the shared one-line admin button", () => {
+    const createPageSource = readFileSync(
+      new URL("../admin/passport-types/AdminCreatePassportTypePage.js", import.meta.url),
+      "utf8",
+    );
+    const fieldsPageSource = readFileSync(
+      new URL("../admin/passport-types/AdminPassportTypeFields.js", import.meta.url),
+      "utf8",
+    );
+    const adminStyles = readFileSync(
+      new URL("../admin/styles/AdminDashboard.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(createPageSource).toContain('className="back-link apt-passport-type-back"');
+    expect(fieldsPageSource).toContain('className="back-link apt-passport-type-back"');
+    expect(adminStyles).toMatch(/\.back-link\s*\{[^}]*white-space:\s*nowrap;/s);
+    expect(adminStyles).toMatch(/\.back-link\s*\{[^}]*flex:\s*0 0 auto;/s);
   });
 
   test("system-header entries resolve configured schema fields", () => {
@@ -392,6 +473,121 @@ describe("frontend modularity helpers", () => {
         },
       },
     });
+  });
+
+  test("semantic JSON-LD export uses nested schema-field ownership for flat passport values", () => {
+    const fieldSemanticId = "https://example.test/terms/chemistry-details/chemistry";
+    const exported = buildPassportJsonLdExport([{
+      passportType: "batteryPassportV1",
+      chemistry: "nmc811",
+    }], "batteryPassportV1", {
+      typeDef: {
+        fieldsJson: {
+          semanticGraph: {
+            rootClassKey: "batteryPassport",
+            classes: [
+              {
+                key: "batteryPassport",
+                semanticId: "https://example.test/classes/BatteryPassport",
+                properties: [
+                  {
+                    key: "generalInformation",
+                    semanticId: "https://example.test/terms/general-information",
+                    rangeKind: "class",
+                    rangeClassKey: "generalInformation",
+                    relationshipType: "composition",
+                    minCount: 0,
+                    maxCount: 1,
+                  },
+                  {
+                    // A stale root-level copy must never override the actual
+                    // owner-scoped field metadata attached to the schema.
+                    key: "chemistry",
+                    semanticId: "https://example.test/terms/stale-root-chemistry",
+                    rangeKind: "scalar",
+                    dataType: "decimal",
+                    minCount: 0,
+                    maxCount: 1,
+                  },
+                ],
+              },
+              {
+                key: "generalInformation",
+                semanticId: "https://example.test/classes/GeneralInformation",
+                properties: [{
+                  key: "chemistryDetails",
+                  semanticId: "https://example.test/terms/chemistry-details",
+                  rangeKind: "class",
+                  rangeClassKey: "chemistryDetails",
+                  relationshipType: "composition",
+                  minCount: 0,
+                  maxCount: 1,
+                }],
+              },
+              {
+                key: "chemistryDetails",
+                semanticId: "https://example.test/classes/ChemistryDetails",
+                properties: [{
+                  key: "chemistry",
+                  semanticId: fieldSemanticId,
+                  rangeKind: "enum",
+                  rangeEnumKey: "batteryChemistry",
+                  minCount: 0,
+                  maxCount: 1,
+                }],
+              },
+            ],
+            enums: [{
+              key: "batteryChemistry",
+              values: [{
+                key: "nmc811",
+                label: "NMC 811",
+                semanticId: "https://example.test/concepts/nmc811",
+              }],
+            }],
+          },
+          sections: [{
+            key: "generalInformation",
+            fields: [],
+            sections: [{
+              key: "chemistryDetails",
+              fields: [{
+                key: "chemistry",
+                label: "Chemistry",
+                semanticId: fieldSemanticId,
+                domainClassKey: "chemistryDetails",
+                rangeKind: "enum",
+                rangeEnumKey: "batteryChemistry",
+                minCount: 0,
+                maxCount: 1,
+              }],
+            }],
+          }],
+        },
+      },
+    });
+
+    expect(exported["@graph"][0].chemistry).toEqual({
+      "@id": "https://example.test/concepts/nmc811",
+    });
+    expect(exported["@context"]).toContainEqual(expect.objectContaining({
+      chemistry: {
+        "@id": fieldSemanticId,
+        "@type": "@id",
+      },
+      generalInformation: expect.objectContaining({
+        "@context": expect.objectContaining({
+          chemistryDetails: expect.objectContaining({
+            "@context": expect.objectContaining({
+              chemistry: {
+                "@id": fieldSemanticId,
+                "@type": "@id",
+              },
+            }),
+          }),
+        }),
+      }),
+    }));
   });
 
   test("product category options merge saved and module-derived categories", () => {

@@ -52,6 +52,25 @@ test("passport attachment access tokens reject tampering and expiry", () => {
   );
 });
 
+test("passport attachment access tokens preserve logical field keys up to 200 characters", () => {
+  const publicId = "attachmentAbc123";
+  const maxFieldKey = `a${"b".repeat(199)}`;
+  const token = encodePassportAttachmentAccessToken({
+    publicId,
+    passportDppId: "dppId-passport-1",
+    fieldKey: maxFieldKey,
+    expiresAt: Date.now() + 60_000,
+  });
+
+  assert.equal(decodePassportAttachmentAccessToken(token)?.fieldKey, maxFieldKey);
+  assert.throws(() => encodePassportAttachmentAccessToken({
+    publicId,
+    passportDppId: "dppId-passport-1",
+    fieldKey: `${maxFieldKey}c`,
+    expiresAt: Date.now() + 60_000,
+  }), /Invalid passport attachment field key/);
+});
+
 test("authorised passport attachment links become expiring access URLs", () => {
   const source = "https://api.example.test/public-files/attachmentAbc123";
   assert.deepEqual(parsePassportAttachmentReference(source), {

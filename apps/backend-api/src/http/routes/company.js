@@ -22,6 +22,11 @@ const {
 } = require("../../modules/passports/import-field-guardrails");
 const { normalizeSafeImageReference } = require("../../shared/passports/passport-uri");
 const { getSafeErrorMessage } = require("../../shared/http/error-response");
+const {
+  buildTemplateFieldPolicy,
+  filterStoredTemplateFields,
+  normalizeTemplateFieldsForStorage,
+} = require("../../modules/passports/template-field-policy");
 
 module.exports = function registerCompanyRoutes(app, {
   pool,
@@ -119,6 +124,28 @@ module.exports = function registerCompanyRoutes(app, {
         ? Number.parseInt(row.modelFieldCount, 10) || 0
         : 0,
     };
+  }
+
+  async function getTemplateFieldPolicy(passportType, { requireSchema = false } = {}) {
+    const typeSchema = await getPassportTypeSchema(passportType);
+    if (!typeSchema && requireSchema) {
+      const error = new Error("Passport type not found");
+      error.statusCode = 400;
+      error.code = "templatePassportTypeNotFound";
+      throw error;
+    }
+    return buildTemplateFieldPolicy(typeSchema);
+  }
+
+  function sendTemplateRouteError(res, error, fallbackMessage = "Failed") {
+    if (Number.isInteger(error?.statusCode) && error.statusCode >= 400 && error.statusCode < 500) {
+      return res.status(error.statusCode).json({
+        error: error.message,
+        ...(error.code ? { code: error.code } : {}),
+      });
+    }
+    logger.error(error);
+    return res.status(500).json({ error: fallbackMessage });
   }
 
   function normalizeBulkPassportRecord(input = {}) {
@@ -349,8 +376,7 @@ module.exports = function registerCompanyRoutes(app, {
                       t."createdAt" AS "createdAt",
                       t."updatedAt" AS "updatedAt",
                       u."firstName" AS "firstName",
-                      u."lastName" AS "lastName",
-                      (SELECT COUNT(*) FROM "passportTemplateFields" WHERE "templateId" = t.id AND "isModelData" = true) AS "modelFieldCount"
+                      u."lastName" AS "lastName"
                FROM "passportTemplates" t
                LEFT JOIN users u ON u.id = t."createdBy"
                WHERE t."companyId" = $1`;
@@ -358,7 +384,38 @@ module.exports = function registerCompanyRoutes(app, {
       if (passportTypeFilter) {q += ` AND t."passportType" = $2`;params.push(passportTypeFilter);}
       q += ` ORDER BY t."passportType", t.name`;
       const r = await pool.query(q, params);
-      res.json(r.rows.map(mapTemplateRow));
+      const templates = r.rows.map(mapTemplateRow);
+      if (!templates.length) return res.json([]);
+
+      const policyByPassportType = new Map();
+      for (const passportType of [...new Set(templates.map((template) => template.passportType).filter(Boolean))]) {
+        policyByPassportType.set(passportType, await getTemplateFieldPolicy(passportType));
+      }
+      const modelFields = await pool.query(
+        `SELECT "templateId" AS "templateId",
+                "fieldKey" AS "fieldKey",
+                "fieldValue" AS "fieldValue",
+                "isModelData" AS "isModelData"
+         FROM "passportTemplateFields"
+         WHERE "templateId" = ANY($1::int[])
+           AND "isModelData" = true`,
+        [templates.map((template) => template.id)]
+      );
+      const modelCountByTemplate = new Map();
+      const templateById = new Map(templates.map((template) => [String(template.id), template]));
+      for (const field of modelFields.rows) {
+        const template = templateById.get(String(field.templateId));
+        const policy = policyByPassportType.get(template?.passportType);
+        if (!filterStoredTemplateFields([field], policy).length) continue;
+        modelCountByTemplate.set(
+          String(field.templateId),
+          (modelCountByTemplate.get(String(field.templateId)) || 0) + 1
+        );
+      }
+      res.json(templates.map((template) => ({
+        ...template,
+        modelFieldCount: modelCountByTemplate.get(String(template.id)) || 0,
+      })));
     } catch (e) {logger.error(e);res.status(500).json({ error: "Failed" });}
   });
 
@@ -387,11 +444,13 @@ module.exports = function registerCompanyRoutes(app, {
          WHERE "templateId"=$1`,
         [id]
       );
+      const fieldPolicy = await getTemplateFieldPolicy(t.rows[0].passportType);
+      const userFields = filterStoredTemplateFields(fields.rows, fieldPolicy);
       res.json({
         ...mapTemplateRow(t.rows[0]),
-        fields: fields.rows.map(mapPassportTemplateFieldRow),
+        fields: userFields.map(mapPassportTemplateFieldRow),
       });
-    } catch (e) {res.status(500).json({ error: "Failed" });}
+    } catch (e) {sendTemplateRouteError(res, e);}
   });
 
   app.post("/api/companies/:companyId/templates", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
@@ -399,6 +458,8 @@ module.exports = function registerCompanyRoutes(app, {
       const { companyId } = req.params;
       const { passportType, name, description, fields } = req.body;
       if (!passportType || !name?.trim()) return res.status(400).json({ error: "passportType and name required" });
+      const fieldPolicy = await getTemplateFieldPolicy(passportType, { requireSchema: true });
+      const userFields = normalizeTemplateFieldsForStorage(fields, fieldPolicy);
 
       const t = await pool.query(
         `INSERT INTO "passportTemplates" ("companyId", "passportType", name, description, "createdBy")
@@ -415,9 +476,8 @@ module.exports = function registerCompanyRoutes(app, {
       );
       const tmplId = t.rows[0].id;
 
-      if (Array.isArray(fields) && fields.length) {
-        for (const f of fields) {
-          if (!f.fieldKey) continue;
+      if (userFields.length) {
+        for (const f of userFields) {
           await pool.query(
             `INSERT INTO "passportTemplateFields" ("templateId", "fieldKey", "fieldValue", "isModelData")
              VALUES ($1,$2,$3,$4) ON CONFLICT ("templateId", "fieldKey") DO UPDATE
@@ -427,7 +487,7 @@ module.exports = function registerCompanyRoutes(app, {
         }
       }
       res.json(mapTemplateRow(t.rows[0]));
-    } catch (e) {logger.error(e);res.status(500).json({ error: "Failed" });}
+    } catch (e) {sendTemplateRouteError(res, e);}
   });
 
   app.put("/api/companies/:companyId/templates/:id", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
@@ -436,9 +496,16 @@ module.exports = function registerCompanyRoutes(app, {
       const { name, description, fields } = req.body;
 
       const existing = await pool.query(
-        "SELECT id FROM \"passportTemplates\" WHERE id=$1 AND \"companyId\"=$2", [id, companyId]
+        `SELECT id, "passportType" AS "passportType"
+         FROM "passportTemplates"
+         WHERE id=$1 AND "companyId"=$2`,
+        [id, companyId]
       );
       if (!existing.rows.length) return res.status(404).json({ error: "Not found" });
+      const fieldPolicy = await getTemplateFieldPolicy(existing.rows[0].passportType, { requireSchema: true });
+      const userFields = fields === undefined
+        ? null
+        : normalizeTemplateFieldsForStorage(fields, fieldPolicy);
 
       const updated = await pool.query(
         `UPDATE "passportTemplates"
@@ -455,10 +522,9 @@ module.exports = function registerCompanyRoutes(app, {
         [name?.trim() || "Untitled", description || null, id]
       );
 
-      if (Array.isArray(fields)) {
+      if (userFields) {
         await pool.query("DELETE FROM \"passportTemplateFields\" WHERE \"templateId\"=$1", [id]);
-        for (const f of fields) {
-          if (!f.fieldKey) continue;
+        for (const f of userFields) {
           await pool.query(
             `INSERT INTO "passportTemplateFields" ("templateId", "fieldKey", "fieldValue", "isModelData")
              VALUES ($1,$2,$3,$4)`,
@@ -475,14 +541,15 @@ module.exports = function registerCompanyRoutes(app, {
          ORDER BY "fieldKey"`,
         [id]
       );
+      const visibleFieldRows = filterStoredTemplateFields(fieldRows.rows, fieldPolicy);
       res.json({
         success: true,
         template: {
           ...mapTemplateRow(updated.rows?.[0] || {}),
-          fields: fieldRows.rows.map(mapPassportTemplateFieldRow),
+          fields: visibleFieldRows.map(mapPassportTemplateFieldRow),
         }
       });
-    } catch (e) {res.status(500).json({ error: "Failed" });}
+    } catch (e) {sendTemplateRouteError(res, e);}
   });
 
   app.delete("/api/companies/:companyId/templates/:id", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
@@ -522,7 +589,9 @@ module.exports = function registerCompanyRoutes(app, {
          WHERE "templateId"=$1`,
         [templateId]
       );
-      const templateFields = Object.fromEntries(fieldRes.rows.map((f) => [f.fieldKey, f.fieldValue]));
+      const fieldPolicy = await getTemplateFieldPolicy(tmpl.passportType);
+      const storedUserFields = filterStoredTemplateFields(fieldRes.rows, fieldPolicy);
+      const templateFields = Object.fromEntries(storedUserFields.map((f) => [f.fieldKey, f.fieldValue]));
 
       const typeRes = await pool.query(
         `SELECT "fieldsJson" AS "fieldsJson",
@@ -534,7 +603,7 @@ module.exports = function registerCompanyRoutes(app, {
       );
       const sections = typeRes.rows[0]?.fieldsJson?.sections || [];
       const schemaFields = flattenSchemaFieldsFromSections(sections).
-      filter((f) => f.type !== "file" && f.type !== "table");
+      filter((f) => fieldPolicy.allowedFieldKeys.has(f.key) && f.type !== "file" && f.type !== "table");
 
       const tableName = getTable(tmpl.passportType);
       const passRes = await pool.query(
@@ -619,6 +688,7 @@ module.exports = function registerCompanyRoutes(app, {
       if (rows.length < 2) return res.status(400).json({ error: "CSV too short" });
 
       const numPassports = rows[0].length - 1;
+      if (numPassports > 500) return res.status(400).json({ error: "Max 500 per request" });
       const fieldRows = rows.slice(1);
       const governanceRowLabels = [...new Set(
         fieldRows

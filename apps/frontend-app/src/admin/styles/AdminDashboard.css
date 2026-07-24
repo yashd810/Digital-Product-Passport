@@ -425,6 +425,32 @@
 .company-form-span {
   grid-column: 1 / -1;
 }
+.company-create-policy {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.company-create-policy h4 {
+  margin: 0 0 6px;
+  color: var(--heading-display);
+  font-size: 17px;
+}
+.company-create-policy .admin-muted-copy {
+  margin: 0 0 16px;
+}
+.company-policy-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 18px;
+}
+.company-policy-fields > .form-group {
+  grid-column: 1 / -1;
+}
+[data-theme="light"] .company-create-policy {
+  background: #f8fbfc;
+  border-color: rgba(28, 55, 56, 0.14);
+}
 .form-group {
   display: flex;
   flex-direction: column;
@@ -966,6 +992,9 @@
   }
   .company-form-span {
     grid-column: auto;
+  }
+  .company-policy-fields {
+    grid-template-columns: 1fr;
   }
   .companies-section > .create-company-card,
   .companies-section > .companies-list {
@@ -1544,6 +1573,24 @@
     border-color 0.18s ease,
     color 0.18s ease;
 }
+.apt-company-access-btn {
+  padding: 7px 12px;
+  border: 1px solid rgba(13, 181, 176, 0.3);
+  border-radius: 8px;
+  background: rgba(13, 181, 176, 0.12);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.apt-company-access-btn:hover {
+  background: rgba(13, 181, 176, 0.2);
+  border-color: rgba(13, 181, 176, 0.48);
+  transform: translateY(-1px);
+}
 .apt-view-fields-btn:hover {
   background: rgba(13, 181, 176, 0.12);
   color: var(--accent);
@@ -1779,6 +1826,11 @@
   transform: none;
   align-self: flex-start;
   margin: 2px 0 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  white-space: nowrap;
   padding: 10px 16px;
   background: linear-gradient(
       180deg,
@@ -2705,6 +2757,431 @@
     grid-template-columns: 1fr;
   }
 }
+/* ── Module-backed passport type field profile ────────────── */
+.acpt-profile {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+.acpt-profile-toolbar {
+  position: sticky;
+  top: 10px;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  align-items: end;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-card) 94%, transparent);
+  box-shadow: 0 12px 30px rgba(0, 15, 8, 0.16);
+  backdrop-filter: blur(14px);
+}
+.acpt-profile-search {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.acpt-profile-search input {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  outline: none;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.acpt-profile-search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(13, 181, 176, 0.14);
+}
+.acpt-profile-selected-only {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.acpt-profile input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.acpt-profile input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+.acpt-profile-bulk-actions {
+  display: flex;
+  gap: 7px;
+}
+.acpt-profile-bulk-actions button {
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1px solid rgba(13, 181, 176, 0.3);
+  border-radius: 10px;
+  background: rgba(13, 181, 176, 0.1);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.acpt-profile-bulk-actions button:hover {
+  background: rgba(13, 181, 176, 0.18);
+  border-color: rgba(13, 181, 176, 0.5);
+  transform: translateY(-1px);
+}
+.acpt-profile-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.acpt-profile-summary > * {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+.acpt-profile-summary strong {
+  border-color: rgba(13, 181, 176, 0.32);
+  background: rgba(13, 181, 176, 0.12);
+  color: var(--heading-strong);
+}
+.acpt-profile-notice {
+  padding: 10px 12px;
+  border: 1px solid rgba(13, 181, 176, 0.28);
+  border-radius: 10px;
+  background: rgba(13, 181, 176, 0.09);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.acpt-profile-tree {
+  display: grid;
+  gap: 9px;
+}
+.acpt-profile-section {
+  margin-inline-start: min(calc(var(--acpt-profile-depth, 0) * 18px), 180px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: visible;
+  background: var(--bg-soft);
+  content-visibility: auto;
+  contain-intrinsic-size: 84px;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+.acpt-profile-section:hover {
+  border-color: rgba(13, 181, 176, 0.3);
+}
+.acpt-profile-section-head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 52px;
+  padding: 9px 12px;
+}
+.acpt-profile-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 15px;
+  transform: rotate(0);
+  transition: transform 0.2s ease, background 0.18s ease, color 0.18s ease;
+}
+.acpt-profile-collapse:hover {
+  background: rgba(13, 181, 176, 0.1);
+  color: var(--heading-strong);
+}
+.acpt-profile-collapse.collapsed {
+  transform: rotate(-90deg);
+}
+.acpt-profile-section-title {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.acpt-profile-section-title strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--heading-strong);
+  font-size: 13px;
+}
+.acpt-profile-section-title strong span {
+  flex: 0 0 auto;
+  min-width: 32px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(13, 181, 176, 0.12);
+  color: var(--accent);
+  font-size: 10px;
+  text-align: center;
+}
+.acpt-profile-section-title code,
+.acpt-profile-section-title small {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.acpt-profile-branch-count {
+  min-width: 46px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+}
+.acpt-profile-fields {
+  display: grid;
+  border-top: 1px solid var(--border);
+}
+.acpt-profile-field {
+  display: grid;
+  grid-template-columns: 88px minmax(180px, 1fr) 90px minmax(130px, 0.55fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 66px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.018);
+  transition: opacity 0.18s ease, background 0.18s ease;
+}
+.acpt-profile-field:last-child {
+  border-bottom: 0;
+}
+.acpt-profile-field.excluded {
+  background: transparent;
+  opacity: 0.58;
+}
+.acpt-profile-field.included:hover {
+  background: rgba(13, 181, 176, 0.045);
+}
+.acpt-profile-include,
+.acpt-profile-required,
+.acpt-profile-chart > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.acpt-profile-field-identity {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.acpt-profile-field-identity > strong {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.acpt-profile-field-identity > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.acpt-profile-field-identity code,
+.acpt-profile-field-identity > div span {
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+.acpt-profile-dependency {
+  color: #f4bf67;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.acpt-profile-translation-toggle {
+  justify-self: start;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 750;
+}
+.acpt-profile-translation-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.acpt-profile-confidentiality {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.acpt-profile-confidentiality > span {
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.acpt-profile-select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 10px;
+}
+.acpt-profile-chart {
+  grid-column: 2 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(13, 181, 176, 0.2);
+  border-radius: 9px;
+  background: rgba(13, 181, 176, 0.055);
+}
+.acpt-profile-chart-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.acpt-profile-translations {
+  grid-column: 2 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-elevated);
+}
+.acpt-profile-translations label {
+  display: grid;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+.acpt-profile-translations input {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  outline: none;
+  background: var(--bg-soft);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 11px;
+}
+.acpt-profile-translations input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(13, 181, 176, 0.12);
+}
+.acpt-profile-section-translations {
+  grid-column: auto;
+  margin: 0 12px 10px 58px;
+}
+.acpt-profile-empty {
+  padding: 28px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+[data-theme="light"] .acpt-profile-toolbar,
+[data-theme="light"] .acpt-profile-section {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 22px rgba(17, 44, 72, 0.07);
+}
+[data-theme="light"] .acpt-profile-search input,
+[data-theme="light"] .acpt-profile-select,
+[data-theme="light"] .acpt-profile-branch-count {
+  background: #f8fbfc;
+}
+[data-theme="light"] .acpt-profile-dependency {
+  color: #8a4c00;
+}
+@media (max-width: 760px) {
+  .acpt-profile-toolbar {
+    position: static;
+    grid-template-columns: 1fr;
+  }
+  .acpt-profile-bulk-actions button {
+    flex: 1;
+  }
+  .acpt-profile-section {
+    margin-inline-start: min(calc(var(--acpt-profile-depth, 0) * 8px), 48px);
+  }
+  .acpt-profile-field {
+    grid-template-columns: 1fr 1fr;
+  }
+  .acpt-profile-field-identity {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .acpt-profile-chart {
+    grid-column: 1 / -1;
+  }
+  .acpt-profile-translations {
+    grid-column: 1 / -1;
+  }
+  .acpt-profile-section-translations {
+    margin-left: 12px;
+  }
+}
+@media (max-width: 480px) {
+  .acpt-profile-section {
+    margin-inline-start: 0;
+  }
+  .acpt-profile-field,
+  .acpt-profile-chart-columns,
+  .acpt-profile-translations {
+    grid-template-columns: 1fr;
+  }
+}
 .acpt-composition-label,
 .acpt-semantic-label,
 .acpt-dynamic-label {
@@ -3156,6 +3633,12 @@
   flex-wrap: wrap;
 }
 .back-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -3171,6 +3654,10 @@
   background: rgba(13, 181, 176, 0.12);
   color: var(--accent);
   border-color: rgba(13, 181, 176, 0.28);
+}
+.acpt-header .apt-passport-type-back {
+  align-self: flex-start;
+  margin-top: 2px;
 }
 .aca-title {
   font-size: 1.5rem;
@@ -3870,9 +4357,9 @@
   border-color: rgba(16, 185, 129, 0.34);
   background: rgba(16, 185, 129, 0.09);
 }
-.type-card.revoked {
-  border-color: rgba(239, 68, 68, 0.34);
-  background: rgba(239, 68, 68, 0.08);
+.type-card.not-granted {
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.025);
 }
 .type-card h4 {
   margin: 0;
@@ -3891,27 +4378,99 @@
   font-family: var(--font);
 }
 .toggle-btn.active {
-  background: rgba(16, 185, 129, 0.14);
-  color: #9ff0ca;
-  border-color: rgba(16, 185, 129, 0.24);
-}
-.toggle-btn.active:hover:not(:disabled) {
-  background: rgba(16, 185, 129, 0.24);
-  color: var(--mint);
-}
-.toggle-btn:not(.active) {
   background: rgba(239, 68, 68, 0.12);
   color: #ffb7b7;
   border-color: rgba(239, 68, 68, 0.24);
 }
-.toggle-btn:not(.active):hover:not(:disabled) {
+.toggle-btn.active:hover:not(:disabled) {
   background: rgba(239, 68, 68, 0.22);
   color: var(--mint);
+}
+.toggle-btn:not(.active) {
+  background: rgba(13, 181, 176, 0.16);
+  color: #b8fffa;
+  border-color: rgba(13, 181, 176, 0.3);
+}
+.toggle-btn:not(.active):hover:not(:disabled) {
+  background: rgba(13, 181, 176, 0.26);
+  color: var(--mint);
+}
+[data-theme="light"] .toggle-btn.active {
+  color: #b4232b;
+}
+[data-theme="light"] .toggle-btn:not(.active) {
+  color: #087e7b;
+}
+[data-theme="light"] .toggle-btn.active:hover:not(:disabled),
+[data-theme="light"] .toggle-btn:not(.active):hover:not(:disabled) {
+  color: #17304a;
 }
 .toggle-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-} /* Summary */
+}
+.access-grant-status {
+  font-size: 12px;
+  font-weight: 700;
+}
+.access-grant-status.granted {
+  color: #75ddb0;
+}
+[data-theme="light"] .access-grant-status.granted {
+  color: #087257;
+}
+.access-grant-status.not-granted {
+  color: var(--text-secondary);
+}
+.apt-company-access-modal {
+  width: min(680px, calc(100vw - 32px));
+  max-width: 680px;
+}
+.apt-company-access-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+.apt-company-access-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(52vh, 480px);
+  overflow-y: auto;
+  padding: 2px 4px 2px 0;
+}
+.apt-company-access-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.apt-company-access-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.apt-company-access-identity strong {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.apt-company-access-identity span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+@media (max-width: 560px) {
+  .apt-company-access-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+/* Summary */
 .access-summary {
   background: var(--bg-card);
   border-radius: 12px;
@@ -4571,10 +5130,22 @@
 } /* Admin passport types / fields helpers */
 .admin-toolbar-compact {
   margin-bottom: 18px;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+}
+.admin-toolbar-compact > div {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .apt-create-btn-back {
   background-color: #064e3b;
   color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
 }
 .apt-draft-card {
   margin-bottom: 24px;
@@ -4840,7 +5411,25 @@
   overflow-wrap: anywhere;
 }
 .apt-fv-section-title-strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 700;
+}
+.apt-fv-section-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: 3px 8px;
+  border: 1px solid rgba(13, 181, 176, 0.28);
+  border-radius: 999px;
+  background: rgba(13, 181, 176, 0.12);
+  color: var(--accent);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 .apt-fv-section-path {
   color: var(--text-secondary);

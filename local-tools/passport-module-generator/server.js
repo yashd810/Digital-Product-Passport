@@ -21,6 +21,13 @@ const {
   "../../apps/backend-api/src/shared/passports/passport-helpers"
 ));
 const {
+  isReservedPassportFieldKey,
+  isReservedPassportSemanticId,
+} = require(path.resolve(
+  __dirname,
+  "../../apps/backend-api/src/shared/passports/passport-reserved-fields"
+));
+const {
   getSectionTreeLimitError,
 } = require("./schema-limits");
 
@@ -343,6 +350,201 @@ function flattenDraftFieldsFromSections(sections = []) {
   return flattenDraftSections(sections).flatMap((section) => section.fields || []);
 }
 
+function assertNoEmptyLeafSections(sections = []) {
+  const pending = (Array.isArray(sections) ? sections : [])
+    .map((section) => ({ section, parentLabels: [] }))
+    .reverse();
+  while (pending.length) {
+    const { section, parentLabels } = pending.pop();
+    if (!section || typeof section !== "object") continue;
+    const sectionLabel = clean(section.label || section.name || section.key) || "Untitled section";
+    const sectionLabels = [...parentLabels, sectionLabel];
+    const childSections = getSectionChildren(section);
+    const fields = Array.isArray(section.fields) ? section.fields : [];
+    if (!childSections.length && !fields.length) {
+      throw new Error(
+        `Section "${sectionLabels.join(" > ")}" has no fields. A section without subsections must contain at least one field.`
+      );
+    }
+    for (let index = childSections.length - 1; index >= 0; index -= 1) {
+      pending.push({ section: childSections[index], parentLabels: sectionLabels });
+    }
+  }
+}
+
+function assertNoReservedRuntimeFields(sections = [], semanticGraph = null) {
+  const rootClass = semanticGraph?.classes?.find(
+    (classDef) => classDef.key === semanticGraph.rootClassKey
+  );
+  const rootPropertiesByKey = new Map(
+    (rootClass?.properties || []).map((property) => [property.key, property])
+  );
+
+  for (const field of flattenDraftFieldsFromSections(sections)) {
+    const fieldKey = clean(field.fieldKey || field.key);
+    const semanticId = clean(field.semanticId || rootPropertiesByKey.get(fieldKey)?.semanticId);
+    if (isReservedPassportSemanticId(semanticId)) {
+      throw new Error(
+        `Field "${fieldKey || "unknown"}" uses reserved semanticId "${semanticId}". Passport runtime/header fields are generated automatically and must not be added to a module.`
+      );
+    }
+    if (isReservedPassportFieldKey(fieldKey)) {
+      throw new Error(
+        `Field key "${fieldKey}" is reserved for passport runtime/header data. This field is generated automatically and must not be added to a module.`
+      );
+    }
+  }
+}
+
+function assertNoReservedSemanticGraphProperties(graphInput = {}) {
+  const properties = [
+    ...(Array.isArray(graphInput.rootProperties) ? graphInput.rootProperties : []),
+    ...(Array.isArray(graphInput.classes) ? graphInput.classes : [])
+      .flatMap((classDef) => Array.isArray(classDef?.properties) ? classDef.properties : []),
+  ];
+  for (const property of properties) {
+    const semanticId = clean(property?.semanticId);
+    if (!isReservedPassportSemanticId(semanticId)) continue;
+    const propertyKey = clean(property?.propertyKey || property?.key) || "unknown";
+    throw new Error(
+      `Field "${propertyKey}" uses reserved semanticId "${semanticId}". Passport runtime/header fields are generated automatically and must not be added to a module.`
+    );
+  }
+}
+
+function validateCsvImport(input = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("CSV import validation input must be an object.");
+  }
+
+  const hasSections = Object.prototype.hasOwnProperty.call(input, "sections");
+  const hasSemanticGraph = Object.prototype.hasOwnProperty.call(input, "semanticGraph");
+  if (!hasSections && !hasSemanticGraph) {
+    throw new Error("CSV import validation requires sections or semanticGraph.");
+  }
+
+  const sections = hasSections ? input.sections : [];
+  if (hasSections) {
+    if (!Array.isArray(sections) || !sections.length) {
+      throw new Error("Fields CSV import must contain at least one section.");
+    }
+    const sectionTreeLimitError = getSectionTreeLimitError(sections);
+    if (sectionTreeLimitError) throw new Error(sectionTreeLimitError);
+    assertCanonicalSections(sections);
+    assertNoEmptyLeafSections(sections);
+  }
+
+  const semanticGraph = hasSemanticGraph ? input.semanticGraph : null;
+  if (hasSemanticGraph) {
+    if (!semanticGraph || typeof semanticGraph !== "object" || Array.isArray(semanticGraph)) {
+      throw new Error("Semantic graph CSV import must contain a semanticGraph object.");
+    }
+    if (!semanticGraph.rootClass || typeof semanticGraph.rootClass !== "object" || Array.isArray(semanticGraph.rootClass)) {
+      throw new Error("Semantic graph CSV import must contain one rootClass object.");
+    }
+    for (const property of ["rootProperties", "classes", "enums"]) {
+      if (!Array.isArray(semanticGraph[property])) {
+        throw new Error(`Semantic graph CSV import ${property} must be an array.`);
+      }
+    }
+    for (const property of semanticGraph.rootProperties) {
+      if (!property || typeof property !== "object" || Array.isArray(property)) {
+        throw new Error("Semantic graph CSV import rootProperties must contain objects.");
+      }
+    }
+    for (const classDef of semanticGraph.classes) {
+      if (!classDef || typeof classDef !== "object" || Array.isArray(classDef)) {
+        throw new Error("Semantic graph CSV import classes must contain objects.");
+      }
+      if (!Array.isArray(classDef.properties)) {
+        throw new Error(`Semantic graph class "${clean(classDef.key || classDef.label) || "unknown"}" properties must be an array.`);
+      }
+      if (classDef.properties.some((property) => !property || typeof property !== "object" || Array.isArray(property))) {
+        throw new Error(`Semantic graph class "${clean(classDef.key || classDef.label) || "unknown"}" properties must contain objects.`);
+      }
+    }
+    for (const enumDef of semanticGraph.enums) {
+      if (!enumDef || typeof enumDef !== "object" || Array.isArray(enumDef)) {
+        throw new Error("Semantic graph CSV import enums must contain objects.");
+      }
+      if (!Array.isArray(enumDef.values)) {
+        throw new Error(`Semantic graph enum "${clean(enumDef.key || enumDef.label) || "unknown"}" values must be an array.`);
+      }
+      if (enumDef.values.some((value) => !value || typeof value !== "object" || Array.isArray(value))) {
+        throw new Error(`Semantic graph enum "${clean(enumDef.key || enumDef.label) || "unknown"}" values must contain objects.`);
+      }
+    }
+    assertNoReservedSemanticGraphProperties(semanticGraph);
+
+    // Root graph properties become runtime passport fields. Check their keys as
+    // well as their semantic IRIs before the graph is allowed to replace the UI.
+    assertNoReservedRuntimeFields([{ fields: semanticGraph.rootProperties }]);
+  }
+
+  const flatSections = flattenDraftSections(sections);
+  const flatFields = flattenDraftFieldsFromSections(sections);
+  if (hasSections) {
+    const sectionKeys = new Set();
+    const fieldKeys = new Set();
+    for (const section of flatSections) {
+      const sectionKey = clean(section.key);
+      if (!sectionKey || !/^[a-z][A-Za-z0-9]{0,199}$/.test(sectionKey)) {
+        throw new Error(`Invalid CSV import section key: ${sectionKey || "missing"}.`);
+      }
+      if (sectionKeys.has(sectionKey)) throw new Error(`Duplicate section key: ${sectionKey}`);
+      sectionKeys.add(sectionKey);
+      for (const field of section.fields || []) {
+        if (!field || typeof field !== "object" || Array.isArray(field)) {
+          throw new Error(`Section "${sectionKey}" fields must contain objects.`);
+        }
+        const fieldKey = clean(field.fieldKey || field.key);
+        if (!isSafePassportStorageFieldKey(fieldKey)) {
+          throw new Error(`Invalid CSV import field key: ${fieldKey || "missing"}.`);
+        }
+        if (fieldKeys.has(fieldKey)) throw new Error(`Duplicate field key: ${fieldKey}`);
+        fieldKeys.add(fieldKey);
+      }
+    }
+
+    const rootClassKey = clean(semanticGraph?.rootClass?.key || semanticGraph?.rootClassKey);
+    const graphForFieldSemanticLookup = semanticGraph
+      ? {
+          rootClassKey,
+          classes: [
+            {
+              ...(semanticGraph.rootClass || {}),
+              key: rootClassKey,
+              properties: semanticGraph.rootProperties || [],
+            },
+            ...(semanticGraph.classes || []),
+          ],
+        }
+      : null;
+    assertNoReservedRuntimeFields(sections, graphForFieldSemanticLookup);
+  }
+
+  const graphClasses = hasSemanticGraph ? semanticGraph.classes : [];
+  const graphEnums = hasSemanticGraph ? semanticGraph.enums : [];
+  const semanticPropertyCount = hasSemanticGraph
+    ? semanticGraph.rootProperties.length
+      + graphClasses.reduce((count, classDef) => count + classDef.properties.length, 0)
+    : 0;
+  const semanticEnumValueCount = graphEnums.reduce(
+    (count, enumDef) => count + enumDef.values.length,
+    0
+  );
+
+  return {
+    valid: true,
+    sectionCount: flatSections.length,
+    fieldCount: flatFields.length,
+    semanticClassCount: hasSemanticGraph ? graphClasses.length + 1 : 0,
+    semanticPropertyCount,
+    semanticEnumCount: graphEnums.length,
+    semanticEnumValueCount,
+  };
+}
+
 function normalizeSummaryRole(value) {
   const role = clean(value);
   if (/^card[1-9]$/.test(role)) return role;
@@ -522,22 +724,24 @@ function normalizeBaseUrl(value) {
   return rawUrl;
 }
 
-function semanticSlugFromIri(value, fallback = "") {
-  const iri = clean(value);
-  const terminal = iri.split(/[\/#]/).filter(Boolean).pop();
-  return kebabCase(terminal || fallback);
-}
-
 function buildSemanticGraphDraft(rawGraph, { family, version, baseUrl, sections }) {
   if (!rawGraph || typeof rawGraph !== "object" || Array.isArray(rawGraph)) {
     throw new Error("Semantic class graph is required.");
   }
   const graphInput = rawGraph || {};
+  assertNoReservedSemanticGraphProperties(graphInput);
   const dictionaryBase = `${baseUrl}/dictionary/${family}/${version}`;
   const termsBase = `${dictionaryBase}/terms`;
   const classesBase = `${dictionaryBase}/classes`;
   const enumsBase = `${dictionaryBase}/enums`;
-  const rootInput = graphInput.rootClass || {};
+  const normalizedRootInput = (Array.isArray(graphInput.classes) ? graphInput.classes : [])
+    .find((classDef) => clean(classDef?.key) === clean(graphInput.rootClassKey));
+  const rootInput = graphInput.rootClass || normalizedRootInput || {};
+  const rootPropertyInputs = Array.isArray(graphInput.rootProperties)
+    ? graphInput.rootProperties
+    : (Array.isArray(normalizedRootInput?.properties) ? normalizedRootInput.properties : []);
+  const rawClassInputs = (Array.isArray(graphInput.classes) ? graphInput.classes : [])
+    .filter((classDef) => classDef !== normalizedRootInput);
   const rootClassKey = clean(rootInput.key || graphInput.rootClassKey || `${camelCase(family)}Passport`);
   const rootClassLabel = clean(rootInput.label) || titleCase(rootClassKey);
 
@@ -621,18 +825,12 @@ function buildSemanticGraphDraft(rawGraph, { family, version, baseUrl, sections 
     root: true,
     properties: [],
   };
-  rootClass.properties = (Array.isArray(graphInput.rootProperties) ? graphInput.rootProperties : [])
-    .map((property) => normalizeGraphProperty(property, rootClass));
-
-  const classes = [
-    rootClass,
-    ...(Array.isArray(graphInput.classes) ? graphInput.classes : []).map(normalizeGraphClass),
-  ];
+  const classes = [rootClass];
   const enums = (Array.isArray(graphInput.enums) ? graphInput.enums : []).map(normalizeGraphEnum);
   const fieldEnumOverrides = new Map(
     [
-      ...(Array.isArray(graphInput.rootProperties) ? graphInput.rootProperties : []),
-      ...(Array.isArray(graphInput.classes) ? graphInput.classes : [])
+      ...rootPropertyInputs,
+      ...rawClassInputs
         .flatMap((classDef) => Array.isArray(classDef?.properties) ? classDef.properties : []),
     ].flatMap((property) => {
       const [sourceKind, , sourceFieldKey] = clean(property?.sourceRef).split(":");
@@ -645,67 +843,264 @@ function buildSemanticGraphDraft(rawGraph, { family, version, baseUrl, sections 
         : [];
     })
   );
-  const classKeys = new Set(classes.map((classDef) => classDef.key));
-  const existingRootKeys = new Set(rootClass.properties.map((property) => property.key));
+  const sectionEntries = [];
+  const visitSections = (sectionList = [], parent = null, depth = 0) => {
+    for (const section of Array.isArray(sectionList) ? sectionList : []) {
+      const entry = { section, parent, depth };
+      sectionEntries.push(entry);
+      visitSections(getSectionChildren(section), entry, depth + 1);
+    }
+  };
+  visitSections(sections);
 
-  for (const field of flattenDraftFieldsFromSections(sections)) {
-    if (existingRootKeys.has(field.fieldKey)) continue;
+  const sectionByKey = new Map(sectionEntries.map((entry) => [entry.section.key, entry]));
+  const fieldsByKey = new Map();
+  const tableEntriesByClassKey = new Map();
+  for (const entry of sectionEntries) {
+    for (const field of entry.section.fields || []) {
+      const fieldEntry = { entry, field };
+      fieldsByKey.set(field.fieldKey, fieldEntry);
+      if (field.fieldType === "table") {
+        tableEntriesByClassKey.set(`${field.fieldKey}Entry`, fieldEntry);
+      }
+    }
+  }
+
+  const parseSourceRef = (value) => {
+    const [kind = "", sectionKey = "", fieldKey = "", columnKey = ""] = clean(value).split(":");
+    return { kind, sectionKey, fieldKey, columnKey };
+  };
+  const isKnownSourceRef = (value) => {
+    const ref = parseSourceRef(value);
+    const entry = sectionByKey.get(ref.sectionKey);
+    if (ref.kind === "section") return Boolean(entry);
+    const field = (entry?.section.fields || []).find((candidate) => candidate.fieldKey === ref.fieldKey);
+    if (ref.kind === "field") return Boolean(field);
+    if (ref.kind === "table") return field?.fieldType === "table";
+    if (ref.kind === "column") {
+      return Boolean((field?.tableColumns || []).some((column) => column.columnKey === ref.columnKey));
+    }
+    return false;
+  };
+
+  const rawPropertyRecords = [
+    ...rootPropertyInputs.map((property) => ({ ownerKey: rootClass.key, property })),
+    ...rawClassInputs.flatMap((classDef) => {
+      const ownerKey = clean(classDef.classKey || classDef.key);
+      return (Array.isArray(classDef?.properties) ? classDef.properties : [])
+        .map((property) => ({ ownerKey, property }));
+    }),
+  ];
+  const rawClassesByKey = new Map(
+    rawClassInputs.map((classDef) => [clean(classDef.classKey || classDef.key), classDef])
+  );
+  const rawClassesBySourceRef = new Map(
+    rawClassInputs
+      .filter((classDef) => isKnownSourceRef(classDef?.sourceRef))
+      .map((classDef) => [clean(classDef.sourceRef), classDef])
+  );
+
+  const managedPropertyRecord = ({ ownerKey, property }) => {
+    if (isKnownSourceRef(property?.sourceRef)) return true;
+    const propertyKey = clean(property?.propertyKey || property?.key);
+    const rangeClassKey = clean(property?.rangeClassKey);
+    if (ownerKey === rootClass.key) {
+      if (sectionByKey.has(propertyKey) && rangeClassKey === propertyKey) return true;
+      if (fieldsByKey.has(propertyKey)) return true;
+      return false;
+    }
+    const sectionEntry = sectionByKey.get(ownerKey);
+    if (sectionEntry) {
+      if ((sectionEntry.section.fields || []).some((field) => field.fieldKey === propertyKey)) return true;
+      if (sectionEntries.some((entry) =>
+        entry.parent?.section.key === ownerKey
+        && entry.section.key === propertyKey
+        && rangeClassKey === propertyKey
+      )) return true;
+    }
+    const tableEntry = tableEntriesByClassKey.get(ownerKey);
+    if (tableEntry && (tableEntry.field.tableColumns || []).some(
+      (column) => column.columnKey === propertyKey
+    )) return true;
+    return false;
+  };
+
+  const rawClassFor = (sourceRef, key) =>
+    rawClassesBySourceRef.get(sourceRef) || rawClassesByKey.get(key) || null;
+  const customPropertiesFor = (rawClass, classDef) => (
+    (Array.isArray(rawClass?.properties) ? rawClass.properties : [])
+      .filter((property) => !managedPropertyRecord({ ownerKey: classDef.key, property }))
+      .map((property) => normalizeGraphProperty(property, classDef))
+  );
+
+  rootClass.properties = rootPropertyInputs
+    .filter((property) => !managedPropertyRecord({ ownerKey: rootClass.key, property }))
+    .map((property) => normalizeGraphProperty(property, rootClass));
+
+  const classByKey = new Map([[rootClass.key, rootClass]]);
+  for (const entry of sectionEntries) {
+    const key = entry.section.key;
+    const rawClass = rawClassFor(`section:${key}`, key);
+    const classDef = {
+      key,
+      label: entry.section.label,
+      semanticId: clean(rawClass?.semanticId) || `${classesBase}/${pascalCaseSemanticKey(key)}`,
+      definition: `${entry.section.label} information for this passport.`,
+      properties: [],
+    };
+    classDef.properties = customPropertiesFor(rawClass, classDef);
+    classes.push(classDef);
+    classByKey.set(key, classDef);
+  }
+
+  for (const { entry, field } of fieldsByKey.values()) {
+    if (field.fieldType !== "table") continue;
+    const key = `${field.fieldKey}Entry`;
+    const rawClass = rawClassFor(`table:${entry.section.key}:${field.fieldKey}`, key);
+    const classDef = {
+      key,
+      label: `${field.fieldLabel} Entry`,
+      semanticId: clean(rawClass?.semanticId) || `${classesBase}/${pascalCaseSemanticKey(key)}`,
+      definition: `One structured entry within ${field.fieldLabel}.`,
+      properties: [],
+    };
+    classDef.properties = customPropertiesFor(rawClass, classDef);
+    classes.push(classDef);
+    classByKey.set(key, classDef);
+  }
+
+  const managedClassKeys = new Set(classByKey.keys());
+  for (const rawClass of rawClassInputs) {
+    const rawKey = clean(rawClass.classKey || rawClass.key);
+    if (managedClassKeys.has(rawKey) || isKnownSourceRef(rawClass?.sourceRef)) continue;
+    const classDef = normalizeGraphClass({
+      ...rawClass,
+      properties: (Array.isArray(rawClass.properties) ? rawClass.properties : [])
+        .filter((property) => !managedPropertyRecord({ ownerKey: rawKey, property })),
+    });
+    classes.push(classDef);
+    classByKey.set(classDef.key, classDef);
+  }
+
+  const findPropertyTemplate = ({ sourceRef, ownerKey, key, rangeClassKey = "" }) => {
+    const matchesRange = (record) => !rangeClassKey
+      || clean(record.property?.rangeClassKey) === rangeClassKey;
+    return rawPropertyRecords.find((record) =>
+      clean(record.property?.sourceRef) === sourceRef && matchesRange(record)
+    ) || rawPropertyRecords.find((record) =>
+      record.ownerKey === ownerKey
+      && clean(record.property?.propertyKey || record.property?.key) === key
+      && matchesRange(record)
+    ) || rawPropertyRecords.find((record) =>
+      clean(record.property?.propertyKey || record.property?.key) === key
+      && matchesRange(record)
+    ) || null;
+  };
+  const managedSemanticId = (ownerClass, key, templateRecord) => {
+    if (templateRecord?.ownerKey === ownerClass.key && clean(templateRecord.property?.semanticId)) {
+      return clean(templateRecord.property.semanticId);
+    }
+    return ownerClass.root
+      ? `${termsBase}/${kebabCase(key)}`
+      : `${termsBase}/${kebabCase(ownerClass.key)}/${kebabCase(key)}`;
+  };
+  const setManagedProperty = (ownerClass, rawProperty) => {
+    const property = normalizeGraphProperty(rawProperty, ownerClass);
+    const existingIndex = ownerClass.properties.findIndex((entry) => entry.key === property.key);
+    if (existingIndex >= 0) ownerClass.properties.splice(existingIndex, 1, property);
+    else ownerClass.properties.push(property);
+  };
+
+  for (const entry of sectionEntries) {
+    const ownerClass = entry.parent
+      ? classByKey.get(entry.parent.section.key)
+      : rootClass;
+    const targetClass = classByKey.get(entry.section.key);
+    const sourceRef = `section:${entry.section.key}`;
+    const template = findPropertyTemplate({
+      sourceRef,
+      ownerKey: ownerClass.key,
+      key: entry.section.key,
+      rangeClassKey: entry.section.key,
+    });
+    setManagedProperty(ownerClass, {
+      key: entry.section.key,
+      label: entry.section.label,
+      semanticId: managedSemanticId(ownerClass, entry.section.key, template),
+      definition: `${entry.section.label} information within ${ownerClass.label}.`,
+      rangeKind: "class",
+      rangeClassKey: targetClass.key,
+      relationshipType: "composition",
+      minCount: 0,
+      maxCount: 1,
+    });
+  }
+
+  for (const { entry, field } of fieldsByKey.values()) {
+    const ownerClass = classByKey.get(entry.section.key);
+    const sourceRef = `field:${entry.section.key}:${field.fieldKey}`;
     if (field.fieldType === "table") {
       const entryClassKey = `${field.fieldKey}Entry`;
-      if (!classKeys.has(entryClassKey)) {
-        const entryClass = {
-          key: entryClassKey,
-          label: `${field.fieldLabel} Entry`,
-          semanticId: `${classesBase}/${pascalCase(field.semanticSlug)}Entry`,
-          definition: `One structured entry within ${field.fieldLabel}.`,
-          properties: (field.tableColumns || []).map((column) => ({
-            key: column.columnKey,
-            label: column.columnLabel,
-            semanticId: `${termsBase}/${field.semanticSlug}/${column.semanticSlug}`,
-            definition: `${column.columnLabel} within ${field.fieldLabel}.`,
-            domainClassKey: entryClassKey,
-            domainClassIri: `${classesBase}/${pascalCase(field.semanticSlug)}Entry`,
-            rangeKind: "scalar",
-            dataType: column.dataType,
-            minCount: 0,
-            maxCount: 1,
-            unit: column.unitKey === "none" ? "" : (column.unitSymbol || ""),
-          })),
-        };
-        classes.push(entryClass);
-        classKeys.add(entryClassKey);
-      }
-      rootClass.properties.push({
+      const template = findPropertyTemplate({
+        sourceRef,
+        ownerKey: ownerClass.key,
+        key: field.fieldKey,
+        rangeClassKey: entryClassKey,
+      });
+      setManagedProperty(ownerClass, {
         key: field.fieldKey,
         label: field.fieldLabel,
-        semanticId: `${termsBase}/${field.semanticSlug}`,
+        semanticId: managedSemanticId(ownerClass, field.fieldKey, template),
         definition: field.definition,
-        domainClassKey: rootClass.key,
-        domainClassIri: rootClass.semanticId,
         rangeKind: "class",
         rangeClassKey: entryClassKey,
         relationshipType: "composition",
-        minCount: 0,
-        maxCount: null,
-      });
-    } else {
-      const rangeEnumKey = fieldEnumOverrides.get(field.fieldKey);
-      rootClass.properties.push({
-        key: field.fieldKey,
-        label: field.fieldLabel,
-        semanticId: `${termsBase}/${field.semanticSlug}`,
-        definition: field.definition,
-        domainClassKey: rootClass.key,
-        domainClassIri: rootClass.semanticId,
-        rangeKind: rangeEnumKey ? "enum" : "scalar",
-        ...(rangeEnumKey ? { rangeEnumKey } : { dataType: field.dataType }),
         minCount: field.required ? 1 : 0,
-        maxCount: 1,
-        unit: rangeEnumKey ? "" : (field.unitKey === "none" ? "" : (field.unitSymbol || "")),
+        maxCount: null,
         uiType: field.fieldType,
       });
+
+      const entryClass = classByKey.get(entryClassKey);
+      for (const column of field.tableColumns || []) {
+        const columnSourceRef = `column:${entry.section.key}:${field.fieldKey}:${column.columnKey}`;
+        const columnTemplate = findPropertyTemplate({
+          sourceRef: columnSourceRef,
+          ownerKey: entryClass.key,
+          key: column.columnKey,
+        });
+        setManagedProperty(entryClass, {
+          key: column.columnKey,
+          label: column.columnLabel,
+          semanticId: managedSemanticId(entryClass, column.columnKey, columnTemplate),
+          definition: `${column.columnLabel} within ${field.fieldLabel}.`,
+          rangeKind: "scalar",
+          dataType: column.dataType,
+          minCount: 0,
+          maxCount: 1,
+          unit: column.unitKey === "none" ? "" : (column.unitSymbol || ""),
+        });
+      }
+      continue;
     }
-    existingRootKeys.add(field.fieldKey);
+
+    const rangeEnumKey = fieldEnumOverrides.get(field.fieldKey);
+    const template = findPropertyTemplate({
+      sourceRef,
+      ownerKey: ownerClass.key,
+      key: field.fieldKey,
+    });
+    setManagedProperty(ownerClass, {
+      key: field.fieldKey,
+      label: field.fieldLabel,
+      semanticId: managedSemanticId(ownerClass, field.fieldKey, template),
+      definition: field.definition,
+      rangeKind: rangeEnumKey ? "enum" : "scalar",
+      ...(rangeEnumKey ? { rangeEnumKey } : { dataType: field.dataType }),
+      minCount: field.required ? 1 : 0,
+      maxCount: 1,
+      unit: rangeEnumKey ? "" : (field.unitKey === "none" ? "" : (field.unitSymbol || "")),
+      uiType: field.fieldType,
+    });
   }
 
   const semanticGraph = normalizeAndValidateSemanticGraph({
@@ -714,51 +1109,7 @@ function buildSemanticGraphDraft(rawGraph, { family, version, baseUrl, sections 
     classes,
     enums,
   });
-  const existingFieldKeys = new Set(
-    flattenDraftFieldsFromSections(sections).map((field) => field.fieldKey)
-  );
-  const generatedFields = semanticGraph.classes
-    .find((classDef) => classDef.key === semanticGraph.rootClassKey)
-    .properties
-    .filter((property) => !existingFieldKeys.has(property.key))
-    .map((property) => {
-      const runtimeField = runtimeFieldFromSemanticProperty(property, semanticGraph);
-      return {
-        fieldKey: property.key,
-        fieldLabel: property.label,
-        fieldType: runtimeField.type,
-        semanticSlug: semanticSlugFromIri(property.semanticId, property.key),
-        definition: property.definition,
-        specRef: "",
-        dataType: runtimeField.dataType,
-        itemDataType: runtimeField.itemDataType,
-        unitKey: "none",
-        unitLabel: "None",
-        unitSymbol: "n.a.",
-        confidentiality: "public",
-        queryable: false,
-        indexed: false,
-        storageType: "jsonb",
-        objectType: runtimeField.objectType,
-        valueDataType: runtimeField.valueDataType,
-        required: runtimeField.required,
-        semanticId: property.semanticId,
-        domainClassKey: property.domainClassKey,
-        domainClassIri: property.domainClassIri,
-        rangeKind: property.rangeKind,
-        rangeClassKey: property.rangeClassKey,
-        rangeEnumKey: property.rangeEnumKey,
-        rangeIri: property.rangeIri,
-        relationshipType: property.relationshipType,
-        minCount: property.minCount,
-        maxCount: property.maxCount,
-        allowedValues: runtimeField.allowedValues,
-        enumValues: runtimeField.enumValues,
-        structured: runtimeField.structured,
-      };
-    });
-
-  return { semanticGraph, generatedFields };
+  return { semanticGraph };
 }
 
 function validateSpec(input) {
@@ -772,7 +1123,8 @@ function validateSpec(input) {
   const roles = input.roles || {};
   const family = kebabCase(module.family);
   const version = normalizeVersion(module.version);
-  const moduleKey = clean(module.moduleKey) || `${family}:${version}`;
+  const expectedModuleKey = `${family}:${version}`;
+  const moduleKey = expectedModuleKey;
   const typeName = clean(module.typeName) || `${camelCase(family)}Passport${pascalCase(version)}`;
   const displayName = clean(module.displayName) || `${titleCase(family)} Passport ${version}`;
   const productCategory = clean(module.productCategory) || titleCase(family);
@@ -819,9 +1171,26 @@ function validateSpec(input) {
   const lifecycleRoles = roles.lifecycleRoles && typeof roles.lifecycleRoles === "object" ? roles.lifecycleRoles : {};
   const objectTypes = roles.objectTypes && typeof roles.objectTypes === "object" ? roles.objectTypes : {};
   const valueDataTypes = roles.valueDataTypes && typeof roles.valueDataTypes === "object" ? roles.valueDataTypes : {};
-  const compositionFieldKey = clean(roles.compositionFieldKey);
-  const compositionLabelColumnKey = normalizeTableColumnKey(roles.compositionLabelColumnKey);
-  const compositionValueColumnKey = normalizeTableColumnKey(roles.compositionValueColumnKey);
+  const rawCompositionCharts = Array.isArray(roles.compositionCharts)
+    ? roles.compositionCharts
+    : roles.compositionFieldKey
+      ? [{
+        fieldKey: roles.compositionFieldKey,
+        labelColumnKey: roles.compositionLabelColumnKey,
+        valueColumnKey: roles.compositionValueColumnKey,
+      }]
+      : [];
+  const compositionCharts = rawCompositionCharts
+    .map((chart) => ({
+      fieldKey: clean(chart?.fieldKey || chart?.compositionFieldKey),
+      labelColumnKey: normalizeTableColumnKey(
+        chart?.labelColumnKey || chart?.compositionLabelColumnKey
+      ),
+      valueColumnKey: normalizeTableColumnKey(
+        chart?.valueColumnKey || chart?.compositionValueColumnKey
+      ),
+    }))
+    .filter((chart) => chart.fieldKey || chart.labelColumnKey || chart.valueColumnKey);
 
   if (!family) throw new Error("Product family is required");
   if (!isSafePassportTypeName(typeName)) {
@@ -876,30 +1245,17 @@ function validateSpec(input) {
     return normalized;
   };
 
-  let sections = (input.sections || [])
-    .map(normalizeInputSection)
-    .filter((section) => section.key && (section.fields.length || section.sections.length));
+  let sections = (input.sections || []).map(normalizeInputSection);
 
   if (!sections.length) throw new Error("At least one section with one field is required");
-  const {
-    semanticGraph,
-    generatedFields: semanticGraphFields,
-  } = buildSemanticGraphDraft(input.semanticGraph, {
+  assertNoEmptyLeafSections(sections);
+  const { semanticGraph } = buildSemanticGraphDraft(input.semanticGraph, {
     family,
     version,
     baseUrl,
     sections,
   });
-  if (semanticGraphFields.length) {
-    sections = [
-      ...sections,
-      {
-        key: "semanticRelationships",
-        label: "Semantic Relationships",
-        fields: semanticGraphFields,
-      },
-    ];
-  }
+  assertNoReservedRuntimeFields(sections, semanticGraph);
   const normalizedSectionTreeLimitError = getSectionTreeLimitError(sections);
   if (normalizedSectionTreeLimitError) throw new Error(normalizedSectionTreeLimitError);
   const sectionKeys = flattenDraftSections(sections).map((section) => section.key);
@@ -937,7 +1293,9 @@ function validateSpec(input) {
   if (duplicateSummaryCardRole) {
     throw new Error(`Product overview ${duplicateSummaryCardRole.replace("card", "card ")} is assigned to multiple fields.`);
   }
-  requireKnownFieldKey(compositionFieldKey, "Composition chart field");
+  compositionCharts.forEach((chart, index) => {
+    requireKnownFieldKey(chart.fieldKey, `Composition chart ${index + 1} field`);
+  });
 
   for (const field of fieldByKey.values()) {
     field.displayRole = summaryRoles[field.fieldKey] ? "hero" : "detail";
@@ -970,69 +1328,108 @@ function validateSpec(input) {
     }
   }
 
-  if (compositionFieldKey) {
-    const field = fieldByKey.get(compositionFieldKey);
-    if (field.fieldType !== "table") {
-      throw new Error("Composition chart field must be a table field.");
-    }
-    if (!compositionLabelColumnKey || !compositionValueColumnKey) {
-      throw new Error("Composition chart must define both label and data columns.");
-    }
-    if (compositionLabelColumnKey === compositionValueColumnKey) {
-      throw new Error("Composition chart must use different label and data columns.");
-    }
-    const columnKeys = new Set((field.tableColumns || []).map((column) => column.columnKey));
-    if (!columnKeys.has(compositionLabelColumnKey) || !columnKeys.has(compositionValueColumnKey)) {
-      throw new Error("Composition chart columns must exist on the selected table field.");
-    }
-    const labelColumn = field.tableColumns.find((column) => column.columnKey === compositionLabelColumnKey);
-    const valueColumn = field.tableColumns.find((column) => column.columnKey === compositionValueColumnKey);
-    if (labelColumn.dataType !== "string") {
-      throw new Error("Composition chart label column must use dataType \"string\".");
-    }
-    if (!["decimal", "integer"].includes(valueColumn.dataType)) {
-      throw new Error("Composition chart data column must use dataType \"decimal\" or \"integer\".");
-    }
-    field.composition = true;
-    field.compositionLabelColumnKey = compositionLabelColumnKey;
-    field.compositionValueColumnKey = compositionValueColumnKey;
-    field.presentation = "compositionChart";
+  const compositionFieldKeys = compositionCharts.map((chart) => chart.fieldKey);
+  const duplicateCompositionFieldKey = compositionFieldKeys.find(
+    (fieldKey, index) => fieldKey && compositionFieldKeys.indexOf(fieldKey) !== index
+  );
+  if (duplicateCompositionFieldKey) {
+    throw new Error(`Composition chart field "${duplicateCompositionFieldKey}" is configured more than once.`);
   }
 
-  const rootClass = semanticGraph.classes.find((classDef) => classDef.key === semanticGraph.rootClassKey);
-  const rootPropertiesByKey = new Map(
-    (rootClass?.properties || []).map((property) => [property.key, property])
-  );
-  for (const field of fieldByKey.values()) {
-    const property = rootPropertiesByKey.get(field.fieldKey);
-    if (!property) throw new Error(`Field "${field.fieldKey}" is missing from the semantic graph root class.`);
-    const runtimeField = runtimeFieldFromSemanticProperty(property, semanticGraph);
-    Object.assign(field, {
-      fieldType: runtimeField.type,
-      dataType: runtimeField.dataType,
-      itemDataType: runtimeField.itemDataType,
-      objectType: runtimeField.objectType,
-      valueDataType: runtimeField.valueDataType,
-      required: runtimeField.required,
-      semanticId: property.semanticId,
-      domainClassKey: property.domainClassKey,
-      domainClassIri: property.domainClassIri,
-      rangeKind: property.rangeKind,
-      rangeClassKey: property.rangeClassKey,
-      rangeEnumKey: property.rangeEnumKey,
-      rangeIri: property.rangeIri,
-      relationshipType: property.relationshipType,
-      minCount: property.minCount,
-      maxCount: property.maxCount,
-      allowedValues: runtimeField.allowedValues,
-      enumValues: runtimeField.enumValues,
-      structured: runtimeField.structured,
-      storageType: runtimeField.storageType || field.storageType,
-    });
-    if (property.rangeKind !== "scalar") {
-      delete field.tableColumns;
+  compositionCharts.forEach((chart, index) => {
+    const chartLabel = `Composition chart ${index + 1}`;
+    const field = fieldByKey.get(chart.fieldKey);
+    if (!field) {
+      throw new Error(`${chartLabel} must select a table field.`);
     }
-    field.presentation = field.composition ? "compositionChart" : inferPresentation(field);
+    if (field.fieldType !== "table") {
+      throw new Error(`${chartLabel} field must be a table field.`);
+    }
+    if (!chart.labelColumnKey || !chart.valueColumnKey) {
+      throw new Error(`${chartLabel} must define both label and data columns.`);
+    }
+    if (chart.labelColumnKey === chart.valueColumnKey) {
+      throw new Error(`${chartLabel} must use different label and data columns.`);
+    }
+    const columnKeys = new Set((field.tableColumns || []).map((column) => column.columnKey));
+    if (!columnKeys.has(chart.labelColumnKey) || !columnKeys.has(chart.valueColumnKey)) {
+      throw new Error(`${chartLabel} columns must exist on the selected table field.`);
+    }
+    const labelColumn = field.tableColumns.find((column) => column.columnKey === chart.labelColumnKey);
+    const valueColumn = field.tableColumns.find((column) => column.columnKey === chart.valueColumnKey);
+    if (labelColumn.dataType !== "string") {
+      throw new Error(`${chartLabel} label column must use dataType "string".`);
+    }
+    if (!["decimal", "integer"].includes(valueColumn.dataType)) {
+      throw new Error(`${chartLabel} data column must use dataType "decimal" or "integer".`);
+    }
+    field.composition = true;
+    field.compositionLabelColumnKey = chart.labelColumnKey;
+    field.compositionValueColumnKey = chart.valueColumnKey;
+    field.presentation = "compositionChart";
+  });
+
+  const semanticClassesByKey = new Map(
+    semanticGraph.classes.map((classDef) => [classDef.key, classDef])
+  );
+  for (const section of flattenDraftSections(sections)) {
+    const ownerClass = semanticClassesByKey.get(section.key);
+    if (!ownerClass) throw new Error(`Section "${section.key}" is missing its semantic class.`);
+    const propertiesByKey = new Map(
+      (ownerClass.properties || []).map((property) => [property.key, property])
+    );
+    for (const field of section.fields || []) {
+      const property = propertiesByKey.get(field.fieldKey);
+      if (!property) {
+        throw new Error(
+          `Field "${field.fieldKey}" is missing from its owning semantic class "${section.key}".`
+        );
+      }
+      const runtimeField = runtimeFieldFromSemanticProperty(property, semanticGraph);
+      const runtimeMetadata = field.fieldType === "table"
+        ? {}
+        : {
+            fieldType: runtimeField.type,
+            dataType: runtimeField.dataType,
+            itemDataType: runtimeField.itemDataType,
+            objectType: runtimeField.objectType,
+            valueDataType: runtimeField.valueDataType,
+          };
+      Object.assign(field, {
+        ...runtimeMetadata,
+        required: runtimeField.required,
+        semanticId: property.semanticId,
+        domainClassKey: property.domainClassKey,
+        domainClassIri: property.domainClassIri,
+        rangeKind: property.rangeKind,
+        rangeClassKey: property.rangeClassKey,
+        rangeEnumKey: property.rangeEnumKey,
+        rangeIri: property.rangeIri,
+        relationshipType: property.relationshipType,
+        minCount: property.minCount,
+        maxCount: property.maxCount,
+        allowedValues: runtimeField.allowedValues,
+        enumValues: runtimeField.enumValues,
+        structured: runtimeField.structured,
+        storageType: runtimeField.storageType || field.storageType,
+      });
+      if (field.fieldType === "table") {
+        const entryClass = semanticClassesByKey.get(property.rangeClassKey);
+        const columnProperties = new Map(
+          (entryClass?.properties || []).map((columnProperty) => [columnProperty.key, columnProperty])
+        );
+        for (const column of field.tableColumns || []) {
+          const columnProperty = columnProperties.get(column.columnKey);
+          if (!columnProperty) {
+            throw new Error(
+              `Table column "${field.fieldKey}.${column.columnKey}" is missing from semantic class "${property.rangeClassKey}".`
+            );
+          }
+          column.semanticId = columnProperty.semanticId;
+        }
+      }
+      field.presentation = field.composition ? "compositionChart" : inferPresentation(field);
+    }
   }
 
   for (const section of flattenDraftSections(sections)) {
@@ -1041,7 +1438,7 @@ function validateSpec(input) {
     }
     for (const field of section.fields || []) {
       if (!isSafePassportStorageFieldKey(field.fieldKey)) {
-        throw new Error(`Invalid field key: ${field.fieldKey}. Field keys must be lower camelCase PostgreSQL identifiers of at most 63 characters.`);
+        throw new Error(`Invalid field key: ${field.fieldKey}. Field keys must be lower camelCase identifiers of at most 200 characters.`);
       }
       if (field.fieldType === "table") {
         for (const column of field.tableColumns || []) {
@@ -1508,6 +1905,7 @@ function buildModuleJs(spec) {
         args.tableColumns = (field.tableColumns || []).map((column) => ({
           label: column.columnLabel,
           semanticSlug: column.semanticSlug,
+          semanticId: column.semanticId,
           elementIdPath: column.elementIdPath,
           objectType: column.objectType,
           valueDataType: column.valueDataType,
@@ -1629,7 +2027,7 @@ function field({
       tableColumns: tableColumns.map((column) => ({
         key: keyFromSemanticSlug(column.semanticSlug, column.label),
         label: column.label,
-        semanticId: term(column.semanticSlug),
+        semanticId: column.semanticId || term(column.semanticSlug),
         elementIdPath: column.elementIdPath,
         objectType: column.objectType,
         valueDataType: column.valueDataType,
@@ -1810,6 +2208,12 @@ async function handleApi(req, res, pathname) {
       return;
     }
 
+    if (req.method === "POST" && pathname === "/api/validate-csv-import") {
+      const input = await readBody(req);
+      sendJson(res, 200, validateCsvImport(input));
+      return;
+    }
+
     if (req.method === "POST" && pathname === "/api/preview") {
       const input = await readBody(req);
       const result = buildArtifacts(input);
@@ -1860,5 +2264,6 @@ if (require.main === module) {
 module.exports = {
   buildArtifacts,
   buildArtifactsZip,
+  validateCsvImport,
   validateSpec,
 };

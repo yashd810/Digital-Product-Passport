@@ -3,6 +3,13 @@ import { PieChart } from "../../../passport-viewer/components/PieChart";
 import { openAnalyticsPrintReport, renderBarChartSvg, renderLineChartSvg, renderPieChartSvg } from "../../../shared/utils/analyticsPrintExport";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { statusColors } from "../../../shared/utils/statusColors";
+import {
+  formatAuditAction,
+  formatAuditActor,
+  formatAuditEntity,
+  getAuditActionKind,
+  isCompanyDashboardAuditEvent,
+} from "../../../shared/audit/auditDisplay";
 
 const api = import.meta.env.VITE_API_URL || "";
 const overviewBarColors = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e"];
@@ -260,7 +267,7 @@ function LineChart({ labels, series }) {
   );
 }
 
-const actionIcons = { create:"✨", update:"📝", delete:"🗑️", release:"🚀", revise:"🔄", submitReview:"📤", submitReview:"📤" };
+const actionIcons = { create:"＋", update:"✎", delete:"−", release:"✓", revise:"↻", neutral:"•" };
 function timeAgo(d) {
   const s=Math.floor((Date.now()-new Date(d))/1000);
   if(s<60)return"just now"; if(s<3600)return`${Math.floor(s/60)}m ago`;
@@ -276,13 +283,14 @@ function normalizeOverviewAnalyticsPayload(payload) {
 
 function normalizeActivityRows(rows) {
   return Array.isArray(rows)
-    ? rows.map((item) => ({
+    ? rows.filter(isCompanyDashboardAuditEvent).map((item) => ({
         ...item,
         userFirstName: item.userFirstName || "",
         userLastName: item.userLastName || "",
         userEmail: item.userEmail || "",
         recordId: item.recordId || "",
         createdAt: item.createdAt || "",
+        tableName: item.tableName || "",
       }))
     : [];
 }
@@ -542,24 +550,26 @@ function Overview({ companyId }) {
           </h3>
           <div className="activity-full-row">
             <div className="activity-feed">
-              {activity.map((a,i)=>(
-                <div key={i} className="activity-item">
-                  <span className={`activity-icon activity-icon-${(a.action || "").toLowerCase()}`}>
-                    {actionIcons[a.action]||"📋"}
+              {activity.map((a,i)=>{
+                const actionKind = getAuditActionKind(a.action);
+                return (
+                <div key={a.id || `${a.createdAt}-${i}`} className="activity-item">
+                  <span className={`activity-icon activity-icon-${actionKind}`} aria-hidden="true">
+                    {actionIcons[actionKind]}
                   </span>
                   <div className="activity-body">
                     <div className="activity-row-top">
-                      <span className="activity-user">{a.userFirstName ? `${a.userFirstName} ${a.userLastName || ""}`.trim() : (a.userEmail?.split("@")[0]||"System")}</span>
-                      <span className={`activity-badge ${(a.action||"").toLowerCase()}`}>{(a.action||"").replaceAll("_", " ")}</span>
+                      <strong className="activity-action">{formatAuditAction(a.action)}</strong>
+                      <span className={`activity-badge ${actionKind}`}>{formatAuditEntity(a.tableName)}</span>
                     </div>
                     <div className="activity-row-bottom">
-                      <span className="activity-copy">passport activity recorded</span>
-                      {a.recordId&&<span className="activity-pass">{a.recordId.substring(0,8)}…</span>}
+                      <span className="activity-user">{formatAuditActor(a)}</span>
+                      {a.recordId&&<span className="activity-pass" title={a.recordId}>Record {a.recordId.substring(0,8)}…</span>}
                     </div>
                   </div>
-                  <span className="activity-time">{timeAgo(a.createdAt)}</span>
+                  <time className="activity-time" dateTime={a.createdAt}>{timeAgo(a.createdAt)}</time>
                 </div>
-              ))}
+              );})}
             </div>
           </div>
         </>

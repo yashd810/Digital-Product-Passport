@@ -1,0 +1,955 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "battery": "https://claros-dpp.online/dictionary/battery/v1/terms/",
+    "batteryPassportV1": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/BatteryPassportV1"
+    },
+    "generalInformation": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/general-information",
+      "@context": {
+        "dppAdministration": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/general-information/dpp-administration",
+          "@context": {
+            "dppSchema": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-schema"
+            },
+            "dppStatusKey": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-status-key"
+            },
+            "dppGranularity": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-granularity"
+            },
+            "dateTimeOfLatestUpdateOfDpp": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/date-time-of-latest-update-of-dpp",
+              "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+            },
+            "uniqueDppIdentifier": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/unique-dpp-identifier",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            }
+          }
+        },
+        "batteryIdentification": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/general-information/battery-identification",
+          "@context": {
+            "uniqueBatteryIdentifier": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/unique-battery-identifier",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "batteryModelIdentifier": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/battery-model-identifier"
+            },
+            "batterySerialNumber": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/battery-serial-number"
+            },
+            "batteryCategory": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/battery-category"
+            },
+            "batteryMass": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/battery-mass",
+              "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+            },
+            "batteryStatus": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/battery-status"
+            },
+            "manufacturingDate": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/manufacturing-date",
+              "@type": "http://www.w3.org/2001/XMLSchema#date"
+            }
+          }
+        },
+        "economicOperatorInformation": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/general-information/economic-operator-information",
+          "@context": {
+            "economicOperatorAddress": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/economic-operator-information/economic-operator-address",
+              "@context": {
+                "economicOperatorAddressStreetName": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/economic-operator-address/economic-operator-address-street-name"
+                },
+                "economicOperatorAddressCity": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/economic-operator-address/economic-operator-address-city"
+                },
+                "economicOperatorAddressPostalCode": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/economic-operator-address/economic-operator-address-postal-code"
+                },
+                "economicOperatorAddressCountry": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/economic-operator-address/economic-operator-address-country"
+                }
+              }
+            },
+            "economicOperatorContact": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/economic-operator-information/economic-operator-contact",
+              "@context": {
+                "economicOperatorContactPhoneNumber": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/economic-operator-contact/economic-operator-contact-phone-number"
+                },
+                "economicOperatorContactEmail": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/economic-operator-contact/economic-operator-contact-email"
+                }
+              }
+            },
+            "uniqueEconomicOperatorIdentifier": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/economic-operator-information/unique-economic-operator-identifier",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "economicOperatorRegisteredName": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/economic-operator-information/economic-operator-registered-name"
+            },
+            "economicOperatorWebsite": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/economic-operator-information/economic-operator-website",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            }
+          }
+        },
+        "manufacturerInformation": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/general-information/manufacturer-information",
+          "@context": {
+            "manufacturerAddress": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturer-information/manufacturer-address",
+              "@context": {
+                "manufacturerAddressStreetName": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturer-address/manufacturer-address-street-name"
+                },
+                "manufacturerAddressCity": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturer-address/manufacturer-address-city"
+                },
+                "manufacturerAddressPostalCode": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturer-address/manufacturer-address-postal-code"
+                },
+                "manufacturerAddressCountry": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturer-address/manufacturer-address-country"
+                }
+              }
+            },
+            "manufacturerContact": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturer-information/manufacturer-contact",
+              "@context": {
+                "manufacturerContactPhoneNumber": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturer-contact/manufacturer-contact-phone-number"
+                },
+                "manufacturerContactEmail": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturer-contact/manufacturer-contact-email"
+                }
+              }
+            },
+            "uniqueManufacturerIdentifier": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturer-information/unique-manufacturer-identifier",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "manufacturerRegisteredName": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturer-information/manufacturer-registered-name"
+            },
+            "manufacturerWebsite": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturer-information/manufacturer-website",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            }
+          }
+        },
+        "manufacturingFacility": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/general-information/manufacturing-facility",
+          "@context": {
+            "manufacturingPlace": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturing-facility/manufacturing-place",
+              "@context": {
+                "streetName": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturing-place/street-name"
+                },
+                "city": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturing-place/city"
+                },
+                "postalCode": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturing-place/postal-code"
+                },
+                "country": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturing-place/country"
+                }
+              }
+            },
+            "uniqueFacilityIdentifier": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/manufacturing-facility/unique-facility-identifier",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            }
+          }
+        },
+        "marketPlacementAndServiceInformation": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/general-information/market-placement-and-service-information",
+          "@context": {
+            "dateOfPuttingTheBatteryIntoService": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/market-placement-and-service-information/date-of-putting-the-battery-into-service",
+              "@type": "http://www.w3.org/2001/XMLSchema#date"
+            },
+            "warrantyPeriodOfTheBattery": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/market-placement-and-service-information/warranty-period-of-the-battery"
+            },
+            "extinguishingAgent": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/market-placement-and-service-information/extinguishing-agent"
+            }
+          }
+        }
+      }
+    },
+    "dppAdministration": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/DppAdministration"
+    },
+    "batteryIdentification": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/BatteryIdentification"
+    },
+    "economicOperatorInformation": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/EconomicOperatorInformation"
+    },
+    "economicOperatorAddress": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/EconomicOperatorAddress"
+    },
+    "economicOperatorContact": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/EconomicOperatorContact"
+    },
+    "manufacturerInformation": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/ManufacturerInformation"
+    },
+    "manufacturerAddress": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/ManufacturerAddress"
+    },
+    "manufacturerContact": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/ManufacturerContact"
+    },
+    "manufacturingFacility": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/ManufacturingFacility"
+    },
+    "manufacturingPlace": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/ManufacturingPlace"
+    },
+    "marketPlacementAndServiceInformation": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/MarketPlacementAndServiceInformation"
+    },
+    "labelsConformity": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/labels-conformity",
+      "@context": {
+        "mandatorySymbolsAndLabels": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/labels-conformity/mandatory-symbols-and-labels",
+          "@context": {
+            "separateCollectionSymbolInclLeadAndCd": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/mandatory-symbols-and-labels/separate-collection-symbol-incl-lead-and-cd",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "carbonFootprintLabel": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/mandatory-symbols-and-labels/carbon-footprint-label",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            }
+          }
+        },
+        "labelAndSymbolInformation": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/labels-conformity/label-and-symbol-information",
+          "@context": {
+            "meaningOfLabelsAndSymbols": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/label-and-symbol-information/meaning-of-labels-and-symbols",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            }
+          }
+        },
+        "conformityDocumentation": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/labels-conformity/conformity-documentation",
+          "@context": {
+            "resultsOfTestReportsProvingCompliance": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/conformity-documentation/results-of-test-reports-proving-compliance",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "euDeclarationOfConformity": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/conformity-documentation/eu-declaration-of-conformity",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            }
+          }
+        }
+      }
+    },
+    "mandatorySymbolsAndLabels": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/MandatorySymbolsAndLabels"
+    },
+    "labelAndSymbolInformation": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/LabelAndSymbolInformation"
+    },
+    "conformityDocumentation": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/ConformityDocumentation"
+    },
+    "carbonFootprint": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint",
+      "@context": {
+        "carbonFootprintResult": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint/carbon-footprint-result",
+          "@context": {
+            "batteryCarbonFootprintPerFunctionalUnit": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-result/battery-carbon-footprint-per-functional-unit",
+              "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+            },
+            "absoluteBatteryCarbonFootprint": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-result/absolute-battery-carbon-footprint",
+              "@type": "http://www.w3.org/2001/XMLSchema#integer"
+            },
+            "carbonFootprintPerformanceClass": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-result/carbon-footprint-performance-class"
+            },
+            "webLinkToPublicCarbonFootprintStudy": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-result/web-link-to-public-carbon-footprint-study",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            }
+          }
+        },
+        "lifecycleStageContributions": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint/lifecycle-stage-contributions",
+          "@context": {
+            "contributionOfRawMaterial": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/lifecycle-stage-contributions/contribution-of-raw-material",
+              "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+            },
+            "contributionOfProductProduction": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/lifecycle-stage-contributions/contribution-of-product-production",
+              "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+            },
+            "contributionOfDistribution": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/lifecycle-stage-contributions/contribution-of-distribution",
+              "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+            },
+            "contributionOfEndOfLife": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/lifecycle-stage-contributions/contribution-of-end-of-life",
+              "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+            }
+          }
+        }
+      }
+    },
+    "carbonFootprintResult": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/CarbonFootprintResult"
+    },
+    "lifecycleStageContributions": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/LifecycleStageContributions"
+    },
+    "supplyChainDueDiligence": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/supply-chain-due-diligence",
+      "@context": {
+        "dueDiligenceAndSupplyChainInformation": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/supply-chain-due-diligence/due-diligence-and-supply-chain-information",
+          "@context": {
+            "informationOfDueDiligenceReport": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/due-diligence-and-supply-chain-information/information-of-due-diligence-report",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "thirdPartyAssurancesOfRecognisedSchemes": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/due-diligence-and-supply-chain-information/third-party-assurances-of-recognised-schemes"
+            },
+            "supplyChainIndices": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/due-diligence-and-supply-chain-information/supply-chain-indices"
+            }
+          }
+        }
+      }
+    },
+    "dueDiligenceAndSupplyChainInformation": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/DueDiligenceAndSupplyChainInformation"
+    },
+    "materialsAndComposition": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-and-composition",
+      "@context": {
+        "batteryChemistry": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-and-composition/battery-chemistry",
+          "@context": {
+            "batteryChemistry": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-chemistry/battery-chemistry"
+            }
+          }
+        },
+        "batteryComposition": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-and-composition/battery-composition",
+          "@context": {
+            "materialsUsedInCathode": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-composition/materials-used-in-cathode",
+              "@container": "@set",
+              "@context": {
+                "materialName": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-used-in-cathode-entry/material-name"
+                },
+                "casNumber": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-used-in-cathode-entry/cas-number"
+                },
+                "composition": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-used-in-cathode-entry/composition",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            },
+            "materialsUsedInAnode": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-composition/materials-used-in-anode",
+              "@container": "@set",
+              "@context": {
+                "materialName": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-used-in-anode-entry/material-name"
+                },
+                "casNumber": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-used-in-anode-entry/cas-number"
+                },
+                "composition": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-used-in-anode-entry/composition",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            },
+            "materialsUsedInElectrolyte": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-composition/materials-used-in-electrolyte",
+              "@container": "@set",
+              "@context": {
+                "materialName": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-used-in-electrolyte-entry/material-name"
+                },
+                "casNumber": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-used-in-electrolyte-entry/cas-number"
+                },
+                "composition": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-used-in-electrolyte-entry/composition",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            }
+          }
+        },
+        "criticalAndHazardousSubstances": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/materials-and-composition/critical-and-hazardous-substances",
+          "@context": {
+            "criticalRawMaterials": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/critical-and-hazardous-substances/critical-raw-materials",
+              "@container": "@set",
+              "@context": {
+                "criticalRawMaterial": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/critical-raw-materials-entry/critical-raw-material"
+                }
+              }
+            },
+            "hazardousSubstances": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/critical-and-hazardous-substances/hazardous-substances",
+              "@container": "@set",
+              "@context": {
+                "materialName": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/hazardous-substances-entry/material-name"
+                },
+                "casNumber": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/hazardous-substances-entry/cas-number"
+                },
+                "concentration": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/hazardous-substances-entry/concentration",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "locationInTheBattery": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/hazardous-substances-entry/location-in-the-battery"
+                },
+                "componentId": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/hazardous-substances-entry/component-id"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "batteryChemistry": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/BatteryChemistry"
+    },
+    "batteryComposition": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/BatteryComposition"
+    },
+    "criticalAndHazardousSubstances": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/CriticalAndHazardousSubstances"
+    },
+    "circularityAndResourceEfficiency": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/circularity-and-resource-efficiency",
+      "@context": {
+        "dismantlingRepairAndSpareParts": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/circularity-and-resource-efficiency/dismantling-repair-and-spare-parts",
+          "@context": {
+            "dismantlingInformation": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dismantling-repair-and-spare-parts/dismantling-information",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "partNumbersForComponents": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dismantling-repair-and-spare-parts/part-numbers-for-components",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "informationOnSourcesOfSpareParts": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dismantling-repair-and-spare-parts/information-on-sources-of-spare-parts",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "safetyMeasures": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dismantling-repair-and-spare-parts/safety-measures",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            }
+          }
+        },
+        "recycledAndRenewableContent": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/circularity-and-resource-efficiency/recycled-and-renewable-content",
+          "@context": {
+            "preConsumerRecycledContent": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/recycled-and-renewable-content/pre-consumer-recycled-content",
+              "@context": {
+                "preConsumerRecycledNickelShare": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/pre-consumer-recycled-content/pre-consumer-recycled-nickel-share",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "preConsumerRecycledCobaltShare": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/pre-consumer-recycled-content/pre-consumer-recycled-cobalt-share",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "preConsumerRecycledLithiumShare": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/pre-consumer-recycled-content/pre-consumer-recycled-lithium-share",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            },
+            "postConsumerRecycledContent": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/recycled-and-renewable-content/post-consumer-recycled-content",
+              "@context": {
+                "postConsumerRecycledNickelShare": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/post-consumer-recycled-content/post-consumer-recycled-nickel-share",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "postConsumerRecycledCobaltShare": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/post-consumer-recycled-content/post-consumer-recycled-cobalt-share",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "postConsumerRecycledLithiumShare": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/post-consumer-recycled-content/post-consumer-recycled-lithium-share",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            },
+            "otherRecycledOrRenewableContent": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/recycled-and-renewable-content/other-recycled-or-renewable-content",
+              "@context": {
+                "recycledLeadShare": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/other-recycled-or-renewable-content/recycled-lead-share",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "renewableContentShare": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/other-recycled-or-renewable-content/renewable-content-share"
+                }
+              }
+            }
+          }
+        },
+        "endUserCollectionAndEndOfLifeInformation": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/circularity-and-resource-efficiency/end-user-collection-and-end-of-life-information",
+          "@context": {
+            "contributingToWastePrevention": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/end-user-collection-and-end-of-life-information/contributing-to-waste-prevention",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "contributingToTheSeparateCollection": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/end-user-collection-and-end-of-life-information/contributing-to-the-separate-collection",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "batteryCollectionPreparation": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/end-user-collection-and-end-of-life-information/battery-collection-preparation",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            },
+            "impactOfSubstances": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/end-user-collection-and-end-of-life-information/impact-of-substances",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            }
+          }
+        }
+      }
+    },
+    "dismantlingRepairAndSpareParts": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/DismantlingRepairAndSpareParts"
+    },
+    "recycledAndRenewableContent": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/RecycledAndRenewableContent"
+    },
+    "preConsumerRecycledContent": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/PreConsumerRecycledContent"
+    },
+    "postConsumerRecycledContent": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/PostConsumerRecycledContent"
+    },
+    "otherRecycledOrRenewableContent": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/OtherRecycledOrRenewableContent"
+    },
+    "endUserCollectionAndEndOfLifeInformation": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/EndUserCollectionAndEndOfLifeInformation"
+    },
+    "performanceAndDurability": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/performance-and-durability",
+      "@context": {
+        "batteryRating": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/performance-and-durability/battery-rating",
+          "@context": {
+            "ratedCapacity": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-rating/rated-capacity",
+              "@type": "http://www.w3.org/2001/XMLSchema#integer"
+            },
+            "certifiedUsableBatteryEnergy": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-rating/certified-usable-battery-energy",
+              "@type": "http://www.w3.org/2001/XMLSchema#integer"
+            },
+            "originalPowerCapability": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-rating/original-power-capability",
+              "@type": "http://www.w3.org/2001/XMLSchema#integer"
+            },
+            "maximumPermittedBatteryPower": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-rating/maximum-permitted-battery-power",
+              "@type": "http://www.w3.org/2001/XMLSchema#integer"
+            },
+            "ratioBetweenNominalBatteryPowerAndBatteryEnergy": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-rating/ratio-between-nominal-battery-power-and-battery-energy"
+            },
+            "initialRoundTripEnergyEfficiency": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-rating/initial-round-trip-energy-efficiency",
+              "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+            }
+          }
+        },
+        "dynamicData": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/performance-and-durability/dynamic-data",
+          "@context": {
+            "currentCapacityAndEnergy": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dynamic-data/current-capacity-and-energy",
+              "@context": {
+                "remainingCapacity": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/current-capacity-and-energy/remaining-capacity",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                },
+                "remainingUsableBatteryEnergy": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/current-capacity-and-energy/remaining-usable-battery-energy",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                },
+                "capacityThresholdForExhaustion": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/current-capacity-and-energy/capacity-threshold-for-exhaustion",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            },
+            "currentEnergyState": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dynamic-data/current-energy-state",
+              "@context": {
+                "stateOfCertifiedEnergySoce": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/current-energy-state/state-of-certified-energy-soce",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "stateOfChargeSoC": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/current-energy-state/state-of-charge-so-c",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            },
+            "currentPowerAndEfficiency": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dynamic-data/current-power-and-efficiency",
+              "@context": {
+                "remainingPowerCapability": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/current-power-and-efficiency/remaining-power-capability",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                },
+                "remainingRoundTripEnergyEfficiency": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/current-power-and-efficiency/remaining-round-trip-energy-efficiency",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            },
+            "currentElectricalAndThermalState": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dynamic-data/current-electrical-and-thermal-state",
+              "@context": {
+                "currentSelfDischargeRate": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/current-electrical-and-thermal-state/current-self-discharge-rate",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "temperatureInformation": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/current-electrical-and-thermal-state/temperature-information",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                }
+              }
+            },
+            "accumulatedUsage": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dynamic-data/accumulated-usage",
+              "@context": {
+                "numberOfFullChargingAndDischargingCycles": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/accumulated-usage/number-of-full-charging-and-discharging-cycles",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                },
+                "energyThroughput": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/accumulated-usage/energy-throughput",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "capacityThroughput": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/accumulated-usage/capacity-throughput",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            }
+          }
+        },
+        "operatingVoltageAndLimits": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/performance-and-durability/operating-voltage-and-limits",
+          "@context": {
+            "nominalVoltage": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/operating-voltage-and-limits/nominal-voltage",
+              "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+            },
+            "minimumVoltage": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/operating-voltage-and-limits/minimum-voltage",
+              "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+            },
+            "maximumVoltage": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/operating-voltage-and-limits/maximum-voltage",
+              "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+            }
+          }
+        },
+        "efficiencyAndElectricalLosses": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/performance-and-durability/efficiency-and-electrical-losses",
+          "@context": {
+            "selfDischargeBehaviour": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/efficiency-and-electrical-losses/self-discharge-behaviour",
+              "@context": {
+                "initialSelfDischargeRate": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/self-discharge-behaviour/initial-self-discharge-rate",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "evolutionOfSelfDischargeRates": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/self-discharge-behaviour/evolution-of-self-discharge-rates",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            },
+            "internalResistance": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/efficiency-and-electrical-losses/internal-resistance",
+              "@context": {
+                "initialInternalResistanceOfBatteryCell": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/internal-resistance/initial-internal-resistance-of-battery-cell",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                },
+                "initialInternalResistanceOfBatteryModule": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/internal-resistance/initial-internal-resistance-of-battery-module",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                },
+                "initialInternalResistanceOfBatteryPack": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/internal-resistance/initial-internal-resistance-of-battery-pack",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                }
+              }
+            },
+            "internalResistanceIncrease": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/efficiency-and-electrical-losses/internal-resistance-increase",
+              "@context": {
+                "internalResistanceIncreaseOfBatteryCell": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/internal-resistance-increase/internal-resistance-increase-of-battery-cell",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "internalResistanceIncreaseOfBatteryModule": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/internal-resistance-increase/internal-resistance-increase-of-battery-module",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "internalResistanceIncreaseOfBatteryPack": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/internal-resistance-increase/internal-resistance-increase-of-battery-pack",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            },
+            "roundTripEnergyEfficiencyAt50OfCycleLife": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/efficiency-and-electrical-losses/round-trip-energy-efficiency-at50-of-cycle-life",
+              "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+            }
+          }
+        },
+        "lifetimeAndAgeing": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/performance-and-durability/lifetime-and-ageing",
+          "@context": {
+            "expectedLifetime": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/lifetime-and-ageing/expected-lifetime",
+              "@context": {
+                "expectedLifetimeInCalendarYears": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/expected-lifetime/expected-lifetime-in-calendar-years",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "expectedLifetimeNumberOfChargeDischargeCycles": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/expected-lifetime/expected-lifetime-number-of-charge-discharge-cycles",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                }
+              }
+            },
+            "cycleLifeTestConditions": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/lifetime-and-ageing/cycle-life-test-conditions",
+              "@context": {
+                "cycleLifeReferenceTest": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/cycle-life-test-conditions/cycle-life-reference-test"
+                },
+                "cRateOfRelevantCycleLifeTest": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/cycle-life-test-conditions/c-rate-of-relevant-cycle-life-test",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            },
+            "degradationAtBol": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/lifetime-and-ageing/degradation-at-bol",
+              "@context": {
+                "capacityFade": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/degradation-at-bol/capacity-fade",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "powerFade": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/degradation-at-bol/power-fade",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                },
+                "energyRoundTripEfficiencyFade": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/degradation-at-bol/energy-round-trip-efficiency-fade",
+                  "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+                }
+              }
+            }
+          }
+        },
+        "temperatureAndEnvironmentalExposure": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/performance-and-durability/temperature-and-environmental-exposure",
+          "@context": {
+            "idleStateTemperatureRange": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/temperature-and-environmental-exposure/idle-state-temperature-range",
+              "@context": {
+                "temperatureRangeIdleStateLowerBoundary": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/idle-state-temperature-range/temperature-range-idle-state-lower-boundary",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                },
+                "temperatureRangeIdleStateUpperBoundary": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/idle-state-temperature-range/temperature-range-idle-state-upper-boundary"
+                }
+              }
+            },
+            "extremeTemperatureExposure": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/temperature-and-environmental-exposure/extreme-temperature-exposure",
+              "@context": {
+                "timeSpentInExtremeTemperaturesAboveBoundary": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/extreme-temperature-exposure/time-spent-in-extreme-temperatures-above-boundary",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                },
+                "timeSpentInExtremeTemperaturesBelowBoundary": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/extreme-temperature-exposure/time-spent-in-extreme-temperatures-below-boundary",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                }
+              }
+            },
+            "chargingDuringExtremeTemperatures": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/temperature-and-environmental-exposure/charging-during-extreme-temperatures",
+              "@context": {
+                "timeSpentChargingDuringExtremeTemperaturesAboveBoundary": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/charging-during-extreme-temperatures/time-spent-charging-during-extreme-temperatures-above-boundary",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                },
+                "timeSpentChargingDuringExtremeTemperaturesBelowBoundary": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/charging-during-extreme-temperatures/time-spent-charging-during-extreme-temperatures-below-boundary",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                }
+              }
+            }
+          }
+        },
+        "abuseEventsAndIncidentHistory": {
+          "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/performance-and-durability/abuse-events-and-incident-history",
+          "@context": {
+            "electricalAbuseEvents": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/abuse-events-and-incident-history/electrical-abuse-events",
+              "@context": {
+                "numberOfDeepDischargeEvents": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/electrical-abuse-events/number-of-deep-discharge-events",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                },
+                "numberOfOverchargeEvents": {
+                  "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/electrical-abuse-events/number-of-overcharge-events",
+                  "@type": "http://www.w3.org/2001/XMLSchema#integer"
+                }
+              }
+            },
+            "informationOnAccidents": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/abuse-events-and-incident-history/information-on-accidents",
+              "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
+            }
+          }
+        }
+      }
+    },
+    "batteryRating": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/BatteryRating"
+    },
+    "dynamicData": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/DynamicData"
+    },
+    "currentCapacityAndEnergy": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/CurrentCapacityAndEnergy"
+    },
+    "currentEnergyState": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/CurrentEnergyState"
+    },
+    "currentPowerAndEfficiency": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/CurrentPowerAndEfficiency"
+    },
+    "currentElectricalAndThermalState": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/CurrentElectricalAndThermalState"
+    },
+    "accumulatedUsage": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/AccumulatedUsage"
+    },
+    "operatingVoltageAndLimits": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/OperatingVoltageAndLimits"
+    },
+    "efficiencyAndElectricalLosses": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/EfficiencyAndElectricalLosses"
+    },
+    "selfDischargeBehaviour": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/SelfDischargeBehaviour"
+    },
+    "internalResistance": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/InternalResistance"
+    },
+    "internalResistanceIncrease": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/InternalResistanceIncrease"
+    },
+    "lifetimeAndAgeing": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/LifetimeAndAgeing"
+    },
+    "expectedLifetime": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/ExpectedLifetime"
+    },
+    "cycleLifeTestConditions": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/CycleLifeTestConditions"
+    },
+    "degradationAtBol": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/DegradationAtBol"
+    },
+    "temperatureAndEnvironmentalExposure": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/TemperatureAndEnvironmentalExposure"
+    },
+    "idleStateTemperatureRange": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/IdleStateTemperatureRange"
+    },
+    "extremeTemperatureExposure": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/ExtremeTemperatureExposure"
+    },
+    "chargingDuringExtremeTemperatures": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/ChargingDuringExtremeTemperatures"
+    },
+    "abuseEventsAndIncidentHistory": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/AbuseEventsAndIncidentHistory"
+    },
+    "electricalAbuseEvents": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/ElectricalAbuseEvents"
+    },
+    "materialsUsedInCathodeEntry": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/MaterialsUsedInCathodeEntry"
+    },
+    "materialsUsedInAnodeEntry": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/MaterialsUsedInAnodeEntry"
+    },
+    "materialsUsedInElectrolyteEntry": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/MaterialsUsedInElectrolyteEntry"
+    },
+    "criticalRawMaterialsEntry": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/CriticalRawMaterialsEntry"
+    },
+    "hazardousSubstancesEntry": {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/HazardousSubstancesEntry"
+    }
+  }
+}

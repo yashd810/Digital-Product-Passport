@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
+import CompanyDppPolicyFields from "../components/CompanyDppPolicyFields";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
+import { buildCompanyDppPolicyForm } from "../utils/companyDppPolicy";
 import "../styles/AdminDashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -27,6 +29,7 @@ const trustLevelOptions = [
 function AdminCompanies() {
   const navigate = useNavigate();
   const [companyForm, setCompanyForm] = useState(initialCompanyForm);
+  const [policyForm, setPolicyForm] = useState(() => buildCompanyDppPolicyForm());
   const [createdCompany, setCreatedCompany] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -65,6 +68,11 @@ function AdminCompanies() {
     setCreatedCompany(null);
   };
 
+  const handlePolicyFormChange = (field, value) => {
+    setPolicyForm((prev) => ({ ...prev, [field]: value }));
+    setCreatedCompany(null);
+  };
+
   const handleCreateCompany = async (event) => {
     event.preventDefault();
     setError("");
@@ -83,16 +91,21 @@ function AdminCompanies() {
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
           ...companyForm,
-          country: companyForm.country.trim().toUpperCase(),
+          country: companyForm.country.trim(),
           websiteDomain: companyForm.websiteDomain.trim(),
           verificationStatus: "unverified",
+          dppPolicy: policyForm,
         }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Failed to create company");
 
-      setCreatedCompany(data.company);
+      setCreatedCompany({
+        ...data.company,
+        dppPolicy: buildCompanyDppPolicyForm(data.dppPolicy || policyForm),
+      });
       setCompanyForm(initialCompanyForm);
+      setPolicyForm(buildCompanyDppPolicyForm());
       setSuccessMsg(`Created ${data.company.companyName}`);
     } catch (err) {
       setError(err.message || "Failed to create company");
@@ -156,8 +169,8 @@ function AdminCompanies() {
                 type="text"
                 value={companyForm.country}
                 onChange={(event) => handleCompanyFormChange("country", event.target.value)}
-                placeholder="SE"
-                maxLength={2}
+                placeholder="Sweden"
+                maxLength={80}
                 disabled={isLoading}
               />
             </div>
@@ -257,8 +270,20 @@ function AdminCompanies() {
               />
             </div>
           </div>
+          <div className="company-create-policy">
+            <h4>DPP Policy</h4>
+            <p className="admin-muted-copy">
+              Choose the issuance and semantic-export policy that will be saved with this company.
+            </p>
+            <CompanyDppPolicyFields
+              policy={policyForm}
+              onChange={handlePolicyFormChange}
+              disabled={isLoading}
+              idPrefix="createCompanyPolicy"
+            />
+          </div>
           <button type="submit" className="create-btn" disabled={isLoading}>
-            {isLoading ? "Creating…" : "Create Company"}
+            {isLoading ? "Creating…" : "Create Company and Save Policy"}
           </button>
         </form>
 
@@ -291,6 +316,10 @@ function AdminCompanies() {
                 <span className="company-code-result-label">Verification</span>
                 <strong className="company-code-result-value">{createdCompany.verificationStatus || "unverified"}</strong>
               </div>
+              <div className="company-code-result-item">
+                <span className="company-code-result-label">DPP Granularity</span>
+                <strong className="company-code-result-value">{createdCompany.dppPolicy?.defaultGranularity || "item"}</strong>
+              </div>
             </div>
 
             <div className="company-code-result-actions">
@@ -299,6 +328,13 @@ function AdminCompanies() {
               </button>
               <button type="button" className="manage-btn manage-btn-secondary" onClick={inviteCreatedCompany}>
                 Invite User
+              </button>
+              <button
+                type="button"
+                className="manage-btn manage-btn-secondary"
+                onClick={() => navigate(`/admin/company/${createdCompany.id}/access`)}
+              >
+                Manage Passport Type Access
               </button>
             </div>
           </div>

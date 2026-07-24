@@ -27,10 +27,11 @@ function issue(code, message, { sectionId = "", fieldId = "", path = [] } = {}) 
 
 export function getSectionTreeEntries(sections = []) {
   const entries = [];
-  const visit = (nodes, parentPath = []) => {
+  const visit = (nodes, parentPath = [], parentNumberPath = []) => {
     if (!Array.isArray(nodes)) return;
     nodes.forEach((section, index) => {
       if (!section || typeof section !== "object") return;
+      const numberPath = [...parentNumberPath, index + 1];
       const entry = {
         key: text(section.key),
         label: text(section.label) || text(section.name),
@@ -39,8 +40,15 @@ export function getSectionTreeEntries(sections = []) {
         index,
       };
       const path = [...parentPath, entry];
-      entries.push({ section, path, depth: parentPath.length, index });
-      visit(getSectionChildren(section), path);
+      entries.push({
+        section,
+        path,
+        depth: parentPath.length,
+        index,
+        numberPath,
+        number: numberPath.join("."),
+      });
+      visit(getSectionChildren(section), path, numberPath);
     });
   };
   visit(sections);

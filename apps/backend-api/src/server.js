@@ -284,7 +284,7 @@ const rateLimitMaintenanceTimer = startRateLimitMaintenance(pool);
 
 async function getCompanyAssetSettings(companyId) {
   const result = await pool.query(
-    `SELECT id, "companyName", "isActive", "assetManagementEnabled", "assetManagementRevokedAt"
+    `SELECT id, "companyName", "isActive"
      FROM companies WHERE id = $1`,
     [companyId]
   );

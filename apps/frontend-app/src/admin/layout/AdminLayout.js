@@ -66,6 +66,10 @@ function AdminLayout({ user, onLogout }) {
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           👑 Admin Management
         </NavLink>
+        <NavLink to="/admin/audit-logs"
+          className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
+          📋 Audit Logs
+        </NavLink>
         <NavLink to="/admin/manual"
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           📘 Manual

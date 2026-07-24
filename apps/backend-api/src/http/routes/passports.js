@@ -223,6 +223,7 @@ module.exports = function registerPassportRoutes(app, {
     logAudit,
     archivePassportSnapshot,
     getActorIdentifier,
+    normalizePassportRow,
   });
 
   registerCompanyPassportReadRoutes(app, {
@@ -304,6 +305,7 @@ module.exports = function registerPassportRoutes(app, {
     getCompanyNameMap,
     buildComplianceManagedFields,
     systemPassportFields,
+    normalizePassportRow,
   });
 
   registerLifecycleRoutes(app, {
@@ -341,6 +343,7 @@ module.exports = function registerPassportRoutes(app, {
     inRevisionStatus,
     submitPassportToWorkflow,
     validGranularities,
+    getPassportTypeSchema,
   });
 
   // ─── BULK REVISE ───────────────────────────────────────────────────────────
@@ -373,6 +376,7 @@ module.exports = function registerPassportRoutes(app, {
     inRevisionStatus,
     submitPassportToWorkflow,
     getPassportLineageContext,
+    normalizePassportRow,
   });
 
   registerDeleteRoutes(app, {
@@ -449,6 +453,7 @@ module.exports = function registerPassportRoutes(app, {
     checkCompanyAdmin,
     logAudit,
     loadLatestLivePassport,
+    getPassportTypeSchema,
     normalizePassportRow,
     stripRestrictedFieldsForPublicView,
     getCompanyNameMap,

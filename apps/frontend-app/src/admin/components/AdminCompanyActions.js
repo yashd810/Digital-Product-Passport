@@ -3,10 +3,8 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
-import {
-  getAssetManagementToggleState,
-  updateAssetManagementAccess,
-} from "../utils/assetManagementAccess";
+import { buildCompanyDppPolicyForm } from "../utils/companyDppPolicy";
+import CompanyDppPolicyFields from "./CompanyDppPolicyFields";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -59,14 +57,8 @@ function AdminCompanyActions({
   const [policyLoading, setPolicyLoading] = useState(false);
   const [policySaving, setPolicySaving] = useState(false);
 
-  const [assetManagementTarget, setAssetManagementTarget] = useState(null);
-  const [assetManagementError, setAssetManagementError] = useState("");
-  const [assetManagementSaving, setAssetManagementSaving] = useState(false);
-
   const companyId = company?.id;
   const companyName = company?.companyName || `Company ${companyId || ""}`;
-  const assetManagementToggle = getAssetManagementToggleState(company);
-  const assetManagementTargetToggle = getAssetManagementToggleState(assetManagementTarget);
 
   const notify = (type, text) => {
     if (onMessage) onMessage(type, text);
@@ -114,6 +106,7 @@ function AdminCompanyActions({
     if (!companyId) return;
     try {
       setPolicyTarget({ ...(company || {}), id: companyId, companyName });
+      setPolicyForm(null);
       setPolicyError("");
       setPolicyLoading(true);
       const response = await fetchWithAuth(`${api}/api/admin/companies/${companyId}/dpp-policy`, {
@@ -121,16 +114,7 @@ function AdminCompanyActions({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Failed to load company DPP policy");
-      setPolicyForm({
-        defaultGranularity: data.defaultGranularity || "item",
-        allowGranularityOverride: !!data.allowGranularityOverride,
-        mintModelDids: !!data.mintModelDids,
-        mintItemDids: !!data.mintItemDids,
-        mintFacilityDids: !!data.mintFacilityDids,
-        vcIssuanceEnabled: !!data.vcIssuanceEnabled,
-        jsonldExportEnabled: !!data.jsonldExportEnabled,
-        semanticDictionaryEnabled: !!data.semanticDictionaryEnabled,
-      });
+      setPolicyForm(buildCompanyDppPolicyForm(data));
     } catch (error) {
       setPolicyError(error.message || "Failed to load company DPP policy");
     } finally {
@@ -155,9 +139,8 @@ function AdminCompanyActions({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Failed to save company DPP policy");
+      setPolicyForm(buildCompanyDppPolicyForm(data));
       notify("success", `Updated DPP policy for ${policyTarget.companyName}`);
-      setPolicyTarget(null);
-      setPolicyForm(null);
       setPolicyError("");
       onCompanyUpdated?.(policyTarget);
     } catch (error) {
@@ -172,48 +155,6 @@ function AdminCompanyActions({
     setDeleteTarget({ ...(company || {}), id: companyId, companyName });
     setDeletePassword("");
     setDeleteError("");
-  };
-
-  const openAssetManagementToggle = () => {
-    closeMenu();
-    setAssetManagementTarget({ ...(company || {}), id: companyId, companyName });
-    setAssetManagementError("");
-  };
-
-  const confirmAssetManagementToggle = async (event) => {
-    event.preventDefault();
-    if (!assetManagementTarget) return;
-
-    const { nextEnabled } = getAssetManagementToggleState(assetManagementTarget);
-    try {
-      setAssetManagementSaving(true);
-      setAssetManagementError("");
-      const data = await updateAssetManagementAccess({
-        companyId: assetManagementTarget.id,
-        enabled: nextEnabled,
-        apiBase: api,
-      });
-      const updatedCompany = data.company || {
-        ...assetManagementTarget,
-        assetManagementEnabled: nextEnabled,
-      };
-      const jobsDeactivated = Number(data.jobsDeactivated) || 0;
-      const jobMessage = jobsDeactivated
-        ? ` Deactivated ${jobsDeactivated} scheduled job${jobsDeactivated === 1 ? "" : "s"}.`
-        : "";
-      notify(
-        "success",
-        nextEnabled
-          ? `Enabled Asset Management for ${assetManagementTarget.companyName}.`
-          : `Disabled Asset Management for ${assetManagementTarget.companyName}.${jobMessage}`
-      );
-      setAssetManagementTarget(null);
-      onCompanyUpdated?.(updatedCompany);
-    } catch (error) {
-      setAssetManagementError(error.message || "Failed to update Asset Management access");
-    } finally {
-      setAssetManagementSaving(false);
-    }
   };
 
   const renderInlineActionButton = (action) => {
@@ -240,20 +181,6 @@ function AdminCompanyActions({
           disabled={policyLoading || policySaving}
         >
           DPP Policy
-        </button>
-      );
-    }
-
-    if (action === "assetManagement") {
-      return (
-        <button
-          key="assetManagement"
-          type="button"
-          className="manage-btn manage-btn-secondary admin-company-action-inline-btn"
-          onClick={openAssetManagementToggle}
-          disabled={assetManagementSaving}
-        >
-          {assetManagementSaving ? "Updating…" : assetManagementToggle.actionLabel}
         </button>
       );
     }
@@ -347,9 +274,6 @@ function AdminCompanyActions({
           <button className="menu-item" onClick={openPolicyEditor}>
             ⚙️ DPP Policy
           </button>
-          <button className="menu-item" onClick={openAssetManagementToggle} disabled={assetManagementSaving}>
-            {assetManagementToggle.currentlyEnabled ? "⏹ Disable Asset Management" : "▶ Enable Asset Management"}
-          </button>
           {!hideDeleteMenuItem && (
             <button className="menu-item menu-item-danger" onClick={openDeleteCompany} disabled={isDeleting}>
               {isDeleting ? "Deleting…" : "🗑 Delete"}
@@ -410,39 +334,12 @@ function AdminCompanyActions({
             ) : (
               <form onSubmit={savePolicy} className="company-form">
                 {policyError && <div className="alert alert-error admin-alert-inline-wide">{policyError}</div>}
-                <div className="form-group">
-                  <label htmlFor={`defaultGranularity-${policyTarget.id}`}>Default Granularity</label>
-                  <select
-                    id={`defaultGranularity-${policyTarget.id}`}
-                    value={policyForm?.defaultGranularity || "item"}
-                    onChange={(event) => handlePolicyFieldChange("defaultGranularity", event.target.value)}
-                    disabled={policySaving}
-                  >
-                    <option value="item">Item</option>
-                    <option value="batch">Batch</option>
-                    <option value="model">Model</option>
-                  </select>
-                </div>
-
-                {[
-                  ["allowGranularityOverride", "Allow granularity override"],
-                  ["mintModelDids", "Mint model DIDs"],
-                  ["mintItemDids", "Mint item DIDs"],
-                  ["mintFacilityDids", "Mint facility DIDs"],
-                  ["vcIssuanceEnabled", "Enable VC issuance"],
-                  ["jsonldExportEnabled", "Enable JSON-LD export"],
-                  ["semanticDictionaryEnabled", "Enable semantic dictionaries"],
-                ].map(([field, label]) => (
-                  <label key={field} className="checkbox-label admin-checkbox-spaced">
-                    <input
-                      type="checkbox"
-                      checked={!!policyForm?.[field]}
-                      onChange={(event) => handlePolicyFieldChange(field, event.target.checked)}
-                      disabled={policySaving}
-                    />
-                    <span>{label}</span>
-                  </label>
-                ))}
+                <CompanyDppPolicyFields
+                  policy={policyForm}
+                  onChange={handlePolicyFieldChange}
+                  disabled={policySaving || !policyForm}
+                  idPrefix={`companyPolicy-${policyTarget.id}`}
+                />
 
                 <div className="apt-modal-actions">
                   <button
@@ -453,49 +350,12 @@ function AdminCompanyActions({
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="apt-modal-confirm-btn" disabled={policySaving}>
+                  <button type="submit" className="apt-modal-confirm-btn" disabled={policySaving || !policyForm}>
                     {policySaving ? "Saving…" : "Save Policy"}
                   </button>
                 </div>
               </form>
             )}
-          </div>
-        </div>
-      )}
-
-      {assetManagementTarget && (
-        <div className="apt-modal-overlay" onClick={() => !assetManagementSaving && setAssetManagementTarget(null)}>
-          <div className="apt-modal companies-delete-modal" onClick={(event) => event.stopPropagation()}>
-            <h3 className="apt-modal-title">{assetManagementTargetToggle.actionLabel}</h3>
-            <p className="apt-modal-warning apt-modal-warning-info">
-              {assetManagementTargetToggle.nextEnabled ? (
-                <>
-                  This lets <strong>{assetManagementTarget.companyName}</strong>{" "}use the Passport Data Management
-                  bulk-update workspace.
-                </>
-              ) : (
-                <>
-                  This immediately blocks new Passport Data Management requests for <strong>{assetManagementTarget.companyName}</strong>
-                  {" "}and deactivates its scheduled jobs. Re-enabling access does not restart those jobs automatically.
-                </>
-              )}
-            </p>
-            <form onSubmit={confirmAssetManagementToggle}>
-              {assetManagementError && <div className="alert alert-error admin-alert-inline-wide">{assetManagementError}</div>}
-              <div className="apt-modal-actions">
-                <button
-                  type="button"
-                  className="cancel-btn"
-                  onClick={() => setAssetManagementTarget(null)}
-                  disabled={assetManagementSaving}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="apt-modal-confirm-btn" disabled={assetManagementSaving}>
-                  {assetManagementSaving ? "Updating…" : assetManagementTargetToggle.actionLabel}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

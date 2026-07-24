@@ -152,6 +152,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       const rows = await getLatestCompanyPassports({
         companyId,
         passportType: typeSchema.typeName,
+        schema: typeSchema,
       });
 
       const assetFieldMap = getAssetFieldMap(typeSchema);

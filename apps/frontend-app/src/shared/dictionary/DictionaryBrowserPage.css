@@ -357,12 +357,30 @@
   border: 1px solid var(--border);
 }
 
-.dictionary-term-meta-block strong {
+.dictionary-term-meta-block strong,
+.dictionary-semantic-reference-label {
   display: block;
   color: var(--text-primary);
   font-size: 13px;
   line-height: 1.45;
   font-weight: 600;
+}
+
+.dictionary-semantic-reference {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.dictionary-semantic-reference-curie {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .dictionary-term-meta-mono {

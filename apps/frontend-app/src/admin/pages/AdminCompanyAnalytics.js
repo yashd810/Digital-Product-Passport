@@ -606,11 +606,18 @@ function AdminCompanyAnalytics() {
               company={currentCompany}
               hideKebabTrigger
               hideDeleteMenuItem
-              inlineActions={["edit", "assetManagement"]}
+              inlineActions={["edit"]}
               onCompanyDeleted={handleCompanyDeleted}
               onCompanyUpdated={handleCompanyUpdated}
               onMessage={flash}
             />
+            <button
+              type="button"
+              className="manage-btn manage-btn-analytics aca-manage-access-btn"
+              onClick={openCompanyAccess}
+            >
+              Manage Passport Type Access
+            </button>
             <button
               className="export-pdf-btn aca-export-btn"
               onClick={exportAnalyticsToPDF}
@@ -738,11 +745,6 @@ function AdminCompanyAnalytics() {
               ))}
             </tbody>
           </table>
-          <div className="aca-table-footer-actions">
-            <button type="button" className="manage-btn manage-btn-analytics" onClick={openCompanyAccess}>
-              Manage Access
-            </button>
-          </div>
         </div>
       )}
 

@@ -1,7 +1,9 @@
 "use strict";
 
+const nodeCrypto = require("crypto");
 const { rewriteRepositoryLinksDeep } = require("../repository/repository-file-links");
 const { getOptionalConfiguredOrigin } = require("../security/configured-origin");
+const { livePassportSystemColumns } = require("./system-passport-columns");
 const {
   isResourceField,
   isSafePassportUri,
@@ -15,10 +17,11 @@ const {
 } = require("./passport-semantic-graph");
 
 const inRevisionStatus = "inRevision";
-// PostgreSQL silently truncates identifiers after 63 bytes. Passport field
-// keys are physical column names, so accepting a longer key can make two
-// distinct schema fields address the same column.
+// PostgreSQL identifiers are limited to 63 bytes. Passport field keys are
+// logical API/schema identifiers and may be longer; long keys are mapped to a
+// deterministic, collision-resistant physical column name before SQL is built.
 const postgresIdentifierMaxBytes = 63;
+const passportFieldKeyMaxLength = 200;
 const passportStorageFieldKeyPattern = /^[a-z][A-Za-z0-9]*$/;
 const passportTypeNamePattern = /^[a-z][A-Za-z0-9]+$/;
 const passportTypeNameMaxLength = postgresIdentifierMaxBytes - "Passports".length;
@@ -57,6 +60,51 @@ const systemPassportFields = new Set([
   "updatedAt",
 ]);
 
+// Database tables can retain columns from older passport-type schema versions.
+// Once a type has a compiled schema projection, those stale columns must not
+// escape through API responses, backups, JSON-LD, or credentials. Keep the
+// platform-owned envelope explicit and project every business value from the
+// current type definition.
+const passportProjectionEnvelopeFields = new Set([
+  ...livePassportSystemColumns,
+  ...systemPassportFields,
+  "modelName",
+  "internalAliasId",
+  "uniqueProductIdentifier",
+  "productImage",
+  "passportPolicyKey",
+  "contentSpecificationIds",
+  "carrierPolicyKey",
+  "economicOperatorId",
+  "economicOperatorIdentifierScheme",
+  "facilityId",
+  "facilityIdentifier",
+  "granularity",
+  "dppSchemaVersion",
+  "dppStatus",
+  "lastUpdate",
+  "digitalProductPassportId",
+  "subjectDid",
+  "dppDid",
+  "companyDid",
+  "createdByName",
+  "companyName",
+  "companyLogo",
+  "manufacturerName",
+  "productIdentifierDid",
+  "releasedAt",
+  "archived",
+  "archivedAt",
+  "snapshotReason",
+  "signatureStatus",
+  "semanticModel",
+  "semanticProfile",
+  "extensions",
+  "elements",
+  "backupPublicHandover",
+  "backupHandoverSource",
+]);
+
 const editablePassportStatuses = new Set(["draft", inRevisionStatus]);
 
 const parseJsonOrFallback = (value, fallback = value) => {
@@ -72,7 +120,23 @@ const hasPostgresIdentifierLength = (value) =>
 
 const isSafePassportStorageFieldKey = (value) => {
   const key = String(value || "").trim();
-  return passportStorageFieldKeyPattern.test(key) && hasPostgresIdentifierLength(key);
+  return passportStorageFieldKeyPattern.test(key) && key.length <= passportFieldKeyMaxLength;
+};
+
+const toPostgresStorageIdentifier = (value) => {
+  const identifier = String(value || "").trim();
+  if (hasPostgresIdentifierLength(identifier)) return identifier;
+  const digest = nodeCrypto.createHash("sha256").update(identifier).digest("hex").slice(0, 12);
+  const prefixLength = postgresIdentifierMaxBytes - digest.length - 1;
+  return `${identifier.slice(0, prefixLength)}_${digest}`;
+};
+
+const toPassportStorageColumnKey = (value) => {
+  const key = String(value || "").trim();
+  if (!isSafePassportStorageFieldKey(key)) {
+    throw new Error(`Invalid passport field key: ${key}`);
+  }
+  return toPostgresStorageIdentifier(key);
 };
 
 const isSafePassportTypeName = (value) => {
@@ -82,10 +146,11 @@ const isSafePassportTypeName = (value) => {
 
 const quoteSqlIdentifier = (value) => {
   const identifier = String(value || "").trim();
-  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(identifier) || !hasPostgresIdentifierLength(identifier)) {
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(identifier) || identifier.length > passportFieldKeyMaxLength) {
     throw new Error(`Invalid SQL identifier: ${identifier}`);
   }
-  return `"${identifier.replace(/"/g, "\"\"")}"`;
+  const storageIdentifier = toPostgresStorageIdentifier(identifier);
+  return `"${storageIdentifier.replace(/"/g, "\"\"")}"`;
 };
 
 const joinQuotedSqlIdentifiers = (identifiers = []) =>
@@ -114,7 +179,11 @@ const getTable = (typeName) => {
   const safe = toStorageSlug(typeName);
   if (!safe) throw new Error("typeName must contain at least one alphanumeric character");
   const identifierSafeSlug = /^[a-z]/.test(safe) ? safe : `type${safe}`;
-  return quoteSqlIdentifier(`${toCamelIdentifier(identifierSafeSlug)}Passports`);
+  const tableIdentifier = `${toCamelIdentifier(identifierSafeSlug)}Passports`;
+  if (!hasPostgresIdentifierLength(tableIdentifier)) {
+    throw new Error(`Invalid SQL identifier: ${tableIdentifier}`);
+  }
+  return quoteSqlIdentifier(tableIdentifier);
 };
 
 const normalizeReleaseStatus = (status) => status;
@@ -217,10 +286,53 @@ const extractSchemaFields = (schema) => {
     throw new Error('Passport schemas must use "sections"; the retired "groups" property is not supported.');
   }
   if (Array.isArray(schema.schemaFields)) return schema.schemaFields.filter((field) => field?.key);
+  if (schema.fieldsJson && typeof schema.fieldsJson === "object") {
+    return extractSchemaFields(schema.fieldsJson);
+  }
   if (Array.isArray(schema.sections)) {
     return flattenSchemaFieldsFromSections(schema.sections);
   }
   return [];
+};
+
+const hasExplicitPassportSchema = (schema) => {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return false;
+  if (Array.isArray(schema.schemaFields) || Array.isArray(schema.sections)) return true;
+  if (schema.fieldsJson && typeof schema.fieldsJson === "object") {
+    return hasExplicitPassportSchema(schema.fieldsJson);
+  }
+  return false;
+};
+
+const projectPassportRowToSchema = (row, schema) => {
+  if (!row || !hasExplicitPassportSchema(schema)) return row;
+
+  const schemaFields = extractSchemaFields(schema);
+  const selectedKeys = new Set();
+  for (const field of schemaFields) {
+    const key = String(field?.key || "").trim();
+    if (!key) continue;
+    selectedKeys.add(key);
+    if (isSafePassportStorageFieldKey(key)) {
+      selectedKeys.add(toPassportStorageColumnKey(key));
+    }
+  }
+
+  const projected = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (key === "fields") continue;
+    if (passportProjectionEnvelopeFields.has(key) || selectedKeys.has(key)) {
+      projected[key] = value;
+    }
+  }
+
+  if (row.fields && typeof row.fields === "object" && !Array.isArray(row.fields)) {
+    projected.fields = Object.fromEntries(
+      Object.entries(row.fields).filter(([key]) => selectedKeys.has(key))
+    );
+  }
+
+  return projected;
 };
 
 const safeCompanyLogo = (value) => {
@@ -290,14 +402,33 @@ const getDisplayName = (rowData = {}) => {
   return null;
 };
 
+const restorePassportLogicalFieldKeys = (row, schema) => {
+  if (!row) return row;
+  const schemaFields = extractSchemaFields(schema);
+  const rowData = { ...row };
+  for (const field of schemaFields) {
+    if (!field?.key || !isSafePassportStorageFieldKey(field.key)) continue;
+    const storageKey = toPassportStorageColumnKey(field.key);
+    if (
+      storageKey !== field.key
+      && Object.prototype.hasOwnProperty.call(rowData, storageKey)
+    ) {
+      rowData[field.key] = rowData[storageKey];
+      delete rowData[storageKey];
+    }
+  }
+  return rowData;
+};
+
 const normalizePassportRow = (row, schema) => {
   if (!row) return row;
   const dppId = row.dppId ?? null;
   const companyId = row.companyId ?? null;
   const schemaFields = extractSchemaFields(schema);
 
-  // Deserialize JSONB fields
-  let rowData = { ...row };
+  // Restore logical API keys before deserializing structured field values.
+  let rowData = restorePassportLogicalFieldKeys(row, schema);
+  rowData = projectPassportRowToSchema(rowData, schema);
 
   if (schemaFields.length > 0) {
     const jsonbFields = new Set();
@@ -374,7 +505,10 @@ const normalizePassportRow = (row, schema) => {
 
 const getPassportFieldLookupKeys = (fieldKey) => {
   const exactKey = String(fieldKey || "").trim();
-  return exactKey ? [exactKey] : [];
+  if (!exactKey) return [];
+  if (!isSafePassportStorageFieldKey(exactKey)) return [exactKey];
+  const storageKey = toPassportStorageColumnKey(exactKey);
+  return storageKey === exactKey ? [exactKey] : [exactKey, storageKey];
 };
 
 const getPassportFieldValue = (passport, fieldKey) => {
@@ -986,6 +1120,7 @@ const toDynamicStoredValue = (value) => {
 module.exports = {
   inRevisionStatus,
   postgresIdentifierMaxBytes,
+  passportFieldKeyMaxLength,
   passportTypeNameMaxLength,
   systemPassportFields,
   editablePassportStatuses,
@@ -994,6 +1129,8 @@ module.exports = {
   isPublicHistoryStatus,
   isEditablePassportStatus,
   normalizePassportRow,
+  projectPassportRowToSchema,
+  restorePassportLogicalFieldKeys,
   toStoredPassportValue,
   normalizePassportRequestBody,
   coercePassportScalarValue,
@@ -1022,6 +1159,7 @@ module.exports = {
   mapPassportTemplateFieldRow,
   mapPassportTypeRow,
   isSafePassportStorageFieldKey,
+  toPassportStorageColumnKey,
   isSafePassportTypeName,
   quoteSqlIdentifier,
   joinQuotedSqlIdentifiers,

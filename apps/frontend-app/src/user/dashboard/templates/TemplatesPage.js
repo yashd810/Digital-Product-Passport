@@ -9,10 +9,11 @@ import {
   parseTableRows,
 } from "../../../shared/passports/tableSchemaUtils";
 import {
-  flattenSchemaFieldsFromSections,
   normalizeSchemaSections,
 } from "../../../shared/passports/passportSchemaUtils";
+import { filterPassportDataEntrySections } from "../../../shared/passports/passportSchemaVisibility";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
+import { buildUserTemplateFields } from "./templatePayload";
 import RepositoryPicker from "../../../passports/form/components/RepositoryPicker";
 import SymbolRepositoryPicker from "../../../passports/form/components/SymbolRepositoryPicker";
 import "../../../shared/styles/Dashboard.css";
@@ -265,7 +266,9 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.fieldsJson?.sections) {
-          setSections(normalizeSchemaSections(data.fieldsJson.sections));
+          setSections(filterPassportDataEntrySections(
+            normalizeSchemaSections(data.fieldsJson.sections)
+          ));
         } else {
           setSections(null);
         }
@@ -317,12 +320,9 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
     if (!passportType) return setError("Select a passport type");
     if (!name.trim())  return setError("Enter a template name");
 
-    // Preserve every field from the canonical section tree, including nested sections.
-    const fields = flattenSchemaFieldsFromSections(sections || []).map((field) => ({
-      fieldKey: field.key,
-      fieldValue: fieldValues[field.key] ?? "",
-      isModelData: modelDataKeys.has(field.key),
-    }));
+    // Templates carry only values the user populated. Semantic relationships
+    // stay in the passport type schema and are never template overrides.
+    const fields = buildUserTemplateFields(sections, fieldValues, modelDataKeys);
 
     setSaving(true); setError("");
     try {

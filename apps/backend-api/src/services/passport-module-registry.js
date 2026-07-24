@@ -12,10 +12,14 @@ const {
 } = require("../shared/passports/passport-helpers");
 const { getPassportFieldDataTypeError } = require("../shared/passports/passport-field-data-types");
 const {
+  findReservedPassportHeaderFieldConflicts,
+} = require("../shared/passports/passport-reserved-fields");
+const {
   getSemanticGraphClass,
   normalizeAndValidateSemanticGraph,
   runtimeFieldFromSemanticProperty,
 } = require("../shared/passports/passport-semantic-graph");
+const { buildPassportModuleDigest } = require("./passport-type-profile");
 
 const defaultPackagesDir = path.resolve(__dirname, "../../passport-modules");
 const packageModuleFileName = "module.js";
@@ -56,26 +60,63 @@ function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null,
   const seenSectionKeys = new Set();
   const seenFieldKeys = new Set();
   const rootClass = getSemanticGraphClass(semanticGraph, semanticGraph.rootClassKey);
-  const rootPropertiesByKey = new Map(
-    (rootClass?.properties || []).map((property) => [property.key, property])
+  const classesByKey = new Map(
+    (semanticGraph?.classes || []).map((classDef) => [classDef.key, classDef])
+  );
+  const expectedSectionParentByKey = new Map();
+
+  const collectSectionParents = (sectionList = [], parentClassKey = semanticGraph.rootClassKey) => {
+    for (const section of sectionList) {
+      if (!section?.key) continue;
+      expectedSectionParentByKey.set(section.key, parentClassKey);
+      collectSectionParents(
+        Array.isArray(section.sections) ? section.sections : [],
+        section.key
+      );
+    }
+  };
+  collectSectionParents(sections);
+
+  const getClassProperty = (classDef, propertyKey) => (
+    (classDef?.properties || []).find((property) => property.key === propertyKey) || null
   );
 
-  const normalizeField = (field) => {
+  const assertSectionContainment = (section, parentClass) => {
+    const relationship = getClassProperty(parentClass, section.key);
+    if (!relationship) {
+      throw new Error(
+        `Passport module "${sourceModuleKey || "unknown"}" section "${section.key}" is missing its semantic graph containment property on class "${parentClass?.key || "unknown"}".`
+      );
+    }
+    if (
+      relationship.rangeKind !== "class"
+      || relationship.rangeClassKey !== section.key
+      || relationship.relationshipType !== "composition"
+    ) {
+      throw new Error(
+        `Passport module "${sourceModuleKey || "unknown"}" section "${section.key}" must be a composition relationship from class "${parentClass.key}" to class "${section.key}".`
+      );
+    }
+  };
+
+  const normalizeField = (field, ownerClass) => {
     if (!field?.key) {
       throw new Error(`Passport module "${sourceModuleKey || "unknown"}" contains a field without a key.`);
     }
     if (!isSafePassportStorageFieldKey(field.key)) {
       throw new Error(
-        `Passport module "${sourceModuleKey || "unknown"}" field "${field.key}" must be a lower camelCase PostgreSQL identifier of at most 63 characters.`
+        `Passport module "${sourceModuleKey || "unknown"}" field "${field.key}" must be a lower camelCase identifier of at most 200 characters.`
       );
     }
     if (seenFieldKeys.has(field.key)) {
       throw new Error(`Passport module "${sourceModuleKey || "unknown"}" contains duplicate field key "${field.key}".`);
     }
     seenFieldKeys.add(field.key);
-    const graphProperty = rootPropertiesByKey.get(field.key);
+    const graphProperty = getClassProperty(ownerClass, field.key);
     if (!graphProperty) {
-      throw new Error(`Passport module "${sourceModuleKey || "unknown"}" field "${field.key}" is missing from the semantic graph root class.`);
+      throw new Error(
+        `Passport module "${sourceModuleKey || "unknown"}" field "${field.key}" is missing from its owning semantic graph class "${ownerClass?.key || "unknown"}".`
+      );
     }
     const expectedField = runtimeFieldFromSemanticProperty(graphProperty, semanticGraph);
     for (const metadataKey of [
@@ -132,7 +173,7 @@ function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null,
     return nextField;
   };
 
-  const normalizeSection = (section) => {
+  const normalizeSection = (section, parentClass = rootClass) => {
     if (!section?.key) {
       throw new Error(`Passport module "${sourceModuleKey || "unknown"}" contains a section without a key.`);
     }
@@ -141,20 +182,45 @@ function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null,
     }
     seenSectionKeys.add(section.key);
     const { sections: nestedSections, ...sectionRest } = section;
+    const fields = Array.isArray(section.fields) ? section.fields : [];
+    const childSections = Array.isArray(nestedSections) ? nestedSections : [];
+    if (fields.length === 0 && childSections.length === 0) {
+      throw new Error(
+        `Passport module "${sourceModuleKey || "unknown"}" section "${section.key}" must contain at least one field or subsection.`
+      );
+    }
+    const sectionClass = classesByKey.get(section.key);
+    if (!sectionClass) {
+      throw new Error(
+        `Passport module "${sourceModuleKey || "unknown"}" section "${section.key}" is missing its semantic graph class.`
+      );
+    }
+    assertSectionContainment(section, parentClass);
     return {
       ...sectionRest,
       sourceModuleKey,
-      fields: (section.fields || []).map(normalizeField),
-      sections: (Array.isArray(nestedSections) ? nestedSections : []).map(normalizeSection),
+      fields: fields.map((field) => normalizeField(field, sectionClass)),
+      sections: childSections.map((childSection) => normalizeSection(childSection, sectionClass)),
     };
   };
 
-  const normalizedSections = sections.map(normalizeSection);
-  const missingRootProperties = [...rootPropertiesByKey.keys()].filter((key) => !seenFieldKeys.has(key));
-  if (missingRootProperties.length) {
-    throw new Error(
-      `Passport module "${sourceModuleKey || "unknown"}" semantic graph root properties are missing runtime fields: ${missingRootProperties.join(", ")}.`
-    );
+  const normalizedSections = sections.map((section) => normalizeSection(section));
+
+  for (const classDef of [rootClass, ...seenSectionKeys].map((entry) => (
+    typeof entry === "string" ? classesByKey.get(entry) : entry
+  )).filter(Boolean)) {
+    for (const property of classDef.properties || []) {
+      const expectedParentKey = expectedSectionParentByKey.get(property.rangeClassKey);
+      const isSectionContainment = expectedParentKey
+        && property.key === property.rangeClassKey
+        && property.rangeKind === "class"
+        && property.relationshipType === "composition";
+      if (isSectionContainment && expectedParentKey !== classDef.key) {
+        throw new Error(
+          `Passport module "${sourceModuleKey || "unknown"}" section "${property.rangeClassKey}" is linked from semantic class "${classDef.key}" instead of its schema parent "${expectedParentKey}".`
+        );
+      }
+    }
   }
   return normalizedSections;
 }
@@ -166,6 +232,13 @@ function normalizeModuleDefinition(moduleDefinition = {}) {
   }
   const sections = Array.isArray(definition.sections) ? definition.sections : [];
   assertCanonicalSchemaSections(sections);
+  const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections);
+  if (reservedFieldConflicts.length) {
+    const conflict = reservedFieldConflicts[0];
+    throw new Error(
+      `Passport module "${definition.moduleKey || definition.typeName || "unknown"}" contains a reserved passport registry/header field. ${conflict.message}`
+    );
+  }
   if (!isSafePassportTypeName(definition.typeName)) {
     throw new Error(
       `Passport module "${definition.moduleKey || definition.typeName || "unknown"}" typeName must be lower camelCase and 2-${passportTypeNameMaxLength} characters.`
@@ -181,7 +254,7 @@ function normalizeModuleDefinition(moduleDefinition = {}) {
     );
   }
 
-  return {
+  const normalizedDefinition = {
     moduleKey: definition.moduleKey,
     typeName: definition.typeName,
     displayName: definition.displayName,
@@ -199,8 +272,12 @@ function normalizeModuleDefinition(moduleDefinition = {}) {
       identity: definition.identity,
       passportPolicyKey: passportPolicy.key,
       passportPolicy,
+      lifecycle: definition.lifecycle || null,
     },
   };
+  normalizedDefinition.moduleDigest = buildPassportModuleDigest(normalizedDefinition);
+  normalizedDefinition.fieldsJson.moduleDigest = normalizedDefinition.moduleDigest;
+  return normalizedDefinition;
 }
 
 function normalizeModuleExport(moduleExport) {

@@ -7,7 +7,11 @@ require("dotenv").config({
 });
 
 const { getPassportTypeModules } = require("../src/services/passport-module-registry");
-const { isSafePassportTypeName } = require("../src/shared/passports/passport-helpers");
+const { compilePassportTypeProfile } = require("../src/services/passport-type-profile");
+const {
+  flattenSchemaFieldsFromSections,
+  isSafePassportTypeName,
+} = require("../src/shared/passports/passport-helpers");
 
 function getArgValue(args, prefix) {
   return (args.find((arg) => arg.startsWith(prefix)) || "").slice(prefix.length);
@@ -172,36 +176,105 @@ async function resolveCompaniesForAccess(pool, { companyIds = [], grantAllActive
   return result.rows;
 }
 
-async function upsertPassportType(pool, definition) {
+function sameFieldSet(leftSections = [], rightSections = []) {
+  const left = flattenSchemaFieldsFromSections(leftSections).map((field) => field.key).sort();
+  const right = flattenSchemaFieldsFromSections(rightSections).map((field) => field.key).sort();
+  return left.length === right.length && left.every((key, index) => key === right[index]);
+}
+
+async function ensurePassportType(pool, definition) {
   await pool.query(
     "INSERT INTO \"productCategories\" (name, icon) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING",
     [definition.productCategory, definition.productIcon || "📋"]
   );
 
+  const existingResult = await pool.query(
+    `SELECT id,
+            "typeName" AS "typeName",
+            "displayName" AS "displayName",
+            "isActive" AS "isActive",
+            "fieldsJson" AS "fieldsJson"
+       FROM "passportTypes"
+      WHERE "typeName" = $1
+      LIMIT 1`,
+    [definition.typeName]
+  );
+  const existing = existingResult.rows?.[0] || null;
+  if (existing) {
+    if (existing.fieldsJson?.profile) {
+      return { ...existing, seedAction: "preservedProfile" };
+    }
+
+    const isProvablyFullLegacyType = existing.fieldsJson?.sourceModule === definition.moduleKey
+      && sameFieldSet(existing.fieldsJson?.sections || [], definition.fieldsJson?.sections || []);
+    if (!isProvablyFullLegacyType) {
+      return { ...existing, seedAction: "preservedLegacy" };
+    }
+
+    try {
+      const fieldsJson = compilePassportTypeProfile({
+        moduleDefinition: definition,
+        sections: existing.fieldsJson.sections,
+        identity: existing.fieldsJson.identity,
+        systemHeader: existing.fieldsJson.systemHeader,
+        schemaVersion: Number.parseInt(existing.fieldsJson.schemaVersion, 10) || 1,
+      });
+      const backfilled = await pool.query(
+        `UPDATE "passportTypes"
+            SET "fieldsJson" = $2::jsonb,
+                "updatedAt" = NOW()
+          WHERE id = $1
+          RETURNING id,
+                    "typeName" AS "typeName",
+                    "displayName" AS "displayName",
+                    "isActive" AS "isActive",
+                    "fieldsJson" AS "fieldsJson"`,
+        [existing.id, JSON.stringify(fieldsJson)]
+      );
+      return { ...(backfilled.rows?.[0] || existing), seedAction: "backfilledFullProfile" };
+    } catch {
+      return { ...existing, seedAction: "preservedLegacy" };
+    }
+  }
+
+  const fieldsJson = compilePassportTypeProfile({
+    moduleDefinition: definition,
+    schemaVersion: 1,
+  });
   const result = await pool.query(
     `INSERT INTO "passportTypes"
        ("typeName", "displayName", "productCategory", "productIcon", "semanticModelKey", "fieldsJson", "createdBy")
      VALUES ($1, $2, $3, $4, $5, $6::jsonb, NULL)
-     ON CONFLICT ("typeName") DO UPDATE
-       SET "displayName" = EXCLUDED."displayName",
-           "productCategory" = EXCLUDED."productCategory",
-           "productIcon" = EXCLUDED."productIcon",
-           "semanticModelKey" = EXCLUDED."semanticModelKey",
-           "fieldsJson" = EXCLUDED."fieldsJson",
-           "isActive" = true,
-           "updatedAt" = NOW()
-     RETURNING id, "typeName" AS "typeName", "displayName" AS "displayName"`,
+     ON CONFLICT ("typeName") DO NOTHING
+     RETURNING id,
+               "typeName" AS "typeName",
+               "displayName" AS "displayName",
+               "isActive" AS "isActive",
+               "fieldsJson" AS "fieldsJson"`,
     [
       definition.typeName,
       definition.displayName,
       definition.productCategory,
       definition.productIcon || "📋",
       definition.semanticModelKey || null,
-      JSON.stringify(definition.fieldsJson),
+      JSON.stringify(fieldsJson),
     ]
   );
+  if (result.rows?.[0]) return { ...result.rows[0], seedAction: "createdFullProfile" };
 
-  return result.rows[0];
+  const concurrent = await pool.query(
+    `SELECT id,
+            "typeName" AS "typeName",
+            "displayName" AS "displayName",
+            "isActive" AS "isActive",
+            "fieldsJson" AS "fieldsJson"
+       FROM "passportTypes"
+      WHERE "typeName" = $1
+      LIMIT 1`,
+    [definition.typeName]
+  );
+  if (!concurrent.rows?.[0]) throw new Error(`Failed to create passport type ${definition.typeName}`);
+  return { ...concurrent.rows[0], seedAction: "preservedConcurrentProfile" };
 }
 
 async function grantCompanyAccess(pool, { companies = [], passportTypes = [] } = {}) {
@@ -270,7 +343,7 @@ async function runSeed({ pool, options }) {
   const seededPassportTypes = [];
 
   for (const definition of modules) {
-    const row = await upsertPassportType(pool, definition);
+    const row = await ensurePassportType(pool, definition);
     let storage = "skipped";
     if (storageService) {
       await storageService.createPassportTable(definition.typeName, {
@@ -284,6 +357,7 @@ async function runSeed({ pool, options }) {
       moduleKey: definition.moduleKey,
       typeName: row.typeName,
       displayName: row.displayName,
+      seedAction: row.seedAction,
     };
     seededPassportTypes.push(seededType);
     results.push({
@@ -330,6 +404,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  ensurePassportType,
   getSelectedModules,
   grantCompanyAccess,
   parseOptions,

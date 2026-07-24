@@ -29,13 +29,14 @@ function createProductIdentifierService() {
 
 function createExampleProductTypeDef() {
   const rootClassIri = "https://www.example.test/dictionary/example-product/v1/classes/ExampleProductPassport";
+  const deviceIdentityClassIri = "https://www.example.test/dictionary/example-product/v1/classes/DeviceIdentity";
   const graphProperties = [
     {
       key: "deviceMaterial",
       label: "Device Material",
-      semanticId: "https://www.example.test/dictionary/example-product/v1/terms/device-material",
-      domainClassKey: "exampleProductPassport",
-      domainClassIri: rootClassIri,
+      semanticId: "https://www.example.test/dictionary/example-product/v1/terms/device-identity/device-material",
+      domainClassKey: "deviceIdentity",
+      domainClassIri: deviceIdentityClassIri,
       rangeKind: "scalar",
       dataType: "string",
       minCount: 0,
@@ -44,9 +45,9 @@ function createExampleProductTypeDef() {
     {
       key: "sterilizationCycles",
       label: "Sterilization Cycles",
-      semanticId: "https://www.example.test/dictionary/example-product/v1/terms/sterilization-cycles",
-      domainClassKey: "exampleProductPassport",
-      domainClassIri: rootClassIri,
+      semanticId: "https://www.example.test/dictionary/example-product/v1/terms/device-identity/sterilization-cycles",
+      domainClassKey: "deviceIdentity",
+      domainClassIri: deviceIdentityClassIri,
       rangeKind: "scalar",
       dataType: "integer",
       minCount: 0,
@@ -59,16 +60,51 @@ function createExampleProductTypeDef() {
     productCategory: "Example Product",
     semanticModelKey: "exampleProductDictionaryV1",
     fieldsJson: {
+      schemaVersion: 5,
+      sourceModule: "example-product:v1",
+      moduleDigest: "sha256:module",
+      profileDigest: "sha256:profile",
+      profile: {
+        contractVersion: 1,
+        selectionMode: "explicit",
+        sourceModule: "example-product:v1",
+        moduleDigest: "sha256:module",
+        profileDigest: "sha256:profile",
+        includedFields: [
+          { sourceModuleFieldKey: "deviceMaterial" },
+          { sourceModuleFieldKey: "sterilizationCycles" },
+        ],
+      },
+      semanticProfile: { schemaVersion: 1, graphDigest: "sha256:graph" },
       semanticGraph: {
         schemaVersion: 1,
         rootClassKey: "exampleProductPassport",
-        classes: [{
-          key: "exampleProductPassport",
-          label: "Example Product Passport",
-          semanticId: rootClassIri,
-          root: true,
-          properties: graphProperties,
-        }],
+        classes: [
+          {
+            key: "exampleProductPassport",
+            label: "Example Product Passport",
+            semanticId: rootClassIri,
+            root: true,
+            properties: [{
+              key: "deviceIdentity",
+              label: "Device Identity",
+              semanticId: "https://www.example.test/dictionary/example-product/v1/terms/device-identity",
+              domainClassKey: "exampleProductPassport",
+              domainClassIri: rootClassIri,
+              rangeKind: "class",
+              rangeClassKey: "deviceIdentity",
+              relationshipType: "composition",
+              minCount: 0,
+              maxCount: 1,
+            }],
+          },
+          {
+            key: "deviceIdentity",
+            label: "Device Identity",
+            semanticId: deviceIdentityClassIri,
+            properties: graphProperties,
+          },
+        ],
         enums: [],
       },
       sections: [{
@@ -79,9 +115,9 @@ function createExampleProductTypeDef() {
             label: "Device Material",
             type: "text",
             dataType: "string",
-            semanticId: "https://www.example.test/dictionary/example-product/v1/terms/device-material",
-            domainClassKey: "exampleProductPassport",
-            domainClassIri: rootClassIri,
+            semanticId: "https://www.example.test/dictionary/example-product/v1/terms/device-identity/device-material",
+            domainClassKey: "deviceIdentity",
+            domainClassIri: deviceIdentityClassIri,
             rangeKind: "scalar",
             rangeIri: "http://www.w3.org/2001/XMLSchema#string",
             minCount: 0,
@@ -94,9 +130,9 @@ function createExampleProductTypeDef() {
             label: "Sterilization Cycles",
             type: "text",
             dataType: "integer",
-            semanticId: "https://www.example.test/dictionary/example-product/v1/terms/sterilization-cycles",
-            domainClassKey: "exampleProductPassport",
-            domainClassIri: rootClassIri,
+            semanticId: "https://www.example.test/dictionary/example-product/v1/terms/device-identity/sterilization-cycles",
+            domainClassKey: "deviceIdentity",
+            domainClassIri: deviceIdentityClassIri,
             rangeKind: "scalar",
             rangeIri: "http://www.w3.org/2001/XMLSchema#integer",
             minCount: 0,
@@ -129,6 +165,7 @@ test("canonical serializer resolves terms from explicit semantic field metadata"
     economicOperatorId: "EORI-EXAMPLE-001",
     deviceMaterial: "Surgical steel",
     sterilizationCycles: "12",
+    excludedLegacyField: "must not leak",
   };
 
   const canonical = serializer.buildCanonicalPassportPayload(passport, typeDef, {
@@ -142,6 +179,20 @@ test("canonical serializer resolves terms from explicit semantic field metadata"
 
   assert.equal(canonical.fields.deviceMaterial, "Surgical steel");
   assert.equal(canonical.fields.sterilizationCycles, 12);
+  assert.equal(Object.prototype.hasOwnProperty.call(canonical.fields, "excludedLegacyField"), false);
+  assert.deepEqual(canonical.semanticProfile, {
+    typeName: "exampleProductPassportV1",
+    semanticModelKey: "exampleProductDictionaryV1",
+    sourceModule: "example-product:v1",
+    schemaVersion: 5,
+    profileDigest: "sha256:profile",
+    moduleDigest: "sha256:module",
+    graphDigest: "sha256:graph",
+    contractVersion: 1,
+    selectionMode: "explicit",
+    includedFieldCount: 2,
+    profilePath: "/api/passport-types/exampleProductPassportV1/semantic-profile",
+  });
   assert.deepEqual(canonical.extensions.platform.validationIssues || [], []);
 
   const expanded = serializer.buildExpandedPassportPayload(passport, typeDef, {
@@ -156,7 +207,7 @@ test("canonical serializer resolves terms from explicit semantic field metadata"
 
   assert.equal(
     cyclesElement.dictionaryReference,
-    "https://www.example.test/dictionary/example-product/v1/terms/sterilization-cycles"
+    "https://www.example.test/dictionary/example-product/v1/terms/device-identity/sterilization-cycles"
   );
   assert.equal(cyclesElement.valueDataType, "Integer");
   assert.equal(cyclesElement.value, 12);
@@ -171,7 +222,7 @@ test("canonical serializer refuses unsafe dictionary regex patterns without eval
       getModel: () => ({
         semanticModelKey: typeDef.semanticModelKey,
         terms: [{
-          iri: "https://www.example.test/dictionary/example-product/v1/terms/device-material",
+          iri: "https://www.example.test/dictionary/example-product/v1/terms/device-identity/device-material",
           dataType: { jsonType: "string", xsdType: "xsd:string" },
           pattern: "^(a+)+$",
         }],

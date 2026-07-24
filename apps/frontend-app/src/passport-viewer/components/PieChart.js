@@ -139,9 +139,7 @@ export function PieChart({ items, title, displayMode = "percentage", showTotalNo
               fill={s.color}
               strokeWidth="1.5"
             >
-              <title>
-                {s.label}: {displayMode === "value" ? formatDisplayValue(s.value) : `${s.pct.toFixed(1)}%`}
-              </title>
+              <title>{`${s.label}: ${displayMode === "value" ? formatDisplayValue(s.value) : `${s.pct.toFixed(1)}%`}`}</title>
             </path>
           ))}
           {/* Labels for slices large enough to fit text */}

@@ -32,6 +32,11 @@ The passport type can then decide:
 - which fields are required
 - which fields are optional
 - UI labels and display text
+- whether an included table (or generated object-list) field is shown as a composition chart
+
+Excluding a field also excludes its chart. It does not block the selection,
+silently re-include the field, or leave an empty chart behind. Multiple included
+fields can each have their own composition chart.
 
 Canonical fields stay locked for interoperability:
 
@@ -99,9 +104,15 @@ This is the preferred local workflow:
 2. Restart the backend so it can discover the new package.
 3. Open the admin Create Passport Type page.
 4. Select the module in Passport Module Source.
-5. Remove fields that do not apply to this passport type.
+5. Include only the fields that apply to this passport type.
 6. Mark the remaining fields required or optional.
 7. Save the passport type.
+
+The backend compiles the submitted profile against the registered module. It
+copies canonical field metadata from the module, retains the nested ancestors
+needed by selected fields, projects the semantic graph, applies required
+cardinality, and stores module/profile digests. The browser does not submit an
+independent replacement schema.
 
 Verify syntax first:
 
@@ -120,9 +131,14 @@ That endpoint requires a logged-in super-admin session in the browser, so `curl`
 
 ## Optional Direct Seed Flow
 
-The seed script still exists for direct publish/admin bootstrap cases. It creates or updates a passport type directly from a module definition.
+The seed script still exists for direct publish/admin bootstrap cases. If the
+module's default `typeName` does not exist, it creates a full-selection passport
+type compiled from the module.
 
-Use this only when you intentionally want one database passport type to match the module definition as-is.
+If that `typeName` already exists, seeding preserves its stored Admin-selected
+profile and only performs safe operational reconciliation. It never replaces a
+curated subset with the full module. Use direct seed only when you intentionally
+want the initial database passport type to include the complete module.
 
 Preview first:
 
@@ -184,7 +200,8 @@ Check these places:
 - Company access for the intended tenant
 - Create passport flow for the new type
 - Public viewer output
-- Dictionary endpoints
+- Canonical dictionary endpoints
+- Type-specific semantic profile and JSON-LD/SHACL artifacts
 
 Useful checks:
 
@@ -192,7 +209,14 @@ Useful checks:
 curl -s http://localhost:3001/api/dictionary/<family>/<version>/terms
 curl -s http://localhost:3001/api/dictionary/<family>/<version>/classes
 curl -s http://localhost:3001/api/dictionary/<family>/<version>/enums
+curl -s http://localhost:3001/api/passport-types/<typeName>/semantic-profile
+curl -s http://localhost:3001/api/passport-types/<typeName>/semantic-profile/context.jsonld
+curl -s http://localhost:3001/api/passport-types/<typeName>/semantic-profile/shapes.jsonld
 ```
+
+The module dictionary calls above stay comprehensive. The passport-type calls
+return only selected fields plus the ancestor classes, containment links,
+ranges, enums, and units needed to understand them.
 
 If your local stack is already running, you usually only need to restart the
 backend after adding a new package.

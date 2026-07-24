@@ -6,7 +6,7 @@ const {
   assertAssetManagementEntitlement,
 } = require("../src/shared/assets/asset-management-entitlement");
 
-test("asset management entitlement fails closed unless the company is active and explicitly enabled", () => {
+test("asset management is available to every active company without an entitlement toggle", () => {
   assert.throws(
     () => assertAssetManagementEntitlement(null),
     (error) => error.statusCode === 404 && error.code === "assetManagementCompanyNotFound"
@@ -15,10 +15,15 @@ test("asset management entitlement fails closed unless the company is active and
     () => assertAssetManagementEntitlement({ isActive: false, assetManagementEnabled: true }),
     (error) => error.statusCode === 403 && error.code === "assetManagementCompanyInactive"
   );
-  assert.throws(
-    () => assertAssetManagementEntitlement({ isActive: true, assetManagementEnabled: false }),
-    (error) => error.statusCode === 403 && error.code === "assetManagementDisabled"
-  );
-  const enabledCompany = { id: 7, isActive: true, assetManagementEnabled: true };
-  assert.strictEqual(assertAssetManagementEntitlement(enabledCompany), enabledCompany);
+  const companyWithLegacyDisabledFlag = {
+    id: 7,
+    isActive: true,
+    assetManagementEnabled: false,
+    assetManagementRevokedAt: "2026-07-16T00:00:00.000Z",
+  };
+  assert.deepEqual(assertAssetManagementEntitlement(companyWithLegacyDisabledFlag), {
+    ...companyWithLegacyDisabledFlag,
+    assetManagementEnabled: true,
+    assetManagementRevokedAt: null,
+  });
 });

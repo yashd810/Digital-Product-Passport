@@ -124,7 +124,7 @@ function ManualCenter({ mode = "user", user, companyId }) {
   const manualTitle = mode === "admin" ? "Super Admin Manual" : "Workspace Manual";
   const manualSubtitle =
     mode === "admin"
-      ? "A guided map of the super-admin UI plus deep backend, security, asset-management, and API guidance for platform operators."
+      ? "A guided map of the super-admin UI plus module-generator, backend wiring, security, asset-management, audit, and API guidance for platform operators."
       : "A detailed guide to the company workspace, Asset Management tool, security model, and practical API usage in plain language.";
 
   return (

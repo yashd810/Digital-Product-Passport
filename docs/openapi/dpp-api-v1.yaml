@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Claros DPP Public and Integration API
-  version: "2026-06-28"
+  version: "2026-07-22"
   license:
     name: ISC
     identifier: ISC
@@ -21,6 +21,8 @@ tags:
     description: Public attachments and temporary capability links returned by authorised passport reads.
   - name: Public verification
     description: Anonymous signature and signing-key verification metadata.
+  - name: Public semantics
+    description: Canonical module dictionaries and compiled passport-type semantic profiles.
   - name: Integration write
     description: Bearer-authenticated company automation mutations.
 security: []
@@ -536,6 +538,74 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/passport-types/{typeName}/semantic-profile:
+    get:
+      operationId: getPassportTypeSemanticProfile
+      tags: [Public semantics]
+      summary: Read the compiled semantic profile for one passport type
+      description: >
+        Returns only the fields selected for this passport type, together with
+        the semantic classes, ancestor containment relationships, ranges,
+        enums, units, context, and SHACL shapes required by that selection.
+        The module-level dictionary remains comprehensive and is not filtered.
+      parameters:
+        - $ref: '#/components/parameters/TypeNamePath'
+      responses:
+        '200':
+          description: Compiled passport-type semantic bundle.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassportTypeSemanticProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/passport-types/{typeName}/semantic-profile/context.jsonld:
+    get:
+      operationId: getPassportTypeSemanticContext
+      tags: [Public semantics]
+      summary: Read the selected JSON-LD context for one passport type
+      parameters:
+        - $ref: '#/components/parameters/TypeNamePath'
+      responses:
+        '200':
+          description: Type-specific JSON-LD context.
+          content:
+            application/ld+json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/passport-types/{typeName}/semantic-profile/{artifact}:
+    get:
+      operationId: getPassportTypeSemanticArtifact
+      tags: [Public semantics]
+      summary: Read a selected semantic artifact for one passport type
+      description: >
+        Reads the filtered terms, classes, enums, units, or SHACL shapes for a
+        compiled passport type. Use `shapes.jsonld` for the SHACL artifact.
+      parameters:
+        - $ref: '#/components/parameters/TypeNamePath'
+        - name: artifact
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [terms, classes, enums, units, shapes.jsonld]
+      responses:
+        '200':
+          description: Type-specific semantic artifact.
+          content:
+            application/json:
+              schema: {}
+            application/ld+json:
+              schema: {}
+        '404':
+          $ref: '#/components/responses/NotFound'
 components:
   securitySchemes:
     bearerAuth:
@@ -557,6 +627,13 @@ components:
       schema:
         type: string
       description: Canonical DPP ID.
+    TypeNamePath:
+      name: typeName
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Stable lower-camel-case passport type name.
     VersionQuery:
       name: version
       in: query
@@ -580,6 +657,96 @@ components:
         type: string
       description: Alternate header for a security group key.
   schemas:
+    PassportTypeSemanticProfile:
+      type: object
+      additionalProperties: false
+      required:
+        - typeName
+        - semanticModelKey
+        - sourceModule
+        - schemaVersion
+        - profileDigest
+        - moduleDigest
+        - graphDigest
+        - contractVersion
+        - selectionMode
+        - includedFieldCount
+        - selectedFields
+        - semanticGraph
+        - context
+        - terms
+        - classes
+        - enums
+        - units
+        - shapes
+      properties:
+        typeName:
+          type: string
+        displayName:
+          type: [string, 'null']
+        productCategory:
+          type: [string, 'null']
+        semanticModelKey:
+          type: string
+        sourceModule:
+          type: string
+        schemaVersion:
+          type: integer
+          minimum: 1
+        profileDigest:
+          type: string
+        moduleDigest:
+          type: string
+        graphDigest:
+          type: string
+        contractVersion:
+          type: integer
+          minimum: 1
+        selectionMode:
+          type: string
+          enum: [full, explicit]
+        includedFieldCount:
+          type: integer
+          minimum: 0
+        profilePath:
+          type: string
+        canonicalDictionary:
+          type: object
+          additionalProperties: true
+        selectedFields:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        semanticGraph:
+          type: object
+          additionalProperties: true
+        context:
+          type: object
+          additionalProperties: true
+        terms:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        classes:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        enums:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        units:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        shapes:
+          type: object
+          additionalProperties: true
     PublicPassportPayload:
       type: object
       additionalProperties: true

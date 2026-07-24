@@ -14,14 +14,11 @@ function assertAssetManagementEntitlement(company) {
   if (company.isActive !== true) {
     throw accessError("Company is inactive", 403, "assetManagementCompanyInactive");
   }
-  if (company.assetManagementEnabled !== true) {
-    throw accessError(
-      "Passport Data Management is not enabled for this company",
-      403,
-      "assetManagementDisabled"
-    );
-  }
-  return company;
+  return {
+    ...company,
+    assetManagementEnabled: true,
+    assetManagementRevokedAt: null,
+  };
 }
 
 module.exports = {

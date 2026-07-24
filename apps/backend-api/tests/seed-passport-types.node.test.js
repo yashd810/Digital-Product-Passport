@@ -6,12 +6,14 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const {
+  ensurePassportType,
   getSelectedModules,
   grantCompanyAccess,
   parseOptions,
   resolveCompaniesForAccess,
   runSeed,
 } = require("../scripts/seed-passport-types");
+const { getPassportTypeModule } = require("../src/services/passport-module-registry");
 
 function createMockPool() {
   const calls = [];
@@ -91,6 +93,7 @@ function createSystemHeader() {
 
 function createExampleProductModule() {
   const rootClassIri = "https://example.test/dictionary/example-product/v1/classes/ExampleProductPassport";
+  const deviceIdentityClassIri = "https://example.test/dictionary/example-product/v1/classes/DeviceIdentity";
   return {
     moduleKey: "example-product:v1",
     typeName: "exampleProductPassportV1",
@@ -110,23 +113,42 @@ function createExampleProductModule() {
     semanticGraph: {
       schemaVersion: 1,
       rootClassKey: "exampleProductPassport",
-      classes: [{
-        key: "exampleProductPassport",
-        label: "Example Product Passport",
-        semanticId: rootClassIri,
-        root: true,
-        properties: [{
-          key: "modelIdentifier",
-          label: "Model Identifier",
-          semanticId: "https://example.test/dictionary/example-product/v1/terms/model-identifier",
-          domainClassKey: "exampleProductPassport",
-          domainClassIri: rootClassIri,
-          rangeKind: "scalar",
-          dataType: "string",
-          minCount: 0,
-          maxCount: 1,
-        }],
-      }],
+      classes: [
+        {
+          key: "exampleProductPassport",
+          label: "Example Product Passport",
+          semanticId: rootClassIri,
+          root: true,
+          properties: [{
+            key: "deviceIdentity",
+            label: "Device Identity",
+            semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity",
+            domainClassKey: "exampleProductPassport",
+            domainClassIri: rootClassIri,
+            rangeKind: "class",
+            rangeClassKey: "deviceIdentity",
+            relationshipType: "composition",
+            minCount: 0,
+            maxCount: 1,
+          }],
+        },
+        {
+          key: "deviceIdentity",
+          label: "Device Identity",
+          semanticId: deviceIdentityClassIri,
+          properties: [{
+            key: "modelIdentifier",
+            label: "Model Identifier",
+            semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/model-identifier",
+            domainClassKey: "deviceIdentity",
+            domainClassIri: deviceIdentityClassIri,
+            rangeKind: "scalar",
+            dataType: "string",
+            minCount: 0,
+            maxCount: 1,
+          }],
+        },
+      ],
       enums: [],
     },
     sections: [{
@@ -138,9 +160,9 @@ function createExampleProductModule() {
           label: "Model Identifier",
           type: "text",
           dataType: "string",
-          semanticId: "https://example.test/dictionary/example-product/v1/terms/model-identifier",
-          domainClassKey: "exampleProductPassport",
-          domainClassIri: rootClassIri,
+          semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/model-identifier",
+          domainClassKey: "deviceIdentity",
+          domainClassIri: deviceIdentityClassIri,
           rangeKind: "scalar",
           rangeIri: "http://www.w3.org/2001/XMLSchema#string",
           minCount: 0,
@@ -154,8 +176,7 @@ function createExampleProductModule() {
   };
 }
 
-function writeModulePackage(packagesDir) {
-  const definition = createExampleProductModule();
+function writeModulePackage(packagesDir, definition = createExampleProductModule()) {
   const packageDir = path.join(packagesDir, "example-product-v1");
   fs.mkdirSync(packageDir, { recursive: true });
   fs.writeFileSync(
@@ -234,6 +255,24 @@ test("seed script can discover and select an arbitrary future module package", a
   assert.equal(result.modules[0].productCategory, "Example Product");
 }));
 
+test("seed script rejects modules that duplicate reserved passport header fields", async () => withTempModules(async (packagesDir) => {
+  const definition = createExampleProductModule();
+  definition.semanticGraph.classes[1].properties[0].key = "dppStatus";
+  definition.sections[0].fields[0].key = "dppStatus";
+  writeModulePackage(packagesDir, definition);
+
+  await assert.rejects(
+    () => runSeed({
+      pool: null,
+      options: {
+        ...parseOptions(["--dry-run", "--module=example-product:v1"]),
+        packagesDir,
+      },
+    }),
+    /contains a reserved passport registry\/header field.*Field "dppStatus" is already generated/
+  );
+}));
+
 test("requested missing module still fails clearly", async () => withTempModules(async (packagesDir) => {
   await assert.rejects(
     () => runSeed({
@@ -283,6 +322,122 @@ test("grantCompanyAccess mirrors admin access upsert behavior", async () => {
   assert.ok(pool.calls.some((call) =>
     call.sql.includes("ON CONFLICT (\"companyId\", \"passportTypeId\") DO UPDATE SET \"accessRevoked\" = FALSE")
   ));
+});
+
+test("existing curated passport type profiles are never overwritten by the seed", async () => {
+  const definition = createExampleProductModule();
+  const existing = {
+    id: 311,
+    typeName: definition.typeName,
+    displayName: "Curated Example Product Type",
+    isActive: true,
+    fieldsJson: {
+      sourceModule: definition.moduleKey,
+      profile: {
+        contractVersion: 1,
+        selectionMode: "explicit",
+        includedFields: [{ sourceModuleFieldKey: "modelIdentifier" }],
+      },
+    },
+  };
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (String(sql).startsWith("INSERT INTO \"productCategories\"")) return { rows: [] };
+      if (String(sql).includes("FROM \"passportTypes\"") && String(sql).includes("WHERE \"typeName\" = $1")) {
+        return { rows: [existing] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+
+  const result = await ensurePassportType(pool, definition);
+
+  assert.equal(result.seedAction, "preservedProfile");
+  assert.equal(result.displayName, "Curated Example Product Type");
+  assert.equal(calls.some((call) => String(call.sql).startsWith("UPDATE \"passportTypes\"")), false);
+  assert.equal(calls.some((call) => String(call.sql).startsWith("INSERT INTO \"passportTypes\"")), false);
+});
+
+test("an exact full legacy module type is safely backfilled to the compiled profile contract", async () => {
+  const definition = getPassportTypeModule("battery:v1");
+  const existing = {
+    id: 312,
+    typeName: definition.typeName,
+    displayName: definition.displayName,
+    isActive: true,
+    fieldsJson: {
+      sourceModule: definition.moduleKey,
+      schemaVersion: 4,
+      identity: definition.fieldsJson.identity,
+      systemHeader: definition.fieldsJson.systemHeader,
+      sections: definition.fieldsJson.sections,
+    },
+  };
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      const normalized = String(sql).replace(/\s+/g, " ").trim();
+      if (normalized.startsWith("INSERT INTO \"productCategories\"")) return { rows: [] };
+      if (normalized.includes("FROM \"passportTypes\"") && normalized.includes("WHERE \"typeName\" = $1")) {
+        return { rows: [existing] };
+      }
+      if (normalized.startsWith("UPDATE \"passportTypes\"")) {
+        return {
+          rows: [{
+            ...existing,
+            fieldsJson: JSON.parse(params[1]),
+          }],
+        };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+
+  const result = await ensurePassportType(pool, definition);
+
+  assert.equal(result.seedAction, "backfilledFullProfile");
+  assert.equal(result.fieldsJson.schemaVersion, 4);
+  assert.equal(result.fieldsJson.profile.selectionMode, "explicit");
+  assert.ok(result.fieldsJson.moduleDigest);
+  assert.ok(result.fieldsJson.profileDigest);
+  assert.equal(calls.some((call) => String(call.sql).startsWith("UPDATE \"passportTypes\"")), true);
+});
+
+test("a legacy subset type is preserved rather than being expanded by the seed", async () => {
+  const definition = createExampleProductModule();
+  const existing = {
+    id: 313,
+    typeName: definition.typeName,
+    displayName: "Legacy subset type",
+    isActive: true,
+    fieldsJson: {
+      sourceModule: definition.moduleKey,
+      sections: [{
+        ...definition.sections[0],
+        fields: [],
+      }],
+    },
+  };
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (String(sql).startsWith("INSERT INTO \"productCategories\"")) return { rows: [] };
+      if (String(sql).includes("FROM \"passportTypes\"") && String(sql).includes("WHERE \"typeName\" = $1")) {
+        return { rows: [existing] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+
+  const result = await ensurePassportType(pool, definition);
+
+  assert.equal(result.seedAction, "preservedLegacy");
+  assert.equal(calls.some((call) => String(call.sql).startsWith("UPDATE \"passportTypes\"")), false);
+  assert.equal(calls.some((call) => String(call.sql).startsWith("INSERT INTO \"passportTypes\"")), false);
 });
 
 test("runSeed can seed a module and grant access to selected companies", async () => withTempModules(async (packagesDir) => {

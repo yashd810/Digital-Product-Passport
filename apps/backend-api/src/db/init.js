@@ -95,7 +95,7 @@ async function initDb(pool, {
       id               SERIAL PRIMARY KEY,
       "companyName"     VARCHAR(255) NOT NULL UNIQUE,
       "legalName"       TEXT,
-      country          TEXT,
+      country          VARCHAR(80),
       "companyRegistrationNumber" TEXT,
       "vatNumber"       TEXT,
       "websiteDomain"   TEXT,
@@ -106,7 +106,7 @@ async function initDb(pool, {
       "companyLogo"      TEXT,
       "introductionText" TEXT,
       "isActive"        BOOLEAN NOT NULL DEFAULT true,
-      "assetManagementEnabled" BOOLEAN NOT NULL DEFAULT false,
+      "assetManagementEnabled" BOOLEAN NOT NULL DEFAULT true,
       "assetManagementRevokedAt" TIMESTAMPTZ,
       "didSlug"         VARCHAR(160),
       "economicOperatorIdentifier" TEXT,
@@ -118,11 +118,41 @@ async function initDb(pool, {
   `);
   await pool.query(`
     ALTER TABLE companies
-    ADD COLUMN IF NOT EXISTS "assetManagementEnabled" BOOLEAN NOT NULL DEFAULT false
+    ADD COLUMN IF NOT EXISTS "assetManagementEnabled" BOOLEAN NOT NULL DEFAULT true
+  `);
+  await pool.query(`
+    ALTER TABLE companies
+    ALTER COLUMN "assetManagementEnabled" SET DEFAULT true
   `);
   await pool.query(`
     ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS "assetManagementRevokedAt" TIMESTAMPTZ
+  `);
+  await pool.query(`
+    UPDATE companies
+       SET "assetManagementEnabled" = true,
+           "assetManagementRevokedAt" = NULL
+     WHERE "assetManagementEnabled" IS DISTINCT FROM true
+        OR "assetManagementRevokedAt" IS NOT NULL
+  `);
+  await pool.query(`
+    ALTER TABLE companies
+    ALTER COLUMN "assetManagementEnabled" SET NOT NULL
+  `);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+          FROM pg_constraint
+         WHERE conname = 'companies_country_length_check'
+      ) THEN
+        ALTER TABLE companies
+          ADD CONSTRAINT companies_country_length_check
+          CHECK (country IS NULL OR char_length(country) <= 80) NOT VALID;
+      END IF;
+    END
+    $$
   `);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS "idxCompaniesDidSlugUnique"
@@ -815,7 +845,7 @@ async function initDb(pool, {
       CREATE TABLE IF NOT EXISTS "passportDynamicValues" (
       id            SERIAL       PRIMARY KEY,
       "passportDppId" TEXT         NOT NULL,
-      "fieldKey"    VARCHAR(100) NOT NULL,
+      "fieldKey"    VARCHAR(200) NOT NULL,
       value         TEXT,
         "updatedAt"   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
       )
@@ -824,9 +854,13 @@ async function initDb(pool, {
     await pool.query(`
       CREATE INDEX IF NOT EXISTS "idxDvPassport" ON "passportDynamicValues"("passportDppId")
   `);
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS "idxDvPassportField"
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS "idxDvPassportField"
       ON "passportDynamicValues"("passportDppId", "fieldKey", "updatedAt" DESC)
+  `);
+  await pool.query(`
+    ALTER TABLE "passportDynamicValues"
+      ALTER COLUMN "fieldKey" TYPE VARCHAR(200)
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "assetManagementJobs" (
@@ -1175,7 +1209,7 @@ async function initDb(pool, {
       "publicId"    VARCHAR(20)  NOT NULL UNIQUE,
       "companyId"   INTEGER      NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
       "passportDppId" TEXT       NOT NULL,
-      "fieldKey"    VARCHAR(100),
+      "fieldKey"    VARCHAR(200),
       "filePath"    TEXT,
       "storageKey"  TEXT,
       "storageProvider" VARCHAR(50),
@@ -1185,6 +1219,10 @@ async function initDb(pool, {
       "isPublic"    BOOLEAN      NOT NULL DEFAULT false,
       "createdAt"   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
+  `);
+  await pool.query(`
+    ALTER TABLE "passportAttachments"
+      ALTER COLUMN "fieldKey" TYPE VARCHAR(200)
   `);
 
   await pool.query(`

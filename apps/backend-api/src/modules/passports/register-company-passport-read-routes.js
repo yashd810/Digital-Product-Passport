@@ -15,7 +15,6 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
     getTable,
     normalizePassportRow,
     getPassportFieldValue,
-    normalizeReleaseStatus,
     normalizeInternalAliasIdValue,
     getPassportTypeSchema,
     fetchCompanyPassportRecord,
@@ -25,9 +24,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
     productIdentifierService,
     isFullRepresentationRequest,
     loadCompanySerializationContext,
-    inRevisionStatus,
     inRevisionStatusesSql,
-    editableReleaseStatusesSql,
     archivedHistoryFilterSql,
   } = deps;
 
@@ -52,12 +49,26 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       let index = 2;
 
       if (status) {
-        const normalizedStatus = normalizeReleaseStatus(status);
-        if (normalizedStatus === inRevisionStatus) {
+        const normalizedStatus = String(status).trim().toLowerCase();
+        const exactStatusByFilter = {
+          draft: "draft",
+          released: "released",
+          inreview: "inReview",
+          obsolete: "obsolete",
+        };
+        if (normalizedStatus === "all") {
+          // No release-status predicate means all active rows for this type.
+        } else if (normalizedStatus === "inrevision") {
           query += ` AND p."releaseStatus" IN ${inRevisionStatusesSql}`;
         } else {
+          const exactStatus = exactStatusByFilter[normalizedStatus];
+          if (!exactStatus) {
+            return res.status(400).json({
+              error: `Invalid status filter "${status}". Use: draft, released, inRevision, inReview, obsolete, all`,
+            });
+          }
           query += ` AND p."releaseStatus" = $${index++}`;
-          params.push(normalizedStatus);
+          params.push(exactStatus);
         }
       }
       if (search) {
@@ -170,7 +181,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       const { companyId } = req.params;
       const passportType = req.query.passportType;
       const format = String(req.query.format || "csv").toLowerCase();
-      const statusFilter = String(req.query.status || "draft").toLowerCase();
+      const statusFilter = String(req.query.status || "draft").trim().toLowerCase();
 
       if (!passportType) return res.status(400).json({ error: "passportType is required" });
 
@@ -190,15 +201,17 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       // CSV/JSON-LD serializers have a chance to resolve them.
       const safeColumns = ["*"];
 
-      let statusSql;
-      if (statusFilter === "all") {
-        statusSql = "";
-      } else if (statusFilter === "released") {
-        statusSql = ' AND "releaseStatus" = \'released\'';
-      } else if (statusFilter === "inRevision") {
-        statusSql = ` AND "releaseStatus" IN ${inRevisionStatusesSql}`;
-      } else {
-        statusSql = ` AND "releaseStatus" IN ${editableReleaseStatusesSql}`;
+      const statusSqlByFilter = {
+        all: "",
+        draft: ' AND "releaseStatus" = \'draft\'',
+        released: ' AND "releaseStatus" = \'released\'',
+        inrevision: ` AND "releaseStatus" IN ${inRevisionStatusesSql}`,
+      };
+      const statusSql = statusSqlByFilter[statusFilter];
+      if (statusSql === undefined) {
+        return res.status(400).json({
+          error: `Invalid status filter "${req.query.status}". Use: draft, released, inRevision, all`,
+        });
       }
 
       const passportResult = await pool.query(
@@ -217,7 +230,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
           : null;
         const exportRows = wantsFullRepresentation
           ? rows.map((row) => buildExpandedPassportPayload(
-              { ...normalizePassportRow(row), passportType },
+              { ...normalizePassportRow(row, typeResult.rows[0]?.fieldsJson), passportType },
               typeResult.rows[0],
               {
                 company,
@@ -309,7 +322,34 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       `;
 
       const result = await pool.query(query, params);
-      res.json(result.rows);
+      const typeNames = [...new Set(
+        (result.rows || []).map((row) => String(row.passportType || "").trim()).filter(Boolean)
+      )];
+      const typeSchemas = new Map(await Promise.all(typeNames.map(async (typeName) => [
+        typeName,
+        await getPassportTypeSchema(typeName),
+      ])));
+      const projectedRows = (result.rows || []).map((row) => {
+        const typeSchema = typeSchemas.get(String(row.passportType || "").trim()) || null;
+        let storedRowData = row.rowData;
+        if (typeof storedRowData === "string") {
+          try {
+            storedRowData = JSON.parse(storedRowData);
+          } catch {
+            storedRowData = null;
+          }
+        }
+        return {
+          ...row,
+          // Never return an unprojected archive snapshot. If its type schema
+          // cannot be resolved, omit the opaque payload instead of exposing
+          // columns retained from an older schema version.
+          rowData: typeSchema && storedRowData && typeof storedRowData === "object"
+            ? normalizePassportRow(storedRowData, typeSchema)
+            : null,
+        };
+      });
+      res.json(projectedRows);
     } catch (error) {
       logger.error("Archived list error:", error.message);
       res.status(500).json({ error: "Failed to fetch archived passports" });

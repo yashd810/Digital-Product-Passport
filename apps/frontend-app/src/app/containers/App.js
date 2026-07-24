@@ -6,7 +6,9 @@ import { useSessionAuth } from "../hooks/useSessionAuth";
 import { AdminRoute, ProtectedRoute } from "../routes/RouteGuards";
 import { applyTheme, getStoredTheme } from "../providers/ThemeContext";
 import AppSkipLink from "../components/AppSkipLink";
+import RouteErrorBoundary from "../components/RouteErrorBoundary";
 import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
+import { lazyWithRecovery } from "../../shared/utils/lazyWithRecovery";
 
 // Auth
 const Login = lazy(() => import("../../auth/containers/Login"));
@@ -16,7 +18,7 @@ const ForgotPassword = lazy(() => import("../../auth/containers/ForgotPassword")
 const ResetPassword = lazy(() => import("../../auth/containers/ForgotPassword").then((m) => ({ default: m.ResetPassword })));
 const OAuthCallback = lazy(() => import("../../auth/containers/OAuthCallback"));
 
-const PassportForm = lazy(() => import("../../passports/form/PassportFormPage"));
+const PassportForm = lazyWithRecovery("passport-form", () => import("../../passports/form/PassportFormPage"));
 const PassportViewer = lazy(() => import("../../passport-viewer/containers/PassportViewerPage"));
 const VersionDiff = lazy(() => import("../../passports/history/VersionDiff"));
 
@@ -52,6 +54,7 @@ const AdminPassportModules = lazy(() => import("../../admin/passport-modules/Adm
 const AdminCreatePassportType = lazy(() => import("../../admin/passport-types/AdminCreatePassportTypePage"));
 const AdminPassportTypeFields = lazy(() => import("../../admin/passport-types/AdminPassportTypeFields"));
 const AdminSecurity = lazy(() => import("../../admin/pages/AdminSecurity"));
+const AdminAuditLogs = lazy(() => import("../../admin/pages/AdminAuditLogs"));
 
 function RouteFallback() {
   return <div className="loading dashboard-loading-screen">Loading…</div>;
@@ -96,6 +99,7 @@ function App() {
 
   return (
     <I18nProvider>
+      <RouteErrorBoundary>
       <Suspense fallback={<RouteFallback />}>
       <AppSkipLink />
       <main id="app-main-content">
@@ -192,6 +196,7 @@ function App() {
           <Route path="passport-types/:typeName/fields" element={<AdminPassportTypeFields />} />
           <Route path="invite"                       element={<AdminInvite />} />
           <Route path="admin-management"             element={<AdminSecurity user={user} />} />
+          <Route path="audit-logs"                   element={<AdminAuditLogs />} />
           <Route path="manual"                       element={<ManualCenter mode="admin" user={user} companyId={companyId} />} />
           <Route path="company/:companyId/access"    element={<CompanyAccess />} />
           <Route path="company/:companyId/edit"      element={<AdminEditCompanyPage />} />
@@ -223,6 +228,7 @@ function App() {
       </Routes>
       </main>
       </Suspense>
+      </RouteErrorBoundary>
     </I18nProvider>
   );
 }

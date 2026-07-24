@@ -260,6 +260,7 @@ module.exports = function registerAdminRoutes(app, {
     authenticateToken,
     isSuperAdmin,
     getTable,
+    logAudit,
   });
 
 };

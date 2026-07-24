@@ -6,6 +6,7 @@ const { createSchemaStorageHelpers } = require("../src/modules/passports/schema-
 const {
   getTable,
   quoteSqlIdentifier,
+  toPassportStorageColumnKey,
 } = require("../src/shared/passports/passport-helpers");
 const {
   livePassportSystemColumnDefinitions,
@@ -68,9 +69,9 @@ test("passport writes fail closed when storage is missing without issuing DDL", 
   assert.equal(hasDdl(calls), false);
 });
 
-test("controlled provisioning rejects overlong schema field keys before DDL", async () => {
+test("controlled provisioning rejects schema field keys longer than 200 before DDL", async () => {
   const calls = [];
-  const longFieldKey = `a${"b".repeat(63)}`;
+  const longFieldKey = `a${"b".repeat(200)}`;
   const helpers = createHelpers({
     async query(sql, params = []) {
       calls.push({ sql, params });
@@ -100,6 +101,43 @@ test("controlled provisioning rejects overlong schema field keys before DDL", as
     }
   );
   assert.equal(hasDdl(calls), false);
+});
+
+test("controlled provisioning creates the deterministic physical column for a long logical field key", async () => {
+  const calls = [];
+  const longFieldKey = `materialDeclaration${"Traceability".repeat(8)}`;
+  const storageKey = toPassportStorageColumnKey(longFieldKey);
+  const helpers = createHelpers({
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (sql.includes('SELECT "fieldsJson" AS "fieldsJson" FROM "passportTypes"')) {
+        return {
+          rows: [{
+            fieldsJson: {
+              sections: [{
+                key: "identity",
+                fields: [{ key: longFieldKey, type: "text", queryable: true }],
+              }],
+            },
+          }],
+        };
+      }
+      if (sql.includes('SELECT id FROM "passportTypes"')) return { rows: [{ id: 17 }] };
+      return { rows: [] };
+    },
+  });
+
+  await helpers.createPassportTable("batteryPassportV1");
+
+  assert.equal(storageKey.length, 63);
+  assert.equal(
+    calls.some(({ sql }) => sql.includes(`ADD COLUMN IF NOT EXISTS "${storageKey}" TEXT`)),
+    true
+  );
+  assert.equal(
+    calls.some(({ sql }) => sql.includes(`("${storageKey}") WHERE "deletedAt" IS NULL`)),
+    true
+  );
 });
 
 test("schema changes fail closed when stored-record checks cannot query live storage", async () => {

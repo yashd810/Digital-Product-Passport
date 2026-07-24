@@ -43,6 +43,12 @@ function AdminPassportTypes() {
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState("");
   const [msg,        setMsg]        = useState("");
+  const [accessTarget, setAccessTarget] = useState(null);
+  const [accessCompanies, setAccessCompanies] = useState([]);
+  const [accessLoading, setAccessLoading] = useState(false);
+  const [accessError, setAccessError] = useState("");
+  const [accessMessage, setAccessMessage] = useState("");
+  const [accessSavingCompanyId, setAccessSavingCompanyId] = useState(null);
 
   // Kebab menu
   const [openKebabId, setOpenKebabId] = useState(null);
@@ -64,6 +70,83 @@ function AdminPassportTypes() {
   const handleEditMetadata = (t) => {
     setOpenKebabId(null);
     navigate(`/admin/passport-types/${t.typeName}/edit`, { state: { editData: t } });
+  };
+
+  const companyHasTypeAccess = (company, typeId) =>
+    (Array.isArray(company?.grantedTypes) ? company.grantedTypes : [])
+      .some((grantedTypeId) => Number(grantedTypeId) === Number(typeId));
+
+  const openCompanyAccess = async (type) => {
+    setOpenKebabId(null);
+    setAccessTarget(type);
+    setAccessCompanies([]);
+    setAccessError("");
+    setAccessMessage("");
+    setAccessLoading(true);
+    try {
+      const response = await fetchWithAuth(`${api}/api/admin/companies`, {
+        headers: authHeaders(),
+      });
+      const data = await response.json().catch(() => []);
+      if (!response.ok) throw new Error(data.error || "Failed to load companies");
+      setAccessCompanies(Array.isArray(data) ? data : []);
+    } catch (accessLoadError) {
+      setAccessError(accessLoadError.message || "Failed to load companies");
+    } finally {
+      setAccessLoading(false);
+    }
+  };
+
+  const toggleCompanyAccess = async (company) => {
+    if (!accessTarget) return;
+    const companyId = Number(company.id);
+    const passportTypeId = Number(accessTarget.id);
+    const granted = companyHasTypeAccess(company, passportTypeId);
+    if (!granted && !accessTarget.isActive) {
+      setAccessError("Activate this passport type before granting it to a company.");
+      return;
+    }
+
+    setAccessSavingCompanyId(companyId);
+    setAccessError("");
+    setAccessMessage("");
+    try {
+      const response = granted
+        ? await fetchWithAuth(`${api}/api/admin/company-access/${companyId}/${passportTypeId}`, {
+            method: "DELETE",
+            headers: authHeaders(),
+          })
+        : await fetchWithAuth(`${api}/api/admin/company-access`, {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ companyId, passportTypeId }),
+          });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to ${granted ? "revoke" : "grant"} access`);
+      }
+
+      setAccessCompanies((companies) => companies.map((entry) => {
+        if (Number(entry.id) !== companyId) return entry;
+        const currentIds = (Array.isArray(entry.grantedTypes) ? entry.grantedTypes : [])
+          .map((id) => Number(id));
+        return {
+          ...entry,
+          grantedTypes: granted
+            ? currentIds.filter((id) => id !== passportTypeId)
+            : [...new Set([...currentIds, passportTypeId])],
+        };
+      }));
+      setAccessMessage(
+        granted
+          ? `Revoked ${accessTarget.displayName} from ${company.companyName}.`
+          : `Granted ${accessTarget.displayName} to ${company.companyName}.`
+      );
+    } catch (accessSaveError) {
+      setAccessError(accessSaveError.message || "Failed to update company access");
+    } finally {
+      setAccessSavingCompanyId(null);
+    }
   };
 
   // Delete passport type
@@ -461,6 +544,12 @@ function AdminPassportTypes() {
                         ▼ View Fields
                       </button>
                       <button
+                        className="apt-company-access-btn"
+                        onClick={() => openCompanyAccess(t)}
+                      >
+                        Company Access
+                      </button>
+                      <button
                         className={`apt-toggle-btn ${t.isActive ? "apt-toggle-deactivate" : "apt-toggle-activate"}`}
                         onClick={() => handleToggle(t)}
                       >
@@ -504,6 +593,76 @@ function AdminPassportTypes() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {accessTarget && (
+        <div
+          className="apt-modal-overlay"
+          onClick={() => accessSavingCompanyId === null && setAccessTarget(null)}
+        >
+          <div className="apt-modal apt-company-access-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="apt-company-access-modal-header">
+              <div>
+                <h3 className="apt-modal-title">Company Access</h3>
+                <p className="apt-modal-warning apt-modal-warning-info">
+                  Grant or revoke <strong>{accessTarget.displayName}</strong> for each company.
+                </p>
+              </div>
+              <span className={`apt-badge ${accessTarget.isActive ? "apt-badge-active" : "apt-badge-inactive"}`}>
+                {accessTarget.isActive ? "Active type" : "Inactive type"}
+              </span>
+            </div>
+
+            {accessError && <div className="alert alert-error admin-alert-inline-wide">{accessError}</div>}
+            {accessMessage && <div className="alert alert-success admin-alert-inline-wide">{accessMessage}</div>}
+
+            {accessLoading ? (
+              <div className="loading">Loading companies…</div>
+            ) : accessCompanies.length === 0 ? (
+              <div className="alert alert-info">Create a company before granting passport type access.</div>
+            ) : (
+              <div className="apt-company-access-list" role="list" aria-label={`Company access for ${accessTarget.displayName}`}>
+                {accessCompanies.map((company) => {
+                  const granted = companyHasTypeAccess(company, accessTarget.id);
+                  const saving = accessSavingCompanyId === Number(company.id);
+                  return (
+                    <div key={company.id} className="apt-company-access-row" role="listitem">
+                      <div className="apt-company-access-identity">
+                        <strong>{company.companyName}</strong>
+                        <span>{granted ? "Access granted" : "No access"}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className={`toggle-btn ${granted ? "active" : ""}`}
+                        onClick={() => toggleCompanyAccess(company)}
+                        disabled={accessSavingCompanyId !== null || (!granted && !accessTarget.isActive)}
+                      >
+                        {saving
+                          ? "Saving…"
+                          : granted
+                            ? "Revoke access"
+                            : accessTarget.isActive
+                              ? "Grant access"
+                              : "Activate type first"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="apt-modal-actions">
+              <button
+                type="button"
+                className="cancel-btn"
+                onClick={() => setAccessTarget(null)}
+                disabled={accessSavingCompanyId !== null}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

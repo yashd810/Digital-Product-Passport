@@ -27,11 +27,6 @@ export function getSemanticGraphEnum(graph, enumKey) {
   return graph?.enums?.find((enumDef) => enumDef.key === enumKey) || null;
 }
 
-export function getRootSemanticProperty(graph, propertyKey) {
-  return getSemanticGraphClass(graph, graph?.rootClassKey)
-    ?.properties?.find((property) => property.key === propertyKey) || null;
-}
-
 export function isManySemanticProperty(property) {
   return property?.maxCount === null || Number(property?.maxCount) > 1;
 }
@@ -222,34 +217,45 @@ export function decorateSemanticGraphPropertyValue(property, value, graph) {
   return many ? decorated : decorated[0];
 }
 
-export function buildSemanticGraphInlineContext(graph) {
+export function buildSemanticGraphInlineContext(graph, schemaFields = []) {
   if (!graph) return {};
+  const scalarTypes = {
+    decimal: "http://www.w3.org/2001/XMLSchema#decimal",
+    integer: "http://www.w3.org/2001/XMLSchema#integer",
+    boolean: "http://www.w3.org/2001/XMLSchema#boolean",
+    date: "http://www.w3.org/2001/XMLSchema#date",
+    datetime: "http://www.w3.org/2001/XMLSchema#dateTime",
+    uri: "@id",
+  };
+  const buildPropertyContext = (property, visited) => {
+    const term = { "@id": property.semanticId };
+    if (isManySemanticProperty(property)) term["@container"] = "@set";
+    if (property.rangeKind === "scalar") {
+      if (scalarTypes[property.dataType]) term["@type"] = scalarTypes[property.dataType];
+    } else if (property.rangeKind === "enum" || property.relationshipType === "reference") {
+      term["@type"] = "@id";
+    } else {
+      const nestedContext = buildClassContext(property.rangeClassKey, visited);
+      if (Object.keys(nestedContext).length) term["@context"] = nestedContext;
+    }
+    return term;
+  };
   const buildClassContext = (classKey, visited = new Set()) => {
     if (visited.has(classKey)) return {};
     const classDef = getSemanticGraphClass(graph, classKey);
     if (!classDef) return {};
     const nextVisited = new Set(visited).add(classKey);
-    return Object.fromEntries((classDef.properties || []).map((property) => {
-      const term = { "@id": property.semanticId };
-      if (isManySemanticProperty(property)) term["@container"] = "@set";
-      if (property.rangeKind === "scalar") {
-        const scalarTypes = {
-          decimal: "http://www.w3.org/2001/XMLSchema#decimal",
-          integer: "http://www.w3.org/2001/XMLSchema#integer",
-          boolean: "http://www.w3.org/2001/XMLSchema#boolean",
-          date: "http://www.w3.org/2001/XMLSchema#date",
-          datetime: "http://www.w3.org/2001/XMLSchema#dateTime",
-          uri: "@id",
-        };
-        if (scalarTypes[property.dataType]) term["@type"] = scalarTypes[property.dataType];
-      } else if (property.rangeKind === "enum" || property.relationshipType === "reference") {
-        term["@type"] = "@id";
-      } else {
-        const nestedContext = buildClassContext(property.rangeClassKey, nextVisited);
-        if (Object.keys(nestedContext).length) term["@context"] = nestedContext;
-      }
-      return [property.key, term];
-    }));
+    return Object.fromEntries((classDef.properties || []).map((property) => [
+      property.key,
+      buildPropertyContext(property, nextVisited),
+    ]));
   };
-  return buildClassContext(graph.rootClassKey);
+  const context = buildClassContext(graph.rootClassKey);
+  for (const field of schemaFields) {
+    if (!field?.key || !field.semanticId || !field.rangeKind) continue;
+    // Passport values are persisted as a flat field map. Give those values a
+    // direct JSON-LD term while retaining the graph's recursive class context.
+    context[field.key] = buildPropertyContext(field, new Set());
+  }
+  return context;
 }

@@ -9,6 +9,8 @@ const {
   flattenSchemaFieldsFromSections,
   mapCompanyRow,
   mapPassportTypeRow,
+  quoteSqlIdentifier,
+  toPassportStorageColumnKey,
 } = require("../../shared/passports/passport-helpers");
 const { createApiKeyHelpers } = require("../../modules/passports/api-key-helpers");
 const {
@@ -80,6 +82,16 @@ module.exports = function registerPassportPublicRoutes(app, {
       subjectDid: "dpp:subjectDid",
       dppDid: "dpp:dppDid",
       companyDid: "dpp:companyDid",
+      semanticProfile: "dpp:semanticProfile",
+      sourceModule: "dpp:sourceModule",
+      schemaVersion: { "@id": "dpp:schemaVersion", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
+      profileDigest: "dpp:profileDigest",
+      moduleDigest: "dpp:moduleDigest",
+      graphDigest: "dpp:graphDigest",
+      contractVersion: { "@id": "dpp:contractVersion", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
+      selectionMode: "dpp:selectionMode",
+      includedFieldCount: { "@id": "dpp:includedFieldCount", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
+      profilePath: "dpp:profilePath",
       passportType: "dpp:passportType",
       modelName: "dpp:modelName",
       versionNumber: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" }
@@ -629,7 +641,7 @@ module.exports = function registerPassportPublicRoutes(app, {
     hydrateCompany(getCompanyId(passport))]
     );
 
-    return { passport, typeDef, company };
+    return { passport: normalizePassportRow(passport, typeDef), typeDef, company };
   }
 
   async function loadPublicVerificationContext(dppId, { versionNumber = null } = {}) {
@@ -741,7 +753,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       hydrateCompany(getCompanyId(passport)),
     ]);
 
-    return { passport, typeDef, company, handover };
+    return { passport: normalizePassportRow(passport, typeDef), typeDef, company, handover };
   }
 
   async function loadPublicPassportByLineage(stableId) {
@@ -800,7 +812,7 @@ module.exports = function registerPassportPublicRoutes(app, {
     hydrateCompany(getCompanyId(passport))]
     );
 
-    return { passport, typeDef, company };
+    return { passport: normalizePassportRow(passport, typeDef), typeDef, company };
   }
 
   function getFacilityFieldKeys(typeDef) {
@@ -832,27 +844,27 @@ module.exports = function registerPassportPublicRoutes(app, {
       if (!facilityFieldKeys.length) continue;
 
       const tableName = getTable(typeDef.typeName);
-      const selectFields = facilityFieldKeys.map((fieldKey) => `"${fieldKey}"`).join(", ");
+      const selectFields = facilityFieldKeys.map((fieldKey) => quoteSqlIdentifier(fieldKey)).join(", ");
       const candidateRes = await pool.query(
         `SELECT "dppId", "lineageId", "companyId", "modelName", "releaseStatus", "versionNumber", "updatedAt", "createdAt", ${selectFields}
          FROM ${tableName}
          WHERE "deletedAt" IS NULL
            AND "releaseStatus" IN ('released', 'obsolete')
-           AND (${facilityFieldKeys.map((fieldKey) => `"${fieldKey}" IS NOT NULL`).join(" OR ")})
+           AND (${facilityFieldKeys.map((fieldKey) => `${quoteSqlIdentifier(fieldKey)} IS NOT NULL`).join(" OR ")})
          ORDER BY "updatedAt" DESC
          LIMIT 250`
       );
 
       for (const row of candidateRes.rows) {
         const matchingKey = facilityFieldKeys.find((fieldKey) => {
-          const rawValue = row[fieldKey];
+          const rawValue = row[toPassportStorageColumnKey(fieldKey)];
           if (rawValue === null || rawValue === undefined || rawValue === "") return false;
           return didService.normalizeFacilityStableId(rawValue) === normalizedStableId;
         });
 
         if (!matchingKey) continue;
 
-        const passport = { ...normalizePassportRow(row), passportType: typeDef.typeName };
+        const passport = { ...normalizePassportRow(row, typeDef), passportType: typeDef.typeName };
         const company = await hydrateCompany(getCompanyId(passport));
         return { passport, typeDef, company, facilityFieldKey: matchingKey };
       }
@@ -1274,7 +1286,12 @@ module.exports = function registerPassportPublicRoutes(app, {
         });
       }
 
-      if (parsed.entityType === "model" || parsed.entityType === "item" || parsed.entityType === "dpp") {
+      if (
+        parsed.entityType === "model"
+        || parsed.entityType === "batch"
+        || parsed.entityType === "item"
+        || parsed.entityType === "dpp"
+      ) {
         const loaded = await loadPublicPassportByLineage(parsed.stableId);
         if (!loaded?.passport) return res.status(404).json({ error: "DID not found" });
         const resolution = buildResolutionPayload(did, loaded.passport, loaded.company, loaded.typeDef);

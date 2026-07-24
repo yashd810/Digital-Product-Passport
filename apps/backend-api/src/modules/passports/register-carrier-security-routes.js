@@ -28,7 +28,7 @@ function normalizeDynamicValueEntries(updates, dynamicFieldKeys) {
 
   const invalidKeys = entries
     .map(([fieldKey]) => fieldKey)
-    .filter((fieldKey) => !/^[a-z][A-Za-z0-9]{0,99}$/.test(fieldKey));
+    .filter((fieldKey) => !/^[a-z][A-Za-z0-9]{0,199}$/.test(fieldKey));
   if (invalidKeys.length) {
     throw createRouteError("Invalid dynamic field key");
   }

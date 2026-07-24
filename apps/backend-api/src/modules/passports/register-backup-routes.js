@@ -10,6 +10,7 @@ function registerBackupRoutes(app, deps) {
     checkCompanyAdmin,
     logAudit,
     loadLatestLivePassport,
+    getPassportTypeSchema,
     normalizePassportRow,
     stripRestrictedFieldsForPublicView,
     getCompanyNameMap,
@@ -162,7 +163,8 @@ function registerBackupRoutes(app, deps) {
       });
       if (!currentPassport) return res.status(404).json({ error: "Released passport not found" });
 
-      const normalizedPassport = { ...normalizePassportRow(currentPassport), passportType };
+      const typeSchema = await getPassportTypeSchema(passportType);
+      const normalizedPassport = { ...normalizePassportRow(currentPassport, typeSchema), passportType };
       const publicRowData = await stripRestrictedFieldsForPublicView(normalizedPassport, passportType);
       const companyName = (await getCompanyNameMap([req.params.companyId])).get(String(req.params.companyId)) || "";
 

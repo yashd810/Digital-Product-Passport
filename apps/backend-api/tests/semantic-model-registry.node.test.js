@@ -622,3 +622,146 @@ test("company semantic models support arbitrary registered models and grouped pa
     fs.rmSync(packagesDir, { recursive: true, force: true });
   }
 });
+
+test("passport type semantic profile artifacts expose only selected terms while the canonical dictionary stays complete", async () => {
+  const packagesDir = fs.mkdtempSync(path.join(os.tmpdir(), "passport-type-profile-models-"));
+  const { modelDir } = writeSemanticFixture(packagesDir);
+  const baseIri = "https://example.test/dictionary/example-product/v1";
+  const rootClassIri = `${baseIri}/classes/ExampleProductPassport`;
+  const selectedIri = `${baseIri}/terms/udi`;
+  const excludedIri = `${baseIri}/terms/excluded-legacy-field`;
+  const terms = JSON.parse(fs.readFileSync(path.join(modelDir, "terms.json"), "utf8"));
+  terms.push({
+    slug: "excluded-legacy-field",
+    label: "Excluded legacy field",
+    definition: "A canonical module term not selected by this passport type.",
+    iri: excludedIri,
+    internalKey: "excludedLegacyField",
+    dataType: "string",
+    unit: "none",
+    rangeKind: "scalar",
+    domain: { key: "exampleProductPassport", iri: rootClassIri, label: "Example Product Passport" },
+    range: {
+      iri: "http://www.w3.org/2001/XMLSchema#string",
+      curie: "xsd:string",
+      label: "String",
+      jsonType: "string",
+    },
+  });
+  writeJson(path.join(modelDir, "terms.json"), terms);
+  writeJson(path.join(modelDir, "context.jsonld"), {
+    "@context": {
+      udi: selectedIri,
+      excludedLegacyField: excludedIri,
+    },
+  });
+
+  const typeDef = {
+    typeName: "exampleProductPassportV1",
+    displayName: "Example Product Passport v1",
+    productCategory: "Example Product",
+    semanticModelKey: "exampleProductDictionaryV1",
+    fieldsJson: {
+      schemaVersion: 7,
+      sourceModule: "example-product:v1",
+      moduleDigest: "sha256:module",
+      profileDigest: "sha256:profile",
+      profile: {
+        contractVersion: 1,
+        selectionMode: "explicit",
+        sourceModule: "example-product:v1",
+        moduleDigest: "sha256:module",
+        profileDigest: "sha256:profile",
+        includedFields: [{ sourceModuleFieldKey: "udi", semanticId: selectedIri }],
+      },
+      semanticProfile: { schemaVersion: 1, graphDigest: "sha256:graph" },
+      sections: [{
+        key: "identity",
+        label: "Identity",
+        fields: [{
+          key: "udi",
+          label: "Unique device identifier",
+          semanticId: selectedIri,
+          domainClassKey: "exampleProductPassport",
+          domainClassIri: rootClassIri,
+          rangeKind: "scalar",
+          rangeIri: "http://www.w3.org/2001/XMLSchema#string",
+          dataType: "string",
+          minCount: 1,
+          maxCount: 1,
+        }],
+      }],
+      semanticGraph: {
+        schemaVersion: 1,
+        rootClassKey: "exampleProductPassport",
+        classes: [{
+          key: "exampleProductPassport",
+          label: "Example Product Passport",
+          semanticId: rootClassIri,
+          root: true,
+          properties: [
+            {
+              key: "udi",
+              label: "Unique device identifier",
+              semanticId: selectedIri,
+              domainClassKey: "exampleProductPassport",
+              rangeKind: "scalar",
+              rangeIri: "http://www.w3.org/2001/XMLSchema#string",
+              dataType: "string",
+              minCount: 1,
+              maxCount: 1,
+            },
+            {
+              key: "excludedLegacyField",
+              label: "Excluded legacy field",
+              semanticId: excludedIri,
+              domainClassKey: "exampleProductPassport",
+              rangeKind: "scalar",
+              rangeIri: "http://www.w3.org/2001/XMLSchema#string",
+              dataType: "string",
+              minCount: 0,
+              maxCount: 1,
+            },
+          ],
+        }],
+        enums: [],
+      },
+    },
+  };
+  const pool = {
+    query: async () => ({ rows: [typeDef] }),
+  };
+
+  try {
+    const app = createDictionaryApp({
+      pool,
+      registry: createSemanticModelRegistry({ packagesDir }),
+    });
+    const canonicalTermsResponse = await invokeRoute(app, {
+      path: "/api/dictionary/:family/:version/terms",
+      params: { family: "example-product", version: "v1" },
+    });
+    assert.equal(parseJsonResponse(canonicalTermsResponse).length, 2);
+
+    const profileResponse = await invokeRoute(app, {
+      path: "/api/passport-types/:typeName/semantic-profile",
+      params: { typeName: "exampleProductPassportV1" },
+    });
+    const profile = parseJsonResponse(profileResponse);
+    assert.equal(profile.statusCode, undefined);
+    assert.equal(profile.profileDigest, "sha256:profile");
+    assert.equal(profile.moduleDigest, "sha256:module");
+    assert.equal(profile.graphDigest, "sha256:graph");
+    assert.deepEqual(profile.terms.map((term) => term.internalKey), ["udi"]);
+    assert.equal(JSON.stringify(profile.context).includes("excludedLegacyField"), false);
+    assert.equal(JSON.stringify(profile.shapes).includes(excludedIri), false);
+
+    const termsResponse = await invokeRoute(app, {
+      path: "/api/passport-types/:typeName/semantic-profile/terms",
+      params: { typeName: "exampleProductPassportV1" },
+    });
+    assert.deepEqual(parseJsonResponse(termsResponse).map((term) => term.internalKey), ["udi"]);
+  } finally {
+    fs.rmSync(packagesDir, { recursive: true, force: true });
+  }
+});

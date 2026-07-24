@@ -45,7 +45,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         ],
       },
       facts: [
-        { label: "Best first stop", value: "Overview for activity, totals, and analytics snapshots" },
+        { label: "Best first stop", value: "Overview for company-member activity, totals, and analytics snapshots" },
         { label: "Role-aware access", value: user?.role === "viewer" ? "You are currently read-only for passport content." : `${prettifyName(user?.role)} users can work directly in passport flows.` },
         { label: "Current company", value: user?.companyName || (companyId ? `Company ${companyId}` : "Company assigned after login") },
         { label: "Granted passport types", value: availableTypes.length ? availableTypes.join(", ") : "Passport types appear here after company access is granted" },
@@ -54,7 +54,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         {
           title: "Start your day",
           items: [
-            "Open Overview to review totals, recent activity, and exported analytics if you need a snapshot report.",
+            "Open Overview to review totals, recent activity created by members of your company, and exported analytics if you need a snapshot report.",
             "Check Notifications for approvals, review requests, and system updates that need your attention.",
           ],
         },
@@ -121,6 +121,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "Choose 'Fill the form' in the hub to open the structured dynamic form for the selected type.",
             "Complete fields section by section. Text, URL, date, boolean, table, file, and symbol fields all render according to the type schema.",
+            "Enter passport field values only. Semantic classes and relationships are maintained by the passport type and dictionary, so they are intentionally not shown as editable form data.",
             "The form auto-saves while you work and tracks the edit session so teammates know when you are inside.",
             "Best for: individual passports where you want full control and can see every field.",
           ],
@@ -278,6 +279,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "Clone creates a new passport based on the current record so teams do not need to re-enter repeated information.",
             "Update History opens the combined timeline and comparison page so changes between releases are easy to review.",
             "Export JSON-LD generates the passport with the selected semantic model's IDs and contexts for interoperable exchange.",
+            "Delete permanently removes a draft. For another editable state such as In Revision, the backend keeps a pre-delete archive snapshot and soft-deletes the active row. Released passports use Archive instead of Delete; bulk delete applies the same rule per passport.",
           ],
         },
         {
@@ -292,7 +294,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           title: "Handle dynamic device data",
           items: [
             "Open Device Integration from a row when the passport includes dynamic fields.",
-            "Copy or regenerate the device API key there and provide it to the physical device or integration service.",
+            "Copy the Bearer-token endpoint and example body from the modal. The modal does not create a passport-specific device key.",
+            "Issue an authenticated-user JWT from Dashboard > Security or `POST /api/users/me/token`, then send it as `Authorization: Bearer <token>` from the device or integration service.",
             "Use manual override values in the same modal when the live data must be corrected without waiting for a new device push.",
           ],
         },
@@ -336,6 +339,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         { label: "Template outputs", value: "Single create and bulk create with model data pre-filled" },
         { label: "Update paths", value: "CSV and JSON imports can update template-generated drafts after creation" },
         { label: "Model data", value: "Fields marked as model data stay fixed when the template is reused" },
+        { label: "Template scope", value: "Templates store passport field values only; semantic relationship metadata is not an authorable template section" },
       ],
       journeys: [
         {
@@ -344,6 +348,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "Choose the passport type first, then give the template a descriptive name and summary.",
             "Populate the values that should appear in every passport generated from that template.",
             "Mark the fields that count as model-level data so your team can distinguish between shared baseline values and unit-specific values.",
+            "Use the dictionary when you need to understand a field's semantics; the template form deliberately contains no semantic-relationship editor.",
           ],
         },
         {
@@ -526,7 +531,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         { label: "Dashboard route", value: dashboardPath("dictionary/:family/:version") },
         { label: "Public route", value: "/dictionary/:family/:version" },
         { label: "Visibility rule", value: "Your dashboard shows dictionaries only for semantic models used by passport types your company can access" },
-        { label: "Term detail", value: "Each term has a slug page plus a raw JSON endpoint" },
+        { label: "Term detail", value: "Each term has a slug page plus a raw JSON endpoint, with the owning class in Domain and the value class, enum, or datatype in Range" },
         { label: "Best use", value: "Validate field meaning before exporting JSON-LD or discussing semantic passport data with partners" },
       ],
       journeys: [
@@ -536,7 +541,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "Open the dictionary available for the passport type from the dashboard sidebar.",
             "If your company has access to multiple passport types with different semantic models, each matching dictionary can appear separately.",
             "Search by label, definition, slug, or known application field key.",
-            "Open the term detail page to confirm data format, JSON type, XSD type, unit, confidentiality, static/dynamic status, internal key, element ID, and regulation references.",
+            "Open the term detail page to confirm its owning Domain class, value Range, data format, JSON type, XSD type, unit, confidentiality, static/dynamic status, internal key, element ID, and regulation references.",
+            "For a nested subsection, use Domain and Range to understand its immediate parent-child relationship; labels stay concise instead of repeating the full breadcrumb path.",
             "Use the dictionary reference URL when another system needs the canonical linked-data identifier.",
           ],
         },
@@ -563,13 +569,13 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       category: "Security",
       audience: "Company admins primarily, with session and optional bearer-token access available to logged-in users",
       title: "Understand security, tokens, API keys, and who should use each one",
-      summary: "The product uses separate credentials for separate purposes: browser sessions are for dashboard work, company Bearer tokens are for authenticated integration writes, and security group API keys are only for selected restricted fields on public reads. Asset Management uses the same company session or Bearer authentication as the dashboard APIs.",
+      summary: "The product uses separate credentials for separate purposes: browser sessions are for dashboard work, authenticated-user JWT Bearer tokens are for protected scripts and integration writes, and security group API keys are only for selected restricted fields on public reads. Asset Management uses the same company session or JWT Bearer authentication as the dashboard APIs.",
       simpleGuide: {
         title: "Which credential should I use?",
         intro: "Most users only need one of these most of the time:",
         items: [
           "Use your normal browser login for everyday dashboard work.",
-          "Use a bearer token only when you are testing protected APIs or running scripts.",
+          "Use the JWT bearer token issued by Dashboard > Security or `POST /api/users/me/token` when testing protected APIs or running authenticated integrations.",
           "Use security group API keys for outside systems that should read approved company passport fields.",
           "Use security group API keys when restricted public fields must be unlocked intentionally.",
         ],
@@ -577,9 +583,9 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       facts: [
         { label: "Company branding", value: "Managed in Company Profile with public viewer, introduction, and single consumer-route presentation controls" },
         { label: "Browser session", value: "Created by login and sent automatically by the dashboard through cookie credentials" },
-        { label: "Bearer token", value: "Optional token from Dashboard > Security or /api/users/me/token for protected API testing/scripts" },
+        { label: "Bearer token", value: "Authenticated-user JWT issued by Dashboard > Security or POST /api/users/me/token for protected APIs and integration writes" },
         { label: "Security group API keys", value: "Created and revoked in Dashboard > Security for restricted public unlocking and scoped read-only external access" },
-        { label: "Integration controls", value: "Company Bearer tokens handle writes; security group keys handle selected restricted reads" },
+        { label: "Integration controls", value: "The authenticated user's JWT Bearer token handles protected writes; security group keys handle selected restricted reads" },
       ],
       journeys: [
         {
@@ -612,8 +618,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         {
           title: "Use Bearer tokens and security group keys correctly",
           items: [
-            "Use a company Bearer token for create, patch, archive, delete, or dynamic-value operations under `/api/companies/:companySlug/integrations/v1/passports`.",
-            "Rotate the company service token if the integration endpoint has been shared too broadly or a device is replaced.",
+            "Use the JWT issued from Dashboard > Security or `POST /api/users/me/token` for create, patch, archive, delete, or dynamic-value operations under `/api/companies/:companySlug/integrations/v1/passports`.",
+            "Device Integration supplies the endpoint and payload shape only; it does not issue, copy, or rotate a separate per-device API key.",
             "Use the security group API key in the public viewer unlock flow when selected restricted fields must be revealed to an allowed audience.",
             "Use the normal company session or Bearer token for Passport Data Management; its write routes still enforce company and editor permissions.",
           ],
@@ -680,7 +686,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "Company DID documents use `/did/company/:slug/did.json`.",
             "Product subject DID documents use `/did/:passportType/model/:stableId/did.json`, `/did/:passportType/batch/:stableId/did.json`, or `/did/:passportType/item/:stableId/did.json`.",
             "DPP record DID documents use `/did/dpp/:granularity/:stableId/did.json`, and facility DID documents use `/did/facility/:stableId/did.json`.",
-            "The universal `/resolve?did=...` endpoint redirects browsers to the public passport where possible and API clients to the DID document URL.",
+            "The universal `/resolve?did=...` endpoint returns JSON for platform, company, model, batch, item, DPP, and facility DIDs, including `publicUrl` and `didDocument` links where applicable.",
           ],
         },
         {
@@ -707,12 +713,13 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       id: "asset-management-tool",
       icon: "📋",
       category: "Operations",
-      audience: "Editors and company admins using high-volume update flows",
+      audience: "Company members inspecting Asset Management, plus editors and company admins running high-volume update flows",
       title: "Use Asset Management for safe bulk updates on existing passports",
       summary: "Asset Management is a separate operational layer for editing many already existing passports at once. It is best when you need to stage updates from CSV, JSON, or an ERP/API source, check the result before writing anything, and then push or schedule the changes in a controlled way.",
       facts: [
         { label: "Best use case", value: "Bulk updates on existing passports, especially when rows already have dppId or internalAliasId" },
         { label: "Launch path", value: "Open from the company dashboard. The tool authenticates automatically from the dashboard launch." },
+        { label: "Permissions", value: "Company access is enough for read-only data; source fetch, preview, push, and job mutations require editor or company-admin permission." },
         { label: "Matching rule", value: "dppId is safest. internalAliasId works as the fallback local passport ID match key for ERP and spreadsheet updates." },
         { label: "Safety rule", value: "Unknown columns are rejected. Nothing changes until Push to Backend is used." },
       ],
@@ -773,7 +780,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       facts: [
         { label: "Human users", value: "Use dashboard session cookies after login; bearer tokens are optional for scripts/tests" },
         { label: "External read-only systems", value: "Use security group API keys with /api/public/passports/:dppId" },
-        { label: "Devices and sensors", value: "Use the company integration Bearer token" },
+        { label: "Devices and sensors", value: "Use the authenticated-user JWT from Dashboard > Security or POST /api/users/me/token as a Bearer token" },
         { label: "Public viewers", value: "Usually need no authentication unless restricted fields must be unlocked" },
       ],
       flowCards: apiGettingStartedFlows,
@@ -851,7 +858,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         { label: "Read-only external partner path", value: "/api/public/passports/:dppId with a security group X-API-Key" },
         { label: "Public passport path", value: "/api/public/passports/:dppId without login" },
         { label: "Restricted-field path", value: "GET /api/public/passports/:dppId with X-API-Key" },
-        { label: "Live-value write path", value: "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values with Bearer token" },
+        { label: "Live-value write path", value: "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values with the JWT from POST /api/users/me/token as a Bearer token" },
       ],
       journeys: [
         {
@@ -901,7 +908,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       facts: [
         { label: "Team roles", value: "Admin, Editor, and Viewer" },
         { label: "Invite rules", value: "Admins can invite all company roles; Editors can invite viewers" },
-        { label: "Audit tools", value: "Audit log filters by user, action, and date range with CSV export" },
+        { label: "Audit scope", value: "Recent Updates and Audit Logs show actions by members of your company only; super-admin activity is kept in the separate admin audit page" },
+        { label: "Audit tools", value: "Readable action and entity labels, filters by user, action, and date range, expandable change details, and CSV export" },
         { label: "Notifications", value: "Track workflow and system updates inside the app" },
       ],
       journeys: [
@@ -920,6 +928,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "Filter audit logs by user, action type, or date range when investigating a change.",
             "Expand the old and new value views to see what was updated, not just that an update happened.",
             "Export audit logs when a compliance or governance review needs a portable record.",
+            "Expect only actions performed by company members here. Platform administration performed by a super admin is intentionally separated from this company trail.",
           ],
         },
       ],
@@ -955,7 +964,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       summary: "Released passports become much more than rows in a table. Their public viewer can show introduction content, translations, charts, signatures, PDF previews, restricted-field unlocking, scan indicators, carrier authenticity evidence, suspicious-carrier reporting, and printable output for external audiences.",
       facts: [
         { label: "Public entry points", value: "Copied link or QR code into the canonical public `/dpp/:manufacturerSlug/:modelSlug/:dppId` route" },
-        { label: "Viewer features", value: "Introduction tabs, translated sections, charts, composition visuals, PDF previews, QR display, print, signature badges, scan badges, and carrier authenticity indicators" },
+        { label: "Viewer structure", value: "Nested sections and subsections keep their parent-child hierarchy instead of being flattened" },
+        { label: "Viewer features", value: "Introduction tabs, translated nested sections, time-series charts, any configured composition charts, PDF previews, QR display, print, signature badges, scan badges, and carrier authenticity indicators" },
         { label: "Restricted access", value: "Restricted fields stay hidden until unlocked with a matching security group API key" },
         { label: "Sharing options", value: "Public link, QR labels, print PDF, JSON-LD export, CSV exports, and analytics PDF exports" },
       ],

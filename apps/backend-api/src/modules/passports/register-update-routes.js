@@ -50,6 +50,7 @@ function registerUpdateRoutes(app, deps) {
     buildCarrierAuthenticityStorageValue,
     getCompanyNameMap,
     buildComplianceManagedFields,
+    normalizePassportRow,
   } = deps;
 
   const updateEditablePassport = updateEditablePassportUseCase(deps);
@@ -173,7 +174,7 @@ function registerUpdateRoutes(app, deps) {
         params
       );
       await archivePassportSnapshots({
-        passports: matchedRowsRes.rows,
+        passports: matchedRowsRes.rows.map((row) => normalizePassportRow(row, typeSchema)),
         passportType: typeSchema.typeName,
         archivedBy: userId,
         actorIdentifier: getActorIdentifier(req.user),
@@ -189,7 +190,7 @@ function registerUpdateRoutes(app, deps) {
       );
       const updatedGuids = updateRes.rows.map((row) => row.dppId);
       await archivePassportSnapshots({
-        passports: updateRes.rows,
+        passports: updateRes.rows.map((row) => normalizePassportRow(row, typeSchema)),
         passportType: typeSchema.typeName,
         archivedBy: userId,
         actorIdentifier: getActorIdentifier(req.user),
@@ -317,6 +318,7 @@ function registerUpdateRoutes(app, deps) {
             const fullRowRes = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1`, [rowId]);
             currentRow = fullRowRes.rows[0] || currentRow;
           }
+          currentRow = normalizePassportRow(currentRow, typeSchema);
           if (fields.internalAliasId !== undefined) {
             if (!normalizedProductId) {
               details.push({ dppId: matchedGuid, status: "failed", error: "internalAliasId cannot be blank" });
@@ -379,7 +381,7 @@ function registerUpdateRoutes(app, deps) {
           }
           if (updateResult.updatedRow) {
             await archivePassportSnapshot({
-              passport: updateResult.updatedRow,
+              passport: normalizePassportRow(updateResult.updatedRow, typeSchema),
               passportType,
               archivedBy: userId,
               actorIdentifier: getActorIdentifier(req.user),

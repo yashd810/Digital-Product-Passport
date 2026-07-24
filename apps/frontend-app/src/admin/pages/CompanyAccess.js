@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
+import { countSchemaFields } from "../../shared/passports/passportSchemaUtils";
 import "../styles/AdminDashboard.css";
 
 function CompanyAccess() {
@@ -9,11 +10,11 @@ function CompanyAccess() {
   const apiBaseUrl = import.meta.env.VITE_API_URL || "";
   const [companyData,    setCompanyData]    = useState(null);
   const [grantedTypeIds, setGrantedTypeIds] = useState([]);
-  const [allTypes,       setAllTypes]       = useState([]);   // all active passport types from DB
+  const [allTypes,       setAllTypes]       = useState([]);
   const [isLoading,      setIsLoading]      = useState(true);
   const [error,          setError]          = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [isSaving,       setIsSaving]       = useState(false);
+  const [savingTypeId,   setSavingTypeId]   = useState(null);
 
   useEffect(() => {
     if (!companyId) { setError("Company ID is missing from URL"); setIsLoading(false); return; }
@@ -22,28 +23,19 @@ function CompanyAccess() {
       try {
         setIsLoading(true);
 
-        // Fetch all active passport types from the dynamic system
-        const [typesRes, companiesRes] = await Promise.all([
-          fetchWithAuth(`${apiBaseUrl}/api/admin/passport-types`, {
-            headers: authHeaders(),
-          }),
-          fetchWithAuth(`${apiBaseUrl}/api/admin/companies`, {
-            headers: authHeaders(),
-          }),
-        ]);
+        const response = await fetchWithAuth(
+          `${apiBaseUrl}/api/admin/companies/${encodeURIComponent(companyId)}/passport-type-access`,
+          { headers: authHeaders() }
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || "Failed to fetch passport type access");
 
-        if (!typesRes.ok)     throw new Error("Failed to fetch passport types");
-        if (!companiesRes.ok) throw new Error("Failed to fetch companies");
-
-        const types     = await typesRes.json();
-        const companies = await companiesRes.json();
-        const company   = companies.find(c => String(c.id) === String(companyId));
-
-        if (!company) throw new Error("Company not found");
-
+        const types = Array.isArray(data.passportTypes)
+          ? data.passportTypes.map((type) => ({ ...type, id: Number(type.id) }))
+          : [];
         setAllTypes(types);
-        setCompanyData(company);
-        setGrantedTypeIds(company.grantedTypes || []);
+        setCompanyData(data.company || null);
+        setGrantedTypeIds(types.filter((type) => type.accessGranted).map((type) => type.id));
       } catch (err) {
         setError(err.message);
       } finally {
@@ -52,12 +44,18 @@ function CompanyAccess() {
     };
 
     fetchData();
-  }, [companyId, navigate]);
+  }, [apiBaseUrl, companyId]);
 
-  const handleToggleAccess = async (typeId, displayName) => {
+  const handleToggleAccess = async (type) => {
+    const typeId = Number(type.id);
+    const displayName = type.displayName || type.typeName;
     const isGranted = grantedTypeIds.includes(typeId);
+    if (!isGranted && !type.isActive) {
+      setError("Activate this passport type before granting it to a company.");
+      return;
+    }
     try {
-      setIsSaving(true);
+      setSavingTypeId(typeId);
       setError("");
 
       if (isGranted) {
@@ -65,28 +63,35 @@ function CompanyAccess() {
           `${apiBaseUrl}/api/admin/company-access/${companyId}/${typeId}`,
           { method: "DELETE", headers: authHeaders() }
         );
-        if (!r.ok) throw new Error("Failed to revoke access");
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || "Failed to revoke access");
         setGrantedTypeIds(ids => ids.filter(id => id !== typeId));
-        setSuccessMessage(`Revoked: ${displayName}`);
+        setAllTypes((types) => types.map((entry) => (
+          entry.id === typeId ? { ...entry, accessGranted: false, grantedAt: null } : entry
+        )));
+        setSuccessMessage(`Revoked ${displayName} from ${companyData?.companyName || "company"}.`);
       } else {
         const r = await fetchWithAuth(`${apiBaseUrl}/api/admin/company-access`, {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify({ companyId: parseInt(companyId), passportTypeId: parseInt(typeId) }),
+          body: JSON.stringify({ companyId: Number(companyId), passportTypeId: typeId }),
         });
+        const data = await r.json().catch(() => ({}));
         if (!r.ok) {
-          const d = await r.json();
-          throw new Error(d.error || "Failed to grant access");
+          throw new Error(data.error || "Failed to grant access");
         }
-        setGrantedTypeIds(ids => [...ids, typeId]);
-        setSuccessMessage(`Granted: ${displayName}`);
+        setGrantedTypeIds(ids => [...new Set([...ids, typeId])]);
+        setAllTypes((types) => types.map((entry) => (
+          entry.id === typeId ? { ...entry, accessGranted: true, grantedAt: data.access?.grantedAt || null } : entry
+        )));
+        setSuccessMessage(`Granted ${displayName} to ${companyData?.companyName || "company"}.`);
       }
 
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
       setError(err.message || "Operation failed");
     } finally {
-      setIsSaving(false);
+      setSavingTypeId(null);
     }
   };
 
@@ -110,7 +115,7 @@ function CompanyAccess() {
   return (
     <div className="company-access-page">
       <header className="access-header">
-        <button className="back-btn" onClick={() => navigate("/admin")} title="Back to admin">← Back</button>
+        <button className="back-btn" onClick={() => navigate("/admin/companies")} title="Back to companies">← Back</button>
         <h1>Manage Company Access</h1>
       </header>
 
@@ -129,9 +134,8 @@ function CompanyAccess() {
           <div className="access-section">
             <h3>🔐 Passport Type Access</h3>
             <p className="section-description">
-              Grant or revoke access to passport types. When access is granted,
-              a dedicated data table is created for this company.
-              Revoking access preserves existing passport data.
+              Grant or revoke the passport types this company can use.
+              Revoking access preserves existing passport data and can be reversed later.
             </p>
 
             {allTypes.length === 0 ? (
@@ -153,20 +157,30 @@ function CompanyAccess() {
                     {types.map(type => {
                       const granted = grantedTypeIds.includes(type.id);
                       return (
-                        <div key={type.id} className={`type-card ${granted ? "granted" : "revoked"}`}>
+                        <div key={type.id} className={`type-card ${granted ? "granted" : "not-granted"}`}>
                           <div className="access-type-meta">
                             <h4 className="access-type-title">{type.displayName}</h4>
                             <code className="access-type-code">{type.typeName}</code>
                           </div>
                           <div className="access-type-count">
-                            {type.fieldsJson?.sections?.reduce((n, s) => n + (s.fields?.length || 0), 0) || 0} fields
+                            {countSchemaFields(type.fieldsJson?.sections || [])} fields
+                          </div>
+                          <div className={`access-grant-status ${granted ? "granted" : "not-granted"}`}>
+                            {granted ? "Access granted" : "No access"}
+                            {!type.isActive && " · Type inactive"}
                           </div>
                           <button
                             className={`toggle-btn ${granted ? "active" : ""}`}
-                            onClick={() => handleToggleAccess(type.id, type.displayName)}
-                            disabled={isSaving}
+                            onClick={() => handleToggleAccess(type)}
+                            disabled={savingTypeId !== null || (!granted && !type.isActive)}
                           >
-                            {granted ? "✓ Granted" : "✗ Revoked"}
+                            {savingTypeId === type.id
+                              ? "Saving…"
+                              : granted
+                                ? "Revoke access"
+                                : type.isActive
+                                  ? "Grant access"
+                                  : "Activate type first"}
                           </button>
                         </div>
                       );

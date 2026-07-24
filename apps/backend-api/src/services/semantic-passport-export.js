@@ -5,12 +5,18 @@ const { getPassportFieldDataTypeError } = require("../shared/passports/passport-
 const {
   coerceSemanticGraphPropertyValue,
   flattenSchemaFieldsFromSections,
+  projectPassportRowToSchema,
 } = require("../shared/passports/passport-helpers");
 const {
   getSemanticGraphClass,
   getSemanticGraphEnum,
   isManyProperty,
 } = require("../shared/passports/passport-semantic-graph");
+const {
+  buildSemanticProfileContext,
+  buildSemanticProfileMetadata,
+  projectSemanticGraphToSections,
+} = require("./passport-type-semantic-profile");
 
 const dppContext = {
   "@version": 1.1,
@@ -40,6 +46,16 @@ const dppContext = {
   dppId: "dpp:dppId",
   passportType: "dpp:passportType",
   semanticModel: "dpp:semanticModel",
+  semanticProfile: "dpp:semanticProfile",
+  sourceModule: "dpp:sourceModule",
+  schemaVersion: { "@id": "dpp:schemaVersion", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
+  profileDigest: "dpp:profileDigest",
+  moduleDigest: "dpp:moduleDigest",
+  graphDigest: "dpp:graphDigest",
+  contractVersion: { "@id": "dpp:contractVersion", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
+  selectionMode: "dpp:selectionMode",
+  includedFieldCount: { "@id": "dpp:includedFieldCount", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
+  profilePath: "dpp:profilePath",
   modelName: "dpp:modelName",
   internalAliasId: "dpp:internalAliasId",
   releaseStatus: "dpp:releaseStatus",
@@ -150,14 +166,15 @@ function decoratePassportSemanticGraph(passport, typeDef) {
   if (!semanticGraph) {
     throw new Error("Semantic passport export requires a semantic class graph.");
   }
-  const rootClass = getSemanticGraphClass(semanticGraph, semanticGraph.rootClassKey);
   const decorated = {
     ...passport,
     ...(passport?.fields && typeof passport.fields === "object" && !Array.isArray(passport.fields)
       ? { fields: { ...passport.fields } }
       : {}),
   };
-  for (const property of rootClass?.properties || []) {
+  const schemaFields = flattenSchemaFieldsFromSections(getFieldsJson(typeDef).sections || []);
+  for (const property of schemaFields) {
+    if (!property?.key || !property.rangeKind) continue;
     if (Object.prototype.hasOwnProperty.call(decorated, property.key)) {
       decorated[property.key] = decorateSemanticGraphValue(property, decorated[property.key], semanticGraph);
     }
@@ -170,40 +187,6 @@ function decoratePassportSemanticGraph(passport, typeDef) {
     }
   }
   return decorated;
-}
-
-function buildSemanticGraphInlineContext(semanticGraph) {
-  if (!semanticGraph) {
-    throw new Error("Semantic passport export requires a semantic class graph.");
-  }
-  const scalarTypes = {
-    decimal: "http://www.w3.org/2001/XMLSchema#decimal",
-    integer: "http://www.w3.org/2001/XMLSchema#integer",
-    boolean: "http://www.w3.org/2001/XMLSchema#boolean",
-    date: "http://www.w3.org/2001/XMLSchema#date",
-    datetime: "http://www.w3.org/2001/XMLSchema#dateTime",
-    uri: "@id",
-  };
-  const buildClassContext = (classKey, visited = new Set()) => {
-    if (visited.has(classKey)) return {};
-    const classDef = getSemanticGraphClass(semanticGraph, classKey);
-    if (!classDef) return {};
-    const nextVisited = new Set(visited).add(classKey);
-    return Object.fromEntries((classDef.properties || []).map((property) => {
-      const term = { "@id": property.semanticId };
-      if (isManyProperty(property)) term["@container"] = "@set";
-      if (property.rangeKind === "scalar") {
-        if (scalarTypes[property.dataType]) term["@type"] = scalarTypes[property.dataType];
-      } else if (property.rangeKind === "enum" || property.relationshipType === "reference") {
-        term["@type"] = "@id";
-      } else {
-        const childContext = buildClassContext(property.rangeClassKey, nextVisited);
-        if (Object.keys(childContext).length) term["@context"] = childContext;
-      }
-      return [property.key, term];
-    }));
-  };
-  return buildClassContext(semanticGraph.rootClassKey);
 }
 
 function createSemanticPassportExportService({
@@ -228,19 +211,20 @@ function createSemanticPassportExportService({
   }
 
   function buildInlineContext({ model, passports = [], typeDef = null } = {}) {
+    void model;
     void passports;
-    const inlineContext = {};
-    const knownContext = model?.context?.["@context"] || {};
-    const semanticGraph = getFieldsJson(typeDef).semanticGraph;
-    const graphContext = buildSemanticGraphInlineContext(semanticGraph);
-    for (const [key, value] of Object.entries(graphContext)) {
-      if (!knownContext[key]) inlineContext[key] = value;
-    }
-    return inlineContext;
+    const fieldsJson = getFieldsJson(typeDef);
+    const sections = fieldsJson.sections || [];
+    const semanticGraph = projectSemanticGraphToSections(fieldsJson.semanticGraph, sections);
+    return buildSemanticProfileContext(semanticGraph, sections)["@context"];
   }
 
   function sanitizePassport(passport, passportType, typeDef = null) {
-    const semanticGraph = getFieldsJson(typeDef).semanticGraph;
+    const fieldsJson = getFieldsJson(typeDef);
+    const semanticGraph = projectSemanticGraphToSections(
+      fieldsJson.semanticGraph,
+      fieldsJson.sections || []
+    );
     if (!semanticGraph) {
       throw new Error("Semantic passport export requires a semantic class graph.");
     }
@@ -250,10 +234,10 @@ function createSemanticPassportExportService({
         ? ["DigitalProductPassport", rootClass.semanticId]
         : "DigitalProductPassport",
     };
-    const typedPassport = decoratePassportSemanticGraph(
+    const typedPassport = projectPassportRowToSchema(decoratePassportSemanticGraph(
       coercePassportSchemaValues(passport, typeDef),
       typeDef
-    );
+    ), typeDef);
     const resolvedPassportType = typedPassport?.passportType || passportType || null;
 
     for (const [key, value] of Object.entries(typedPassport || {})) {
@@ -291,7 +275,6 @@ function createSemanticPassportExportService({
     const resolvedType = String(passportType || getTypeName(typeDef) || "").trim();
     const model = resolveSemanticModel({ passportType: resolvedType, typeDef, options });
     const contexts = [dppContext];
-    if (model) contexts.push(model.contextUrl);
     const inlineContext = buildInlineContext({ model, typeDef });
     if (Object.keys(inlineContext).length > 0) contexts.push(inlineContext);
     return contexts;
@@ -306,23 +289,21 @@ function createSemanticPassportExportService({
     const model = resolveSemanticModel({ passportType: resolvedType, typeDef, options });
     const contexts = [dppContext];
 
-    if (model) {
-      contexts.push(model.contextUrl);
-    }
-
     const inlineContext = buildInlineContext({ model, passports: graph, typeDef });
     if (Object.keys(inlineContext).length > 0) contexts.push(inlineContext);
 
     const metadata = buildSemanticModelMetadata(model);
+    const semanticProfile = buildSemanticProfileMetadata(typeDef, {
+      profilePath: resolvedType
+        ? `/api/passport-types/${encodeURIComponent(resolvedType)}/semantic-profile`
+        : null,
+    });
     return {
       "@context": contexts,
       "@graph": graph,
-      ...(metadata
-        ? {
-            passportType: resolvedType || graph[0]?.passportType || null,
-            semanticModel: metadata,
-          }
-        : {}),
+      passportType: resolvedType || graph[0]?.passportType || null,
+      ...(metadata ? { semanticModel: metadata } : {}),
+      semanticProfile,
     };
   }
 

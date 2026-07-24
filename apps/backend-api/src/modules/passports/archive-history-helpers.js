@@ -18,6 +18,7 @@ function createArchiveHistoryHelpers({
   getPassportLineageContext,
   getPassportVersionsByLineage,
   getCompanyNameMap,
+  getPassportTypeSchema,
 }) {
   const publicHistoryExcludedFieldKeys = new Set([
     "internalAliasId",
@@ -42,8 +43,17 @@ function createArchiveHistoryHelpers({
     snapshotReason = "stateSnapshot",
     client = pool,
   }) {
-    const rowData = buildArchiveSnapshotRow(passport);
-    if (!rowData || !passportType) return null;
+    if (!passport || !passportType) return null;
+    const typeSchema = typeof getPassportTypeSchema === "function"
+      ? await getPassportTypeSchema(passportType)
+      : null;
+    if (!typeSchema) {
+      const error = new Error(`Passport type schema is required to archive "${passportType}" safely.`);
+      error.code = "passportTypeSchemaMissing";
+      throw error;
+    }
+    const rowData = buildArchiveSnapshotRow(normalizePassportRow(passport, typeSchema));
+    if (!rowData) return null;
 
     const dppId = rowData.dppId || null;
     const lineageId = rowData.lineageId || dppId || null;

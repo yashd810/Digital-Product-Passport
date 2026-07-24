@@ -10,15 +10,22 @@ const {
   getSectionTreeLimitError,
   passportModuleSchemaLimits,
 } = schemaLimits;
-const sectionCsvPaths = globalThis.PassportModuleSectionCsvPaths;
-if (!sectionCsvPaths) {
-  throw new Error("The section CSV path helper did not load.");
+const derivedFieldMetadata = globalThis.PassportModuleDerivedFieldMetadata;
+if (!derivedFieldMetadata) {
+  throw new Error("The derived field metadata helper did not load.");
 }
-const {
-  buildSectionPathCells,
-  convertRowsToNestedSections,
-  normalizeSectionPathRow,
-} = sectionCsvPaths;
+const fieldsCsv = globalThis.PassportModuleFieldsCsv;
+if (!fieldsCsv) {
+  throw new Error("The fields CSV helper did not load.");
+}
+const semanticGraphCsv = globalThis.PassportModuleSemanticGraphCsv;
+if (!semanticGraphCsv) {
+  throw new Error("The semantic graph CSV helper did not load.");
+}
+const csvImportReconciliation = globalThis.PassportModuleCsvImportReconciliation;
+if (!csvImportReconciliation) {
+  throw new Error("The CSV import reconciliation helper did not load.");
+}
 
 const headerSlotDefinitions = [
   { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
@@ -95,9 +102,7 @@ const sample = {
       productCategoryDetail: "card3",
     },
     lifecycleRoles: {},
-    compositionFieldKey: "",
-    compositionLabelColumnKey: "",
-    compositionValueColumnKey: "",
+    compositionCharts: [],
   },
   sections: [
     {
@@ -249,102 +254,6 @@ const sample = {
   },
 };
 
-const fieldsCsvColumns = [
-  "sectionLabel",
-  "sectionPath",
-  "sectionKeyPath",
-  "fieldLabel",
-  "fieldType",
-  "definition",
-  "dataType",
-  "unitLabel",
-  "unitSymbol",
-  "confidentiality",
-  "queryable",
-  "indexed",
-  "tableColumns",
-];
-
-const fieldsCsvColumnLabels = {
-  fieldLabel: "Label",
-  sectionLabel: "Section label",
-  sectionPath: "Section path",
-  sectionKeyPath: "Section key path",
-  fieldType: "UI type",
-  definition: "Definition",
-  dataType: "Data type",
-  unitLabel: "Unit label",
-  unitSymbol: "Unit symbol",
-  confidentiality: "Confidentiality",
-  objectType: "Schema object",
-  valueDataType: "Schema value",
-  queryable: "queryable",
-  indexed: "indexed",
-  tableColumns: "Table schema",
-};
-
-const fieldsCsvColumnAliases = {
-  fieldLabel: ["Field label", "Field name"],
-  sectionLabel: ["Section"],
-  sectionPath: ["Section labels path"],
-  sectionKeyPath: ["Section keys path"],
-  fieldType: ["Type", "Field type"],
-  dataType: ["JSON type"],
-  objectType: ["Object type", "Schema object type"],
-  valueDataType: ["Value type", "Value data type", "Schema value type"],
-  tableColumns: ["Columns", "Table columns", "Table column JSON"],
-};
-
-const tableColumnCsvPropertyLabels = {
-  columnLabel: "Label",
-  dataType: "Data type",
-  unitLabel: "Unit label",
-  unitSymbol: "Unit symbol",
-  objectType: "Object type",
-  valueDataType: "Value data type",
-  semanticSlug: "Semantic slug",
-  columnKey: "Column key",
-  unitKey: "Unit key",
-};
-
-const tableColumnCsvPropertyAliases = {
-  columnLabel: ["Column label", "Column name"],
-  dataType: ["JSON type"],
-  objectType: ["Schema object", "Schema object type"],
-  valueDataType: ["Schema value", "Schema value type", "Value type"],
-};
-
-const fieldTypeCsvOptions = [
-  { value: "text" },
-  { value: "textarea", aliases: ["multi-line text", "long text"] },
-  { value: "boolean", aliases: ["true false", "yes no"] },
-  { value: "date" },
-  { value: "datetime", aliases: ["date time", "date-time"] },
-  { value: "url", aliases: ["link"] },
-  { value: "file", aliases: ["evidence file"] },
-  { value: "symbol" },
-  { value: "table", aliases: ["collection"] },
-];
-const dataTypeCsvOptions = [
-  { value: "string", aliases: ["text"] },
-  { value: "decimal" },
-  { value: "integer" },
-  { value: "boolean" },
-  { value: "date" },
-  { value: "datetime", aliases: ["date time", "date-time"] },
-  { value: "uri", aliases: ["url", "link"] },
-  { value: "array", aliases: ["list", "collection"] },
-];
-const tableColumnDataTypeCsvOptions = dataTypeCsvOptions.filter((option) => option.value !== "array");
-const confidentialityCsvOptions = [
-  { value: "public" },
-  { value: "restricted" },
-];
-
-const fieldTypeOptions = new Set(fieldTypeCsvOptions.map((option) => option.value));
-const dataTypeOptions = new Set(dataTypeCsvOptions.map((option) => option.value));
-const tableColumnDataTypeOptions = new Set(tableColumnDataTypeCsvOptions.map((option) => option.value));
-const confidentialityOptions = new Set(confidentialityCsvOptions.map((option) => option.value));
 const fixedDataTypeByFieldType = Object.freeze({
   boolean: "boolean",
   date: "date",
@@ -355,17 +264,9 @@ const fixedDataTypeByFieldType = Object.freeze({
   url: "uri",
 });
 
-const fieldTypeCsvAliases = buildCsvOptionAliases(fieldTypeCsvOptions);
-const dataTypeCsvAliases = buildCsvOptionAliases(dataTypeCsvOptions);
-const tableColumnDataTypeCsvAliases = buildCsvOptionAliases(tableColumnDataTypeCsvOptions);
-const confidentialityCsvAliases = buildCsvOptionAliases(confidentialityCsvOptions);
-const fieldsCsvColumnNameAliases = buildCsvColumnAliases(fieldsCsvColumnLabels, fieldsCsvColumnAliases);
-const tableColumnCsvPropertyNameAliases = buildCsvColumnAliases(tableColumnCsvPropertyLabels, tableColumnCsvPropertyAliases);
-
 const draftStorageKey = "passport-module-generator:draft:v1";
 const sessionStorageKey = "passport-module-generator:session:v1";
-const maxFieldsCsvBytes = 2 * 1024 * 1024;
-const maxFieldsCsvRows = passportModuleSchemaLimits.maxFields;
+const maxCsvBytes = 2 * 1024 * 1024;
 let sessionSaveTimer = null;
 let syncingGraphSources = false;
 let graphSourceSyncTimer = null;
@@ -375,11 +276,19 @@ let graphNodeSequence = 0;
 let selectedGraphNodeId = "root";
 let fieldsNodeSequence = 0;
 let selectedFieldsNodeId = "";
+let expandedFieldsExplorerSections = new WeakSet();
 let graphFirstLayerBuilt = false;
 let searchableSelectSequence = 0;
 let openSearchableSelect = null;
 let searchableSelectObserver = null;
 let searchableSelectRefreshQueued = false;
+let searchableSelectPositionQueued = false;
+let derivedFieldsRefreshTimer = null;
+let refreshingDerivedFields = false;
+let suspendDerivedFieldsRefresh = false;
+let fieldsExplorerRenderQueued = false;
+let buildingSectionsDom = false;
+let graphExplorerRenderQueued = false;
 
 function searchableSelectLabel(select) {
   const explicitLabel = select.getAttribute("aria-label");
@@ -432,10 +341,23 @@ function positionSearchableSelectMenu(instance) {
 
 function closeSearchableSelect(instance = openSearchableSelect, { restoreFocus = false } = {}) {
   if (!instance) return;
-  instance.menu.hidden = true;
+  instance.menu.classList.remove("searchable-select-menu-open");
+  instance.menu.setAttribute("aria-hidden", "true");
   instance.wrapper.classList.remove("searchable-select-open");
   instance.trigger.setAttribute("aria-expanded", "false");
   instance.search.value = "";
+  if (instance.closeTimer) window.clearTimeout(instance.closeTimer);
+  const finishClosing = () => {
+    instance.closeTimer = null;
+    if (!instance.menu.classList.contains("searchable-select-menu-open")) {
+      instance.menu.hidden = true;
+    }
+  };
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    finishClosing();
+  } else {
+    instance.closeTimer = window.setTimeout(finishClosing, 170);
+  }
   if (openSearchableSelect === instance) openSearchableSelect = null;
   if (restoreFocus && instance.wrapper.isConnected) instance.trigger.focus();
 }
@@ -519,12 +441,18 @@ function openSearchableSelectMenu(instance) {
   }
   openSearchableSelect = instance;
   syncSearchableSelect(instance.select);
+  if (instance.closeTimer) {
+    window.clearTimeout(instance.closeTimer);
+    instance.closeTimer = null;
+  }
   instance.menu.hidden = false;
+  instance.menu.setAttribute("aria-hidden", "false");
   instance.wrapper.classList.add("searchable-select-open");
   instance.trigger.setAttribute("aria-expanded", "true");
   renderSearchableSelectOptions(instance);
   positionSearchableSelectMenu(instance);
   window.requestAnimationFrame(() => {
+    instance.menu.classList.add("searchable-select-menu-open");
     positionSearchableSelectMenu(instance);
     instance.search.focus();
   });
@@ -560,6 +488,7 @@ function enhanceSearchableSelect(select) {
   menu.className = "searchable-select-menu";
   menu.dataset.searchableSelectMenu = "true";
   menu.hidden = true;
+  menu.setAttribute("aria-hidden", "true");
   const searchWrap = document.createElement("div");
   searchWrap.className = "searchable-select-search-wrap";
   const search = document.createElement("input");
@@ -669,6 +598,15 @@ function queueSearchableSelectRefresh() {
   });
 }
 
+function queueSearchableSelectPosition() {
+  if (searchableSelectPositionQueued) return;
+  searchableSelectPositionQueued = true;
+  window.requestAnimationFrame(() => {
+    searchableSelectPositionQueued = false;
+    positionSearchableSelectMenu(openSearchableSelect);
+  });
+}
+
 function setupSearchableSelects() {
   refreshSearchableSelects();
   if (!searchableSelectObserver) {
@@ -706,24 +644,86 @@ function setupSearchableSelects() {
       closeSearchableSelect(openSearchableSelect, { restoreFocus: true });
     }
   });
-  window.addEventListener("resize", () => positionSearchableSelectMenu(openSearchableSelect));
+  window.addEventListener("resize", queueSearchableSelectPosition);
   document.addEventListener(
     "scroll",
-    () => positionSearchableSelectMenu(openSearchableSelect),
+    queueSearchableSelectPosition,
     true
   );
 }
 
+function toggleSmoothDetails(details) {
+  const summary = $(":scope > summary", details);
+  if (!summary) return;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const currentTarget = details.dataset.smoothDetailsTarget
+    ? details.dataset.smoothDetailsTarget === "open"
+    : details.open;
+  const opening = !currentTarget;
+  details.dataset.smoothDetailsTarget = opening ? "open" : "closed";
+  if (reducedMotion || typeof details.animate !== "function") {
+    details.open = opening;
+    delete details.dataset.smoothDetailsTarget;
+    return;
+  }
+
+  const currentHeight = details.getBoundingClientRect().height;
+  details._smoothDetailsAnimation?.cancel();
+  details.style.height = `${currentHeight}px`;
+  details.style.overflow = "hidden";
+  if (opening) details.open = true;
+  const targetHeight = opening ? details.scrollHeight : summary.getBoundingClientRect().height;
+  const animation = details.animate(
+    { height: [`${currentHeight}px`, `${targetHeight}px`] },
+    { duration: opening ? 220 : 180, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+  );
+  details._smoothDetailsAnimation = animation;
+  animation.onfinish = () => {
+    if (details._smoothDetailsAnimation !== animation) return;
+    if (!opening) details.open = false;
+    details.style.height = "";
+    details.style.overflow = "";
+    details._smoothDetailsAnimation = null;
+    delete details.dataset.smoothDetailsTarget;
+  };
+  animation.oncancel = () => {
+    if (details._smoothDetailsAnimation === animation) details._smoothDetailsAnimation = null;
+  };
+}
+
+function setupSmoothDetails() {
+  document.addEventListener("click", (event) => {
+    const summary = event.target.closest("details.auto-group > summary");
+    if (!summary) return;
+    event.preventDefault();
+    toggleSmoothDetails(summary.parentElement);
+  });
+}
+
 function setMessage(text, type = "info") {
   const box = $("#message");
+  if (!box) return;
   box.textContent = text;
-  box.className = `message ${type}`;
+  box.className = `message workspace-message ${type}`;
+  if (
+    typeof box.animate === "function"
+    && !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    box.animate(
+      [
+        { opacity: 0, transform: "translateY(-6px)" },
+        { opacity: 1, transform: "translateY(0)" },
+      ],
+      { duration: 180, easing: "ease-out" }
+    );
+  }
 }
 
 function clearMessage() {
   const box = $("#message");
+  if (!box) return;
   box.textContent = "";
-  box.className = "message hidden";
+  box.className = "message workspace-message hidden";
 }
 
 function getCurrentStep() {
@@ -754,9 +754,7 @@ function createBlankSpec() {
       businessIdentifierField: "",
       summaryRoles: {},
       lifecycleRoles: {},
-      compositionFieldKey: "",
-      compositionLabelColumnKey: "",
-      compositionValueColumnKey: "",
+      compositionCharts: [],
     },
     sections: [],
     semanticGraph: {
@@ -816,10 +814,15 @@ function queueSessionSave() {
 function setActiveStep(step) {
   const nextStep = step || "module";
   $$("[data-step]").forEach((panel) => {
-    panel.classList.toggle("active", panel.dataset.step === nextStep);
+    const active = panel.dataset.step === nextStep;
+    panel.classList.toggle("active", active);
+    panel.setAttribute("aria-hidden", String(!active));
   });
   $$("[data-step-target]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.stepTarget === nextStep);
+    const active = button.dataset.stepTarget === nextStep;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "step");
+    else button.removeAttribute("aria-current");
   });
   const clearButton = $("#clearAll");
   if (clearButton) {
@@ -862,7 +865,25 @@ function updateWorkspaceMeta() {
     meta.textContent = `${sectionCount} section${sectionCount === 1 ? "" : "s"}, ${fieldCount} field${fieldCount === 1 ? "" : "s"}`;
   }
   updateSectionSummaries();
-  renderFieldsExplorer();
+  queueFieldsExplorerRender();
+}
+
+function queueFieldsExplorerRender() {
+  if (fieldsExplorerRenderQueued) return;
+  fieldsExplorerRenderQueued = true;
+  window.requestAnimationFrame(() => {
+    fieldsExplorerRenderQueued = false;
+    renderFieldsExplorer();
+  });
+}
+
+function queueGraphExplorerRender() {
+  if (graphExplorerRenderQueued) return;
+  graphExplorerRenderQueued = true;
+  window.requestAnimationFrame(() => {
+    graphExplorerRenderQueued = false;
+    renderGraphExplorer();
+  });
 }
 
 function ensureFieldsNodeId(element, prefix) {
@@ -919,7 +940,7 @@ function getSectionDisplayLabel(sectionNode) {
 function revealSectionPath(sectionNode) {
   let current = sectionNode;
   while (current?.matches?.(".section-card")) {
-    current.classList.remove("fields-node-hidden", "collapsed");
+    current.classList.remove("fields-node-hidden");
     current = current.parentElement?.closest(".section-card") || null;
   }
 }
@@ -951,7 +972,7 @@ function getSectionNodesDepthFirst(sectionNodes = getTopLevelSectionNodes()) {
 
 function getFieldsExplorerItems() {
   const items = [];
-  const addSectionItem = (section, parentId = "") => {
+  const addSectionItem = (section, parentId = "", depth = 0) => {
     const sectionId = ensureFieldsNodeId(section, "section");
     const sectionLabel = getSectionLabelInput(section)?.value.trim() || "New section";
     const sectionPath = getSectionDisplayLabel(section);
@@ -968,6 +989,8 @@ function getFieldsExplorerItems() {
       searchText: `${sectionPath} ${getSectionKeyInput(section)?.value || ""}`,
       element: section,
       parentId,
+      depth,
+      hasChildren: fields.length > 0 || children.length > 0,
     });
     fields.forEach((field) => {
       const fieldId = ensureFieldsNodeId(field, "field");
@@ -985,6 +1008,7 @@ function getFieldsExplorerItems() {
         searchText: `${sectionPath} ${fieldValues}`,
         element: field,
         parentId: sectionId,
+        depth: depth + 1,
       });
       $$(":scope [data-table-columns] > .table-column-card", field).forEach((column) => {
         const columnLabel = $("[data-column='columnLabel']", column)?.value.trim() || "New column";
@@ -999,10 +1023,11 @@ function getFieldsExplorerItems() {
           searchText: `${sectionPath} ${fieldLabel} ${columnValues}`,
           element: column,
           parentId: fieldId,
+          depth: depth + 2,
         });
       });
     });
-    children.forEach((child) => addSectionItem(child, sectionId));
+    children.forEach((child) => addSectionItem(child, sectionId, depth + 1));
   };
   getTopLevelSectionNodes().forEach((section) => addSectionItem(section));
   return items;
@@ -1014,6 +1039,16 @@ function fieldsExplorerKindLabel(kind) {
     field: "Passport field",
     column: "Table column",
   }[kind] || "Form item";
+}
+
+function expandFieldsExplorerAncestors(element) {
+  let section = element?.matches?.(".section-card")
+    ? element.parentElement?.closest(".section-card") || null
+    : element?.closest?.(".section-card") || null;
+  while (section) {
+    expandedFieldsExplorerSections.add(section);
+    section = section.parentElement?.closest(".section-card") || null;
+  }
 }
 
 function applyFieldsEditorSelection(items = getFieldsExplorerItems()) {
@@ -1039,14 +1074,14 @@ function applyFieldsEditorSelection(items = getFieldsExplorerItems()) {
     const section = selected.element.closest(".section-card");
     revealSectionPath(section);
     section?.classList.add("fields-focus-child");
-    selected.element.classList.remove("fields-node-hidden", "filtered-out");
+    selected.element.classList.remove("fields-node-hidden");
     selected.element.classList.add("fields-node-selected", "fields-focus-self");
   } else if (selected?.kind === "column") {
     const field = selected.element.closest(".field-row");
     const section = field?.closest(".section-card");
     revealSectionPath(section);
     section?.classList.add("fields-focus-column");
-    field?.classList.remove("fields-node-hidden", "filtered-out");
+    field?.classList.remove("fields-node-hidden");
     field?.classList.add("fields-node-selected", "fields-focus-column");
     selected.element.classList.remove("fields-node-hidden");
     selected.element.classList.add("fields-node-selected");
@@ -1066,31 +1101,139 @@ function applyFieldsEditorSelection(items = getFieldsExplorerItems()) {
   }
 }
 
+function fieldsExplorerItemIsCollapsed(item, itemsById) {
+  let parent = itemsById.get(item.parentId) || null;
+  while (parent) {
+    if (parent.kind === "section" && !expandedFieldsExplorerSections.has(parent.element)) {
+      return true;
+    }
+    parent = itemsById.get(parent.parentId) || null;
+  }
+  return false;
+}
+
+function syncFieldsExplorerVisibility(items, itemsById, { searching = false } = {}) {
+  const rows = new Map(
+    $$("#fieldsExplorerList .fields-explorer-row")
+      .map((row) => [row.dataset.fieldsItemId, row])
+  );
+  items.forEach((item) => {
+    const row = rows.get(item.id);
+    if (!row) return;
+    const collapsed = !searching && fieldsExplorerItemIsCollapsed(item, itemsById);
+    row.classList.toggle("fields-explorer-row-collapsed", collapsed);
+    row.setAttribute("aria-hidden", String(collapsed));
+    $$("button", row).forEach((button) => {
+      button.tabIndex = collapsed ? -1 : 0;
+    });
+  });
+}
+
+function syncFieldsExplorerSelection(items) {
+  $$("#fieldsExplorerList [data-fields-select]").forEach((button) => {
+    const selected = button.dataset.fieldsSelect === selectedFieldsNodeId;
+    button.classList.toggle("selected", selected);
+    if (selected) button.setAttribute("aria-current", "true");
+    else button.removeAttribute("aria-current");
+  });
+  applyFieldsEditorSelection(items);
+}
+
 function renderFieldsExplorer() {
+  if (buildingSectionsDom) return;
   const list = $("#fieldsExplorerList");
   if (!list) return;
   const items = getFieldsExplorerItems();
+  const itemsById = new Map(items.map((item) => [item.id, item]));
   if (!items.some((item) => item.id === selectedFieldsNodeId)) {
     selectedFieldsNodeId = items[0]?.id || "";
   }
   const search = ($("#fieldsExplorerSearch")?.value || "").trim().toLowerCase();
-  const visibleItems = items.filter((item) => {
-    if (!search) return true;
-    return `${item.label} ${item.meta} ${item.searchText} ${fieldsExplorerKindLabel(item.kind)}`
-      .toLowerCase()
-      .includes(search);
-  });
+  let visibleItems;
+  if (search) {
+    const visibleIds = new Set();
+    items.forEach((item) => {
+      const isMatch = `${item.label} ${item.meta} ${item.searchText} ${fieldsExplorerKindLabel(item.kind)}`
+        .toLowerCase()
+        .includes(search);
+      if (!isMatch) return;
+      let current = item;
+      while (current) {
+        visibleIds.add(current.id);
+        current = itemsById.get(current.parentId) || null;
+      }
+    });
+    visibleItems = items.filter((item) => visibleIds.has(item.id));
+  } else {
+    visibleItems = items;
+  }
+  const visibleParentIds = new Set(visibleItems.map((item) => item.parentId).filter(Boolean));
   list.innerHTML = "";
   visibleItems.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "fields-explorer-row";
+    row.dataset.fieldsItemId = item.id;
+    row.dataset.fieldsDepth = String(item.depth);
+    // Cap indentation so deeply nested schemas remain readable in the sidebar.
+    row.style.setProperty("--fields-explorer-indent", `${Math.min(item.depth * 14, 84)}px`);
+
+    if (item.kind === "section" && item.hasChildren) {
+      const isExpanded = search
+        ? visibleParentIds.has(item.id)
+        : expandedFieldsExplorerSections.has(item.element);
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "fields-explorer-toggle";
+      toggle.dataset.fieldsToggle = item.id;
+      toggle.setAttribute("aria-expanded", String(isExpanded));
+      toggle.setAttribute("aria-label", `${isExpanded ? "Collapse" : "Expand"} ${item.label}`);
+      toggle.title = search
+        ? "Clear the search to collapse or expand sections"
+        : `${isExpanded ? "Collapse" : "Expand"} ${item.label}`;
+      toggle.disabled = Boolean(search);
+      const chevron = document.createElement("span");
+      chevron.className = "fields-explorer-chevron";
+      chevron.setAttribute("aria-hidden", "true");
+      toggle.appendChild(chevron);
+      toggle.addEventListener("click", () => {
+        let selectionChanged = false;
+        if (expandedFieldsExplorerSections.has(item.element)) {
+          expandedFieldsExplorerSections.delete(item.element);
+          const selected = itemsById.get(selectedFieldsNodeId);
+          if (
+            selected
+            && selected.id !== item.id
+            && item.element.contains(selected.element)
+          ) {
+            selectedFieldsNodeId = item.id;
+            selectionChanged = true;
+          }
+        } else {
+          expandedFieldsExplorerSections.add(item.element);
+        }
+        const expanded = expandedFieldsExplorerSections.has(item.element);
+        toggle.setAttribute("aria-expanded", String(expanded));
+        toggle.setAttribute("aria-label", `${expanded ? "Collapse" : "Expand"} ${item.label}`);
+        toggle.title = `${expanded ? "Collapse" : "Expand"} ${item.label}`;
+        syncFieldsExplorerVisibility(items, itemsById);
+        if (selectionChanged) syncFieldsExplorerSelection(items);
+        toggle.focus({ preventScroll: true });
+      });
+      row.appendChild(toggle);
+    } else {
+      const spacer = document.createElement("span");
+      spacer.className = "fields-explorer-toggle-spacer";
+      spacer.setAttribute("aria-hidden", "true");
+      row.appendChild(spacer);
+    }
+
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `fields-explorer-item fields-explorer-item-${item.kind}${item.parentId ? " fields-explorer-item-child" : ""}`;
-    if (item.kind === "column" || getSectionPathLabels(item.element.closest(".section-card") || item.element).length > 2) {
-      button.classList.add("fields-explorer-item-grandchild");
-    }
+    button.className = `fields-explorer-item fields-explorer-item-${item.kind}`;
+    button.dataset.fieldsDepth = String(item.depth);
     button.dataset.fieldsSelect = item.id;
     button.classList.toggle("selected", item.id === selectedFieldsNodeId);
-    button.setAttribute("aria-current", item.id === selectedFieldsNodeId ? "true" : "false");
+    if (item.id === selectedFieldsNodeId) button.setAttribute("aria-current", "true");
 
     const marker = document.createElement("span");
     marker.className = "fields-explorer-marker";
@@ -1104,21 +1247,26 @@ function renderFieldsExplorer() {
     copy.append(title, meta);
     button.append(marker, copy);
     button.addEventListener("click", () => {
+      expandFieldsExplorerAncestors(item.element);
       selectedFieldsNodeId = item.id;
-      renderFieldsExplorer();
+      syncFieldsExplorerVisibility(items, itemsById, { searching: Boolean(search) });
+      syncFieldsExplorerSelection(items);
       item.element.querySelector("input, select, textarea")?.focus({ preventScroll: true });
     });
-    list.appendChild(button);
+    row.appendChild(button);
+    list.appendChild(row);
   });
   if ($("#fieldsExplorerCount")) {
     $("#fieldsExplorerCount").textContent = `${items.length} item${items.length === 1 ? "" : "s"}`;
   }
   $("#fieldsExplorerEmpty")?.classList.toggle("hidden", visibleItems.length > 0);
+  syncFieldsExplorerVisibility(items, itemsById, { searching: Boolean(search) });
   applyFieldsEditorSelection(items);
 }
 
 function focusFieldsElement(element) {
   if (!element) return;
+  expandFieldsExplorerAncestors(element);
   selectedFieldsNodeId = ensureFieldsNodeId(
     element,
     element.classList.contains("section-card")
@@ -1186,421 +1334,19 @@ function titleCase(value) {
     .join(" ");
 }
 
-function csvOptionKey(value) {
-  return String(value || "")
-    .trim()
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
-}
-
-function buildCsvOptionAliases(options) {
-  const aliases = new Map();
-  for (const option of options) {
-    for (const value of [option.value, option.label, ...(option.aliases || [])]) {
-      const key = csvOptionKey(value);
-      if (key) aliases.set(key, option.value);
-    }
-  }
-  return aliases;
-}
-
-function buildCsvColumnAliases(labels, extraAliases = {}) {
-  const aliases = new Map();
-  for (const [key, label] of Object.entries(labels)) {
-    for (const value of [key, label, ...(extraAliases[key] || [])]) {
-      const aliasKey = csvOptionKey(value);
-      if (aliasKey) aliases.set(aliasKey, key);
-    }
-  }
-  return aliases;
-}
-
-function normalizeCsvColumnName(value) {
-  return fieldsCsvColumnNameAliases.get(csvOptionKey(value)) || "";
-}
-
-function normalizeCsvTableColumnPropertyName(value) {
-  return tableColumnCsvPropertyNameAliases.get(csvOptionKey(value)) || "";
-}
-
-function describeCsvOptions(options) {
-  return options
-    .map((option) => option.label && option.label !== option.value ? `${option.label} (${option.value})` : option.value)
-    .join(" | ");
-}
-
-function getCsvColumnHeaders() {
-  return fieldsCsvColumns.map((column) => fieldsCsvColumnLabels[column] || column);
-}
-
-function csvEscape(value) {
-  const rawText = String(value ?? "");
-  const text = /^[\u0000-\u0020]*[=+\-@]/.test(rawText) ? `'${rawText}` : rawText;
-  if (/["\n,]/.test(text)) {
-    return `"${text.replace(/"/g, "\"\"")}"`;
-  }
-  return text;
-}
-
-function restoreCsvFormulaCell(value) {
-  const text = String(value ?? "");
-  return /^'[\u0000-\u0020]*[=+\-@]/.test(text) ? text.slice(1) : text;
-}
-
 function downloadTextFile(fileName, content, contentType = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type: contentType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = fileName;
+  link.style.display = "none";
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
-}
-
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let value = "";
-  let index = 0;
-  let inQuotes = false;
-  let quotedValueClosed = false;
-
-  while (index < text.length) {
-    const char = text[index];
-    const next = text[index + 1];
-
-    if (inQuotes) {
-      if (char === "\"" && next === "\"") {
-        value += "\"";
-        index += 2;
-        continue;
-      }
-      if (char === "\"") {
-        inQuotes = false;
-        quotedValueClosed = true;
-        index += 1;
-        continue;
-      }
-      value += char;
-      index += 1;
-      continue;
-    }
-
-    if (char === "\"") {
-      if (value || quotedValueClosed) {
-        throw new Error("CSV contains a quote in an unquoted value.");
-      }
-      inQuotes = true;
-      index += 1;
-      continue;
-    }
-
-    if (char === ",") {
-      row.push(value);
-      value = "";
-      quotedValueClosed = false;
-      index += 1;
-      continue;
-    }
-
-    if (char === "\n") {
-      row.push(value);
-      rows.push(row);
-      row = [];
-      value = "";
-      quotedValueClosed = false;
-      index += 1;
-      continue;
-    }
-
-    if (char === "\r") {
-      index += 1;
-      continue;
-    }
-
-    if (quotedValueClosed) {
-      throw new Error("CSV contains characters after a closing quote.");
-    }
-    value += char;
-    index += 1;
-  }
-
-  if (inQuotes) throw new Error("CSV contains an unterminated quoted value.");
-  row.push(value);
-  if (row.length > 1 || row[0]) rows.push(row);
-  return rows;
-}
-
-function parseBooleanCell(value, label) {
-  const text = String(value || "").trim().toLowerCase();
-  if (!text || ["false", "0", "no", "n"].includes(text)) return false;
-  if (["true", "1", "yes", "y"].includes(text)) return true;
-  throw new Error(`${label} must be true or false.`);
-}
-
-function normalizeCsvOption(value, allowedValues, fallback, aliases, label, allowedDescription = "") {
-  const text = String(value || "").trim();
-  if (!text) return fallback;
-  if (allowedValues.has(text)) return text;
-  const normalized = aliases?.get(csvOptionKey(text));
-  if (normalized && allowedValues.has(normalized)) return normalized;
-  throw new Error(`${label} must be one of: ${allowedDescription || [...allowedValues].join(", ")}.`);
-}
-
-function parseJsonCell(value, label, fallback) {
-  const text = String(value || "").trim();
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`${label} must be valid JSON.`);
-  }
-}
-
-function isCsvCommentRow(row) {
-  return String(row?.[0] || "").trim().startsWith("#");
-}
-
-function normalizeCsvObjectKeys(input, aliasResolver) {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
-  const normalized = Object.create(null);
-  for (const [key, value] of Object.entries(input)) {
-    normalized[aliasResolver(key) || key] = value;
-  }
-  return normalized;
-}
-
-function csvRowLabel(rowNumber, column) {
-  return `CSV row ${rowNumber} ${fieldsCsvColumnLabels[column] || column}`;
-}
-
-function csvTableColumnLabel(rowNumber, columnIndex, property) {
-  return `CSV row ${rowNumber} tableColumns[${columnIndex}] ${tableColumnCsvPropertyLabels[property] || property}`;
-}
-
-function normalizeCsvTableColumns(tableColumns, rowNumber) {
-  return tableColumns.map((rawColumn, columnIndex) => {
-    const column = normalizeCsvObjectKeys(rawColumn, normalizeCsvTableColumnPropertyName);
-    const editableProperties = new Set(["columnLabel", "dataType", "unitLabel", "unitSymbol"]);
-    const unsupportedProperties = Object.keys(column).filter((property) => !editableProperties.has(property));
-    if (unsupportedProperties.length) {
-      throw new Error(
-        `CSV row ${rowNumber} tableColumns[${columnIndex}] contains unsupported properties: ${unsupportedProperties.join(", ")}.`
-      );
-    }
-    const dataType = normalizeCsvOption(
-      column.dataType,
-      tableColumnDataTypeOptions,
-      "string",
-      tableColumnDataTypeCsvAliases,
-      csvTableColumnLabel(rowNumber, columnIndex, "dataType"),
-      describeCsvOptions(tableColumnDataTypeCsvOptions)
-    );
-    return {
-      columnLabel: String(column.columnLabel || "").trim(),
-      dataType,
-      unitLabel: String(column.unitLabel || "").trim(),
-      unitSymbol: String(column.unitSymbol || "").trim(),
-      objectType: "SingleValuedDataElement",
-      valueDataType: valueDataTypeFromDataType(dataType),
-    };
-  });
-}
-
-function serializeEditableTableColumns(columns = []) {
-  return JSON.stringify(columns.map((column) => ({
-    [tableColumnCsvPropertyLabels.columnLabel]: column.columnLabel || "",
-    [tableColumnCsvPropertyLabels.dataType]: column.dataType || "string",
-    [tableColumnCsvPropertyLabels.unitLabel]: column.unitLabel || "",
-    [tableColumnCsvPropertyLabels.unitSymbol]: column.unitSymbol || "",
-  })));
-}
-
-function getFieldsCsvRowsFromSpec(spec = readSpec()) {
-  const rows = [];
-  const visitSection = (section, parentLabels = [], parentKeys = []) => {
-    const sectionLabel = String(section.label || "").trim();
-    const sectionKey = String(section.key || "").trim() || camelCaseFromWords(sectionLabel);
-    const sectionPathCells = buildSectionPathCells({
-      labels: [...parentLabels, sectionLabel],
-      keys: [...parentKeys, sectionKey],
-      deriveSectionKey: camelCaseFromWords,
-    });
-    (section.fields || []).forEach((field) => {
-      rows.push({
-        fieldLabel: field.fieldLabel || "",
-        sectionLabel,
-        ...sectionPathCells,
-        fieldType: field.fieldType || "text",
-        definition: field.definition || "",
-        dataType: field.dataType || defaultDataTypeForFieldType(field.fieldType || "text"),
-        unitLabel: field.unitLabel || "",
-        unitSymbol: field.unitSymbol || "",
-        confidentiality: field.confidentiality || "public",
-        queryable: field.queryable ? "true" : "false",
-        indexed: field.indexed ? "true" : "false",
-        tableColumns: field.fieldType === "table" ? serializeEditableTableColumns(field.tableColumns || []) : "",
-      });
-    });
-    (section.sections || []).forEach((child) => visitSection(
-      child,
-      [...parentLabels, sectionLabel],
-      [...parentKeys, sectionKey]
-    ));
-  };
-  (spec.sections || []).forEach(visitSection);
-  return rows;
-}
-
-function buildFieldsCsvContent(rows = []) {
-  const lines = [
-    getCsvColumnHeaders().join(","),
-    ...rows.map((row) => fieldsCsvColumns.map((column) => csvEscape(row[column] || "")).join(",")),
-  ];
-  return `${lines.join("\n")}\n`;
-}
-
-function readFieldsCsvRows(text) {
-  if (new Blob([String(text || "")]).size > maxFieldsCsvBytes) {
-    throw new Error("CSV file is too large. Maximum size is 2 MB.");
-  }
-  const rows = parseCsv(text);
-  if (!rows.length) throw new Error("CSV file is empty.");
-  if (rows.length > maxFieldsCsvRows + 1) {
-    throw new Error(`CSV contains too many rows. Maximum field rows: ${maxFieldsCsvRows}.`);
-  }
-
-  const headerIndex = rows.findIndex((row) => {
-    if (isCsvCommentRow(row)) return false;
-    const cells = row.map((cell) => normalizeCsvColumnName(cell));
-    return cells.includes("fieldLabel") && cells.includes("sectionLabel");
-  });
-  if (headerIndex === -1) {
-    throw new Error("CSV is missing the field header row. Download the template and fill that format only.");
-  }
-
-  const rawHeader = rows[headerIndex].map((cell) => String(cell || "").trim());
-  const header = rawHeader.map((cell) => normalizeCsvColumnName(cell));
-  for (const column of ["fieldLabel", "sectionLabel"]) {
-    if (!header.includes(column)) {
-      throw new Error(`CSV is missing required column "${fieldsCsvColumnLabels[column]}". Download the template and fill that format only.`);
-    }
-  }
-
-  const unsupported = rawHeader.filter((column, index) => column && !header[index]);
-  if (unsupported.length) {
-    throw new Error(`CSV contains unsupported columns: ${unsupported.join(", ")}. Use the fixed local-tool template only.`);
-  }
-  const duplicates = header.filter((column, index) => column && header.indexOf(column) !== index);
-  if (duplicates.length) {
-    const duplicateLabels = [...new Set(duplicates)].map((column) => fieldsCsvColumnLabels[column] || column);
-    throw new Error(`CSV contains duplicate columns after name matching: ${duplicateLabels.join(", ")}.`);
-  }
-
-  const parsedRows = [];
-  let skippedRowCount = 0;
-
-  for (let rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex += 1) {
-    const row = rows[rowIndex];
-    const rowNumber = rowIndex + 1;
-    if (isCsvCommentRow(row)) continue;
-    if (!row.some((cell) => String(cell || "").trim())) continue;
-
-    const entry = Object.fromEntries(header.map((column, columnIndex) => [
-      column,
-      restoreCsvFormulaCell(row[columnIndex]).trim(),
-    ]));
-    const fieldLabel = entry.fieldLabel || "";
-    const sectionLabel = entry.sectionLabel || "";
-    if (!fieldLabel || !sectionLabel) {
-      skippedRowCount += 1;
-      continue;
-    }
-    const normalizedSectionPath = normalizeSectionPathRow({
-      sectionLabel,
-      sectionPath: entry.sectionPath,
-      sectionKeyPath: entry.sectionKeyPath,
-      rowNumber,
-      deriveSectionKey: camelCaseFromWords,
-    });
-    let fieldType = normalizeCsvOption(
-      entry.fieldType,
-      fieldTypeOptions,
-      "text",
-      fieldTypeCsvAliases,
-      csvRowLabel(rowNumber, "fieldType"),
-      describeCsvOptions(fieldTypeCsvOptions)
-    );
-    const dataType = normalizeCsvOption(
-      entry.dataType,
-      dataTypeOptions,
-      defaultDataTypeForFieldType(fieldType),
-      dataTypeCsvAliases,
-      csvRowLabel(rowNumber, "dataType"),
-      describeCsvOptions(dataTypeCsvOptions)
-    );
-    if (fieldType === "date" && dataType === "datetime") fieldType = "datetime";
-    if (fieldType === "datetime" && dataType === "date") fieldType = "date";
-    if (fieldType === "table" && dataType !== "array") {
-      throw new Error(`CSV row ${rowNumber} Data type must be "array" when UI type is "table".`);
-    }
-    if (fieldType !== "table" && dataType === "array") {
-      throw new Error(`CSV row ${rowNumber} Data type "array" requires UI type "table".`);
-    }
-    const fixedDataType = fixedDataTypeByFieldType[fieldType];
-    if (fixedDataType && dataType !== fixedDataType) {
-      throw new Error(
-        `CSV row ${rowNumber} UI type "${fieldType}" requires Data type "${fixedDataType}".`
-      );
-    }
-    const tableColumnsSource = entry.tableColumns || "";
-    let tableColumns = fieldType === "table"
-      ? parseJsonCell(tableColumnsSource, `CSV row ${rowNumber} tableColumns`, [])
-      : [];
-
-    if (fieldType === "table" && !Array.isArray(tableColumns)) {
-      throw new Error(`CSV row ${rowNumber} tableColumns must be a JSON array.`);
-    }
-    tableColumns = normalizeCsvTableColumns(tableColumns, rowNumber);
-
-    parsedRows.push({
-      rowNumber,
-      sectionLabel: normalizedSectionPath.sectionLabel,
-      sectionPath: normalizedSectionPath.sectionPath,
-      sectionKeyPath: normalizedSectionPath.sectionKeyPath,
-      field: {
-        fieldLabel,
-        fieldType,
-        definition: entry.definition || "",
-        dataType,
-        unitLabel: entry.unitLabel || "",
-        unitSymbol: entry.unitSymbol || "",
-        confidentiality: normalizeCsvOption(
-          entry.confidentiality,
-          confidentialityOptions,
-          "public",
-          confidentialityCsvAliases,
-          csvRowLabel(rowNumber, "confidentiality"),
-          describeCsvOptions(confidentialityCsvOptions)
-        ),
-        queryable: parseBooleanCell(entry.queryable, csvRowLabel(rowNumber, "queryable")),
-        indexed: parseBooleanCell(entry.indexed, csvRowLabel(rowNumber, "indexed")),
-        tableColumns,
-      },
-    });
-  }
-
-  return {
-    rows: parsedRows,
-    skippedRowCount,
-  };
-}
-
-function convertFieldsCsvRowsToSections(rows = []) {
-  return convertRowsToNestedSections(rows);
+  // WebKit and embedded browsers may process the synthetic click asynchronously.
+  // Revoking immediately can cancel an otherwise valid download with no visible error.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 function camelCaseFromWords(value) {
@@ -1623,9 +1369,11 @@ function slugFromValue(value) {
     .join("-");
 }
 
-function unitKeyFromLabel(value) {
-  const slug = slugFromValue(value);
-  return slug || "none";
+function normalizeModuleVersion(value) {
+  const version = String(value || "v1").trim().toLowerCase();
+  if (/^v\d+$/.test(version)) return version;
+  if (/^\d+$/.test(version)) return `v${version}`;
+  return slugFromValue(version) || "v1";
 }
 
 function trackManualInput(input) {
@@ -1647,37 +1395,27 @@ function autoFillInput(input, nextValue) {
   input.dataset.autoFilled = "true";
 }
 
-function bindDerivedInput(input, computeValue, sources = []) {
-  if (!input || input.dataset.derivedBound === "true") return;
-  input.dataset.derivedBound = "true";
-  trackManualInput(input);
-  const update = () => autoFillInput(input, computeValue());
-  for (const source of sources) {
-    if (!source) continue;
-    source.addEventListener("input", update);
-    source.addEventListener("blur", update);
-  }
-  update();
-}
-
 function maybeAutoModuleValues() {
   const family = getFormValue("family");
   const version = getFormValue("version") || "v1";
+  const normalizedFamily = slugFromValue(family);
+  const normalizedVersion = normalizeModuleVersion(version);
   const familyCamel = camelCaseFromWords(family);
   const versionPascal = pascalCaseFromWords(version);
   const title = titleCase(family);
 
-  autoFillInput($("#moduleKey"), family && version ? `${family}:${version}` : "");
+  const moduleKeyInput = $("#moduleKey");
+  if (moduleKeyInput) {
+    moduleKeyInput.value = normalizedFamily ? `${normalizedFamily}:${normalizedVersion}` : "";
+    delete moduleKeyInput.dataset.manual;
+    moduleKeyInput.dataset.autoFilled = "true";
+  }
   autoFillInput($("#typeName"), familyCamel && versionPascal ? `${familyCamel}Passport${versionPascal}` : "");
   autoFillInput($("#displayName"), title && version ? `${title} Passport ${version}` : "");
   autoFillInput($("#productCategory"), title);
   autoFillInput($("#semanticModelKey"), familyCamel && versionPascal ? `${familyCamel}Dictionary${versionPascal}` : "");
   autoFillInput($("#passportPolicyKey"), familyCamel && versionPascal ? `${familyCamel}Dpp${versionPascal}` : "");
   autoFillInput($("#dictionaryName"), title ? `${title} Dictionary` : "");
-}
-
-function columnKeyFromLabel(value) {
-  return canonicalKeyFromSemanticSlug(value);
 }
 
 function canonicalKeyFromSemanticSlug(value) {
@@ -1739,43 +1477,28 @@ function setupModuleAutoFill() {
 }
 
 function setupSectionAutoFill(node) {
-  const keyInput = getSectionKeyInput(node);
   const labelInput = getSectionLabelInput(node);
-  bindDerivedInput(keyInput, () => camelCaseFromWords(labelInput.value), [labelInput]);
-  bindDerivedInput(labelInput, () => titleCase(keyInput.value), [keyInput]);
+  labelInput?.addEventListener("input", queueDerivedFieldsRefresh);
+  labelInput?.addEventListener("blur", queueDerivedFieldsRefresh);
 }
 
 function setupFieldAutoFill(node) {
-  const keyInput = $("[data-field='fieldKey']", node);
   const labelInput = $("[data-field='fieldLabel']", node);
-  const semanticSlugInput = $("[data-field='semanticSlug']", node);
-  const unitKeyInput = $("[data-field='unitKey']", node);
   const unitLabelInput = $("[data-field='unitLabel']", node);
-
-  bindDerivedInput(semanticSlugInput, () => slugFromValue(labelInput.value), [labelInput]);
-  bindDerivedInput(keyInput, () => canonicalKeyFromSemanticSlug(semanticSlugInput.value || slugFromValue(labelInput.value)), [semanticSlugInput, labelInput]);
-  bindDerivedInput(labelInput, () => titleCase(keyInput.value), [keyInput]);
-  bindDerivedInput(unitKeyInput, () => unitKeyFromLabel(unitLabelInput.value), [unitLabelInput]);
+  [labelInput, unitLabelInput].filter(Boolean).forEach((input) => {
+    input.addEventListener("input", queueDerivedFieldsRefresh);
+    input.addEventListener("blur", queueDerivedFieldsRefresh);
+  });
 }
 
 function setupTableColumnAutoFill(row, node) {
-  const keyInput = $("[data-column='columnKey']", node);
   const labelInput = $("[data-column='columnLabel']", node);
-  const semanticSlugInput = $("[data-column='semanticSlug']", node);
-  const unitKeyInput = $("[data-column='unitKey']", node);
   const unitLabelInput = $("[data-column='unitLabel']", node);
-
-  bindDerivedInput(semanticSlugInput, () => slugFromValue(labelInput.value), [labelInput]);
-  bindDerivedInput(keyInput, () => canonicalKeyFromSemanticSlug(semanticSlugInput.value || slugFromValue(labelInput.value)), [semanticSlugInput, labelInput]);
-  bindDerivedInput(labelInput, () => titleCase(keyInput.value), [keyInput]);
-  bindDerivedInput(unitKeyInput, () => unitKeyFromLabel(unitLabelInput.value), [unitLabelInput]);
-
-  labelInput.addEventListener("input", () => {
-    syncRoleOptions();
+  [labelInput, unitLabelInput].filter(Boolean).forEach((input) => {
+    input.addEventListener("input", queueDerivedFieldsRefresh);
+    input.addEventListener("blur", queueDerivedFieldsRefresh);
   });
-  keyInput.addEventListener("input", () => {
-    syncRoleOptions();
-  });
+
 }
 
 function getTableColumnDefaults(index = 0) {
@@ -2023,8 +1746,30 @@ function renderSystemHeaderFields(fields) {
   }
 }
 
-function syncCompositionRoleColumns() {
-  const tableKey = $("#compositionFieldKey")?.value || "";
+function normalizeCompositionCharts(roles = {}) {
+  const collection = Array.isArray(roles.compositionCharts)
+    ? roles.compositionCharts
+    : roles.compositionFieldKey
+      ? [{
+        fieldKey: roles.compositionFieldKey,
+        labelColumnKey: roles.compositionLabelColumnKey,
+        valueColumnKey: roles.compositionValueColumnKey,
+      }]
+      : [];
+  return collection.map((chart) => ({
+    fieldKey: String(chart?.fieldKey || chart?.compositionFieldKey || ""),
+    labelColumnKey: String(chart?.labelColumnKey || chart?.compositionLabelColumnKey || ""),
+    valueColumnKey: String(chart?.valueColumnKey || chart?.compositionValueColumnKey || ""),
+  }));
+}
+
+function updateCompositionChartsEmptyState() {
+  const hasCharts = $$("#compositionCharts .composition-chart-row").length > 0;
+  $("#compositionChartsEmpty")?.classList.toggle("hidden", hasCharts);
+}
+
+function syncCompositionChartColumns(row) {
+  const tableKey = $("[data-composition-chart='fieldKey']", row)?.value || "";
   const tableField = getTableFieldsFromDom().find((field) => field.fieldKey === tableKey);
   const columns = tableField?.tableColumns || [];
   const toOption = (column) => ({
@@ -2033,87 +1778,74 @@ function syncCompositionRoleColumns() {
   });
   const labelOptions = columns.filter((column) => column.dataType === "string").map(toOption);
   const valueOptions = columns.filter((column) => ["decimal", "integer"].includes(column.dataType)).map(toOption);
-  setSelectOptions($("#compositionLabelColumnKey"), labelOptions, "Select text label column");
-  setSelectOptions($("#compositionValueColumnKey"), valueOptions, "Select numeric data column");
+  setSelectOptions(
+    $("[data-composition-chart='labelColumnKey']", row),
+    labelOptions,
+    "Select text label column"
+  );
+  setSelectOptions(
+    $("[data-composition-chart='valueColumnKey']", row),
+    valueOptions,
+    "Select numeric data column"
+  );
+}
+
+function syncCompositionChartRoleOptions() {
+  const tableOptions = fieldOptionEntries(getTableFieldsFromDom());
+  $$("#compositionCharts .composition-chart-row").forEach((row) => {
+    setSelectOptions(
+      $("[data-composition-chart='fieldKey']", row),
+      tableOptions,
+      "Select table field"
+    );
+    syncCompositionChartColumns(row);
+  });
+}
+
+function addCompositionChart(mapping = {}, { focus = false } = {}) {
+  const host = $("#compositionCharts");
+  const template = $("#compositionChartTemplate");
+  if (!host || !template) return null;
+  const row = template.content.firstElementChild.cloneNode(true);
+  host.appendChild(row);
+  const fieldSelect = $("[data-composition-chart='fieldKey']", row);
+  setSelectOptions(fieldSelect, fieldOptionEntries(getTableFieldsFromDom()), "Select table field");
+  fieldSelect.value = mapping.fieldKey || "";
+  syncCompositionChartColumns(row);
+  const labelSelect = $("[data-composition-chart='labelColumnKey']", row);
+  const valueSelect = $("[data-composition-chart='valueColumnKey']", row);
+  labelSelect.value = mapping.labelColumnKey || "";
+  valueSelect.value = mapping.valueColumnKey || "";
+  fieldSelect.addEventListener("change", () => syncCompositionChartColumns(row));
+  $("[data-remove-composition-chart]", row).addEventListener("click", () => {
+    row.remove();
+    updateCompositionChartsEmptyState();
+    queueSessionSave();
+  });
+  refreshSearchableSelects(row);
+  [fieldSelect, labelSelect, valueSelect].forEach(syncSearchableSelect);
+  updateCompositionChartsEmptyState();
+  if (focus) fieldSelect._searchableSelect?.trigger.focus();
+  return row;
+}
+
+function renderCompositionCharts(charts = []) {
+  const host = $("#compositionCharts");
+  if (!host) return;
+  host.innerHTML = "";
+  normalizeCompositionCharts({ compositionCharts: charts }).forEach((chart) => addCompositionChart(chart));
+  updateCompositionChartsEmptyState();
 }
 
 function syncRoleOptions() {
+  if (buildingSectionsDom) return;
   const fields = getAllFieldsFromDom();
   const fieldOptions = fieldOptionEntries(fields);
   setSelectOptions($("#businessIdentifierField"), fieldOptions, "Select product identifier");
-  setSelectOptions(
-    $("#compositionFieldKey"),
-    fieldOptionEntries(getTableFieldsFromDom()),
-    "No composition chart"
-  );
   renderPresentationFields(fields);
   renderSystemHeaderFields(fields);
-  syncCompositionRoleColumns();
+  syncCompositionChartRoleOptions();
   updateWorkspaceMeta();
-}
-
-function normalizeFilterValue(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function getFieldFilterText(row, key) {
-  if (key === "advanced") {
-    return [
-      "fieldKey",
-      "semanticSlug",
-      "unitKey",
-      "objectType",
-      "valueDataType",
-    ]
-      .map((fieldKey) => $(`[data-field='${fieldKey}']`, row)?.value || "")
-      .concat($$("[data-column]", row).map((input) => input.type === "checkbox" ? String(input.checked) : input.value))
-      .join(" ");
-  }
-  const input = $(`[data-field='${key}']`, row);
-  if (!input) return "";
-  return input.type === "checkbox" ? String(input.checked) : input.value;
-}
-
-function applySectionFilters(sectionNode) {
-  if (!sectionNode) return;
-  const filters = $$(":scope > .field-grid-wrap > .field-grid-filters [data-field-filter]", sectionNode)
-    .map((input) => ({
-      key: input.dataset.fieldFilter,
-      value: normalizeFilterValue(input.value),
-      exact: input.tagName === "SELECT",
-    }))
-    .filter((filter) => filter.key && filter.value);
-  const rows = getDirectFieldRows(sectionNode);
-  let visibleCount = 0;
-
-  for (const row of rows) {
-    const isMatch = filters.every((filter) => {
-      const value = normalizeFilterValue(getFieldFilterText(row, filter.key));
-      return filter.exact ? value === filter.value : value.includes(filter.value);
-    });
-    row.classList.toggle("filtered-out", !isMatch);
-    if (isMatch) visibleCount += 1;
-  }
-
-  const count = $("[data-filter-count]", sectionNode);
-  if (count) {
-    count.classList.toggle("hidden", filters.length === 0);
-    count.textContent = `${visibleCount}/${rows.length} visible`;
-  }
-}
-
-function setupSectionFilters(sectionNode) {
-  $$(":scope > .field-grid-wrap > .field-grid-filters [data-field-filter]", sectionNode).forEach((input) => {
-    input.addEventListener("input", () => applySectionFilters(sectionNode));
-    input.addEventListener("change", () => applySectionFilters(sectionNode));
-  });
-  $("[data-clear-filters]", sectionNode)?.addEventListener("click", () => {
-    $$(":scope > .field-grid-wrap > .field-grid-filters [data-field-filter]", sectionNode).forEach((input) => {
-      input.value = "";
-      if (input instanceof HTMLSelectElement) syncSearchableSelect(input);
-    });
-    applySectionFilters(sectionNode);
-  });
 }
 
 function addTableColumn(row, data = {}) {
@@ -2131,37 +1863,28 @@ function addTableColumn(row, data = {}) {
       input.value = value || "";
     }
   }
-  ["columnLabel", "columnKey", "semanticSlug", "unitKey"].forEach((key) => {
-    const input = $(`[data-column='${key}']`, node);
-    if (data[key] !== undefined && String(data[key] || "").trim()) input.dataset.manual = "true";
-  });
-
   setupTableColumnAutoFill(row, node);
   const dataTypeSelect = $("[data-column='dataType']", node);
   const valueDataTypeSelect = $("[data-column='valueDataType']", node);
-  if (valueDataTypeSelect && data.valueDataType === undefined) {
+  if (valueDataTypeSelect) {
     valueDataTypeSelect.value = valueDataTypeFromDataType(dataTypeSelect?.value || "string");
   }
   dataTypeSelect?.addEventListener("change", () => {
-    if (valueDataTypeSelect && !valueDataTypeSelect.dataset.manual) {
-      valueDataTypeSelect.value = valueDataTypeFromDataType(dataTypeSelect.value);
-    }
-  });
-  valueDataTypeSelect?.addEventListener("change", () => {
-    valueDataTypeSelect.dataset.manual = "true";
+    if (valueDataTypeSelect) valueDataTypeSelect.value = valueDataTypeFromDataType(dataTypeSelect.value);
+    queueDerivedFieldsRefresh();
   });
 
   $("[data-remove-column]", node).addEventListener("click", () => {
     selectedFieldsNodeId = ensureFieldsNodeId(row, "field");
     node.remove();
-    applySectionFilters(row.closest(".section-card"));
+    queueDerivedFieldsRefresh();
     syncRoleOptions();
     renderFieldsExplorer();
     queueGraphSourceSync();
   });
 
   host.appendChild(node);
-  applySectionFilters(row.closest(".section-card"));
+  queueDerivedFieldsRefresh();
   syncRoleOptions();
   renderFieldsExplorer();
   queueGraphSourceSync();
@@ -2225,8 +1948,6 @@ function addSection(data = {}, { afterSection = null, parentSection = null, addB
   const node = template.content.firstElementChild.cloneNode(true);
   getSectionKeyInput(node).value = data.key || "";
   getSectionLabelInput(node).value = data.label || "";
-  if (data.key) getSectionKeyInput(node).dataset.manual = "true";
-  if (data.label) getSectionLabelInput(node).dataset.manual = "true";
   $("[data-add-field]", node).addEventListener("click", () => {
     const firstField = getDirectFieldRows(node)[0] || null;
     focusFieldsElement(addManualField(node, {}, { beforeField: firstField }));
@@ -2234,34 +1955,18 @@ function addSection(data = {}, { afterSection = null, parentSection = null, addB
   $("[data-add-subsection]", node).addEventListener("click", () => {
     focusFieldsElement(addManualSection({}, { parentSection: node, addBlankField: false }));
   });
-  getSectionLabelInput(node).addEventListener("input", renderFieldsExplorer);
-  getSectionKeyInput(node).addEventListener("input", renderFieldsExplorer);
-  $("[data-toggle-section]", node).addEventListener("click", () => {
-    node.classList.toggle("collapsed");
-    const button = $("[data-toggle-section]", node);
-    if (button) button.textContent = node.classList.contains("collapsed") ? "Expand" : "Collapse";
-  });
-  $("[data-toggle-details]", node).addEventListener("click", () => {
-    const shouldOpen = !node.classList.contains("show-details");
-    node.classList.toggle("show-details", shouldOpen);
-    getDirectFieldRows(node).forEach((row) => {
-      $$(".field-more-group", row).forEach((details) => {
-        details.open = shouldOpen;
-      });
-    });
-    const button = $("[data-toggle-details]", node);
-    if (button) button.textContent = shouldOpen ? "Hide details" : "Show details";
-  });
+  getSectionLabelInput(node).addEventListener("input", queueFieldsExplorerRender);
+  getSectionKeyInput(node).addEventListener("input", queueFieldsExplorerRender);
   $("[data-remove-section]", node).addEventListener("click", () => {
     const parent = node.parentElement?.closest(".section-card");
     selectedFieldsNodeId = parent ? ensureFieldsNodeId(parent, "section") : "";
     node.remove();
+    queueDerivedFieldsRefresh();
     syncRoleOptions();
     renderFieldsExplorer();
     queueGraphSourceSync();
   });
   setupSectionAutoFill(node);
-  setupSectionFilters(node);
   const sectionsHost = parentSection ? getChildSectionsHost(parentSection) : $("#sections");
   if (afterSection?.parentElement === sectionsHost) {
     sectionsHost.insertBefore(node, afterSection.nextSibling);
@@ -2274,9 +1979,9 @@ function addSection(data = {}, { afterSection = null, parentSection = null, addB
   childSections.forEach((childSection) => {
     addSection(childSection, { parentSection: node, addBlankField: false });
   });
-  applySectionFilters(node);
   syncRoleOptions();
   renderFieldsExplorer();
+  queueDerivedFieldsRefresh();
   return node;
 }
 
@@ -2291,10 +1996,6 @@ function addField(sectionNode, data = {}, { afterField = null, beforeField = nul
       input.value = data[key];
     }
   }
-  ["fieldLabel", "fieldKey", "semanticSlug", "unitKey"].forEach((key) => {
-    const input = $(`[data-field='${key}']`, node);
-    if (data[key] !== undefined && String(data[key] || "").trim()) input.dataset.manual = "true";
-  });
   const typeSelect = $("[data-field='fieldType']", node);
   const dataTypeSelect = $("[data-field='dataType']", node);
   const objectTypeSelect = $("[data-field='objectType']", node);
@@ -2318,18 +2019,14 @@ function addField(sectionNode, data = {}, { afterField = null, beforeField = nul
   };
   const syncFieldSchemaMetadata = () => {
     syncFieldDataType();
-    if (objectTypeSelect && !objectTypeSelect.dataset.manual) {
-      objectTypeSelect.value = defaultObjectTypeForFieldType(typeSelect.value);
-    }
-    if (valueDataTypeSelect && !valueDataTypeSelect.dataset.manual) {
+    if (objectTypeSelect) objectTypeSelect.value = defaultObjectTypeForFieldType(typeSelect.value);
+    if (valueDataTypeSelect) {
       valueDataTypeSelect.value = defaultValueDataTypeForField(typeSelect.value, dataTypeSelect?.value || "string");
     }
     [typeSelect, dataTypeSelect, objectTypeSelect, valueDataTypeSelect]
       .filter(Boolean)
       .forEach(syncSearchableSelect);
   };
-  if (data.objectType) objectTypeSelect.dataset.manual = "true";
-  if (data.valueDataType) valueDataTypeSelect.dataset.manual = "true";
   const defaultDataType = defaultDataTypeForFieldType(typeSelect.value);
   if (data.dataType && data.dataType !== defaultDataType) {
     dataTypeSelect.dataset.manual = "true";
@@ -2341,26 +2038,18 @@ function addField(sectionNode, data = {}, { afterField = null, beforeField = nul
     syncFieldSchemaMetadata();
     syncTableConfigVisibility(node);
     syncRoleOptions();
+    queueDerivedFieldsRefresh();
   });
   dataTypeSelect?.addEventListener("change", () => {
     dataTypeSelect.dataset.manual = "true";
     syncFieldSchemaMetadata();
+    queueDerivedFieldsRefresh();
   });
-  objectTypeSelect?.addEventListener("change", () => {
-    objectTypeSelect.dataset.manual = "true";
-  });
-  valueDataTypeSelect?.addEventListener("change", () => {
-    valueDataTypeSelect.dataset.manual = "true";
-  });
-  $("[data-field='fieldKey']", node).addEventListener("input", syncRoleOptions);
-  $("[data-field='fieldLabel']", node).addEventListener("input", syncRoleOptions);
   node.addEventListener("input", () => {
-    applySectionFilters(sectionNode);
-    renderFieldsExplorer();
+    queueFieldsExplorerRender();
   });
   node.addEventListener("change", () => {
-    applySectionFilters(sectionNode);
-    renderFieldsExplorer();
+    queueFieldsExplorerRender();
   });
 
   (data.tableColumns || []).forEach((column) => addTableColumn(node, column));
@@ -2370,16 +2059,10 @@ function addField(sectionNode, data = {}, { afterField = null, beforeField = nul
     const panel = $("[data-table-config]", node);
     panel.classList.toggle("hidden", typeSelect.value !== "table");
   }
-  if (sectionNode.classList.contains("show-details")) {
-    $$(".field-more-group", node).forEach((details) => {
-      details.open = true;
-    });
-  }
-
   $("[data-remove-field]", node).addEventListener("click", () => {
     selectedFieldsNodeId = ensureFieldsNodeId(sectionNode, "section");
     node.remove();
-    applySectionFilters(sectionNode);
+    queueDerivedFieldsRefresh();
     syncRoleOptions();
     renderFieldsExplorer();
     queueGraphSourceSync();
@@ -2392,9 +2075,9 @@ function addField(sectionNode, data = {}, { afterField = null, beforeField = nul
   } else {
     fieldsHost.appendChild(node);
   }
-  applySectionFilters(sectionNode);
   syncRoleOptions();
   renderFieldsExplorer();
+  queueDerivedFieldsRefresh();
   return node;
 }
 
@@ -2415,6 +2098,164 @@ function readField(row) {
   field.semanticSlug = slugFromValue(field.semanticSlug || field.fieldLabel || field.fieldKey);
   field.fieldKey = canonicalKeyFromSemanticSlug(field.semanticSlug || field.fieldLabel || field.fieldKey);
   return field;
+}
+
+function remapDerivedRoleState(roleState, fieldKeyMap, columnKeyMap) {
+  const roles = {
+    ...(roleState || {}),
+    summaryRoles: { ...(roleState?.summaryRoles || {}) },
+    lifecycleRoles: { ...(roleState?.lifecycleRoles || {}) },
+  };
+  const remapField = (value) => fieldKeyMap.get(String(value || "")) || String(value || "");
+  const remapRoleMap = (roleMap) => Object.fromEntries(
+    Object.entries(roleMap || {}).map(([fieldKey, role]) => [remapField(fieldKey), role])
+  );
+  roles.businessIdentifierField = remapField(roles.businessIdentifierField);
+  roles.summaryRoles = remapRoleMap(roles.summaryRoles);
+  roles.lifecycleRoles = remapRoleMap(roles.lifecycleRoles);
+  if (roles.objectTypes) roles.objectTypes = remapRoleMap(roles.objectTypes);
+  if (roles.valueDataTypes) roles.valueDataTypes = remapRoleMap(roles.valueDataTypes);
+  roles.compositionCharts = normalizeCompositionCharts(roles).map((chart) => ({
+    fieldKey: remapField(chart.fieldKey),
+    labelColumnKey: columnKeyMap.get(`${chart.fieldKey}\u0000${chart.labelColumnKey}`)
+      || chart.labelColumnKey,
+    valueColumnKey: columnKeyMap.get(`${chart.fieldKey}\u0000${chart.valueColumnKey}`)
+      || chart.valueColumnKey,
+  }));
+  delete roles.compositionFieldKey;
+  delete roles.compositionLabelColumnKey;
+  delete roles.compositionValueColumnKey;
+  return roles;
+}
+
+function remapDerivedHeaderAssignments(assignments, fieldKeyMap) {
+  return Object.fromEntries(
+    Object.entries(normalizeSystemHeaderAssignments(assignments)).map(([slot, value]) => {
+      const current = String(value || "");
+      return [slot, current.startsWith("__managed__:") ? current : fieldKeyMap.get(current) || current];
+    })
+  );
+}
+
+function applyRoleStateSelections(roles, assignments) {
+  preservedRoleState = {
+    ...(roles || {}),
+    summaryRoles: { ...(roles?.summaryRoles || {}) },
+    lifecycleRoles: { ...(roles?.lifecycleRoles || {}) },
+  };
+  preservedSystemHeaderAssignments = normalizeSystemHeaderAssignments(assignments);
+  renderCompositionCharts(normalizeCompositionCharts(roles));
+  syncRoleOptions();
+  setFormValue("businessIdentifierField", roles?.businessIdentifierField);
+  Object.entries(roles?.summaryRoles || {}).forEach(([fieldKey, value]) => {
+    const select = $(`[data-summary-role-slot="${normalizeProductOverviewCardRole(value)}"]`);
+    if (select) select.value = fieldKey;
+  });
+  Object.entries(roles?.lifecycleRoles || {}).forEach(([fieldKey, value]) => {
+    const select = $(`[data-lifecycle-role-slot="${value}"]`);
+    if (select) select.value = fieldKey;
+  });
+  $$('[data-system-header-slot]').forEach((select) => {
+    select.value = preservedSystemHeaderAssignments[select.dataset.systemHeaderSlot] || "";
+  });
+  refreshSearchableSelects();
+}
+
+function applyDerivedSectionsToDom(derivedSections) {
+  const fieldKeyMap = new Map();
+  const columnKeyMap = new Map();
+  const applySection = (sectionNode, section) => {
+    const sectionKeyInput = getSectionKeyInput(sectionNode);
+    const previousSectionKey = sectionKeyInput?.value.trim() || "";
+    if (previousSectionKey && !sectionNode.dataset.graphSourceKey) {
+      sectionNode.dataset.graphSourceKey = previousSectionKey;
+    }
+    if (sectionKeyInput) sectionKeyInput.value = section?.key || "";
+
+    const fieldNodes = getDirectFieldRows(sectionNode);
+    fieldNodes.forEach((fieldNode, fieldIndex) => {
+      const field = section?.fields?.[fieldIndex];
+      if (!field) return;
+      const keyInput = $("[data-field='fieldKey']", fieldNode);
+      const previousFieldKey = keyInput?.value.trim() || "";
+      if (previousFieldKey) {
+        if (!fieldNode.dataset.graphSourceKey) fieldNode.dataset.graphSourceKey = previousFieldKey;
+        fieldKeyMap.set(previousFieldKey, field.fieldKey || "");
+      }
+      if (keyInput) keyInput.value = field.fieldKey || "";
+      const values = {
+        semanticSlug: field.semanticSlug,
+        unitKey: field.unitKey,
+        dataType: field.dataType,
+        objectType: field.objectType,
+        valueDataType: field.valueDataType,
+      };
+      Object.entries(values).forEach(([key, value]) => {
+        const input = $(`[data-field='${key}']`, fieldNode);
+        if (!input) return;
+        input.value = value || "";
+        if (input instanceof HTMLSelectElement) syncSearchableSelect(input);
+      });
+
+      const columnNodes = $$(".table-column-card", fieldNode);
+      columnNodes.forEach((columnNode, columnIndex) => {
+        const column = field.tableColumns?.[columnIndex];
+        if (!column) return;
+        const columnKeyInput = $("[data-column='columnKey']", columnNode);
+        const previousColumnKey = columnKeyInput?.value.trim() || "";
+        if (previousColumnKey) {
+          if (!columnNode.dataset.graphSourceKey) columnNode.dataset.graphSourceKey = previousColumnKey;
+          columnKeyMap.set(`${previousFieldKey}\u0000${previousColumnKey}`, column.columnKey || "");
+        }
+        const columnValues = {
+          columnKey: column.columnKey,
+          semanticSlug: column.semanticSlug,
+          unitKey: column.unitKey,
+          objectType: column.objectType,
+          valueDataType: column.valueDataType,
+        };
+        Object.entries(columnValues).forEach(([key, value]) => {
+          const input = $(`[data-column='${key}']`, columnNode);
+          if (input) input.value = value || "";
+        });
+      });
+    });
+
+    const childNodes = getDirectChildSections(sectionNode);
+    childNodes.forEach((childNode, index) => applySection(childNode, section?.sections?.[index]));
+  };
+  getTopLevelSectionNodes().forEach((sectionNode, index) => applySection(sectionNode, derivedSections[index]));
+  return { fieldKeyMap, columnKeyMap };
+}
+
+function refreshDerivedFieldsMetadata() {
+  if (refreshingDerivedFields || suspendDerivedFieldsRefresh) return;
+  refreshingDerivedFields = true;
+  try {
+    const roles = $$(".field-row").length ? readRoleStateFromDom() : preservedRoleState || {};
+    const assignments = $$(".field-row").length
+      ? readSystemHeaderAssignmentsFromDom()
+      : preservedSystemHeaderAssignments || {};
+    const sourceSections = getTopLevelSectionNodes().map(readSection);
+    const derivedSections = derivedFieldMetadata.deriveSections(sourceSections);
+    const { fieldKeyMap, columnKeyMap } = applyDerivedSectionsToDom(derivedSections);
+    const remappedRoles = remapDerivedRoleState(roles, fieldKeyMap, columnKeyMap);
+    const remappedAssignments = remapDerivedHeaderAssignments(assignments, fieldKeyMap);
+    applyRoleStateSelections(remappedRoles, remappedAssignments);
+    renderFieldsExplorer();
+    queueGraphSourceSync();
+  } finally {
+    refreshingDerivedFields = false;
+  }
+}
+
+function queueDerivedFieldsRefresh() {
+  if (suspendDerivedFieldsRefresh) return;
+  if (derivedFieldsRefreshTimer) window.clearTimeout(derivedFieldsRefreshTimer);
+  derivedFieldsRefreshTimer = window.setTimeout(() => {
+    derivedFieldsRefreshTimer = null;
+    refreshDerivedFieldsMetadata();
+  }, 70);
 }
 
 function graphDictionaryBase() {
@@ -2453,8 +2294,8 @@ function readGraphProperty(node) {
   for (const input of $$("[data-graph-property]", node)) {
     property[input.dataset.graphProperty] = input.value.trim();
   }
-  property.key = property.key || canonicalKeyFromSemanticSlug(property.label);
-  property.semanticSlug = slugFromValue(property.label || property.key);
+  property.semanticSlug = slugFromValue(property.semanticSlug || property.label || property.key);
+  property.key = property.key || canonicalKeyFromSemanticSlug(property.semanticSlug || property.label);
   property.minCount = property.minCount === "" ? 0 : Number(property.minCount);
   property.maxCount = ["", "n", "*"].includes(String(property.maxCount || "").toLowerCase())
     ? null
@@ -2550,7 +2391,10 @@ function getGraphEnumOptions() {
 function getGraphSourceCatalog() {
   return getSectionNodesDepthFirst().map((sectionNode) => {
     const key = getSectionKeyInput(sectionNode)?.value.trim();
-    const label = getSectionDisplayLabel(sectionNode) || titleCase(key);
+    const label = getSectionLabelInput(sectionNode)?.value.trim() || titleCase(key);
+    const pathLabel = getSectionDisplayLabel(sectionNode) || label;
+    const parentNode = sectionNode.parentElement?.closest(".section-card") || null;
+    const parentKey = parentNode ? getSectionKeyInput(parentNode)?.value.trim() || "" : "";
     const previousKey = sectionNode.dataset.graphSourceKey || key;
     sectionNode.dataset.graphSourceKey = key;
     const fields = getDirectFieldRows(sectionNode).map((row) => {
@@ -2571,7 +2415,7 @@ function getGraphSourceCatalog() {
         sectionLabel: label,
       };
     });
-    return { key, previousKey, label, fields };
+    return { key, previousKey, label, pathLabel, parentKey, fields };
   }).filter((section) => section.key);
 }
 
@@ -2641,13 +2485,13 @@ function graphClassSourceOptions(catalog) {
   return disambiguateOptionLabels(catalog.flatMap((section) => [
     {
       value: graphSectionSourceRef(section.key),
-      label: `Section · ${section.label}`,
+      label: `Section · ${section.pathLabel || section.label}`,
     },
     ...section.fields
       .filter((field) => field.fieldType === "table")
       .map((field) => ({
         value: graphTableSourceRef(section.key, field.fieldKey),
-        label: `Table · ${section.label} › ${field.fieldLabel}`,
+        label: `Table · ${section.pathLabel || section.label} › ${field.fieldLabel}`,
       })),
   ]));
 }
@@ -2659,10 +2503,19 @@ function graphPropertySourceOptions(card, catalog) {
     catalog
   );
   if (ownerSource?.kind === "section") {
-    return disambiguateOptionLabels(ownerSource.section.fields.map((field) => ({
-      value: graphFieldSourceRef(ownerSource.section.key, field.fieldKey),
-      label: `Field · ${field.fieldLabel}`,
-    })));
+    const childSections = catalog.filter(
+      (section) => section.parentKey === ownerSource.section.key
+    );
+    return disambiguateOptionLabels([
+      ...childSections.map((section) => ({
+        value: graphSectionSourceRef(section.key),
+        label: `Subsection · ${section.label}`,
+      })),
+      ...ownerSource.section.fields.map((field) => ({
+        value: graphFieldSourceRef(ownerSource.section.key, field.fieldKey),
+        label: `Field · ${field.fieldLabel}`,
+      })),
+    ]);
   }
   if (ownerSource?.kind === "table") {
     return disambiguateOptionLabels((ownerSource.field.tableColumns || []).map((column) => ({
@@ -2674,16 +2527,15 @@ function graphPropertySourceOptions(card, catalog) {
       label: `Column · ${column.columnLabel}`,
     })));
   }
-  return disambiguateOptionLabels(catalog.flatMap((section) => [
-    {
-      value: graphSectionSourceRef(section.key),
-      label: `Section relationship · ${section.label}`,
-    },
-    ...section.fields.map((field) => ({
-      value: graphFieldSourceRef(section.key, field.fieldKey),
-      label: `Field · ${section.label} › ${field.fieldLabel}`,
-    })),
-  ]));
+  if (classCard) return [];
+  return disambiguateOptionLabels(
+    catalog
+      .filter((section) => !section.parentKey)
+      .map((section) => ({
+        value: graphSectionSourceRef(section.key),
+        label: `Top-level section · ${section.label}`,
+      }))
+  );
 }
 
 function setGraphSourceOptions(select, options, placeholder) {
@@ -2787,9 +2639,14 @@ function applyGraphClassSource(card, catalog, { populate = false } = {}) {
       ? (source.field.tableColumns || []).map((column) =>
           graphColumnSourceRef(source.section.key, source.field.fieldKey, column.columnKey)
         )
-      : source.section.fields.map((field) =>
-          graphFieldSourceRef(source.section.key, field.fieldKey)
-        );
+      : [
+          ...catalog
+            .filter((section) => section.parentKey === source.section.key)
+            .map((section) => graphSectionSourceRef(section.key)),
+          ...source.section.fields.map((field) =>
+            graphFieldSourceRef(source.section.key, field.fieldKey)
+          ),
+        ];
     $$("[data-graph-property-source]", container).forEach((entry) => {
       const existingRef = entry.dataset.desiredValue || entry.value;
       if (existingRef && !sourceRefs.includes(existingRef)) {
@@ -2863,6 +2720,52 @@ function ensureGraphClassForSource(sourceRef, catalog, { populate = true } = {})
   return card;
 }
 
+function canonicalGraphPropertyContainer(source) {
+  if (!source) return null;
+  if (source.kind === "section") {
+    if (!source.section.parentKey) return $("#rootGraphProperties");
+    const parentClass = findGraphClassBySourceRef(
+      graphSectionSourceRef(source.section.parentKey)
+    );
+    return parentClass ? $("[data-graph-properties]", parentClass) : null;
+  }
+  if (source.kind === "field") {
+    const ownerClass = findGraphClassBySourceRef(
+      graphSectionSourceRef(source.section.key)
+    );
+    return ownerClass ? $("[data-graph-properties]", ownerClass) : null;
+  }
+  if (source.kind === "column") {
+    const ownerClass = findGraphClassBySourceRef(
+      graphTableSourceRef(source.section.key, source.field.fieldKey)
+    );
+    return ownerClass ? $("[data-graph-properties]", ownerClass) : null;
+  }
+  return null;
+}
+
+function canonicalizeGraphPropertyPlacement(catalog) {
+  const cardsBySourceRef = new Map();
+  $$("[data-graph-property-source]").forEach((select) => {
+    const sourceRef = select.dataset.desiredValue || select.value;
+    if (!sourceRef) return;
+    if (!cardsBySourceRef.has(sourceRef)) cardsBySourceRef.set(sourceRef, []);
+    cardsBySourceRef.get(sourceRef).push(select.closest(".graph-property-card"));
+  });
+
+  for (const [sourceRef, cards] of cardsBySourceRef.entries()) {
+    const source = findGraphSource(sourceRef, catalog);
+    const target = canonicalGraphPropertyContainer(source);
+    if (!target) continue;
+    const validCards = cards.filter(Boolean);
+    const preferred = validCards.find((card) => card.parentElement === target) || validCards[0];
+    validCards.forEach((card) => {
+      if (card !== preferred) card.remove();
+    });
+    if (preferred && preferred.parentElement !== target) target.appendChild(preferred);
+  }
+}
+
 function applyGraphPropertySource(card, catalog, { populateRelatedClasses = false } = {}) {
   const select = $("[data-graph-property-source]", card);
   const source = findGraphSource(select?.value, catalog);
@@ -2874,6 +2777,7 @@ function applyGraphPropertySource(card, catalog, { populateRelatedClasses = fals
   const ownerClassKey = getGraphOwnerClassKey(card);
   const labelInput = $("[data-graph-property='label']", card);
   const keyInput = $("[data-graph-property='key']", card);
+  const semanticSlugInput = $("[data-graph-property='semanticSlug']", card);
   const definitionInput = $("[data-graph-property='definition']", card);
   const rangeKindInput = $("[data-graph-property='rangeKind']", card);
   const dataTypeInput = $("[data-graph-property='dataType']", card);
@@ -2962,6 +2866,7 @@ function applyGraphPropertySource(card, catalog, { populateRelatedClasses = fals
 
   setGraphManagedValue(labelInput, label);
   setGraphManagedValue(keyInput, key);
+  setGraphManagedValue(semanticSlugInput, semanticSlug);
   setGraphManagedValue(definitionInput, definition);
   setGraphManagedValue(rangeKindInput, rangeKind);
   setGraphManagedValue(dataTypeInput, dataType);
@@ -3014,6 +2919,7 @@ function syncGraphSourceBindings({ populate = false } = {}) {
       );
       applyGraphClassSource(card, catalog, { populate });
     });
+    canonicalizeGraphPropertyPlacement(catalog);
     $$(".graph-property-card").forEach((card) => {
       setGraphSourceOptions(
         $("[data-graph-property-source]", card),
@@ -3248,7 +3154,7 @@ function getSelectedGraphItem() {
 
 function arrangeGraphFirstLayer(catalog) {
   const rootContainer = $("#rootGraphProperties");
-  for (const section of catalog) {
+  for (const section of catalog.filter((entry) => !entry.parentKey)) {
     const sourceRef = graphSectionSourceRef(section.key);
     const propertyCard = $$("[data-graph-property-source]", rootContainer)
       .find((entry) => (entry.dataset.desiredValue || entry.value) === sourceRef)
@@ -3314,7 +3220,7 @@ function buildGraphFirstLayerFromSections({ showMessage = true } = {}) {
   const wasSyncingGraphSources = syncingGraphSources;
   syncingGraphSources = true;
   try {
-    for (const section of catalog) {
+    for (const section of catalog.filter((entry) => !entry.parentKey)) {
       const sourceRef = graphSectionSourceRef(section.key);
       if (!existingSourceRefs.has(sourceRef)) {
         addGraphProperty(rootContainer, { sourceRef });
@@ -3415,6 +3321,7 @@ function addGraphProperty(container, data = {}, { afterProperty = null } = {}) {
   });
   const labelInput = $("[data-graph-property='label']", node);
   const keyInput = $("[data-graph-property='key']", node);
+  const semanticSlugInput = $("[data-graph-property='semanticSlug']", node);
   const iriInput = $("[data-graph-property='semanticId']", node);
   const title = $("[data-graph-property-title]", node);
   const getOwnerClassKey = () => {
@@ -3424,17 +3331,21 @@ function addGraphProperty(container, data = {}, { afterProperty = null } = {}) {
   };
   const syncDerived = () => {
     const label = labelInput.value.trim();
-    setDerivedGraphValue(keyInput, canonicalKeyFromSemanticSlug(label));
+    setDerivedGraphValue(semanticSlugInput, slugFromValue(label));
+    setDerivedGraphValue(keyInput, canonicalKeyFromSemanticSlug(semanticSlugInput.value || label));
     const resolvedKey = keyInput.value.trim();
     setDerivedGraphValue(iriInput, resolvedKey ? graphPropertyIri(resolvedKey, getOwnerClassKey()) : "");
     title.textContent = label || "New property";
     if (!syncingGraphSources) renderGraphExplorer();
   };
   if (data.key) keyInput.dataset.manual = "true";
+  if (data.semanticSlug) semanticSlugInput.dataset.manual = "true";
   if (data.semanticId) iriInput.dataset.manual = "true";
   markGraphInputManual(keyInput);
+  markGraphInputManual(semanticSlugInput);
   markGraphInputManual(iriInput);
   labelInput.addEventListener("input", syncDerived);
+  semanticSlugInput.addEventListener("input", syncDerived);
   keyInput.addEventListener("input", () => {
     setDerivedGraphValue(
       iriInput,
@@ -3481,10 +3392,12 @@ function addGraphClass(data = {}) {
     setDerivedGraphValue(iriInput, resolvedKey ? graphClassIri(resolvedKey) : "");
     title.textContent = label || "New class";
     $$("[data-graph-properties] .graph-property-card", card).forEach((propertyCard) => {
-      const propertyLabel = $("[data-graph-property='label']", propertyCard)?.value.trim();
+      const propertyIdentity = $("[data-graph-property='semanticSlug']", propertyCard)?.value.trim()
+        || $("[data-graph-property='key']", propertyCard)?.value.trim()
+        || $("[data-graph-property='label']", propertyCard)?.value.trim();
       setDerivedGraphValue(
         $("[data-graph-property='semanticId']", propertyCard),
-        propertyLabel ? graphPropertyIri(propertyLabel, keyInput.value.trim()) : ""
+        propertyIdentity ? graphPropertyIri(propertyIdentity, keyInput.value.trim()) : ""
       );
     });
     syncGraphRangeOptions();
@@ -3498,10 +3411,12 @@ function addGraphClass(data = {}) {
   keyInput.addEventListener("input", () => {
     setDerivedGraphValue(iriInput, keyInput.value.trim() ? graphClassIri(keyInput.value.trim()) : "");
     $$("[data-graph-properties] .graph-property-card", card).forEach((propertyCard) => {
-      const propertyLabel = $("[data-graph-property='label']", propertyCard)?.value.trim();
+      const propertyIdentity = $("[data-graph-property='semanticSlug']", propertyCard)?.value.trim()
+        || $("[data-graph-property='key']", propertyCard)?.value.trim()
+        || $("[data-graph-property='label']", propertyCard)?.value.trim();
       setDerivedGraphValue(
         $("[data-graph-property='semanticId']", propertyCard),
-        propertyLabel ? graphPropertyIri(propertyLabel, keyInput.value.trim()) : ""
+        propertyIdentity ? graphPropertyIri(propertyIdentity, keyInput.value.trim()) : ""
       );
     });
     syncGraphRangeOptions();
@@ -3663,6 +3578,7 @@ function readSemanticGraphDraft() {
         label: $("[data-enum-value='label']", node).value.trim(),
         key: $("[data-enum-value='key']", node).value.trim(),
         semanticId: $("[data-enum-value='semanticId']", node).value.trim(),
+        definition: $("[data-enum-value='definition']", node)?.value.trim() || "",
       })),
     })),
   };
@@ -3708,11 +3624,16 @@ function refreshGraphDerivedValues() {
   });
   $$(".graph-property-card").forEach((card) => {
     const label = $("[data-graph-property='label']", card).value.trim();
+    const semanticSlugInput = $("[data-graph-property='semanticSlug']", card);
+    setDerivedGraphValue(semanticSlugInput, slugFromValue(label));
     const classCard = card.closest(".graph-class-card");
     const ownerClassKey = classCard
       ? $("[data-graph-class='key']", classCard)?.value.trim()
       : "";
-    setDerivedGraphValue($("[data-graph-property='key']", card), canonicalKeyFromSemanticSlug(label));
+    setDerivedGraphValue(
+      $("[data-graph-property='key']", card),
+      canonicalKeyFromSemanticSlug(semanticSlugInput?.value || label)
+    );
     const propertyKey = $("[data-graph-property='key']", card).value.trim();
     setDerivedGraphValue(
       $("[data-graph-property='semanticId']", card),
@@ -3742,207 +3663,176 @@ function refreshGraphDerivedValues() {
   renderGraphExplorer();
 }
 
-const semanticGraphCsvHeaders = [
-  "Owner class",
-  "Class definition",
-  "Property label",
-  "Property definition",
-  "Range kind",
-  "Data type",
-  "Range target",
-  "Relationship",
-  "Minimum count",
-  "Maximum count",
-  "Unit",
-  "Enum values",
-];
-
-function buildSemanticGraphCsvContent(graph = readSemanticGraphDraft()) {
-  const rows = [];
-  if (!graph) return `${semanticGraphCsvHeaders.join(",")}\n`;
-  const appendClass = (classDef, ownerLabel) => {
-    const properties = classDef.properties?.length ? classDef.properties : [{}];
-    properties.forEach((property) => {
-      const rangeTarget = property.rangeKind === "class"
-        ? property.rangeClassKey
-        : property.rangeKind === "enum"
-          ? property.rangeEnumKey
-          : "";
-      const enumDef = graph.enums?.find((entry) => entry.key === property.rangeEnumKey);
-      rows.push([
-        ownerLabel,
-        classDef.definition || "",
-        property.label || "",
-        property.definition || "",
-        property.rangeKind || "",
-        property.dataType || "",
-        rangeTarget,
-        property.relationshipType || "",
-        property.minCount ?? 0,
-        property.maxCount === null ? "n" : (property.maxCount ?? 1),
-        property.unit || "",
-        enumDef?.values?.map((value) => value.label).join(" | ") || "",
-      ]);
-    });
-  };
-  appendClass({ ...graph.rootClass, properties: graph.rootProperties }, "@root");
-  (graph.classes || []).forEach((classDef) => appendClass(classDef, classDef.label));
-  return `${[
-    semanticGraphCsvHeaders.map(csvEscape).join(","),
-    ...rows.map((row) => row.map(csvEscape).join(",")),
-  ].join("\n")}\n`;
-}
-
-function parseSemanticGraphCsv(text) {
-  if (new Blob([String(text || "")]).size > maxFieldsCsvBytes) {
-    throw new Error("Semantic graph CSV is too large. Maximum size is 2 MB.");
-  }
-  const rows = parseCsv(text);
-  if (rows.length < 2) throw new Error("Semantic graph CSV must include a header and at least one row.");
-  const header = rows[0].map((cell) => String(cell || "").trim().toLowerCase());
-  const expected = semanticGraphCsvHeaders.map((cell) => cell.toLowerCase());
-  if (header.length !== expected.length || expected.some((cell, index) => header[index] !== cell)) {
-    throw new Error("Semantic graph CSV headers do not match the fixed template.");
-  }
-  const graph = {
-    rootClass: {
-      label: getFormValue("rootClassLabel") || `${getFormValue("displayName")} Root`,
-      key: getFormValue("rootClassKey") || canonicalKeyFromSemanticSlug(getFormValue("typeName")),
-      semanticId: getFormValue("rootClassSemanticId") || graphClassIri(getFormValue("typeName")),
-      definition: getFormValue("rootClassDefinition") || "Root semantic class for this passport.",
-    },
-    rootProperties: [],
-    classes: [],
-    enums: [],
-  };
-  const classesByLabel = new Map();
-  const enumsByKey = new Map();
-  for (let index = 1; index < rows.length; index += 1) {
-    const cells = rows[index].map((cell) => restoreCsvFormulaCell(cell).trim());
-    if (!cells.some(Boolean)) continue;
-    const [
-      ownerClass,
-      classDefinition,
-      propertyLabel,
-      propertyDefinition,
-      rangeKindRaw,
-      dataType,
-      rangeTarget,
-      relationship,
-      minCount,
-      maxCount,
-      unit,
-      enumValues,
-    ] = cells;
-    if (!ownerClass) throw new Error(`Semantic graph CSV row ${index + 1} Owner class is required.`);
-    const targetProperties = ownerClass === "@root"
-      ? graph.rootProperties
-      : (() => {
-          if (!classesByLabel.has(ownerClass)) {
-            const classKey = canonicalKeyFromSemanticSlug(ownerClass);
-            const classDef = {
-              label: ownerClass,
-              key: classKey,
-              semanticId: graphClassIri(classKey),
-              definition: classDefinition,
-              properties: [],
-            };
-            classesByLabel.set(ownerClass, classDef);
-            graph.classes.push(classDef);
-          }
-          return classesByLabel.get(ownerClass).properties;
-        })();
-    if (!propertyLabel) continue;
-    const rangeKind = String(rangeKindRaw || "scalar").toLowerCase();
-    if (!["scalar", "class", "enum"].includes(rangeKind)) {
-      throw new Error(`Semantic graph CSV row ${index + 1} Range kind must be scalar, class, or enum.`);
-    }
-    const targetKey = canonicalKeyFromSemanticSlug(rangeTarget);
-    const property = {
-      label: propertyLabel,
-      key: canonicalKeyFromSemanticSlug(propertyLabel),
-      semanticId: graphPropertyIri(
-        propertyLabel,
-        ownerClass === "@root" ? "" : canonicalKeyFromSemanticSlug(ownerClass)
-      ),
-      definition: propertyDefinition,
-      rangeKind,
-      dataType: rangeKind === "scalar" ? (dataType || "string").toLowerCase() : "",
-      rangeClassKey: rangeKind === "class" ? targetKey : "",
-      rangeEnumKey: rangeKind === "enum" ? targetKey : "",
-      relationshipType: rangeKind === "class" ? (relationship || "composition").toLowerCase() : "",
-      minCount: minCount === "" ? 0 : Number(minCount),
-      maxCount: ["", "n", "*"].includes(String(maxCount).toLowerCase()) ? null : Number(maxCount),
-      unit,
-    };
-    targetProperties.push(property);
-    if (rangeKind === "enum" && !enumsByKey.has(targetKey)) {
-      const enumDef = {
-        label: rangeTarget,
-        key: targetKey,
-        semanticId: graphEnumIri(targetKey),
-        definition: `${rangeTarget} controlled vocabulary.`,
-        values: String(enumValues || "").split("|").map((value) => value.trim()).filter(Boolean).map((label) => ({
-          label,
-          key: canonicalKeyFromSemanticSlug(label),
-          semanticId: `${graphEnumIri(targetKey)}/${slugFromValue(canonicalKeyFromSemanticSlug(label))}`,
-        })),
-      };
-      enumsByKey.set(targetKey, enumDef);
-      graph.enums.push(enumDef);
-    }
-  }
-  return graph;
-}
-
 function downloadSemanticGraphCsvTemplate() {
-  const template = {
-    rootClass: {},
-    rootProperties: [{
-      label: "Material Composition",
-      rangeKind: "class",
-      rangeClassKey: "materialComposition",
-      relationshipType: "composition",
-      minCount: 1,
-      maxCount: 1,
-    }],
-    classes: [{
-      label: "Material Composition",
-      definition: "Material composition information.",
-      properties: [{
-        label: "Battery Materials",
+  try {
+    const baseUrl = (getFormValue("baseUrl") || "https://claros-dpp.online").replace(/\/+$/, "");
+    const family = slugFromValue(getFormValue("family")) || "example-product";
+    const version = normalizeModuleVersion(getFormValue("version"));
+    const dictionaryBase = `${baseUrl}/dictionary/${family}/${version}`;
+    const template = {
+      rootClass: {
+        label: "Example Product Passport Root",
+        key: "exampleProductPassportRoot",
+        semanticId: `${dictionaryBase}/classes/ExampleProductPassportRoot`,
+        definition: "Root semantic class for the example product passport.",
+      },
+      rootProperties: [{
+        label: "Material Composition",
+        key: "materialComposition",
+        semanticId: `${dictionaryBase}/terms/material-composition`,
+        definition: "Connects the passport to its material composition.",
+        semanticSlug: "material-composition",
         rangeKind: "class",
-        rangeClassKey: "batteryMaterials",
+        dataType: "",
+        rangeClassKey: "materialComposition",
+        rangeEnumKey: "",
         relationshipType: "composition",
         minCount: 1,
-        maxCount: null,
-      }],
-    }, {
-      label: "Battery Materials",
-      definition: "Materials used in the battery.",
-      properties: [{
-        label: "Material Identifier",
-        rangeKind: "scalar",
-        dataType: "string",
-        minCount: 1,
         maxCount: 1,
+        unit: "",
+        uiType: "table",
+        sourceRef: "",
+        enumOverrideKey: "",
       }],
-    }],
-    enums: [],
-  };
-  downloadTextFile("passport-semantic-graph-template.csv", buildSemanticGraphCsvContent(template), "text/csv;charset=utf-8");
-  setMessage("Downloaded semantic class graph CSV template.", "success");
+      classes: [{
+        label: "Material Composition",
+        key: "materialComposition",
+        semanticId: `${dictionaryBase}/classes/MaterialComposition`,
+        definition: "Material composition information.",
+        sourceRef: "",
+        properties: [{
+          label: "Material Identifier",
+          key: "materialIdentifier",
+          semanticId: `${dictionaryBase}/terms/material-composition/material-identifier`,
+          definition: "Identifier of a material used in the product.",
+          semanticSlug: "material-identifier",
+          rangeKind: "scalar",
+          dataType: "string",
+          rangeClassKey: "",
+          rangeEnumKey: "",
+          relationshipType: "",
+          minCount: 1,
+          maxCount: 1,
+          unit: "",
+          uiType: "text",
+          sourceRef: "",
+          enumOverrideKey: "",
+        }, {
+          label: "Hazard Class",
+          key: "hazardClass",
+          semanticId: `${dictionaryBase}/terms/material-composition/hazard-class`,
+          definition: "Controlled hazard classification for the material.",
+          semanticSlug: "hazard-class",
+          rangeKind: "enum",
+          dataType: "",
+          rangeClassKey: "",
+          rangeEnumKey: "hazardClass",
+          relationshipType: "",
+          minCount: 0,
+          maxCount: 1,
+          unit: "",
+          uiType: "text",
+          sourceRef: "",
+          enumOverrideKey: "",
+        }],
+      }],
+      enums: [{
+        label: "Hazard Class",
+        key: "hazardClass",
+        semanticId: `${dictionaryBase}/enums/HazardClass`,
+        definition: "Controlled material hazard classifications.",
+        values: [{
+          label: "Non-hazardous",
+          key: "nonHazardous",
+          semanticId: `${dictionaryBase}/enums/HazardClass/non-hazardous`,
+          definition: "The material is not classified as hazardous.",
+        }],
+      }],
+    };
+    const fileName = csvFileName("semantic-graph", { template: true });
+    downloadTextFile(
+      fileName,
+      semanticGraphCsv.buildSemanticGraphCsvContent(template),
+      "text/csv;charset=utf-8"
+    );
+    setMessage("Downloaded the lossless semantic graph CSV v2 template.", "success");
+  } catch (error) {
+    setMessage(error.message, "error");
+  }
 }
 
 async function importSemanticGraphCsvFile(file) {
   if (!file) return;
+  clearMessage();
+  let previousState = null;
+  let replacementStarted = false;
   try {
-    if (file.size > maxFieldsCsvBytes) throw new Error("Semantic graph CSV is too large. Maximum size is 2 MB.");
-    const graph = parseSemanticGraphCsv(await file.text());
-    loadSemanticGraphDraft(graph);
+    if (file.size > maxCsvBytes) throw new Error("Semantic graph CSV is too large. Maximum size is 2 MB.");
+    const content = await file.text();
+    const currentRoot = {
+      label: getFormValue("rootClassLabel") || `${getFormValue("displayName") || "Digital Product Passport"} Root`,
+      key: getFormValue("rootClassKey") || canonicalKeyFromSemanticSlug(getFormValue("typeName")),
+      semanticId: getFormValue("rootClassSemanticId") || graphClassIri(getFormValue("typeName")),
+      definition: getFormValue("rootClassDefinition") || "Root semantic class for this passport.",
+    };
+    const graph = semanticGraphCsv.parseSemanticGraphCsv(content, {
+      legacyRootClass: currentRoot,
+      keyFromLabel: canonicalKeyFromSemanticSlug,
+      classIri: (key) => graphClassIri(key),
+      propertyIri: (key, ownerKey) => graphPropertyIri(key, ownerKey === currentRoot.key ? "" : ownerKey),
+      enumIri: (key) => graphEnumIri(key),
+      enumValueIri: (key, enumDef) => `${enumDef.semanticId}/${slugFromValue(key)}`,
+    });
+    const currentSpec = readSpec();
+    let sourceReconciliation;
+    try {
+      sourceReconciliation = csvImportReconciliation.reconcileSemanticGraphSources(
+        graph,
+        currentSpec.sections
+      );
+    } catch (error) {
+      throw new Error(
+        `${error.message} Fix the CSV reference, or import its matching fields before importing this graph.`
+      );
+    }
+    const nextGraph = sourceReconciliation.graph;
+    const graphSummary = summarizeSemanticGraph(nextGraph);
+    await callApi("/api/validate-csv-import", {
+      ...(currentSpec.sections.length ? { sections: currentSpec.sections } : {}),
+      semanticGraph: nextGraph,
+    });
+    const cleanupText = sourceReconciliation.removedClassCount || sourceReconciliation.removedPropertyCount
+      ? ` Before replacement, ${sourceReconciliation.removedClassCount} stale linked class${sourceReconciliation.removedClassCount === 1 ? "" : "es"} and ${sourceReconciliation.removedPropertyCount} stale linked propert${sourceReconciliation.removedPropertyCount === 1 ? "y" : "ies"} will be removed.`
+      : " All source links match the current fields.";
+    const confirmed = window.confirm(
+      `Replace the current semantic graph with ${graphSummary.classCount} class${graphSummary.classCount === 1 ? "" : "es"}, `
+      + `${graphSummary.propertyCount} propert${graphSummary.propertyCount === 1 ? "y" : "ies"}, and ${graphSummary.enumCount} enum${graphSummary.enumCount === 1 ? "" : "s"} from this CSV?\n\n`
+      + `Sections and fields will stay in place.${cleanupText}`
+    );
+    if (!confirmed) {
+      setMessage("Semantic graph CSV replacement cancelled. The graph was not changed.", "info");
+      return;
+    }
+    previousState = readWorkspaceState();
+    replacementStarted = true;
+    loadSemanticGraphDraft(nextGraph);
     setActiveStep("graph");
-    setMessage("Imported semantic class graph CSV.", "success");
+    const retainedSummary = summarizeSemanticGraph(readSemanticGraphDraft());
+    const cleanupResult = sourceReconciliation.removedClassCount || sourceReconciliation.removedPropertyCount
+      ? ` Removed ${sourceReconciliation.removedClassCount} stale linked class${sourceReconciliation.removedClassCount === 1 ? "" : "es"} and ${sourceReconciliation.removedPropertyCount} stale linked propert${sourceReconciliation.removedPropertyCount === 1 ? "y" : "ies"}.`
+      : " All source links still match the current fields.";
+    setMessage(
+      `Replaced the semantic graph from CSV with ${retainedSummary.classCount} class${retainedSummary.classCount === 1 ? "" : "es"}, ${retainedSummary.propertyCount} propert${retainedSummary.propertyCount === 1 ? "y" : "ies"}, ${retainedSummary.enumCount} enum${retainedSummary.enumCount === 1 ? "" : "s"}, and ${retainedSummary.enumValueCount} enum value${retainedSummary.enumValueCount === 1 ? "" : "s"}.${cleanupResult}`,
+      "success"
+    );
   } catch (error) {
+    if (replacementStarted && previousState) {
+      try {
+        applyWorkspaceState(previousState);
+      } catch {
+        // Keep the original import error when recovery itself fails.
+      }
+    }
     setMessage(error.message, "error");
   }
 }
@@ -3954,13 +3844,16 @@ function readRoleStateFromDom() {
   const lifecycleRoleEntries = $$("[data-lifecycle-role-slot]")
     .map((select) => [select.value, select.dataset.lifecycleRoleSlot])
     .filter(([fieldKey, role]) => fieldKey && role);
+  const compositionCharts = $$("#compositionCharts .composition-chart-row").map((row) => ({
+    fieldKey: $("[data-composition-chart='fieldKey']", row)?.value || "",
+    labelColumnKey: $("[data-composition-chart='labelColumnKey']", row)?.value || "",
+    valueColumnKey: $("[data-composition-chart='valueColumnKey']", row)?.value || "",
+  }));
   return {
     businessIdentifierField: getFormValue("businessIdentifierField"),
     summaryRoles: Object.fromEntries(summaryRoleEntries),
     lifecycleRoles: Object.fromEntries(lifecycleRoleEntries),
-    compositionFieldKey: getFormValue("compositionFieldKey"),
-    compositionLabelColumnKey: getFormValue("compositionLabelColumnKey"),
-    compositionValueColumnKey: getFormValue("compositionValueColumnKey"),
+    compositionCharts,
   };
 }
 
@@ -4047,7 +3940,7 @@ function readSpec() {
       summaryRoles: { ...(roles.summaryRoles || {}) },
       lifecycleRoles: { ...(roles.lifecycleRoles || {}) },
     },
-    sections: getTopLevelSectionNodes().map(readSection),
+    sections: derivedFieldMetadata.deriveSections(getTopLevelSectionNodes().map(readSection)),
     semanticGraph: readSemanticGraphDraft(),
   };
 }
@@ -4056,44 +3949,36 @@ function loadSpec(spec) {
   const sectionLimitsError = getSectionTreeLimitError(spec?.sections || []);
   if (sectionLimitsError) throw new Error(sectionLimitsError);
   assertCanonicalSectionsSpec(spec);
-  preservedRoleState = {
-    ...(spec.roles || {}),
-    summaryRoles: { ...(spec.roles?.summaryRoles || {}) },
-    lifecycleRoles: { ...(spec.roles?.lifecycleRoles || {}) },
-  };
-  preservedSystemHeaderAssignments = normalizeSystemHeaderAssignments(
-    spec.module?.systemHeaderFieldAssignments
-  );
-  Object.entries(spec.module || {}).forEach(([key, value]) => setFormValue(key, value));
   const roles = spec.roles || {};
-  const objectTypes = roles.objectTypes && typeof roles.objectTypes === "object" ? roles.objectTypes : {};
-  const valueDataTypes = roles.valueDataTypes && typeof roles.valueDataTypes === "object" ? roles.valueDataTypes : {};
-  const sections = (spec.sections || []).map((section) =>
-    hydrateSectionDefaults(section, objectTypes, valueDataTypes)
-  );
-  $("#sections").innerHTML = "";
-  sections.forEach((section) => addSection(section, { addBlankField: false }));
-  maybeAutoModuleValues();
-  loadSemanticGraphDraft(spec.semanticGraph);
-  syncRoleOptions();
-  setFormValue("businessIdentifierField", roles.businessIdentifierField);
-  setFormValue("compositionFieldKey", roles.compositionFieldKey);
-  syncCompositionRoleColumns();
-  setFormValue("compositionLabelColumnKey", roles.compositionLabelColumnKey);
-  setFormValue("compositionValueColumnKey", roles.compositionValueColumnKey);
-  Object.entries(roles.summaryRoles || {}).forEach(([fieldKey, value]) => {
-    const select = $(`[data-summary-role-slot="${normalizeProductOverviewCardRole(value)}"]`);
-    if (select) select.value = fieldKey;
-  });
-  Object.entries(roles.lifecycleRoles || {}).forEach(([fieldKey, value]) => {
-    const select = $(`[data-lifecycle-role-slot="${value}"]`);
-    if (select) select.value = fieldKey;
-  });
   const assignments = normalizeSystemHeaderAssignments(spec.module?.systemHeaderFieldAssignments);
-  $$("[data-system-header-slot]").forEach((select) => {
-    select.value = assignments[select.dataset.systemHeaderSlot] || "";
-  });
-  refreshSearchableSelects();
+  suspendDerivedFieldsRefresh = true;
+  try {
+    preservedRoleState = {
+      ...roles,
+      summaryRoles: { ...(roles.summaryRoles || {}) },
+      lifecycleRoles: { ...(roles.lifecycleRoles || {}) },
+    };
+    preservedSystemHeaderAssignments = assignments;
+    Object.entries(spec.module || {}).forEach(([key, value]) => setFormValue(key, value));
+    const objectTypes = roles.objectTypes && typeof roles.objectTypes === "object" ? roles.objectTypes : {};
+    const valueDataTypes = roles.valueDataTypes && typeof roles.valueDataTypes === "object" ? roles.valueDataTypes : {};
+    const sections = (spec.sections || []).map((section) =>
+      hydrateSectionDefaults(section, objectTypes, valueDataTypes)
+    );
+    $("#sections").innerHTML = "";
+    buildingSectionsDom = true;
+    try {
+      sections.forEach((section) => addSection(section, { addBlankField: false }));
+    } finally {
+      buildingSectionsDom = false;
+    }
+    maybeAutoModuleValues();
+    loadSemanticGraphDraft(spec.semanticGraph);
+    applyRoleStateSelections(roles, assignments);
+  } finally {
+    suspendDerivedFieldsRefresh = false;
+  }
+  refreshDerivedFieldsMetadata();
   queueSessionSave();
 }
 
@@ -4185,9 +4070,7 @@ function clearViewerStep() {
   };
   preservedSystemHeaderAssignments = getManagedOnlyHeaderAssignments();
   setFormValue("businessIdentifierField", "");
-  setFormValue("compositionFieldKey", "");
-  setFormValue("compositionLabelColumnKey", "");
-  setFormValue("compositionValueColumnKey", "");
+  renderCompositionCharts([]);
   $$("[data-summary-role-slot], [data-lifecycle-role-slot], [data-system-header-slot]")
     .forEach((select) => {
       select.value = "";
@@ -4218,65 +4101,221 @@ function clearCurrentStep() {
   queueSessionSave();
 }
 
+function csvFileName(kind, { template = false } = {}) {
+  const family = slugFromValue(getFormValue("family")) || "passport";
+  const version = normalizeModuleVersion(getFormValue("version"));
+  return `${family}-${version}-${kind}${template ? "-template" : ""}.csv`;
+}
+
+function getFieldsFromSectionSpec(sections = []) {
+  const fields = [];
+  const visit = (section) => {
+    (section.fields || []).forEach((field) => fields.push(field));
+    (section.sections || []).forEach(visit);
+  };
+  sections.forEach(visit);
+  return fields;
+}
+
+function reconcileFieldsImportDependencies(spec, sections) {
+  const fields = getFieldsFromSectionSpec(sections);
+  const fieldsByKey = new Map(fields.map((field) => [field.fieldKey, field]));
+  const roles = { ...(spec.roles || {}) };
+  let clearedMappingCount = 0;
+  const keepField = (fieldKey) => {
+    const value = String(fieldKey || "");
+    if (!value || fieldsByKey.has(value)) return value;
+    clearedMappingCount += 1;
+    return "";
+  };
+  const filterRoleMap = (roleMap) => Object.fromEntries(
+    Object.entries(roleMap || {}).filter(([fieldKey]) => {
+      const keep = fieldsByKey.has(fieldKey);
+      if (!keep) clearedMappingCount += 1;
+      return keep;
+    })
+  );
+
+  roles.businessIdentifierField = keepField(roles.businessIdentifierField);
+  roles.summaryRoles = filterRoleMap(roles.summaryRoles);
+  roles.lifecycleRoles = filterRoleMap(roles.lifecycleRoles);
+  if (roles.objectTypes) roles.objectTypes = filterRoleMap(roles.objectTypes);
+  if (roles.valueDataTypes) roles.valueDataTypes = filterRoleMap(roles.valueDataTypes);
+
+  roles.compositionCharts = normalizeCompositionCharts(roles).flatMap((chart) => {
+    const fieldKey = keepField(chart.fieldKey);
+    const compositionField = fieldsByKey.get(fieldKey);
+    if (!compositionField || compositionField.fieldType !== "table") {
+      if (fieldKey) clearedMappingCount += 1;
+      if (chart.labelColumnKey) clearedMappingCount += 1;
+      if (chart.valueColumnKey) clearedMappingCount += 1;
+      return [];
+    }
+    const columnKeys = new Set((compositionField.tableColumns || []).map((column) => column.columnKey));
+    const reconciled = { fieldKey, labelColumnKey: chart.labelColumnKey, valueColumnKey: chart.valueColumnKey };
+    for (const key of ["labelColumnKey", "valueColumnKey"]) {
+      if (reconciled[key] && !columnKeys.has(reconciled[key])) {
+        reconciled[key] = "";
+        clearedMappingCount += 1;
+      }
+    }
+    return [reconciled];
+  });
+  delete roles.compositionFieldKey;
+  delete roles.compositionLabelColumnKey;
+  delete roles.compositionValueColumnKey;
+  spec.roles = roles;
+
+  const assignments = normalizeSystemHeaderAssignments(spec.module?.systemHeaderFieldAssignments);
+  const reconciledAssignments = {};
+  for (const slot of headerSlotDefinitions) {
+    const managedValue = `__managed__:${slot.managedKey}`;
+    const value = assignments[slot.slotKey] || "";
+    if (slot.managedOnly) {
+      reconciledAssignments[slot.slotKey] = managedValue;
+    } else if (!value || value === managedValue || fieldsByKey.has(value)) {
+      reconciledAssignments[slot.slotKey] = value;
+    } else {
+      reconciledAssignments[slot.slotKey] = managedValue;
+      clearedMappingCount += 1;
+    }
+  }
+  spec.module = {
+    ...(spec.module || {}),
+    systemHeaderFieldAssignments: reconciledAssignments,
+  };
+  return { clearedMappingCount };
+}
+
+function summarizeSemanticGraph(graph = {}) {
+  const classes = Array.isArray(graph.classes) ? graph.classes : [];
+  const enums = Array.isArray(graph.enums) ? graph.enums : [];
+  return {
+    classCount: classes.length,
+    propertyCount: (Array.isArray(graph.rootProperties) ? graph.rootProperties.length : 0)
+      + classes.reduce(
+        (count, classDef) => count + (Array.isArray(classDef?.properties) ? classDef.properties.length : 0),
+        0
+      ),
+    enumCount: enums.length,
+    enumValueCount: enums.reduce(
+      (count, enumDef) => count + (Array.isArray(enumDef?.values) ? enumDef.values.length : 0),
+      0
+    ),
+  };
+}
+
+function resetFieldsExplorerAfterImport() {
+  const search = $("#fieldsExplorerSearch");
+  if (search) search.value = "";
+  selectedFieldsNodeId = "";
+  expandedFieldsExplorerSections = new WeakSet();
+  const firstSection = getTopLevelSectionNodes()[0];
+  if (firstSection) {
+    expandedFieldsExplorerSections.add(firstSection);
+    focusFieldsElement(firstSection);
+  } else {
+    renderFieldsExplorer();
+  }
+}
+
 function downloadFieldsCsvTemplate() {
-  const templateRows = [
-    {
-      fieldLabel: "Manufacturer Name",
-      sectionLabel: "Product Identity",
-      sectionPath: JSON.stringify(["Product Identity"]),
-      sectionKeyPath: JSON.stringify(["productIdentity"]),
-      fieldType: "text",
-      definition: "Name of the manufacturer responsible for placing the product on the market.",
-      dataType: "string",
-      unitLabel: "",
-      unitSymbol: "",
-      confidentiality: "public",
-      queryable: "false",
-      indexed: "false",
-      tableColumns: "",
-    },
-    {
-      fieldLabel: "Material Composition",
-      sectionLabel: "Composition",
-      sectionPath: JSON.stringify(["Material Data", "Composition"]),
-      sectionKeyPath: JSON.stringify(["materialData", "composition"]),
-      fieldType: "table",
-      definition: "Lists the component materials used in the product.",
-      dataType: "array",
-      unitLabel: "",
-      unitSymbol: "",
-      confidentiality: "public",
-      queryable: "false",
-      indexed: "false",
-      tableColumns: JSON.stringify([
+  try {
+    const template = {
+      sections: [
         {
-          "Label": "Material Name",
-          "Data type": "string",
-          "Unit label": "",
-          "Unit symbol": "",
+          key: "productIdentity",
+          label: "Product Identity",
+          fields: [{
+            fieldLabel: "Manufacturer Name",
+            fieldKey: "manufacturerName",
+            semanticSlug: "manufacturer-name",
+            fieldType: "text",
+            definition: "Name of the manufacturer responsible for placing the product on the market.",
+            dataType: "string",
+            unitKey: "none",
+            unitLabel: "",
+            unitSymbol: "",
+            confidentiality: "public",
+            objectType: "SingleValuedDataElement",
+            valueDataType: "String",
+            queryable: false,
+            indexed: false,
+          }],
         },
         {
-          "Label": "Percentage",
-          "Data type": "decimal",
-          "Unit label": "Percent",
-          "Unit symbol": "%",
+          key: "materialData",
+          label: "Material Data",
+          fields: [],
+          sections: [{
+            key: "composition",
+            label: "Composition",
+            fields: [{
+              fieldLabel: "Material Composition",
+              fieldKey: "materialComposition",
+              semanticSlug: "material-composition",
+              fieldType: "table",
+              definition: "Lists the component materials used in the product.",
+              dataType: "array",
+              unitKey: "none",
+              unitLabel: "",
+              unitSymbol: "",
+              confidentiality: "public",
+              objectType: "DataElementCollection",
+              valueDataType: "Array",
+              queryable: false,
+              indexed: false,
+              tableColumns: [
+                {
+                  columnLabel: "Material Name",
+                  columnKey: "materialName",
+                  semanticSlug: "material-name",
+                  dataType: "string",
+                  unitKey: "none",
+                  unitLabel: "",
+                  unitSymbol: "",
+                  objectType: "SingleValuedDataElement",
+                  valueDataType: "String",
+                },
+                {
+                  columnLabel: "Percentage",
+                  columnKey: "percentage",
+                  semanticSlug: "percentage",
+                  dataType: "decimal",
+                  unitKey: "percent",
+                  unitLabel: "Percent",
+                  unitSymbol: "%",
+                  objectType: "SingleValuedDataElement",
+                  valueDataType: "Decimal",
+                },
+              ],
+            }],
+          }],
         },
-      ]),
-    },
-  ];
-  downloadTextFile("passport-module-fields-template.csv", buildFieldsCsvContent(templateRows), "text/csv;charset=utf-8");
-  setMessage("Downloaded fixed CSV template for Part 2 fields.", "success");
+      ],
+    };
+    const rows = fieldsCsv.getFieldsCsvRowsFromSpec(template);
+    downloadTextFile(
+      csvFileName("fields", { template: true }),
+      fieldsCsv.buildFieldsCsvContent(rows),
+      "text/csv;charset=utf-8"
+    );
+    setMessage("Downloaded the fields CSV v2 template. Auto-filled columns are reference-only on import.", "success");
+  } catch (error) {
+    setMessage(error.message, "error");
+  }
 }
 
 function exportFieldsCsv() {
   try {
-    const rows = getFieldsCsvRowsFromSpec();
+    const rows = fieldsCsv.getFieldsCsvRowsFromSpec(readSpec());
     if (!rows.length) {
-      setMessage("Add at least one field before exporting CSV.", "error");
+      setMessage("Add at least one field before exporting fields CSV.", "error");
       return;
     }
-    downloadTextFile("passport-module-fields.csv", buildFieldsCsvContent(rows), "text/csv;charset=utf-8");
-    setMessage(`Exported ${rows.length} field rows to CSV with section paths.`, "success");
+    const fileName = csvFileName("fields");
+    downloadTextFile(fileName, fieldsCsv.buildFieldsCsvContent(rows), "text/csv;charset=utf-8");
+    setMessage(`Exported ${rows.length} fields to ${fileName}. Nested inputs are preserved; auto-filled columns are reference-only on import.`, "success");
   } catch (error) {
     setMessage(error.message, "error");
   }
@@ -4285,31 +4324,93 @@ function exportFieldsCsv() {
 async function importFieldsCsvFile(file) {
   if (!file) return;
   clearMessage();
+  let previousState = null;
+  let replacementStarted = false;
   try {
-    if (file.size > maxFieldsCsvBytes) {
-      throw new Error("CSV file is too large. Maximum size is 2 MB.");
+    if (file.size > maxCsvBytes) {
+      throw new Error("Fields CSV file is too large. Maximum size is 2 MB.");
     }
-    const text = await file.text();
-    const { rows, skippedRowCount } = readFieldsCsvRows(text);
-    const nextSpec = readSpec();
-    const wasGraphFirstLayerBuilt = graphFirstLayerBuilt;
-    nextSpec.sections = convertFieldsCsvRowsToSections(rows);
+    const parsed = fieldsCsv.readFieldsCsvRows(await file.text());
+    const rebuildGraph = Boolean($("#rebuildGraphOnFieldsCsvImport")?.checked);
+    const currentSpec = readSpec();
+    const currentSummary = fieldsCsv.summarizeSections(currentSpec.sections);
+    const nextSpec = {
+      ...currentSpec,
+      sections: parsed.sections,
+    };
+    const dependencyReconciliation = reconcileFieldsImportDependencies(nextSpec, parsed.sections);
+    let graphReconciliation = {
+      graph: createBlankSpec().semanticGraph,
+      removedClassCount: 0,
+      removedPropertyCount: 0,
+    };
+    if (rebuildGraph) {
+      nextSpec.semanticGraph = graphReconciliation.graph;
+    } else {
+      try {
+        graphReconciliation = csvImportReconciliation.reconcileSemanticGraphSources(
+          nextSpec.semanticGraph,
+          parsed.sections
+        );
+      } catch (error) {
+        throw new Error(
+          `${error.message} Fix the graph reference, or select “Rebuild the semantic graph from imported fields” and import again.`
+        );
+      }
+      nextSpec.semanticGraph = graphReconciliation.graph;
+    }
+    await callApi("/api/validate-csv-import", {
+      sections: nextSpec.sections,
+      semanticGraph: nextSpec.semanticGraph,
+    });
+    const formatLabel = parsed.legacy ? "legacy fields CSV" : "fields CSV v2";
+    const graphChoice = rebuildGraph
+      ? "The semantic graph will be reset and rebuilt from these fields."
+      : graphReconciliation.removedClassCount || graphReconciliation.removedPropertyCount
+        ? `The existing semantic graph will be preserved after removing ${graphReconciliation.removedClassCount} stale linked class${graphReconciliation.removedClassCount === 1 ? "" : "es"} and ${graphReconciliation.removedPropertyCount} stale linked propert${graphReconciliation.removedPropertyCount === 1 ? "y" : "ies"}.`
+        : "The existing semantic graph will be preserved; all source links still match.";
+    const confirmed = window.confirm(
+      `Replace ${currentSummary.fieldCount} current field${currentSummary.fieldCount === 1 ? "" : "s"} in ${currentSummary.sectionCount} section${currentSummary.sectionCount === 1 ? "" : "s"} `
+      + `with ${parsed.fieldCount} field${parsed.fieldCount === 1 ? "" : "s"} in ${parsed.sectionCount} section${parsed.sectionCount === 1 ? "" : "s"} from ${formatLabel}?\n\n`
+      + `Fields that are not in the CSV will be removed. ${graphChoice}`
+    );
+    if (!confirmed) {
+      setMessage("Fields CSV replacement cancelled. The form was not changed.", "info");
+      return;
+    }
+
+    previousState = readWorkspaceState();
+    replacementStarted = true;
     loadSpec(nextSpec);
-    setGraphFirstLayerBuilt(wasGraphFirstLayerBuilt || graphFirstLayerBuilt);
-    const graphBuild = graphFirstLayerBuilt
-      ? { alreadyBuilt: true }
-      : buildGraphFirstLayerFromSections({ showMessage: false });
-    if (graphBuild.alreadyBuilt) syncGraphSourceBindings({ populate: false });
+
+    let graphText;
+    if (rebuildGraph) {
+      setGraphFirstLayerBuilt(false);
+      const graphBuild = buildGraphFirstLayerFromSections({ showMessage: false });
+      graphText = ` Rebuilt ${graphBuild.sectionCount} linked section${graphBuild.sectionCount === 1 ? "" : "s"} in the semantic graph.`;
+    } else {
+      syncGraphSourceBindings({ populate: false });
+      graphText = graphReconciliation.removedClassCount || graphReconciliation.removedPropertyCount
+        ? ` Preserved the graph after removing ${graphReconciliation.removedClassCount} stale linked class${graphReconciliation.removedClassCount === 1 ? "" : "es"} and ${graphReconciliation.removedPropertyCount} stale linked propert${graphReconciliation.removedPropertyCount === 1 ? "y" : "ies"}.`
+        : " Preserved and reconciled the existing semantic graph.";
+    }
+    resetFieldsExplorerAfterImport();
     setActiveStep("fields");
-    const skippedText = skippedRowCount ? ` Skipped ${skippedRowCount} incomplete row${skippedRowCount === 1 ? "" : "s"}.` : "";
-    const graphText = graphBuild.alreadyBuilt
-      ? " Preserved the existing semantic graph and its manual removals."
-      : ` Built the first semantic layer from ${graphBuild.sectionCount} section${graphBuild.sectionCount === 1 ? "" : "s"}${graphBuild.tableCount ? ` with ${graphBuild.tableCount} nested table ${graphBuild.tableCount === 1 ? "class" : "classes"}` : ""}.`;
+    const mappingText = dependencyReconciliation.clearedMappingCount
+      ? ` Cleared or reset ${dependencyReconciliation.clearedMappingCount} viewer mapping${dependencyReconciliation.clearedMappingCount === 1 ? "" : "s"} that no longer matched.`
+      : " Viewer mappings still point to valid stable keys.";
     setMessage(
-      `Imported ${rows.length} field rows from CSV using the fixed template.${skippedText}${graphText}`,
+      `Replaced the form from ${formatLabel}: ${parsed.sectionCount} section${parsed.sectionCount === 1 ? "" : "s"}, ${parsed.fieldCount} field${parsed.fieldCount === 1 ? "" : "s"}, maximum depth ${parsed.maxDepth}.${graphText}${mappingText}`,
       "success"
     );
   } catch (error) {
+    if (replacementStarted && previousState) {
+      try {
+        applyWorkspaceState(previousState);
+      } catch {
+        // Keep the original import error when recovery itself fails.
+      }
+    }
     setMessage(error.message, "error");
   }
 }
@@ -4372,10 +4473,11 @@ async function downloadGeneratedFiles() {
     const link = document.createElement("a");
     link.href = url;
     link.download = fileName;
+    link.style.display = "none";
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1500);
     setMessage(`Downloaded ${fileName} with all generated files and repository paths preserved.`, "success");
   } catch (error) {
     setMessage(error.message, "error");
@@ -4454,12 +4556,12 @@ $("#addFieldToSelection").addEventListener("click", () => {
   const field = getDirectFieldRows(newSection)[0] || null;
   focusFieldsElement(field || newSection);
 });
-$("#fieldsExplorerSearch").addEventListener("input", renderFieldsExplorer);
+$("#fieldsExplorerSearch").addEventListener("input", queueFieldsExplorerRender);
 $("#fieldsBackToParent").addEventListener("click", () => {
   const parentId = $("#fieldsBackToParent").dataset.parentId;
   if (!parentId) return;
-  selectedFieldsNodeId = parentId;
-  renderFieldsExplorer();
+  const parent = getFieldsExplorerItems().find((item) => item.id === parentId);
+  if (parent) focusFieldsElement(parent.element);
 });
 $("#saveDraft").addEventListener("click", saveDraft);
 $("#loadDraft").addEventListener("click", loadDraft);
@@ -4480,7 +4582,7 @@ $("#addRootProperty").addEventListener("click", () => {
 $("#buildGraphFirstLayer").addEventListener("click", () => buildGraphFirstLayerFromSections());
 $("#addGraphClass").addEventListener("click", () => focusGraphElement(addGraphClass()));
 $("#addGraphEnum").addEventListener("click", () => focusGraphElement(addGraphEnum()));
-$("#graphExplorerSearch").addEventListener("input", renderGraphExplorer);
+$("#graphExplorerSearch").addEventListener("input", queueGraphExplorerRender);
 $("#graphBackToParent").addEventListener("click", () => {
   const parentId = $("#graphBackToParent").dataset.parentId;
   if (!parentId) return;
@@ -4489,9 +4591,18 @@ $("#graphBackToParent").addEventListener("click", () => {
 });
 $("#downloadSemanticGraphCsvTemplate").addEventListener("click", downloadSemanticGraphCsvTemplate);
 $("#exportSemanticGraphCsv").addEventListener("click", () => {
-  const graph = readSemanticGraphDraft();
-  downloadTextFile("passport-semantic-graph.csv", buildSemanticGraphCsvContent(graph), "text/csv;charset=utf-8");
-  setMessage("Exported semantic class graph CSV.", "success");
+  try {
+    const graph = readSemanticGraphDraft();
+    const fileName = csvFileName("semantic-graph");
+    downloadTextFile(
+      fileName,
+      semanticGraphCsv.buildSemanticGraphCsvContent(graph),
+      "text/csv;charset=utf-8"
+    );
+    setMessage(`Exported the lossless semantic graph to ${fileName}.`, "success");
+  } catch (error) {
+    setMessage(error.message, "error");
+  }
 });
 $("#importSemanticGraphCsv").addEventListener("click", () => $("#semanticGraphCsvInput").click());
 $("#semanticGraphCsvInput").addEventListener("change", async (event) => {
@@ -4509,7 +4620,7 @@ $("#rootClassSemanticId").addEventListener("input", syncGraphRangeOptions);
 });
 $("#preview").addEventListener("click", preview);
 $("#downloadGeneratedFiles").addEventListener("click", downloadGeneratedFiles);
-$("#compositionFieldKey").addEventListener("change", syncCompositionRoleColumns);
+$("#addCompositionChart").addEventListener("click", () => addCompositionChart({}, { focus: true }));
 document.addEventListener("input", (event) => {
   if (event.target.closest("#sections")) queueGraphSourceSync();
 }, true);
@@ -4524,6 +4635,7 @@ document.addEventListener("change", () => {
 setupWorkspaceNavigation();
 setupModuleAutoFill();
 setupSearchableSelects();
+setupSmoothDetails();
 let restoredSession = loadJsonStorage(sessionStorage, sessionStorageKey);
 try {
   loadSpec(restoredSession?.spec || sample);

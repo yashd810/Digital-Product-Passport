@@ -58,13 +58,17 @@ function AdminPassportTypeFields() {
   const systemHeaderEntries = resolveSystemHeaderEntries(sections, systemHeader);
   const fieldCount = countSchemaFields(sections);
   const sectionCount = countSchemaSections(sections);
-  const renderSection = (section, depth = 0, path = []) => {
+  const renderSection = (section, numberPath, depth = 0, path = []) => {
+    const sectionNumber = numberPath.join(".");
     const sectionKey = [...path, section.key || section.label || depth].join(".");
-    const sectionPath = [...path, section.label || section.key || `Section ${depth + 1}`];
+    const sectionPath = [...path, section.label || section.key || `Section ${sectionNumber}`];
     const childSections = section.sections || [];
     return (
       <div key={sectionKey} className={`apt-fv-section apt-fv-section-spaced apt-fv-section-depth-${Math.min(depth, 3)}`}>
-        <div className="apt-fv-section-title apt-fv-section-title-strong">{section.label}</div>
+        <div className="apt-fv-section-title apt-fv-section-title-strong">
+          <span className="apt-fv-section-number">{sectionNumber}</span>
+          <span>{section.label}</span>
+        </div>
         <div className="apt-fv-section-path">{sectionPath.join(" › ")}</div>
         {(section.fields || []).length > 0 && (
           <table className="apt-fv-table apt-fv-table-full apt-fv-table-custom">
@@ -92,7 +96,12 @@ function AdminPassportTypeFields() {
           </table>
         )}
         {childSections.map((child, childIndex) => (
-          renderSection(child, depth + 1, [...path, section.label || section.key || childIndex])
+          renderSection(
+            child,
+            [...numberPath, childIndex + 1],
+            depth + 1,
+            [...path, section.label || section.key || childIndex]
+          )
         ))}
       </div>
     );
@@ -100,7 +109,7 @@ function AdminPassportTypeFields() {
   return (
     <div className="apt-page">
       <div className="apt-toolbar admin-toolbar-compact">
-        <button className="apt-create-btn apt-create-btn-back" onClick={() => navigate(-1)}>
+        <button className="back-link apt-passport-type-back" onClick={() => navigate(-1)}>
           ← Back
         </button>
         <div>
@@ -146,7 +155,7 @@ function AdminPassportTypeFields() {
           <div className="alert alert-info">No custom field sections are defined.</div>
         ) : (
           <>
-          {sections.map((section) => renderSection(section))}
+          {sections.map((section, sectionIndex) => renderSection(section, [sectionIndex + 1]))}
           </>
         )}
       </div>

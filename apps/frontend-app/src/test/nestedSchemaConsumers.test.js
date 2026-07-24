@@ -50,6 +50,9 @@ describe("nested schema consumers", () => {
     expect(source).toContain("const renderSchemaSectionTree");
     expect(source).toContain("const renderSchemaFields");
     expect(source).toContain("childSections.map((child, childIndex)");
+    expect(source).toContain("const fields = flattenSchemaFieldsFromSections(Object.values(sections || {}))");
+    expect(source).toContain('["file", "symbol", "table"].includes(field.type)');
+    expect(source).not.toContain("getRootSemanticProperty");
     expect(source).not.toContain("flattenSchemaFieldsFromSections([section])");
   });
 
@@ -59,8 +62,9 @@ describe("nested schema consumers", () => {
       "utf8",
     );
 
-    expect(source).toContain("setSections(normalizeSchemaSections(data.fieldsJson.sections))");
-    expect(source).toContain("flattenSchemaFieldsFromSections(sections || [])");
+    expect(source).toContain("filterPassportDataEntrySections(");
+    expect(source).toContain("normalizeSchemaSections(data.fieldsJson.sections)");
+    expect(source).toContain("buildUserTemplateFields(sections, fieldValues, modelDataKeys)");
     expect(source).toContain("const renderTemplateSection");
     expect(source).toContain("childSections.map((child, childIndex)");
   });

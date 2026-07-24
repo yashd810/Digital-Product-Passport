@@ -186,6 +186,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
         subjectDid: canonicalPayload.subjectDid,
         dppDid: canonicalPayload.dppDid,
         companyDid: canonicalPayload.companyDid,
+        semanticProfile: canonicalPayload.semanticProfile,
         modelName: passport.modelName || null,
         ...fields
       }

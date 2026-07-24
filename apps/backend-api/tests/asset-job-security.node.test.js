@@ -146,8 +146,8 @@ test("all asset-management routes enforce the company entitlement before their h
   assert.equal(nextCalled, true);
 
   const deniedError = Object.assign(
-    new Error("Passport Data Management is not enabled for this company"),
-    { statusCode: 403, code: "assetManagementDisabled" }
+    new Error("Company is inactive"),
+    { statusCode: 403, code: "assetManagementCompanyInactive" }
   );
   const deniedHarness = createRouteHarness({
     serviceOverrides: {
@@ -159,7 +159,7 @@ test("all asset-management routes enforce the company entitlement before their h
   const deniedMiddleware = deniedHarness.routes.find((entry) => entry.method === "use").handlers.at(-1);
   const deniedResponse = createResponse();
   await deniedMiddleware({ params: { companyId: "7" } }, deniedResponse, () => {
-    throw new Error("disabled asset management must not continue to the route handler");
+    throw new Error("an inactive company must not continue to the route handler");
   });
   assert.equal(deniedResponse.statusCode, 403);
   assert.equal(deniedResponse.body.error, deniedError.message);
@@ -172,9 +172,8 @@ test("all asset-management routes enforce the company entitlement before their h
   assert.match(invalidResponse.body.error, /positive integer/);
 });
 
-test("asset reads fail closed instead of remapping a PostgreSQL-truncated column name", async () => {
+test("asset reads support logical field keys longer than PostgreSQL identifiers", async () => {
   const longFieldKey = `a${"b".repeat(63)}`;
-  const truncatedColumnKey = longFieldKey.slice(0, 63);
   const { routes } = createRouteHarness({
     serviceOverrides: {
       assertCompanyAssetPassportTypeAccess: async () => ({
@@ -182,7 +181,7 @@ test("asset reads fail closed instead of remapping a PostgreSQL-truncated column
         displayName: "Battery",
       }),
       getLatestCompanyPassports: async () => [{
-        [truncatedColumnKey]: "must-not-be-remapped",
+        [longFieldKey]: "logical-value",
         isEditable: true,
       }],
       getAssetFieldMap: () => new Map([[
@@ -200,9 +199,8 @@ test("asset reads fail closed instead of remapping a PostgreSQL-truncated column
     query: { passportType: "battery" },
   }, response);
 
-  assert.equal(response.statusCode, 503);
-  assert.equal(response.body.error, "passportTypeInvalidStorageFieldKeys");
-  assert.match(response.body.detail, /cannot be safely mapped/);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.passports[0][longFieldKey], "logical-value");
 });
 
 test("asset push rejects browser-generated payloads and regenerates an internal payload from raw rows", async () => {
@@ -582,11 +580,11 @@ test("scheduled jobs reject unsafe persisted credential fields before any outbou
   );
 });
 
-test("entitlement revocation disables an in-flight scheduled job instead of rescheduling it", async () => {
+test("company deactivation disables an in-flight scheduled job instead of rescheduling it", async () => {
   const queries = [];
   const deniedError = Object.assign(
-    new Error("Passport Data Management is not enabled for this company"),
-    { statusCode: 403, code: "assetManagementDisabled" }
+    new Error("Company is inactive"),
+    { statusCode: 403, code: "assetManagementCompanyInactive" }
   );
   const pool = {
     async query(sql, params = []) {
@@ -629,7 +627,7 @@ test("entitlement revocation disables an in-flight scheduled job instead of resc
   assert.equal(runInsert.params[5], "disabled");
 });
 
-test("scheduler selects only jobs belonging to active, enabled companies", async () => {
+test("scheduler selects jobs for every active company without a legacy entitlement filter", async () => {
   const queries = [];
   const service = createAssetService({
     pool: {
@@ -645,5 +643,5 @@ test("scheduler selects only jobs belonging to active, enabled companies", async
   assert.equal(queries.length, 1);
   assert.match(queries[0], /JOIN companies c ON c\.id = j\."companyId"/);
   assert.match(queries[0], /c\."isActive" = true/);
-  assert.match(queries[0], /c\."assetManagementEnabled" = true/);
+  assert.doesNotMatch(queries[0], /assetManagementEnabled/);
 });

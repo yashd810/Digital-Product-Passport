@@ -4,15 +4,25 @@
 
 This is the part of the system that makes the app product-generic.
 
-A passport module defines:
+A passport module defines the complete, versioned vocabulary available to a
+product family:
 
 - the product type name
-- the visible form sections and fields
+- every canonical section and field that a passport type may select
 - compliance profile defaults
 - semantic model linkage
 - some product-specific rules
 
 A semantic model defines the machine-readable vocabulary behind those fields.
+The module and its public dictionary remain comprehensive; they are not a
+promise that every passport type or passport will use every term.
+
+A passport type is a compiled profile of one module. The super admin selects
+which module fields apply, whether each selected field is optional or required,
+its confidentiality, and its presentation settings. The backend then stores a
+pruned section tree and semantic graph. Create forms, templates, viewers,
+exports, validation, credentials, and signatures read that stored profile, not
+the complete module.
 
 ## Shared Package Loader
 
@@ -36,9 +46,13 @@ The runtime module registry and semantic registry use the same discovery pass.
 
 1. Create `passport-modules/<family>-<version>/`.
 2. Put `module.js`, `manifest.json`, and every generated semantic artifact in it.
-3. Seed passport types with the backend seed/bootstrap scripts.
-4. Grant company access if required.
-5. Verify frontend create/edit flows and public outputs.
+3. Create one or more passport types from that module in the Admin UI.
+4. Select the fields for each type and grant company access where required.
+5. Verify create/edit flows, public outputs, and the type semantic profile.
+
+The optional seed/bootstrap scripts create a full-selection passport type only
+when that module's default `typeName` is absent. They never overwrite an
+existing Admin-created profile.
 
 The folder name is exact: module key `example-product:v1` uses
 `example-product-v1`. The backend rejects mismatched names, missing package
@@ -48,3 +62,8 @@ and `manifest.json`.
 ## Important Clarification
 
 The platform code should stay product-generic. Product-specific assumptions belong only in generated module files and semantic resources that you deliberately add for your deployment.
+
+The canonical dictionary endpoints under `/api/dictionary/<family>/<version>/`
+always describe the full module. A compiled passport type has its own filtered
+bundle at `/api/passport-types/<typeName>/semantic-profile` and artifact routes
+below it, such as `/context.jsonld` and `/shapes.jsonld`.

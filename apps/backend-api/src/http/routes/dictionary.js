@@ -1,5 +1,10 @@
 "use strict";
 
+const { isSafePassportTypeName } = require("../../shared/passports/passport-helpers");
+const {
+  buildPassportTypeSemanticProfile,
+} = require("../../services/passport-type-semantic-profile");
+
 function defaultMiddleware(_req, _res, next) {
   next();
 }
@@ -140,6 +145,60 @@ module.exports = function registerDictionaryRoutes(app, {
     return sendPrettyJson(res, term);
   };
 
+  const loadPassportTypeSemanticProfile = async (req, res) => {
+    if (!pool) {
+      sendPrettyError(res, 503, { error: "Database is unavailable" });
+      return null;
+    }
+    const typeName = String(req.params.typeName || "").trim();
+    if (!isSafePassportTypeName(typeName)) {
+      sendPrettyError(res, 400, { error: "Invalid passport type name" });
+      return null;
+    }
+
+    // Deactivating a type stops new authoring; it must not make the semantic
+    // profile of already-issued passports unavailable to public verifiers.
+    const result = await pool.query(
+      `SELECT id,
+              "typeName",
+              "displayName",
+              "productCategory",
+              "semanticModelKey",
+              "fieldsJson"
+         FROM "passportTypes"
+        WHERE "typeName" = $1
+        LIMIT 1`,
+      [typeName]
+    );
+    const typeDef = result.rows?.[0] || null;
+    if (!typeDef) {
+      sendPrettyError(res, 404, { error: "Passport type not found" });
+      return null;
+    }
+    const modelKey = typeDef.semanticModelKey || typeDef.fieldsJson?.semanticModelKey || null;
+    const model = modelKey ? semanticModelRegistry.getModel(modelKey) : null;
+    return buildPassportTypeSemanticProfile(typeDef, model, {
+      profilePath: `/api/passport-types/${encodeURIComponent(typeName)}/semantic-profile`,
+    });
+  };
+
+  const sendPassportTypeProfileArtifact = async (req, res, artifact = null) => {
+    try {
+      const profile = await loadPassportTypeSemanticProfile(req, res);
+      if (!profile) return null;
+      if (!artifact) return sendPrettyJson(res, profile);
+      if (artifact === "context") return sendPrettyJson(res, profile.context, "application/ld+json");
+      if (artifact === "shapes") return sendPrettyJson(res, profile.shapes, "application/ld+json");
+      if (artifact === "terms") return sendPrettyJson(res, filterTerms(profile.terms, req.query));
+      if (["classes", "enums", "units"].includes(artifact)) {
+        return sendPrettyJson(res, profile[artifact]);
+      }
+      return sendPrettyError(res, 404, { error: "Semantic profile artifact not found" });
+    } catch {
+      return sendPrettyError(res, 500, { error: "Failed to build passport type semantic profile" });
+    }
+  };
+
   app.get("/api/semantic-models", publicReadRateLimit, (_req, res) => {
     sendPrettyJson(res, semanticModelRegistry.listModels());
   });
@@ -192,6 +251,20 @@ module.exports = function registerDictionaryRoutes(app, {
   app.get(["/api/dictionary/:family/:version/terms/:slug", "/dictionary/:family/:version/terms/:slug"], publicReadRateLimit, (req, res) => {
     sendTerm(req, res, getModelByPath(req, res));
   });
+
+  app.get("/api/passport-types/:typeName/semantic-profile", publicReadRateLimit, (req, res) =>
+    sendPassportTypeProfileArtifact(req, res));
+  for (const [suffix, artifact] of [
+    ["context.jsonld", "context"],
+    ["terms", "terms"],
+    ["classes", "classes"],
+    ["enums", "enums"],
+    ["units", "units"],
+    ["shapes.jsonld", "shapes"],
+  ]) {
+    app.get(`/api/passport-types/:typeName/semantic-profile/${suffix}`, publicReadRateLimit, (req, res) =>
+      sendPassportTypeProfileArtifact(req, res, artifact));
+  }
 
   app.get("/api/companies/:companyId/semantic-models", authenticateToken, checkCompanyAccess, async (req, res) => {
     if (!pool) return res.status(503).json({ error: "Database is unavailable" });

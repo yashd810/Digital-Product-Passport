@@ -256,7 +256,9 @@ function normalizeAndValidateSemanticGraph(rawGraph, { required = false } = {}) 
     const propertyKeys = new Set();
     for (const property of classDef.properties) {
       const path = `${classDef.key}.${property.key || "property"}`;
-      if (!isCanonicalKey(property.key)) throw graphError("Property key must be lower camelCase.", path);
+      if (!isCanonicalKey(property.key)) {
+        throw graphError("Property key must be lower camelCase and at most 200 characters.", path);
+      }
       if (!property.label) throw graphError("Property label is required.", path);
       if (!isAbsoluteIri(property.semanticId)) throw graphError("Property semanticId must be an absolute IRI.", path);
       if (canonicalKeyFromSemanticId(property.semanticId) !== property.key) {
@@ -378,7 +380,7 @@ function runtimeFieldFromSemanticProperty(property, graph) {
   }
   return {
     ...property,
-    type: isManyProperty(property) ? "objectList" : "object",
+    type: property.uiType || (isManyProperty(property) ? "objectList" : "object"),
     dataType: isManyProperty(property) ? "array" : "object",
     objectType: "DataElementCollection",
     valueDataType: isManyProperty(property) ? "Array" : "Object",

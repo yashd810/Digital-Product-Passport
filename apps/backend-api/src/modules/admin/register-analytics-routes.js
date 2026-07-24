@@ -80,6 +80,146 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
     lastLoginAt: row.lastLoginAt ?? null,
   });
 
+  const mapAdminAuditLogRow = (row = {}) => ({
+    id: row.id,
+    companyId: row.companyId ?? null,
+    companyName: row.companyName ?? null,
+    userId: row.userId ?? null,
+    action: row.action ?? null,
+    actorIdentifier: row.actorIdentifier ?? null,
+    audience: row.audience ?? null,
+    previousEventHash: row.previousEventHash ?? null,
+    eventHash: row.eventHash ?? null,
+    hashVersion: row.hashVersion ?? null,
+    actorEmail: row.actorEmail ?? null,
+    actorFirstName: row.actorFirstName ?? null,
+    actorLastName: row.actorLastName ?? null,
+    actorRole: row.actorRole ?? null,
+    createdAt: row.createdAt ?? null,
+    tableName: row.tableName ?? null,
+    recordId: row.recordId ?? null,
+    oldValues: row.oldValues ?? null,
+    newValues: row.newValues ?? null,
+  });
+
+  app.get("/api/admin/audit-logs", authenticateToken, isSuperAdmin, async (req, res) => {
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 100, 1), 500);
+    const offset = Math.min(Math.max(Number.parseInt(req.query.offset, 10) || 0, 0), 1000000);
+    const conditions = ["u.role = 'superAdmin'"];
+    const params = [];
+
+    const companyIdText = String(req.query.companyId ?? "").trim();
+    if (companyIdText) {
+      const companyId = Number.parseInt(companyIdText, 10);
+      if (!/^\d+$/.test(companyIdText) || !Number.isSafeInteger(companyId) || companyId <= 0) {
+        return res.status(400).json({ error: "companyId must be a positive integer" });
+      }
+      params.push(companyId);
+      conditions.push(`al."companyId" = $${params.length}`);
+    }
+
+    const action = String(req.query.action ?? "").trim();
+    if (action) {
+      if (action.length > 100) {
+        return res.status(400).json({ error: "action must not exceed 100 characters" });
+      }
+      params.push(action);
+      conditions.push(`al.action = $${params.length}`);
+    }
+
+    const actor = String(req.query.actor ?? req.query.user ?? "").trim();
+    if (actor) {
+      if (actor.length > 200) {
+        return res.status(400).json({ error: "actor search must not exceed 200 characters" });
+      }
+      params.push(`%${actor}%`);
+      conditions.push(`(
+        u.email ILIKE $${params.length}
+        OR u."firstName" ILIKE $${params.length}
+        OR u."lastName" ILIKE $${params.length}
+        OR al."actorIdentifier" ILIKE $${params.length}
+      )`);
+    }
+
+    for (const [queryKey, operator] of [["from", ">="], ["to", "<="]]) {
+      const rawDate = String(req.query[queryKey] ?? "").trim();
+      if (!rawDate) continue;
+      const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(rawDate);
+      const normalizedDate = dateOnly
+        ? `${rawDate}T${queryKey === "to" ? "23:59:59.999" : "00:00:00.000"}Z`
+        : rawDate;
+      const parsedDate = new Date(normalizedDate);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ error: `${queryKey} must be a valid date` });
+      }
+      params.push(parsedDate.toISOString());
+      conditions.push(`al."createdAt" ${operator} $${params.length}`);
+    }
+
+    params.push(limit, offset);
+    const limitParameter = `$${params.length - 1}`;
+    const offsetParameter = `$${params.length}`;
+
+    try {
+      const result = await pool.query(
+        `WITH filtered AS (
+           SELECT al.id,
+                al."companyId" AS "companyId",
+                c."companyName" AS "companyName",
+                al."userId" AS "userId",
+                al.action,
+                al."actorIdentifier" AS "actorIdentifier",
+                al.audience,
+                al."previousEventHash" AS "previousEventHash",
+                al."eventHash" AS "eventHash",
+                al."hashVersion" AS "hashVersion",
+                al."createdAt" AS "createdAt",
+                al."tableName" AS "tableName",
+                al."recordId" AS "recordId",
+                al."oldValues" AS "oldValues",
+                al."newValues" AS "newValues",
+                u.email AS "actorEmail",
+                u."firstName" AS "actorFirstName",
+                u."lastName" AS "actorLastName",
+                u.role AS "actorRole"
+           FROM "auditLogs" al
+           JOIN users u ON al."userId" = u.id
+           LEFT JOIN companies c ON al."companyId" = c.id
+           WHERE ${conditions.join(" AND ")}
+         ), paged AS (
+           SELECT *
+           FROM filtered
+           ORDER BY "createdAt" DESC, id DESC
+           LIMIT ${limitParameter} OFFSET ${offsetParameter}
+         ), totals AS (
+           SELECT COUNT(*)::int AS "totalCount"
+           FROM filtered
+         )
+         SELECT paged.*, totals."totalCount"
+         FROM totals
+         LEFT JOIN paged ON TRUE
+         ORDER BY paged."createdAt" DESC NULLS LAST, paged.id DESC NULLS LAST`,
+        params
+      );
+      const entries = result.rows
+        .filter((row) => row.id != null)
+        .map(mapAdminAuditLogRow);
+      const total = Number.parseInt(result.rows[0]?.totalCount, 10) || 0;
+      return res.json({
+        entries,
+        pagination: {
+          limit,
+          offset,
+          returned: entries.length,
+          total,
+        },
+      });
+    } catch (error) {
+      logger.error({ err: error }, "Admin audit log fetch error");
+      return res.status(500).json({ error: "Failed to fetch admin audit logs" });
+    }
+  });
+
   app.get("/api/admin/analytics", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const companiesRes = await pool.query(

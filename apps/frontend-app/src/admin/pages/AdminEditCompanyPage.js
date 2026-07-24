@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
+import CompanyDppPolicyFields from "../components/CompanyDppPolicyFields";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
+import { buildCompanyDppPolicyForm } from "../utils/companyDppPolicy";
 import "../styles/AdminDashboard.css";
 import "../../shared/styles/Dashboard.css";
 
@@ -36,19 +38,6 @@ function buildEditForm(company = {}) {
     customerTrustLevel: company.customerTrustLevel || "basic",
     authorizedContactName: company.authorizedContactName || "",
     authorizedContactEmail: company.authorizedContactEmail || "",
-  };
-}
-
-function buildPolicyForm(policy = {}) {
-  return {
-    defaultGranularity: policy.defaultGranularity || "item",
-    allowGranularityOverride: !!policy.allowGranularityOverride,
-    mintModelDids: !!policy.mintModelDids,
-    mintItemDids: !!policy.mintItemDids,
-    mintFacilityDids: !!policy.mintFacilityDids,
-    vcIssuanceEnabled: !!policy.vcIssuanceEnabled,
-    jsonldExportEnabled: !!policy.jsonldExportEnabled,
-    semanticDictionaryEnabled: !!policy.semanticDictionaryEnabled,
   };
 }
 
@@ -129,7 +118,7 @@ function AdminEditCompanyPage() {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "Failed to load company DPP policy");
-        if (!ignore) setPolicyForm(buildPolicyForm(data));
+        if (!ignore) setPolicyForm(buildCompanyDppPolicyForm(data));
       } catch (loadError) {
         if (!ignore) setPolicyError(loadError.message || "Failed to load company DPP policy");
       } finally {
@@ -170,7 +159,7 @@ function AdminEditCompanyPage() {
         body: JSON.stringify({
           ...editForm,
           companyName: editForm.companyName.trim(),
-          country: editForm.country.trim().toUpperCase(),
+          country: editForm.country.trim(),
           websiteDomain: editForm.websiteDomain.trim(),
         }),
       });
@@ -206,7 +195,7 @@ function AdminEditCompanyPage() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Failed to save company DPP policy");
-      setPolicyForm(buildPolicyForm(data));
+      setPolicyForm(buildCompanyDppPolicyForm(data));
       showFlash("success", `Updated DPP policy for ${company?.companyName || "company"}`);
     } catch (saveError) {
       setPolicyError(saveError.message || "Failed to save company DPP policy");
@@ -273,7 +262,8 @@ function AdminEditCompanyPage() {
                 type="text"
                 value={editForm.country}
                 onChange={(event) => handleEditFormChange("country", event.target.value)}
-                maxLength={2}
+                maxLength={80}
+                placeholder="Sweden"
                 disabled={saving}
               />
             </div>
@@ -362,39 +352,12 @@ function AdminEditCompanyPage() {
         ) : (
           <form onSubmit={savePolicy} className="company-form">
             {policyError && <div className="alert alert-error admin-alert-inline-wide">{policyError}</div>}
-            <div className="form-group">
-              <label htmlFor="defaultGranularity">Default Granularity</label>
-              <select
-                id="defaultGranularity"
-                value={policyForm?.defaultGranularity || "item"}
-                onChange={(event) => handlePolicyFieldChange("defaultGranularity", event.target.value)}
-                disabled={policySaving}
-              >
-                <option value="item">Item</option>
-                <option value="batch">Batch</option>
-                <option value="model">Model</option>
-              </select>
-            </div>
-
-            {[
-              ["allowGranularityOverride", "Allow granularity override"],
-              ["mintModelDids", "Mint model DIDs"],
-              ["mintItemDids", "Mint item DIDs"],
-              ["mintFacilityDids", "Mint facility DIDs"],
-              ["vcIssuanceEnabled", "Enable VC issuance"],
-              ["jsonldExportEnabled", "Enable JSON-LD export"],
-              ["semanticDictionaryEnabled", "Enable semantic dictionaries"],
-            ].map(([field, label]) => (
-              <label key={field} className="checkbox-label admin-checkbox-spaced">
-                <input
-                  type="checkbox"
-                  checked={!!policyForm?.[field]}
-                  onChange={(event) => handlePolicyFieldChange(field, event.target.checked)}
-                  disabled={policySaving}
-                />
-                <span>{label}</span>
-              </label>
-            ))}
+            <CompanyDppPolicyFields
+              policy={policyForm}
+              onChange={handlePolicyFieldChange}
+              disabled={policySaving}
+              idPrefix="editCompanyPolicy"
+            />
 
             <div className="apt-modal-actions">
               <button type="submit" className="apt-modal-confirm-btn" disabled={policySaving || policyLoading || !policyForm}>

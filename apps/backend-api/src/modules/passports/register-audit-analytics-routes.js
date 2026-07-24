@@ -1,3 +1,10 @@
+const companyMemberAuditActorPredicateSql = `
+  al."companyId" = $1
+  AND al."userId" IS NOT NULL
+  AND u."companyId" = $1
+  AND u.role IN ('companyAdmin', 'editor', 'viewer')
+`;
+
 function registerAuditAnalyticsRoutes(app, deps) {
   const {
     pool,
@@ -16,6 +23,15 @@ function registerAuditAnalyticsRoutes(app, deps) {
     archivedHistoryFilterSql,
   } = deps;
 
+  const getChangedAuditFields = (row = {}) => {
+    const keys = new Set();
+    for (const values of [row.oldValues, row.newValues]) {
+      if (!values || typeof values !== "object" || Array.isArray(values)) continue;
+      Object.keys(values).forEach((key) => keys.add(key));
+    }
+    return [...keys].sort((left, right) => left.localeCompare(right));
+  };
+
   const mapAuditLogRow = (row = {}) => ({
     id: row.id,
     companyId: row.companyId ?? null,
@@ -29,11 +45,11 @@ function registerAuditAnalyticsRoutes(app, deps) {
     userEmail: row.userEmail ?? null,
     userFirstName: row.userFirstName ?? null,
     userLastName: row.userLastName ?? null,
+    actorRole: row.actorRole ?? null,
     createdAt: row.createdAt ?? null,
     tableName: row.tableName ?? null,
     recordId: row.recordId ?? null,
-    oldValues: row.oldValues ?? null,
-    newValues: row.newValues ?? null,
+    changedFields: getChangedAuditFields(row),
   });
 
   app.get("/api/companies/:companyId/analytics", authenticateToken, checkCompanyAccess, async (req, res) => {
@@ -48,6 +64,8 @@ function registerAuditAnalyticsRoutes(app, deps) {
         FROM "companyPassportAccess" cpa
         JOIN "passportTypes" pt ON pt.id = cpa."passportTypeId"
         WHERE cpa."companyId" = $1
+          AND COALESCE(cpa."accessRevoked", false) = false
+          AND pt."isActive" = true
       `, [companyId]);
 
       let totalPassports = 0;
@@ -170,10 +188,13 @@ function registerAuditAnalyticsRoutes(app, deps) {
                 al."newValues" AS "newValues",
                 u.email AS "userEmail",
                 u."firstName" AS "userFirstName",
-                u."lastName" AS "userLastName"
+                u."lastName" AS "userLastName",
+                u.role AS "actorRole"
          FROM "auditLogs" al
-         LEFT JOIN users u ON al."userId" = u.id
-         WHERE al."companyId" = $1 ORDER BY al."createdAt" DESC LIMIT $2`,
+         JOIN users u ON al."userId" = u.id
+         WHERE ${companyMemberAuditActorPredicateSql}
+         ORDER BY al."createdAt" DESC, al.id DESC
+         LIMIT $2`,
         [req.params.companyId, limit]
       );
       res.json(r.rows.map(mapAuditLogRow));
@@ -203,10 +224,13 @@ function registerAuditAnalyticsRoutes(app, deps) {
                 al."newValues" AS "newValues",
                 u.email AS "userEmail",
                 u."firstName" AS "userFirstName",
-                u."lastName" AS "userLastName"
+                u."lastName" AS "userLastName",
+                u.role AS "actorRole"
          FROM "auditLogs" al
-         LEFT JOIN users u ON al."userId" = u.id
-         WHERE al."companyId" = $1 ORDER BY al."createdAt" DESC LIMIT $2 OFFSET $3`,
+         JOIN users u ON al."userId" = u.id
+         WHERE ${companyMemberAuditActorPredicateSql}
+         ORDER BY al."createdAt" DESC, al.id DESC
+         LIMIT $2 OFFSET $3`,
         [req.params.companyId, limit, offset]
       );
       res.json(r.rows.map(withAuditActorAliases).map(mapAuditLogRow));

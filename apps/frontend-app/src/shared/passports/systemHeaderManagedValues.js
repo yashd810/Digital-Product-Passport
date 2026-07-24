@@ -68,3 +68,30 @@ export function resolveManagedSystemHeaderValue(managedKey, {
       return null;
   }
 }
+
+export function buildPassportFormHeaderContext({
+  formData = {},
+  modelName = "",
+  internalAliasId = "",
+  passportType = "",
+  systemHeader = {},
+} = {}) {
+  const semanticModelKey = formData?.semanticModelKey || passportType || "";
+  return {
+    passport: {
+      ...formData,
+      modelName,
+      internalAliasId,
+      passportType,
+    },
+    typeDef: {
+      semanticModelKey,
+      fieldsJson: {
+        dppSchemaVersion: formData?.dppSchemaVersion || formData?.schemaVersion || "",
+        semanticModelKey,
+        systemHeader,
+      },
+    },
+    lastUpdateAt: formData?.updatedAt || null,
+  };
+}

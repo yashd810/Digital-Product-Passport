@@ -72,3 +72,94 @@
   color: #0d6f74;
   border-color: rgba(13, 181, 176, 0.36);
 }
+
+.route-load-error {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background: var(--surface-glow), var(--bg-primary);
+}
+
+.route-load-error-card {
+  width: min(100%, 560px);
+  padding: 36px;
+  text-align: center;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 18px;
+  box-shadow: var(--panel-shadow);
+}
+
+.route-load-error-icon {
+  display: inline-grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  color: var(--accent-strong);
+  background: rgba(13, 181, 176, 0.12);
+  font-size: 30px;
+}
+
+.route-load-error-card h1 {
+  margin: 0 0 12px;
+  font-size: clamp(24px, 4vw, 34px);
+}
+
+.route-load-error-card p {
+  margin: 0 auto 24px;
+  max-width: 440px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.route-load-error-card button {
+  min-height: 44px;
+  padding: 10px 20px;
+  color: #07111f;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  border: 0;
+  border-radius: 11px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.route-load-error-card button:focus-visible {
+  outline: 3px solid rgba(13, 181, 176, 0.34);
+  outline-offset: 3px;
+}
+
+.route-load-error-card button:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+[data-theme="light"] .route-load-error-card {
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(17, 44, 72, 0.14);
+}
+
+@media (max-width: 520px) {
+  .route-load-error {
+    padding: 20px 14px;
+  }
+
+  .route-load-error-card {
+    padding: 28px 20px;
+    border-radius: 14px;
+  }
+
+  .route-load-error-card button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-load-error-card button:hover {
+    transform: none;
+  }
+}

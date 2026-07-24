@@ -740,6 +740,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 12px;
+  min-width: 0;
 }
 
 .pf-header-field-card {
@@ -750,6 +751,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   background: rgba(255,255,255,0.025);
+  min-width: 0;
 }
 
 [data-theme="light"] .pf-header-field-card {
@@ -758,10 +760,12 @@
 }
 
 .pf-header-field-top {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: start;
+  display: block;
+  min-width: 0;
+}
+
+.pf-header-field-top > div {
+  min-width: 0;
 }
 
 .pf-header-field-top label {
@@ -772,6 +776,7 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  overflow-wrap: break-word;
 }
 
 .pf-header-field-top code {
@@ -782,6 +787,7 @@
 
 .pf-header-readonly-input {
   width: 100%;
+  min-width: 0;
   padding: 10px 11px;
   border: 1px solid var(--border);
   border-radius: 7px;

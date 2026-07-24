@@ -157,8 +157,9 @@ function createComplianceHelpers({
   }
 
   async function evaluateCompliance(passport, passportType) {
+    const typeSchema = await getPassportTypeSchema(passportType);
     return complianceService.evaluatePassport(
-      { ...normalizePassportRow(passport), passportType },
+      { ...normalizePassportRow(passport, typeSchema), passportType },
       passportType
     );
   }
@@ -168,6 +169,7 @@ function createComplianceHelpers({
 
     const typeSchema = await getPassportTypeSchema(passportType);
     if (!typeSchema) return passport;
+    passport = normalizePassportRow(passport, typeSchema);
 
     const nextFields = {};
     const effectiveGranularity = passport.granularity || "item";
@@ -180,6 +182,7 @@ function createComplianceHelpers({
         internalAliasId: normalizedProductId,
         granularity: effectiveGranularity,
         passportLike: passport,
+        typeDef: typeSchema.typeDef || typeSchema,
       });
       if (storedProductIdentifiers.internalAliasId && storedProductIdentifiers.internalAliasId !== passport.internalAliasId) {
         nextFields.internalAliasId = storedProductIdentifiers.internalAliasId;
@@ -229,7 +232,9 @@ function createComplianceHelpers({
       includeUpdatedRow: true,
     });
 
-    return updateResult.updatedRow || { ...passport, ...nextFields };
+    return updateResult.updatedRow
+      ? normalizePassportRow(updateResult.updatedRow, typeSchema)
+      : { ...passport, ...nextFields };
   }
 
   return {

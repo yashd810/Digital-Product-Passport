@@ -15,6 +15,9 @@ const {
   isManyProperty,
   runtimeFieldFromSemanticProperty,
 } = require("../shared/passports/passport-semantic-graph");
+const {
+  buildSemanticProfileMetadata,
+} = require("./passport-type-semantic-profile");
 
 function createCanonicalPassportSerializer({
   didService,
@@ -1062,6 +1065,11 @@ function createCanonicalPassportSerializer({
     }
 
     const resolvedVersionNumber = Number(passport.versionNumber) || 1;
+    const semanticProfile = buildSemanticProfileMetadata(typeDef, {
+      profilePath: getTypeName(typeDef)
+        ? `/api/passport-types/${encodeURIComponent(getTypeName(typeDef))}/semantic-profile`
+        : null,
+    });
     const extensions = buildPlatformExtensions({
       passportType,
       versionNumber: resolvedVersionNumber,
@@ -1091,6 +1099,7 @@ function createCanonicalPassportSerializer({
       subjectDid,
       dppDid,
       companyDid,
+      semanticProfile,
       fields,
       ...(extensions ? { extensions } : {}),
     };

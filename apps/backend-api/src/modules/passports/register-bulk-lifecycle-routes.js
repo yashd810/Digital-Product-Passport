@@ -3,6 +3,7 @@
 const {
   flattenSchemaFieldsFromSections,
   joinQuotedSqlIdentifiers,
+  restorePassportLogicalFieldKeys,
 } = require("../../shared/passports/passport-helpers");
 const { getSafeErrorMessage } = require("../../shared/http/error-response");
 const { releasePassportAtomically } = require("./release-passport-transaction");
@@ -36,6 +37,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
     inRevisionStatus,
     submitPassportToWorkflow,
     getPassportLineageContext,
+    normalizePassportRow,
   } = deps;
 
   app.post("/api/companies/:companyId/passports/bulk-revise", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
@@ -116,7 +118,10 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
            WHERE "companyId" = $1 AND "dppId" = ANY($2::text[]) AND "releaseStatus" = 'released' AND "deletedAt" IS NULL`,
           [companyId, dppIds]
         );
-        const releasedByGuid = new Map(releasedRes.rows.map((row) => [row.dppId, row]));
+        const releasedByGuid = new Map(releasedRes.rows.map((row) => [
+          row.dppId,
+          restorePassportLogicalFieldKeys(row, fieldsJson),
+        ]));
 
         for (const dppId of dppIds) {
           const insertBatchItem = async (status, message, sourceVersion = null, newVersion = null) => {
@@ -209,7 +214,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             });
 
             await archivePassportSnapshot({
-              passport: insertedRevision.rows[0],
+              passport: normalizePassportRow(insertedRevision.rows[0], fieldsJson),
               passportType,
               archivedBy: userId,
               actorIdentifier: getActorIdentifier(req.user),

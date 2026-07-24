@@ -130,7 +130,7 @@ function encodePassportAttachmentAccessToken({
   if (!normalizedPassportDppId || normalizedPassportDppId.length > 200) {
     throw new Error("Invalid passport attachment DPP identifier");
   }
-  if (!/^[a-z][A-Za-z0-9]{0,99}$/.test(normalizedFieldKey)) {
+  if (!/^[a-z][A-Za-z0-9]{0,199}$/.test(normalizedFieldKey)) {
     throw new Error("Invalid passport attachment field key");
   }
   const payload = JSON.stringify({
@@ -164,7 +164,7 @@ function decodePassportAttachmentAccessToken(token) {
   const expiresAt = Number.parseInt(parsed?.exp, 10);
   if (!/^[a-zA-Z0-9_-]{8,24}$/.test(publicId)) return null;
   if (!passportDppId || passportDppId.length > 200) return null;
-  if (!/^[a-z][A-Za-z0-9]{0,99}$/.test(fieldKey)) return null;
+  if (!/^[a-z][A-Za-z0-9]{0,199}$/.test(fieldKey)) return null;
   if (!Number.isInteger(expiresAt) || expiresAt <= 0 || Date.now() > expiresAt) return null;
   return { publicId, passportDppId, fieldKey, expiresAt };
 }

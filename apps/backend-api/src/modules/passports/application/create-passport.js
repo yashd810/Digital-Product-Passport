@@ -51,6 +51,7 @@ function createDraftPassportUseCase(deps) {
     archivePassportSnapshot,
     getActorIdentifier,
     normalizeReleaseStatus,
+    normalizePassportRow = (row) => row,
     systemPassportFields,
   } = deps;
 
@@ -245,8 +246,9 @@ function createDraftPassportUseCase(deps) {
       passportPolicyKey: complianceManagedFields.passportPolicyKey,
       ...(isBulk ? { bulk: true } : {}),
     });
+    const createdPassport = normalizePassportRow(inserted, typeSchema);
     await archivePassportSnapshot({
-      passport: inserted,
+      passport: createdPassport,
       passportType: resolvedPassportType,
       archivedBy: userId,
       actorIdentifier: getActorIdentifier(reqUser),
@@ -254,7 +256,7 @@ function createDraftPassportUseCase(deps) {
     });
 
     return {
-      passport: inserted,
+      passport: createdPassport,
       dppId,
       modelName: modelName || null,
       normalizedProductId,

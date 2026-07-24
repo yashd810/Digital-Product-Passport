@@ -5,9 +5,16 @@ const { isPublicVersionVisible } = require("../public-passports/visibility");
 function createPassportQueryRepository({
   pool,
   getTable,
+  getPassportTypeSchema = null,
   normalizePassportRow,
   isPublicHistoryStatus,
 }) {
+  const loadNormalizationSchema = async (passportType) => (
+    typeof getPassportTypeSchema === "function"
+      ? getPassportTypeSchema(passportType)
+      : null
+  );
+
   async function findExistingPassportByInternalAliasId({
     tableName,
     companyId,
@@ -87,6 +94,7 @@ function createPassportQueryRepository({
 
   async function getPassportVersionsByLineage({ lineageId, passportType, companyId = null }) {
     const tableName = getTable(passportType);
+    const typeSchema = await loadNormalizationSchema(passportType);
     const liveParams = [lineageId];
     let liveCompanyFilter = "";
     if (companyId !== null && companyId !== undefined) {
@@ -117,7 +125,7 @@ function createPassportQueryRepository({
       archiveParams
     );
 
-    const liveVersions = liveRes.rows.map(normalizePassportRow);
+    const liveVersions = liveRes.rows.map((row) => normalizePassportRow(row, typeSchema));
     const seenDppIds = new Set(liveVersions.map((row) => row.dppId));
     const archiveVersions = archiveRes.rows
       .map((row) => {
@@ -137,7 +145,7 @@ function createPassportQueryRepository({
           archivedAt: row.archivedAt,
         };
       })
-      .map(normalizePassportRow)
+      .map((row) => normalizePassportRow(row, typeSchema))
       .filter((row) => row?.dppId && !seenDppIds.has(row.dppId));
 
     return [...liveVersions, ...archiveVersions]
@@ -175,6 +183,7 @@ function createPassportQueryRepository({
     if (!resolvedPassportType) return null;
 
     const tableName = getTable(resolvedPassportType);
+    const typeSchema = await loadNormalizationSchema(resolvedPassportType);
     const liveParams = [dppId, companyId];
     let liveVersionSql = "";
     if (parsedVersionNumber !== null) {
@@ -196,7 +205,7 @@ function createPassportQueryRepository({
     );
     if (liveRes.rows.length) {
       return {
-        passport: { ...normalizePassportRow(liveRes.rows[0]), passportType: resolvedPassportType },
+        passport: { ...normalizePassportRow(liveRes.rows[0], typeSchema), passportType: resolvedPassportType },
         archived: false,
       };
     }
@@ -222,7 +231,7 @@ function createPassportQueryRepository({
       : archiveRes.rows[0].rowData;
 
     return {
-      passport: { ...normalizePassportRow(rowData), passportType: resolvedPassportType, archived: true },
+      passport: { ...normalizePassportRow(rowData, typeSchema), passportType: resolvedPassportType, archived: true },
       archived: true,
     };
   }
@@ -239,6 +248,7 @@ function createPassportQueryRepository({
 
     const passportType = reg.rows[0].passportType;
     const tableName = getTable(passportType);
+    const typeSchema = await loadNormalizationSchema(passportType);
 
     const liveRes = await pool.query(
       `SELECT * FROM ${tableName}
@@ -251,7 +261,7 @@ function createPassportQueryRepository({
     );
     if (liveRes.rows.length) {
       return {
-        passport: { ...normalizePassportRow(liveRes.rows[0]), passportType },
+        passport: { ...normalizePassportRow(liveRes.rows[0], typeSchema), passportType },
         archived: false,
       };
     }
@@ -280,7 +290,7 @@ function createPassportQueryRepository({
       return { passport: null, archived: false };
     }
     return {
-      passport: { ...normalizePassportRow(rowData), passportType, archived: true },
+      passport: { ...normalizePassportRow(rowData, typeSchema), passportType, archived: true },
       archived: true,
     };
   }
@@ -297,6 +307,7 @@ function createPassportQueryRepository({
 
     const passportType = reg.rows[0].passportType;
     const tableName = getTable(passportType);
+    const typeSchema = await loadNormalizationSchema(passportType);
 
     if (versionNumber !== null && versionNumber !== undefined) {
       const lineageContext = await getPassportLineageContext({ dppId: normalizedDppId, passportType });
@@ -314,7 +325,7 @@ function createPassportQueryRepository({
         [lineageContext.lineageId, versionNumber]
       );
       if (liveRes.rows.length) {
-        const passport = { ...normalizePassportRow(liveRes.rows[0]), passportType };
+        const passport = { ...normalizePassportRow(liveRes.rows[0], typeSchema), passportType };
         const visibilityRes = await pool.query(
           `SELECT "isPublic"
            FROM "passportHistoryVisibility"
@@ -350,7 +361,7 @@ function createPassportQueryRepository({
       if (!isPublicVersionVisible(rowData?.releaseStatus, archiveRes.rows[0].isPublic, isPublicHistoryStatus)) {
         return { passport: null, archived: false };
       }
-      const passport = { ...normalizePassportRow(rowData), passportType, archived: true };
+      const passport = { ...normalizePassportRow(rowData, typeSchema), passportType, archived: true };
       const visibilityRes = await pool.query(
         `SELECT "isPublic"
          FROM "passportHistoryVisibility"

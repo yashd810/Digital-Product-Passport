@@ -17,16 +17,22 @@ import {
   normalizeSchemaSections,
 } from "../../shared/passports/passportSchemaUtils";
 import {
+  filterPassportDataEntrySections,
+  getPassportDataEntryFieldKeys,
+  selectPassportDataEntryValues,
+} from "../../shared/passports/passportSchemaVisibility";
+import {
   normalizeSystemPassportHeader,
   resolveSystemHeaderEntries,
 } from "../../admin/passport-types/builderHelpers";
 import SemanticGraphFieldEditor from "../../shared/passports/SemanticGraphFieldEditor";
 import {
   coerceSemanticGraphPropertyValue,
-  getRootSemanticProperty,
-  getSemanticGraphClass,
 } from "../../shared/passports/semanticGraphUtils";
-import { resolveManagedSystemHeaderValue } from "../../shared/passports/systemHeaderManagedValues";
+import {
+  buildPassportFormHeaderContext,
+  resolveManagedSystemHeaderValue,
+} from "../../shared/passports/systemHeaderManagedValues";
 import { toSafeImageSrc, toSafeResourceHref } from "../../shared/security/urlSafety";
 import { formatFieldLabelWithUnit, getFieldUnitLabel } from "../../passport-viewer/utils/viewerHelpers";
 import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
@@ -116,11 +122,8 @@ function buildClonePrefill(record, sections) {
   ]);
 
   const formData = Object.fromEntries(
-    Object.entries(aligned).filter(([key, value]) => {
-      if (excludedKeys.has(key)) return false;
-      if (value === undefined) return false;
-      return true;
-    })
+    Object.entries(selectPassportDataEntryValues(aligned, sections))
+      .filter(([key, value]) => !excludedKeys.has(key) && value !== undefined)
   );
 
   return {
@@ -205,6 +208,30 @@ const nonPersistedPayloadKeys = new Set([
   "schemaVersion",
 ]);
 
+const managedEditableKeys = new Set([
+  "economicOperatorId",
+  "economicOperatorIdentifierScheme",
+  "facilityId",
+  "granularity",
+  "productImage",
+]);
+
+const passportFormContextKeys = new Set([
+  ...nonEditableFormKeys,
+  ...nonPersistedPayloadKeys,
+  ...reservedSystemFieldKeys,
+  ...managedEditableKeys,
+  "semanticModelKey",
+]);
+
+function sanitizePassportFormData(record, sections) {
+  const dataEntryKeys = getPassportDataEntryFieldKeys(sections);
+  return Object.fromEntries(
+    Object.entries(record && typeof record === "object" ? record : {})
+      .filter(([key]) => dataEntryKeys.has(key) || passportFormContextKeys.has(key))
+  );
+}
+
 function PassportForm({ user, companyId, mode = "create", passportType: typeProp }) {
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -228,7 +255,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   // Module-derived passport type definitions are the only source of editable fields.
   const [dynamicSections, setDynamicSections] = useState(null);
   const [semanticGraph, setSemanticGraph] = useState(null);
-  const [loadingType,     setLoadingType]     = useState(false);
+  const [loadingType,     setLoadingType]     = useState(() => Boolean(activePassportType));
   const [systemHeader,    setSystemHeader]    = useState(() => normalizeSystemPassportHeader());
   const [complianceContext, setComplianceContext] = useState({ company: null, facilities: [] });
 
@@ -250,6 +277,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   const [isLoading,      setIsLoading]      = useState(mode === "edit");
   const [isSaving,       setIsSaving]       = useState(false);
   const [error,          setError]          = useState("");
+  const [typeLoadError,  setTypeLoadError]  = useState("");
   const [success,        setSuccess]        = useState("");
   const [displayName,    setDisplayName]    = useState("");
   const [activeEditors,  setActiveEditors]  = useState([]);
@@ -318,7 +346,10 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       const draft = JSON.parse(raw);
       setModelName(draft.modelName ?? initialData?.modelName ?? "");
       setInternalAliasId(draft.internalAliasId ?? initialData?.internalAliasId ?? "");
-      const draftFormData = draft.formData && typeof draft.formData === "object" ? draft.formData : (initialData || {});
+      const draftFormData = sanitizePassportFormData(
+        draft.formData && typeof draft.formData === "object" ? draft.formData : (initialData || {}),
+        sections
+      );
       formDataRef.current = draftFormData; // ← Update ref
       setFormData(draftFormData);
       dirtyRef.current = true;
@@ -326,7 +357,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
         [
           "modelName",
           "internalAliasId",
-          ...Object.keys(draft.formData && typeof draft.formData === "object" ? draft.formData : {}),
+          ...Object.keys(draftFormData),
         ]
           .map((key) => String(key || "").trim())
           .filter(Boolean)
@@ -347,7 +378,10 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       ...(data?.fields && typeof data.fields === "object" ? data.fields : {}),
       ...extractFieldValuesFromElements(data?.elements, keyMap),
     };
-    const alignedData = alignRecordToSchemaKeys(flattenedData, sections);
+    const alignedData = sanitizePassportFormData(
+      alignRecordToSchemaKeys(flattenedData, sections),
+      sections
+    );
     const restored = allowDraftRestore ? restoreLocalDraft(alignedData) : false;
     if (!restored) {
       setModelName(alignedData?.modelName || "");
@@ -435,39 +469,45 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   useEffect(() => {
     if (!activePassportType) return;
     setLoadingType(true);
+    setTypeLoadError("");
     fetchWithAuth(`${api}/api/internal/passport-types/${activePassportType}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.fieldsJson?.sections) {
-          // Convert server format to component format
-          const sections = {};
-          for (const section of normalizeSchemaSections(data.fieldsJson.sections)) {
-            sections[section.key] = {
-              ...section,
-              label: section.label,
-              fields: section.fields || [],
-            };
-          }
-          setDynamicSections(sections);
-          setSemanticGraph(data.fieldsJson.semanticGraph || null);
-          setSystemHeader(normalizeSystemPassportHeader(data.fieldsJson.systemHeader));
-          setDisplayName(data.displayName || activePassportType);
-          // Expand first section by default
-          if (data.fieldsJson.sections.length > 0) {
-            setExpanded({ [data.fieldsJson.sections[0].key]: true });
-          }
-        } else {
-          setDynamicSections(null);
-          setSemanticGraph(null);
-          setSystemHeader(normalizeSystemPassportHeader());
-          setDisplayName(activePassportType);
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Passport type definition could not be loaded (${response.status}).`);
         }
+        return response.json();
       })
-      .catch(() => {
+      .then(data => {
+        if (!Array.isArray(data?.fieldsJson?.sections)) {
+          throw new Error("Passport type definition does not contain field sections.");
+        }
+        // Convert server format to component format.
+        const sections = {};
+        const dataEntrySections = filterPassportDataEntrySections(
+          normalizeSchemaSections(data.fieldsJson.sections)
+        );
+        if (dataEntrySections.length === 0) {
+          throw new Error("Passport type definition does not contain user-editable field sections.");
+        }
+        for (const section of dataEntrySections) {
+          sections[section.key] = {
+            ...section,
+            label: section.label,
+            fields: section.fields || [],
+          };
+        }
+        setDynamicSections(sections);
+        setSemanticGraph(data.fieldsJson.semanticGraph || null);
+        setSystemHeader(normalizeSystemPassportHeader(data.fieldsJson.systemHeader));
+        setDisplayName(data.displayName || activePassportType);
+        setExpanded({ [dataEntrySections[0].key]: true });
+      })
+      .catch((loadError) => {
         setDynamicSections(null);
         setSemanticGraph(null);
         setSystemHeader(normalizeSystemPassportHeader());
         setDisplayName(activePassportType);
+        setTypeLoadError(loadError?.message || "Passport type definition could not be loaded.");
       })
       .finally(() => setLoadingType(false));
   }, [activePassportType]);
@@ -481,7 +521,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
   // Load template pre-fill on create mode
   useEffect(() => {
-    if (mode !== "create" || !templateId || !effectiveCompanyId) return;
+    if (mode !== "create" || !templateId || !effectiveCompanyId || !dynamicSections) return;
     fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/templates/${templateId}`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(tmpl => {
@@ -489,7 +529,9 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
         setTemplateName(tmpl.name || "");
         const vals = {};
         const modelKeys = new Set();
+        const dataEntryKeys = getPassportDataEntryFieldKeys(sections);
         for (const f of tmpl.fields || []) {
+          if (!dataEntryKeys.has(f.fieldKey)) continue;
           if (f.fieldValue) vals[f.fieldKey] = f.fieldValue;
           if (f.isModelData) modelKeys.add(f.fieldKey);
         }
@@ -498,7 +540,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
         setModelDataKeys(modelKeys);
       })
       .catch((error) => console.warn("Ignored async error", error));
-  }, [mode, templateId, effectiveCompanyId]);
+  }, [mode, templateId, effectiveCompanyId, dynamicSections]);
 
   useEffect(() => {
     if (mode !== "create") return;
@@ -632,16 +674,19 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
   const getSemanticGraphValidationError = () => {
     if (!semanticGraph) return "";
-    const rootClass = getSemanticGraphClass(semanticGraph, semanticGraph.rootClassKey);
-    for (const property of rootClass?.properties || []) {
-      const hasValue = Object.prototype.hasOwnProperty.call(formDataRef.current || {}, property.key);
-      if (!hasValue && property.minCount === 0) continue;
+    const fields = flattenSchemaFieldsFromSections(Object.values(sections || {}));
+    for (const field of fields) {
+      if (!field?.rangeKind) {
+        return `Field "${field?.label || field?.key || "unknown"}" is missing required semantic graph metadata.`;
+      }
+      const hasValue = Object.prototype.hasOwnProperty.call(formDataRef.current || {}, field.key);
+      if (!hasValue && field.minCount === 0) continue;
       try {
         coerceSemanticGraphPropertyValue(
-          property,
-          hasValue ? formDataRef.current[property.key] : undefined,
+          field,
+          hasValue ? formDataRef.current[field.key] : undefined,
           semanticGraph,
-          property.label || property.key
+          field.label || field.key
         );
       } catch (error) {
         return error.message;
@@ -680,13 +725,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
         .map((field) => field?.key)
         .filter((key) => key && !reservedSystemFieldKeys.has(key))
     );
-    const managedEditableKeys = new Set([
-      "economicOperatorId",
-      "economicOperatorIdentifierScheme",
-      "facilityId",
-      "granularity",
-      "productImage",
-    ]);
     const hasSchemaKeys = schemaFieldKeys.size > 0;
     const allowedKeys = new Set([...schemaFieldKeys, ...managedEditableKeys]);
     const cleanData = Object.fromEntries(
@@ -1050,11 +1088,9 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     const fieldLabel = formatFieldLabelWithUnit(field.label, field);
     const highlightMissing = isTemplateCreateMode && !isLocked && isFieldUnfilled(field);
     const fieldClassName = highlightMissing ? "pf-needs-input" : "";
-    const semanticProperty = field.rangeKind
-      ? (getRootSemanticProperty(semanticGraph, field.key) || field)
-      : null;
+    const semanticProperty = field.rangeKind ? field : null;
 
-    if (semanticProperty && semanticGraph && !["file", "symbol"].includes(field.type)) {
+    if (semanticProperty && semanticGraph && !["file", "symbol", "table"].includes(field.type)) {
       return (
         <SemanticGraphFieldEditor
           graph={semanticGraph}
@@ -1346,18 +1382,16 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
   const getHeaderDisplayValue = (entry) => {
     const value = entry.sourceType === "managed"
-      ? resolveManagedSystemHeaderValue(entry.managedKey, {
-          passport: formData,
-          typeDef: {
-            semanticModelKey: getFormValue("semanticModelKey"),
-            fieldsJson: {
-              dppSchemaVersion: formData.dppSchemaVersion || formData.schemaVersion || "",
-              semanticModelKey: getFormValue("semanticModelKey"),
-              systemHeader,
-            },
-          },
-          lastUpdateAt: formData.updatedAt || null,
-        })
+      ? resolveManagedSystemHeaderValue(
+          entry.managedKey,
+          buildPassportFormHeaderContext({
+            formData,
+            modelName,
+            internalAliasId,
+            passportType: activePassportType,
+            systemHeader,
+          })
+        )
       : formData[entry.fieldKey];
     if (value === null || value === undefined || value === "") return "No value yet";
     if (Array.isArray(value)) return value.join(", ");
@@ -1388,7 +1422,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
                     <label>{entry.label}</label>
                     <code>{entry.sourceType === "managed" ? entry.slotKey : entry.fieldKey}</code>
                   </div>
-                  {entry.semanticId && <span className="pf-header-locked-pill">{entry.semanticId}</span>}
                 </div>
                 <input
                   type="text"
@@ -1479,12 +1512,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     );
   };
 
-  if (isLoading || loadingType) return (
-    <div className="createpass-page">
-      <div className="loading" style={{ padding:60 }}>Loading passport…</div>
-    </div>
-  );
-
   const typeLabel = displayName || (activePassportType
     ? activePassportType.charAt(0).toUpperCase() + activePassportType.slice(1)
     : "");
@@ -1493,6 +1520,35 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     companyId: effectiveCompanyId,
     subpath: `passports/${activePassportType}`,
   });
+
+  if (loadingType || (isLoading && !typeLoadError)) return (
+    <div className="createpass-page">
+      <div className="loading" style={{ padding:60 }}>Loading passport…</div>
+    </div>
+  );
+
+  if (typeLoadError) return (
+    <div className="createpass-page">
+      <header className="createpass-header">
+        <button className="back-btn" onClick={() => navigate(passportListPath)}>← Back</button>
+        <h1>{mode === "create" ? "Create New" : "Edit"} {typeLabel} Passport</h1>
+      </header>
+      <main className="createpass-main">
+        <div className="createpass-container">
+          <div className="alert alert-error" role="alert">
+            <div>
+              <strong>Passport fields could not be loaded.</strong>
+              <div>{typeLoadError}</div>
+            </div>
+          </div>
+          <div className="form-actions">
+            <button type="button" className="cancel-btn" onClick={() => navigate(passportListPath)}>Back to passports</button>
+            <button type="button" className="submit-btn" onClick={() => window.location.reload()}>Try again</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 
   return (
     <div className="createpass-page">

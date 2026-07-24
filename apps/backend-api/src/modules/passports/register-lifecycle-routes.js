@@ -2,6 +2,7 @@
 
 const {
   joinQuotedSqlIdentifiers,
+  restorePassportLogicalFieldKeys,
 } = require("../../shared/passports/passport-helpers");
 
 const { createValidationMiddleware } = require("../../shared/validation/request-schema");
@@ -47,6 +48,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
     inRevisionStatus,
     submitPassportToWorkflow,
     validGranularities,
+    getPassportTypeSchema,
   } = deps;
 
   const companyDppParamsSchema = {
@@ -208,7 +210,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       res.json({
         success: true,
-        passport: normalizePassportRow(released),
+        passport: normalizePassportRow(released, typeDef),
         compliance,
         verification: buildVerificationSummary(compliance),
       });
@@ -245,7 +247,9 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       );
       if (!current.rows.length) return res.status(404).json({ error: "Released passport not found" });
 
-      const src = current.rows[0];
+      const typeSchema = await getPassportTypeSchema(passportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+      const src = restorePassportLogicalFieldKeys(current.rows[0], typeSchema);
       const dup = await pool.query(
         `SELECT id FROM ${tableName} WHERE "lineageId" = $1 AND "releaseStatus" IN ${revisionBlockingStatusesSql} AND "deletedAt" IS NULL`,
         [src.lineageId]
@@ -288,7 +292,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       });
 
       await archivePassportSnapshot({
-        passport: insertRes.rows[0],
+        passport: normalizePassportRow(insertRes.rows[0], typeSchema),
         passportType,
         archivedBy: userId,
         actorIdentifier: getActorIdentifier(req.user),
@@ -325,7 +329,9 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       );
       if (!current.rows.length) return res.status(404).json({ error: "Released passport not found" });
 
-      const src = current.rows[0];
+      const typeSchema = await getPassportTypeSchema(passportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+      const src = restorePassportLogicalFieldKeys(current.rows[0], typeSchema);
       const currentGranularity = String(src.granularity || "item").trim().toLowerCase();
       if (requestedGranularity === currentGranularity) {
         return res.status(400).json({ error: "granularity must change to create a linked successor identifier" });
@@ -418,7 +424,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       });
 
       await archivePassportSnapshot({
-        passport: insertRes.rows[0],
+        passport: normalizePassportRow(insertRes.rows[0], typeSchema),
         passportType,
         archivedBy: userId,
         actorIdentifier: getActorIdentifier(req.user),

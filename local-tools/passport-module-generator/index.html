@@ -60,6 +60,7 @@
         </aside>
 
         <div class="workspace-main">
+      <div id="message" class="message workspace-message hidden" role="status" aria-live="polite" aria-atomic="true"></div>
       <section class="panel tool-step active" data-step="module">
         <div class="panel-head">
           <div>
@@ -91,7 +92,7 @@
           <summary>Auto-filled fields</summary>
           <div class="auto-group-grid">
               <label>Module key
-                <input id="moduleKey" value="example-product:v1" placeholder="example-product:v1">
+                <input id="moduleKey" value="example-product:v1" placeholder="example-product:v1" readonly title="Generated from the product family and version so the downloaded module folder can be loaded by the app.">
               </label>
               <label>Type name
                 <input id="typeName" value="exampleProductPassportV1" placeholder="exampleProductPassportV1">
@@ -121,12 +122,21 @@
           </div>
           <div class="actions">
             <input type="file" id="fieldsCsvInput" accept=".csv,text/csv" hidden>
-            <button type="button" id="downloadFieldsCsvTemplate">Download CSV template</button>
-            <button type="button" id="exportFieldsCsv">Export current CSV</button>
-            <button type="button" id="importFieldsCsv">Import CSV</button>
+            <button type="button" id="downloadFieldsCsvTemplate">Download fields CSV template</button>
+            <button type="button" id="exportFieldsCsv">Export fields CSV</button>
+            <button type="button" id="importFieldsCsv">Replace fields from CSV</button>
           </div>
         </div>
-        <p class="helper-copy">CSV headers match the editable fields below, and auto-filled metadata is omitted. Exports include Section path and Section key path as JSON arrays so nested sections round-trip exactly; keep both paths together and never use a &gt; or / separator. Paths support up to 32 section levels. Older flat CSV files without those two columns still import as top-level sections. Dropdown imports accept displayed names or stored values. UI type: text, textarea, boolean, date, datetime, url, file, symbol, table. Data type: string, decimal, integer, boolean, date, datetime, uri, array. Date-time rows are normalized to the datetime UI type. File fields use URI semantics. Table fields use array; their individual columns use scalar data types. Confidentiality: public or restricted.</p>
+        <div class="csv-import-guidance">
+          <p class="helper-copy"><strong>Fields CSV v2 preserves editable inputs and nesting.</strong> <strong>Section path</strong> is the authoritative JSON label path, for example <code>["Product identity", "Materials"]</code>. Exported auto-filled columns—including key paths, field/column keys, semantic slugs, unit keys, and schema metadata—are reference-only and are regenerated from the actual imported labels, UI/data types, and units. Older flat CSV files remain supported as top-level sections.</p>
+          <label class="check csv-import-option">
+            <input type="checkbox" id="rebuildGraphOnFieldsCsvImport">
+            <span>
+              <strong>Rebuild the semantic graph from imported fields</strong>
+              <small>Leave unchecked to preserve and reconcile the existing graph. Select this only when you deliberately want to replace its linked field structure.</small>
+            </span>
+          </label>
+        </div>
         <div class="fields-studio">
           <aside class="fields-explorer" aria-label="Sections and fields navigator">
             <div class="fields-explorer-head">
@@ -176,12 +186,12 @@
           <div class="actions">
             <button type="button" id="buildGraphFirstLayer">Build first layer</button>
             <input type="file" id="semanticGraphCsvInput" accept=".csv,text/csv" hidden>
-            <button type="button" id="downloadSemanticGraphCsvTemplate">Download graph CSV</button>
+            <button type="button" id="downloadSemanticGraphCsvTemplate">Download graph CSV template</button>
             <button type="button" id="exportSemanticGraphCsv">Export graph CSV</button>
-            <button type="button" id="importSemanticGraphCsv">Import graph CSV</button>
+            <button type="button" id="importSemanticGraphCsv">Replace graph from CSV</button>
           </div>
         </div>
-        <p class="helper-copy">The semantic class graph is required. Build the first layer once, then refine it without removed properties being recreated. Clear Semantic Graph only when you intentionally want to unlock and rebuild that first layer. Linked entries that remain in the graph keep their metadata synchronized when Part 2 changes. Linked scalar fields can use their Part 2 datatype or override it with a controlled enum without becoming custom properties. Choose “Custom” only for concepts that are not represented by module sections or fields. RDFS domain and range come from the owning class and selected range; SHACL min/max counts enforce cardinality.</p>
+        <p class="helper-copy"><strong>Semantic graph CSV v2 is lossless.</strong> It keeps stable keys, explicit IRIs, field-source links, enum overrides, and UI metadata. Replacing it changes only the graph; Sections And Fields stay in place. Build the first layer only when you intentionally want to create graph links from Part 2, and use <strong>Custom</strong> only for concepts not represented there.</p>
         <div id="semanticGraphWorkspace" class="semantic-graph-workspace">
           <div class="graph-studio">
             <aside class="graph-explorer" aria-label="Semantic graph navigator">
@@ -263,26 +273,16 @@
             </label>
           </article>
 
-          <article class="role-card">
-            <h3>Composition pie chart</h3>
-            <p>Charts are created only from an explicit table and explicit columns.</p>
-            <label>Table field
-              <select id="compositionFieldKey">
-                <option value="">No composition chart</option>
-              </select>
-            </label>
-            <div class="role-inline">
-              <label>Label column
-                <select id="compositionLabelColumnKey">
-                  <option value="">Select label column</option>
-                </select>
-              </label>
-              <label>Data column (%)
-                <select id="compositionValueColumnKey">
-                  <option value="">Select data column</option>
-                </select>
-              </label>
+          <article class="role-card role-card-wide composition-role-card">
+            <div class="role-card-heading">
+              <div>
+                <h3>Composition pie charts</h3>
+                <p>Add one chart for every table field that should be visualised. Each chart uses its own label and numeric data columns.</p>
+              </div>
+              <button type="button" id="addCompositionChart">+ Add chart</button>
             </div>
+            <div id="compositionCharts" class="composition-chart-list"></div>
+            <p id="compositionChartsEmpty" class="composition-chart-empty">No composition charts configured.</p>
           </article>
 
           <article class="role-card role-card-wide">
@@ -326,7 +326,6 @@
           </div>
         </div>
         <p class="helper-copy">This tool never writes into the repository. Download creates one ZIP with every generated <code>.js</code>, <code>.json</code>, and <code>.jsonld</code> file in its intended repository folder path. Review the archive, then copy or extract it manually when you are ready.</p>
-        <div id="message" class="message hidden"></div>
         <div class="preview-layout">
           <aside>
             <h3>Files</h3>
@@ -345,9 +344,6 @@
           <label>Section label <input data-section-label placeholder="Product Identity"></label>
           <div class="section-actions">
             <span class="section-count" data-section-count>0 fields</span>
-            <span class="filter-count hidden" data-filter-count></span>
-            <button type="button" data-toggle-section>Collapse</button>
-            <button type="button" data-toggle-details>Show details</button>
             <button type="button" data-add-field>Add field</button>
             <button type="button" data-add-subsection>Add subsection</button>
             <button type="button" data-remove-section>Remove</button>
@@ -356,69 +352,35 @@
         <details class="auto-group section-auto-group">
           <summary>Auto-filled fields</summary>
           <div class="auto-group-grid">
-            <label>Section key <input data-section-key placeholder="productIdentity"></label>
+            <label>Section key <input data-section-key placeholder="productIdentity" readonly aria-readonly="true" title="Generated from the section label and its nested context."></label>
           </div>
         </details>
         <div class="field-grid-wrap">
-          <div class="field-grid-header" aria-hidden="true">
-            <span>Label</span>
-            <span>Type</span>
-            <span>Definition</span>
-            <span>Data type</span>
-            <span>Unit</span>
-            <span>Symbol</span>
-            <span>Confidentiality</span>
-            <span>Actions</span>
-            <span>More</span>
-            <span>Remove</span>
-          </div>
-          <div class="field-grid-filters" aria-label="Field column filters">
-            <label><span>Filter label</span><input data-field-filter="fieldLabel" placeholder="Search label"></label>
-            <label><span>Filter type</span>
-              <select data-field-filter="fieldType">
-                <option value="">All</option>
-                <option value="text">text</option>
-                <option value="textarea">textarea</option>
-                <option value="boolean">boolean</option>
-                <option value="date">date</option>
-                <option value="datetime">datetime</option>
-                <option value="url">url</option>
-                <option value="file">file</option>
-                <option value="symbol">symbol</option>
-                <option value="table">table</option>
-              </select>
-            </label>
-            <label><span>Filter definition</span><input data-field-filter="definition" placeholder="Search definition"></label>
-            <label><span>Filter data type</span>
-              <select data-field-filter="dataType">
-                <option value="">All</option>
-                <option value="string">string</option>
-                <option value="decimal">decimal</option>
-                <option value="integer">integer</option>
-                <option value="boolean">boolean</option>
-                <option value="date">date</option>
-                <option value="datetime">datetime</option>
-                <option value="uri">uri</option>
-                <option value="array">array</option>
-              </select>
-            </label>
-            <label><span>Filter unit</span><input data-field-filter="unitLabel" placeholder="Search unit"></label>
-            <label><span>Filter symbol</span><input data-field-filter="unitSymbol" placeholder="Search symbol"></label>
-            <label><span>Filter confidentiality</span>
-              <select data-field-filter="confidentiality">
-                <option value="">All</option>
-                <option value="public">public</option>
-                <option value="restricted">restricted</option>
-              </select>
-            </label>
-            <button type="button" class="clear-filters" data-clear-filters>Clear</button>
-            <label><span>Filter more metadata</span><input data-field-filter="advanced" placeholder="Search key/slug/schema"></label>
-            <span class="field-filter-spacer" aria-hidden="true"></span>
-          </div>
           <div data-fields class="field-grid-body"></div>
         </div>
         <div class="child-sections" data-child-sections></div>
       </article>
+    </template>
+
+    <template id="compositionChartTemplate">
+      <div class="composition-chart-row">
+        <label>Table field
+          <select data-composition-chart="fieldKey">
+            <option value="">Select table field</option>
+          </select>
+        </label>
+        <label>Label column
+          <select data-composition-chart="labelColumnKey">
+            <option value="">Select text label column</option>
+          </select>
+        </label>
+        <label>Data column (%)
+          <select data-composition-chart="valueColumnKey">
+            <option value="">Select numeric data column</option>
+          </select>
+        </label>
+        <button type="button" data-remove-composition-chart aria-label="Remove composition chart">Remove</button>
+      </div>
     </template>
 
     <template id="fieldTemplate">
@@ -467,7 +429,7 @@
             <summary>Auto-filled</summary>
             <div class="auto-group-grid">
               <label>Schema object
-                <select data-field="objectType">
+                <select data-field="objectType" disabled title="Generated from UI type.">
                   <option value="SingleValuedDataElement">Single value</option>
                   <option value="MultiValuedDataElement">Multiple values</option>
                   <option value="DataElementCollection">Collection/table</option>
@@ -476,7 +438,7 @@
                 </select>
               </label>
               <label>Schema value
-                <select data-field="valueDataType">
+                <select data-field="valueDataType" disabled title="Generated from UI type and data type.">
                   <option value="String">String</option>
                   <option value="Boolean">Boolean</option>
                   <option value="Integer">Integer</option>
@@ -490,8 +452,8 @@
                 </select>
               </label>
               <input type="hidden" data-field="fieldKey">
-              <label>Semantic slug <input data-field="semanticSlug" placeholder="manufacturer-name"></label>
-              <label>Unit key <input data-field="unitKey" value="none" placeholder="none"></label>
+              <label>Semantic slug <input data-field="semanticSlug" placeholder="manufacturer-name" readonly aria-readonly="true" title="Generated from the field label and nested section context."></label>
+              <label>Unit key <input data-field="unitKey" value="none" placeholder="none" readonly aria-readonly="true" title="Generated from Unit label."></label>
             </div>
           </details>
         </div>
@@ -506,13 +468,6 @@
             <button type="button" data-add-column>Add column</button>
           </div>
           <div class="table-columns-wrap">
-            <div class="table-columns-header" aria-hidden="true">
-              <span>Label</span>
-              <span>Data type</span>
-              <span>Unit</span>
-              <span>Symbol</span>
-              <span>Actions</span>
-            </div>
             <div class="table-columns" data-table-columns></div>
           </div>
         </div>
@@ -546,8 +501,8 @@
           <summary>Auto-filled</summary>
           <div class="auto-group-grid">
             <input type="hidden" data-column="columnKey">
-            <label>Semantic slug <input data-column="semanticSlug" placeholder="cas-number"></label>
-            <label>Unit key <input data-column="unitKey" value="none" placeholder="none"></label>
+            <label>Semantic slug <input data-column="semanticSlug" placeholder="cas-number" readonly aria-readonly="true" title="Generated from the column label."></label>
+            <label>Unit key <input data-column="unitKey" value="none" placeholder="none" readonly aria-readonly="true" title="Generated from Unit label."></label>
             <label>Object type
               <input data-column="objectType" readonly>
             </label>
@@ -649,7 +604,8 @@
           <summary>Auto-filled identifiers</summary>
           <div class="auto-group-grid">
             <label>Property key <input data-graph-property="key" placeholder="batteryMaterials"></label>
-            <label class="span3">Property IRI <input data-graph-property="semanticId" placeholder="https://example.com/.../terms/battery-materials"></label>
+            <label>Semantic slug <input data-graph-property="semanticSlug" placeholder="battery-materials"></label>
+            <label class="span2">Property IRI <input data-graph-property="semanticId" placeholder="https://example.com/.../terms/battery-materials"></label>
             <label class="span4">Resolved range IRI <input data-resolved-range-iri readonly aria-readonly="true"></label>
           </div>
         </details>
@@ -687,6 +643,7 @@
       <div class="graph-enum-value">
         <label>Value label <input data-enum-value="label" placeholder="Acute Toxicity"></label>
         <button type="button" data-remove-enum-value>Remove</button>
+        <label class="graph-enum-value-definition">Definition <input data-enum-value="definition" placeholder="Meaning of this controlled value."></label>
         <details class="auto-group graph-auto-group">
           <summary>Auto-filled identifiers</summary>
           <div class="auto-group-grid">
@@ -699,6 +656,11 @@
 
     <script src="/schema-limits.js"></script>
     <script src="/section-csv-paths.js"></script>
+    <script src="/csv-core.js"></script>
+    <script src="/derived-field-metadata.js"></script>
+    <script src="/fields-csv.js"></script>
+    <script src="/semantic-graph-csv.js"></script>
+    <script src="/csv-import-reconciliation.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

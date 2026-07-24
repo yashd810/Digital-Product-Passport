@@ -1,0 +1,26 @@
+{
+  "semanticModelKey": "batteryDictionaryV1",
+  "name": "Battery Dictionary",
+  "version": "1.0.0",
+  "description": "Semantic dictionary for the Battery Passport dataset.",
+  "versioning": {
+    "dictionaryVersion": "1.0.0"
+  },
+  "publisher": {
+    "name": "Digital Product Passport Platform",
+    "url": "https://claros-dpp.online"
+  },
+  "issuerDid": "did:web:claros-dpp.online",
+  "baseIri": "https://claros-dpp.online/dictionary/battery/v1",
+  "contextUrl": "https://claros-dpp.online/dictionary/battery/v1/context.jsonld",
+  "termsUrl": "https://claros-dpp.online/api/dictionary/battery/v1/terms",
+  "unitsUrl": "https://claros-dpp.online/api/dictionary/battery/v1/units",
+  "classesUrl": "https://claros-dpp.online/api/dictionary/battery/v1/classes",
+  "enumsUrl": "https://claros-dpp.online/api/dictionary/battery/v1/enums",
+  "ontologyUrl": "https://claros-dpp.online/dictionary/battery/v1/ontology.jsonld",
+  "shapesUrl": "https://claros-dpp.online/dictionary/battery/v1/shapes.jsonld",
+  "catalogUrl": "https://claros-dpp.online/dictionary/battery/v1/catalog.jsonld",
+  "interoperabilityProfile": {
+    "catalogUrl": "https://claros-dpp.online/dictionary/battery/v1/catalog.jsonld"
+  }
+}

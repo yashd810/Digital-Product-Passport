@@ -73,7 +73,7 @@ module.exports = function registerAuthRoutes(app, {
       firstName: row.firstName ?? "",
       lastName: row.lastName ?? "",
       companyName: row.companyName ?? null,
-      assetManagementEnabled: Boolean(row.assetManagementEnabled),
+      assetManagementEnabled: row.companyId ? true : Boolean(row.assetManagementEnabled),
       avatarUrl: safeAvatarUrl(row.avatarUrl),
       phone: row.phone ?? null,
       jobTitle: row.jobTitle ?? null,
@@ -213,7 +213,7 @@ module.exports = function registerAuthRoutes(app, {
         user: buildAuthUserResponse({
           ...u,
           companyName: companyRow.companyName || null,
-          assetManagementEnabled: companyRow.assetManagementEnabled || false,
+          assetManagementEnabled: invite.companyId ? true : false,
           economicOperatorIdentifier: companyRow.economicOperatorIdentifier || null,
           economicOperatorIdentifierScheme: companyRow.economicOperatorIdentifierScheme || null,
         }),

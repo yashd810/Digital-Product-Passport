@@ -6,6 +6,7 @@ const {
   assertCanonicalSchemaSections,
   flattenSchemaFieldsFromSections,
   isSafePassportStorageFieldKey,
+  toPassportStorageColumnKey,
 } = require("../../shared/passports/passport-helpers");
 
 function createSchemaStorageHelpers({
@@ -52,7 +53,7 @@ function createSchemaStorageHelpers({
     return new Map(columns.rows.map((row) => [row.columnName, row.dataType]));
   }
 
-  async function getLatestCompanyPassports({ companyId, passportType }) {
+  async function getLatestCompanyPassports({ companyId, passportType, schema = null }) {
     const tableName = getTable(passportType);
     const result = await pool.query(
       `SELECT DISTINCT ON ("lineageId") *
@@ -63,7 +64,7 @@ function createSchemaStorageHelpers({
       [companyId]
     );
     return result.rows.map((row) => {
-      const normalized = normalizePassportRow(row);
+      const normalized = normalizePassportRow(row, schema);
       return {
         ...normalized,
         isEditable: isEditablePassportStatus(normalized.releaseStatus),
@@ -113,13 +114,14 @@ function createSchemaStorageHelpers({
   function getPassportStorageFieldKeyIssues(fields = []) {
     const issues = [];
     const seenFieldKeys = new Set();
+    const logicalKeyByStorageKey = new Map();
     for (const field of fields) {
       const fieldKey = String(field?.key || "").trim();
       if (!isSafePassportStorageFieldKey(fieldKey)) {
         issues.push({
           type: "invalidFieldKey",
           field: fieldKey || null,
-          message: "Passport field keys must be lower camelCase PostgreSQL identifiers of at most 63 ASCII characters.",
+          message: "Passport field keys must be lower camelCase identifiers of at most 200 ASCII characters.",
         });
         continue;
       }
@@ -128,6 +130,18 @@ function createSchemaStorageHelpers({
         continue;
       }
       seenFieldKeys.add(fieldKey);
+      const storageKey = toPassportStorageColumnKey(fieldKey);
+      const existingLogicalKey = logicalKeyByStorageKey.get(storageKey);
+      if (existingLogicalKey && existingLogicalKey !== fieldKey) {
+        issues.push({
+          type: "storageFieldKeyCollision",
+          field: fieldKey,
+          conflictingField: existingLogicalKey,
+          storageKey,
+        });
+        continue;
+      }
+      logicalKeyByStorageKey.set(storageKey, fieldKey);
     }
     return issues;
   }
@@ -372,8 +386,9 @@ function createSchemaStorageHelpers({
 
     for (const field of fields) {
       if (!isSafePassportStorageFieldKey(field.key)) continue;
-      expectedFieldKeys.add(field.key);
-      const actualDataType = columnMap.get(field.key);
+      const storageKey = toPassportStorageColumnKey(field.key);
+      expectedFieldKeys.add(storageKey);
+      const actualDataType = columnMap.get(storageKey);
       const expectedDataType = getPassportFieldDataType(field);
       if (!actualDataType) {
         issues.push({ type: "missingColumn", field: field.key, expectedDataType });

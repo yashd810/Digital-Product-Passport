@@ -64,7 +64,11 @@ function AdminPassportModules() {
     }
   };
 
-  const seededModuleCount = moduleTemplates.filter((moduleTemplate) => moduleTemplate.seeded).length;
+  const moduleWithProfilesCount = moduleTemplates.filter((moduleTemplate) => (moduleTemplate.profileCount || 0) > 0).length;
+  const totalProfileCount = moduleTemplates.reduce(
+    (count, moduleTemplate) => count + (moduleTemplate.profileCount || 0),
+    0,
+  );
   const semanticModelByKey = new Map(
     semanticModels.map((model) => [model.semanticModelKey || model.key, model])
   );
@@ -77,7 +81,7 @@ function AdminPassportModules() {
         <div>
           <h2 className="apt-title">🧩 Passport Modules</h2>
           <p className="apt-subtitle">
-            Code-defined passport modules registered in the backend. Seed a module to create or update its runtime passport type.
+            Comprehensive code-defined vocabularies. Create one or more selected passport-type profiles from each module.
           </p>
         </div>
         <div className="apt-toolbar-actions">
@@ -102,11 +106,11 @@ function AdminPassportModules() {
           <div>
             <h3 className="apt-moduleTemplates-title">Registered Code Modules</h3>
             <p className="apt-moduleTemplates-hint">
-              Module files are loaded from the backend registry and tracked against seeded passport types.
+              Module files remain canonical. Passport types choose the fields, requirements, confidentiality, and chart presentation they need.
             </p>
           </div>
           <span className="apt-moduleTemplates-count">
-            {seededModuleCount}/{moduleTemplates.length} seeded
+            {totalProfileCount} type{totalProfileCount === 1 ? "" : "s"} across {moduleWithProfilesCount}/{moduleTemplates.length} module{moduleTemplates.length === 1 ? "" : "s"}
           </span>
         </div>
 
@@ -120,7 +124,7 @@ function AdminPassportModules() {
               return (
                 <div
                   key={moduleTemplate.moduleKey}
-                  className={`apt-card apt-moduleTemplate-card ${moduleTemplate.seeded ? "" : "apt-card-inactive"}`}
+                  className={`apt-card apt-moduleTemplate-card ${(moduleTemplate.profileCount || 0) > 0 ? "" : "apt-card-inactive"}`}
                 >
                   <div className="apt-card-header">
                     <div>
@@ -128,8 +132,10 @@ function AdminPassportModules() {
                       <code className="apt-card-type-name">{moduleTemplate.moduleKey}</code>
                     </div>
                     <div className="admin-inline-stack">
-                      <span className={`apt-badge ${moduleTemplate.seeded ? "apt-badge-active" : "apt-badge-draft"}`}>
-                        {moduleTemplate.seeded ? "Seeded" : "Ready to seed"}
+                      <span className={`apt-badge ${(moduleTemplate.profileCount || 0) > 0 ? "apt-badge-active" : "apt-badge-draft"}`}>
+                        {(moduleTemplate.profileCount || 0) > 0
+                          ? `${moduleTemplate.profileCount} type${moduleTemplate.profileCount === 1 ? "" : "s"}`
+                          : "No types yet"}
                       </span>
                     </div>
                   </div>
@@ -145,11 +151,25 @@ function AdminPassportModules() {
                       Semantic model: {getSemanticModelLabel(moduleTemplate.semanticModelKey)}
                     </span>
                     <span className="apt-card-meta-secondary">
-                      Runtime type: {moduleTemplate.typeName || "Created when the module is seeded"}
+                      Default full-profile type: {moduleTemplate.typeName || "Not configured"}
                     </span>
+                    {(moduleTemplate.profileTypes || []).map((profileType) => (
+                      <span key={profileType.id || profileType.typeName} className="apt-card-meta-secondary">
+                        {profileType.typeName} · {profileType.fieldCount || 0} selected fields{profileType.isActive ? "" : " · inactive"}
+                      </span>
+                    ))}
                   </div>
 
                   <div className="apt-card-actions apt-moduleTemplate-actions">
+                    <button
+                      type="button"
+                      className="apt-create-btn"
+                      onClick={() => navigate("/admin/passport-types/new", {
+                        state: { sourceModuleKey: moduleTemplate.moduleKey },
+                      })}
+                    >
+                      Create Passport Type
+                    </button>
                     <button
                       type="button"
                       className="apt-view-fields-btn"
@@ -191,7 +211,7 @@ function AdminPassportModules() {
             <h3 className="apt-modal-title">Seed Passport Module</h3>
             <p className="apt-modal-warning">
               <strong>{seedGuideModule.displayName}</strong> is defined in code as <code>{seedGuideModule.moduleKey}</code>.
-              Seeding creates or updates the database passport type, reconciles storage, and can grant company access.
+              Use the Admin builder to create selected passport types. Seeding only creates the default full-profile type when it does not already exist; it never overwrites an Admin-selected profile.
             </p>
             <div className="apt-seed-guide-grid">
               <div>
@@ -208,7 +228,7 @@ function AdminPassportModules() {
               </div>
               <div>
                 <span className="apt-seed-guide-label">Status</span>
-                <strong>{seedGuideModule.seeded ? "Already seeded" : "Ready to seed"}</strong>
+                <strong>{seedGuideModule.profileCount || 0} type{seedGuideModule.profileCount === 1 ? "" : "s"} currently use this module</strong>
               </div>
             </div>
             <div className="apt-seed-guide-commands">

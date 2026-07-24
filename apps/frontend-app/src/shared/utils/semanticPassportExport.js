@@ -2,7 +2,6 @@ import {
   buildSemanticGraphInlineContext,
   coerceSemanticGraphPropertyValue,
   decorateSemanticGraphPropertyValue,
-  getRootSemanticProperty,
   getSemanticGraphClass,
 } from "../passports/semanticGraphUtils";
 import { flattenSchemaFieldsFromSections } from "../passports/passportSchemaUtils";
@@ -86,9 +85,7 @@ function coercePassportSchemaValues(passport, typeDef) {
 
   for (const field of schemaFields) {
     if (!field?.key) continue;
-    const semanticProperty = field.rangeKind
-      ? (getRootSemanticProperty(semanticGraph, field.key) || field)
-      : null;
+    const semanticProperty = field.rangeKind ? field : null;
     if (!semanticProperty) {
       throw new Error(`Field "${field.key}" is missing required semantic graph metadata.`);
     }
@@ -114,7 +111,8 @@ function buildInlineContext(typeDef = null) {
   if (!semanticGraph) {
     throw new Error("Semantic passport export requires a semantic class graph.");
   }
-  return buildSemanticGraphInlineContext(semanticGraph);
+  const schemaFields = flattenSchemaFieldsFromSections(getTypeDefSections(typeDef));
+  return buildSemanticGraphInlineContext(semanticGraph, schemaFields);
 }
 
 function sanitizePassport(passport, passportType, typeDef = null) {
@@ -141,24 +139,20 @@ function sanitizePassport(passport, passportType, typeDef = null) {
     clean.passportType = resolvedPassportType;
   }
 
-  for (const section of getTypeDefSections(typeDef)) {
-    for (const field of section?.fields || []) {
-      const property = field?.rangeKind
-        ? (getRootSemanticProperty(semanticGraph, field.key) || field)
-        : null;
-      if (!property) {
-        throw new Error(`Field "${field?.key || "unknown"}" is missing required semantic graph metadata.`);
-      }
-      if (Object.prototype.hasOwnProperty.call(clean, field.key)) {
-        clean[field.key] = decorateSemanticGraphPropertyValue(property, clean[field.key], semanticGraph);
-      }
-      if (clean.fields && Object.prototype.hasOwnProperty.call(clean.fields, field.key)) {
-        clean.fields[field.key] = decorateSemanticGraphPropertyValue(
-          property,
-          clean.fields[field.key],
-          semanticGraph
-        );
-      }
+  for (const field of flattenSchemaFieldsFromSections(getTypeDefSections(typeDef))) {
+    const property = field?.rangeKind ? field : null;
+    if (!property) {
+      throw new Error(`Field "${field?.key || "unknown"}" is missing required semantic graph metadata.`);
+    }
+    if (Object.prototype.hasOwnProperty.call(clean, field.key)) {
+      clean[field.key] = decorateSemanticGraphPropertyValue(property, clean[field.key], semanticGraph);
+    }
+    if (clean.fields && Object.prototype.hasOwnProperty.call(clean.fields, field.key)) {
+      clean.fields[field.key] = decorateSemanticGraphPropertyValue(
+        property,
+        clean.fields[field.key],
+        semanticGraph
+      );
     }
   }
 

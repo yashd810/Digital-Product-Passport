@@ -8,6 +8,7 @@ const zlib = require("node:zlib");
 const {
   buildArtifacts,
   buildArtifactsZip,
+  validateCsvImport,
   validateSpec,
 } = require("../../../local-tools/passport-module-generator/server");
 
@@ -103,7 +104,7 @@ test("passport module generator emits camelCase module identifiers by default", 
   assert.deepEqual(generatedModule.passportPolicy.contentSpecificationIds, ["exampleProductDictionaryV1"]);
   assert.equal(
     generatedModule.sections[0].fields[0].semanticId,
-    "https://example.test/dictionary/example-product/v1/terms/model-identifier"
+    "https://example.test/dictionary/example-product/v1/terms/product-identity/model-identifier"
   );
   assert.equal(generatedModule.sections[0].fields[0].key, "modelIdentifier");
 });
@@ -118,17 +119,206 @@ test("passport module generator requires an explicit deployment base URL", () =>
   );
 });
 
-test("passport module generator rejects field keys PostgreSQL would truncate", () => {
+test("passport module generator derives the module key from its output folder identity", () => {
+  const matchingInput = createGeneratorInput();
+  matchingInput.module.family = "Example Product";
+  matchingInput.module.version = "1";
+  matchingInput.module.moduleKey = "different-product:v2";
+
+  const generated = buildArtifacts(matchingInput);
+  assert.equal(generated.spec.module.moduleKey, "example-product:v1");
+  assert.ok(
+    generated.artifacts.every((artifact) => artifact.path.startsWith(`${generatedPackagePath}/`))
+  );
+  const moduleArtifact = generated.artifacts.find((artifact) => artifact.path === generatedModulePath);
+  assert.equal(executeCommonJs(moduleArtifact.content).moduleKey, "example-product:v1");
+  const pageSource = fs.readFileSync(path.join(generatorDir, "index.html"), "utf8");
+  assert.match(pageSource, /<input id="moduleKey"[^>]*\breadonly\b/);
+  const appSource = fs.readFileSync(path.join(generatorDir, "app.js"), "utf8");
+  assert.match(appSource, /moduleKeyInput\.value = normalizedFamily/);
+  assert.match(appSource, /delete moduleKeyInput\.dataset\.manual/);
+});
+
+test("passport module generator accepts logical field keys longer than PostgreSQL identifiers", () => {
   const input = createGeneratorInput();
   const longFieldKey = `a${"b".repeat(63)}`;
   input.sections[0].fields[0].fieldKey = longFieldKey;
   input.sections[0].fields[0].semanticSlug = longFieldKey;
   input.roles.businessIdentifierField = longFieldKey;
 
+  assert.equal(buildArtifacts(input).spec.sections[0].fields[0].fieldKey, longFieldKey);
+});
+
+test("passport module generator rejects field keys longer than 200 characters", () => {
+  const input = createGeneratorInput();
+  const longFieldKey = `a${"b".repeat(200)}`;
+  input.sections[0].fields[0].fieldKey = longFieldKey;
+  input.sections[0].fields[0].semanticSlug = longFieldKey;
+  input.roles.businessIdentifierField = longFieldKey;
+
+  assert.throws(() => buildArtifacts(input), /at most 200 characters/);
+});
+
+test("passport module generator rejects reserved runtime and header field keys", () => {
+  const input = createGeneratorInput();
+  input.roles.businessIdentifierField = "dppStatus";
+  input.sections[0].fields[0] = {
+    fieldLabel: "DPP Status",
+    semanticSlug: "dpp-status",
+    definition: "Attempts to duplicate a managed passport header field.",
+  };
+
   assert.throws(
     () => buildArtifacts(input),
-    /Field keys must be lower camelCase PostgreSQL identifiers of at most 63 characters/
+    /Field key "dppStatus" is reserved for passport runtime\/header data.*generated automatically/
   );
+});
+
+test("passport module generator rejects reserved runtime and header semantic IDs", () => {
+  const input = createGeneratorInput();
+  input.roles.businessIdentifierField = "dppStatus";
+  input.sections[0].fields[0] = {
+    fieldLabel: "DPP Status",
+    semanticSlug: "dpp-status",
+    definition: "Attempts to duplicate a managed passport header field.",
+  };
+  input.semanticGraph.rootProperties = [{
+    propertyKey: "dppStatus",
+    propertyLabel: "DPP Status",
+    semanticId: "dpp:dppStatus",
+    rangeKind: "scalar",
+    dataType: "string",
+  }];
+
+  assert.throws(
+    () => buildArtifacts(input),
+    /Field "dppStatus" uses reserved semanticId "dpp:dppStatus".*generated automatically/
+  );
+});
+
+test("passport module generator CSV preflight accepts nested fields and a semantic graph without mutating them", () => {
+  const input = createGeneratorInput();
+  input.sections[0].key = "productIdentity";
+  input.sections[0].fields[0].fieldKey = "modelIdentifier";
+  input.sections[0].sections = [{
+    key: "technicalDetails",
+    label: "Technical Details",
+    fields: [{
+      fieldKey: "ratedCapacity",
+      fieldLabel: "Rated Capacity",
+    }],
+  }];
+  input.semanticGraph.classes = [{
+    key: "technicalDetails",
+    label: "Technical Details",
+    properties: [{
+      key: "ratedCapacity",
+      semanticId: "https://example.test/terms/rated-capacity",
+    }],
+  }];
+  input.semanticGraph.enums = [{
+    key: "statusCode",
+    label: "Status Code",
+    values: [{ key: "active", label: "Active" }],
+  }];
+
+  const validationInput = {
+    sections: input.sections,
+    semanticGraph: input.semanticGraph,
+  };
+  const snapshot = structuredClone(validationInput);
+  assert.deepEqual(validateCsvImport(validationInput), {
+    valid: true,
+    sectionCount: 2,
+    fieldCount: 2,
+    semanticClassCount: 2,
+    semanticPropertyCount: 1,
+    semanticEnumCount: 1,
+    semanticEnumValueCount: 1,
+  });
+  assert.deepEqual(validationInput, snapshot);
+});
+
+test("passport module generator CSV preflight rejects reserved field keys and graph semantics", () => {
+  assert.throws(
+    () => validateCsvImport({
+      sections: [{
+        key: "identity",
+        label: "Identity",
+        fields: [{ fieldKey: "dppStatus", fieldLabel: "DPP Status" }],
+      }],
+    }),
+    /Field key "dppStatus" is reserved for passport runtime\/header data/
+  );
+
+  assert.throws(
+    () => validateCsvImport({
+      semanticGraph: {
+        rootClass: { key: "examplePassport", label: "Example Passport" },
+        rootProperties: [{
+          key: "customStatus",
+          label: "Custom Status",
+          semanticId: "dpp:dppStatus",
+        }],
+        classes: [],
+        enums: [],
+      },
+    }),
+    /uses reserved semanticId "dpp:dppStatus"/
+  );
+
+  assert.throws(
+    () => validateCsvImport({
+      semanticGraph: {
+        rootClass: { key: "examplePassport", label: "Example Passport" },
+        rootProperties: [{
+          key: "dppSchemaVersion",
+          label: "Duplicate DPP Schema Version",
+          semanticId: "https://example.test/terms/duplicate-schema-version",
+        }],
+        classes: [],
+        enums: [],
+      },
+    }),
+    /Field key "dppSchemaVersion" is reserved for passport runtime\/header data/
+  );
+});
+
+test("passport module generator CSV preflight rejects incomplete and ambiguous structures", () => {
+  assert.throws(
+    () => validateCsvImport({}),
+    /requires sections or semanticGraph/
+  );
+  assert.throws(
+    () => validateCsvImport({ sections: [] }),
+    /at least one section/
+  );
+  assert.throws(
+    () => validateCsvImport({
+      sections: [
+        { key: "details", label: "Details", fields: [{ fieldKey: "model", fieldLabel: "Model" }] },
+        { key: "details", label: "Other Details", fields: [{ fieldKey: "serial", fieldLabel: "Serial" }] },
+      ],
+    }),
+    /Duplicate section key: details/
+  );
+  assert.throws(
+    () => validateCsvImport({
+      semanticGraph: {
+        rootClass: { key: "examplePassport", label: "Example Passport" },
+        rootProperties: [null],
+        classes: [],
+        enums: [],
+      },
+    }),
+    /rootProperties must contain objects/
+  );
+});
+
+test("passport module generator exposes the CSV preflight POST endpoint", () => {
+  const serverSource = fs.readFileSync(path.join(generatorDir, "server.js"), "utf8");
+  assert.match(serverSource, /req\.method === "POST" && pathname === "\/api\/validate-csv-import"/);
+  assert.match(serverSource, /sendJson\(res, 200, validateCsvImport\(input\)\)/);
 });
 
 test("passport module generator rejects the retired groups schema alias", () => {
@@ -145,6 +335,36 @@ test("passport module generator rejects the retired groups schema alias", () => 
     () => buildArtifacts(rootAlias),
     /retired "groups" property is not supported/
   );
+});
+
+test("passport module generator rejects empty leaf sections at every nesting level", () => {
+  const nestedInput = createGeneratorInput();
+  nestedInput.sections[0].sections = [{
+    key: "technicalDetails",
+    label: "Technical Details",
+    fields: [],
+  }];
+  assert.throws(
+    () => buildArtifacts(nestedInput),
+    /Section "Product Identity > Technical Details" has no fields.*without subsections must contain at least one field/
+  );
+
+  const rootInput = createGeneratorInput();
+  rootInput.sections[0].fields = [];
+  assert.throws(
+    () => buildArtifacts(rootInput),
+    /Section "Product Identity" has no fields.*without subsections must contain at least one field/
+  );
+
+  const parentOnlyInput = createGeneratorInput();
+  const [modelField] = parentOnlyInput.sections[0].fields;
+  parentOnlyInput.sections[0].fields = [];
+  parentOnlyInput.sections[0].sections = [{
+    key: "technicalDetails",
+    label: "Technical Details",
+    fields: [modelField],
+  }];
+  assert.doesNotThrow(() => buildArtifacts(parentOnlyInput));
 });
 
 test("passport module generator rejects overly deep schemas before normalizing them", () => {
@@ -218,9 +438,9 @@ test("passport module generator derives field and table column keys from semanti
   assert.equal(serialField.confidentiality, "restricted");
   assert.equal(serialField.access, undefined);
   assert.equal(serialField.updateAuthority, undefined);
-  assert.equal(serialField.semanticId, "https://example.test/dictionary/example-product/v1/terms/asset-serial-number");
+  assert.equal(serialField.semanticId, "https://example.test/dictionary/example-product/v1/terms/product-identity/asset-serial-number");
   assert.equal(tableField.key, "materialComposition");
-  assert.equal(tableField.type, "objectList");
+  assert.equal(tableField.type, "table");
   assert.equal(tableField.compositionLabelColumnKey, "materialName");
   assert.equal(tableField.compositionValueColumnKey, "massPercent");
   assert.deepEqual(

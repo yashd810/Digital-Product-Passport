@@ -44,7 +44,7 @@ function createBackupEventHelpers({
       || "";
 
     return assertBackupReplicationResult(await backupProviderService.replicatePassportSnapshot({
-      passport: { ...normalizePassportRow(passport), passportType: resolvedPassportType },
+      passport: { ...normalizePassportRow(passport, typeDef), passportType: resolvedPassportType },
       typeDef,
       companyName: resolvedCompanyName,
       reason,

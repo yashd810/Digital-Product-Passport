@@ -99,6 +99,7 @@ module.exports = function createPassportService({
   } = createPassportQueryRepository({
     pool,
     getTable,
+    getPassportTypeSchema,
     normalizePassportRow,
     isPublicHistoryStatus,
   });
@@ -128,6 +129,7 @@ module.exports = function createPassportService({
     getPassportLineageContext,
     getPassportVersionsByLineage,
     getCompanyNameMap,
+    getPassportTypeSchema,
   });
   const {
     getLatestCompanyPassports,

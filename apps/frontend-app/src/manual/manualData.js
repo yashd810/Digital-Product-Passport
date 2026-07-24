@@ -36,7 +36,7 @@ export const coreDatabaseTables = [
     tables: [
       {
         name: "companies",
-        purpose: "Tenant master record, Asset Management switch, DID slug, and economic-operator identity.",
+        purpose: "Tenant master record, universally available Asset Management compatibility fields, DID slug, and economic-operator identity.",
         columns: ["id", "companyName", "isActive", "assetManagementEnabled", "assetManagementRevokedAt", "didSlug", "economicOperatorIdentifier", "economicOperatorIdentifierScheme", "createdAt", "updatedAt"],
       },
       {
@@ -56,7 +56,7 @@ export const coreDatabaseTables = [
       },
       {
         name: "passportTypes",
-        purpose: "Published passport type definitions from code modules or admin-created custom types, including semantic model selection, governance metadata, passport policy, and field schemas.",
+        purpose: "Published, compiled profiles of registered modules, including selected fields, the projected semantic graph, governance metadata, passport policy, and module/profile digests.",
         columns: ["id", "typeName", "displayName", "productCategory", "productIcon", "semanticModelKey", "fieldsJson", "isActive", "createdBy", "createdAt", "updatedAt"],
       },
       {
@@ -82,7 +82,7 @@ export const coreDatabaseTables = [
     tables: [
       {
         name: "passportRegistry",
-        purpose: "Maps every passport DPP ID to its company, type, and device API key metadata.",
+        purpose: "Maps every passport DPP ID to its company, type, and lineage. The retained device-key columns are legacy schema fields; current integrations authenticate with user JWT Bearer tokens.",
         columns: ["dppId", "lineageId", "companyId", "passportType", "deviceApiKey", "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt", "createdAt"],
       },
       {
@@ -179,7 +179,7 @@ export const coreDatabaseTables = [
       },
       {
         name: "auditLogs",
-        purpose: "Company-level audit history with before/after values.",
+        purpose: "Audit history with before/after values. Company dashboard queries return company-member actions only; super-admin actions are read through the separate admin audit API and page.",
         columns: ["id", "companyId", "userId", "action", "tableName", "recordId", "oldValues", "newValues", "actorIdentifier", "audience", "previousEventHash", "eventHash", "hashVersion", "createdAt"],
       },
       {
@@ -282,9 +282,9 @@ export const backendApiFamilies = [
     name: "Super admin setup",
     route: "/api/admin/*",
     details: [
-      "Creates and lists companies, registered passport modules, seeded/custom passport types, product categories, company analytics, and super admins.",
+      "Creates and lists companies, comprehensive registered passport modules, seeded full profiles or Admin-created field profiles, product categories, company analytics, and super admins.",
       "Stores draft passport-type builder state and exposes module preview, activate, deactivate, clone, metadata edit, and delete actions.",
-      "Also handles company type grants and the company-level Asset Management enable or disable toggle.",
+      "Also handles company type grants, company DPP policy, and a dedicated super-admin audit feed; Asset Management is available to every active company.",
     ],
   },
   {
@@ -294,6 +294,7 @@ export const backendApiFamilies = [
       "Creates one passport or many, lists company records, fetches single passports, and updates draft or revision data.",
       "Handles release, revise, granularity transition, compare-version, delete, bulk update, CSV/JSON upsert, JSON-LD export, QR generation, and version history.",
       "Supports bulk release, bulk workflow submission, single and bulk archive with restore, edit-session locking, and manual dynamic-value overrides.",
+      "Create and template forms expose authorable passport fields only. Semantic graph relationships remain module metadata and are not editable company data.",
       "Archived passports are stored separately and excluded from active analytics. They can be viewed, exported, and restored from the Archived page.",
     ],
   },
@@ -331,7 +332,7 @@ export const backendApiFamilies = [
       "Stores company branding, introduction content, public-page styling, and logo assets.",
       "Stores economic-operator identity and managed facility identifiers used by DID, VC, JSON-LD, and standards API flows.",
       "Creates scoped, revocable security group API keys from the dashboard Security page for restricted public-view unlocking and read-only external `/api/public/passports/:dppId` access.",
-      "Separates security group API keys from browser sessions and company integration Bearer tokens.",
+      "Separates security group API keys from browser sessions and authenticated-user JWT Bearer tokens issued by POST /api/users/me/token.",
     ],
   },
   {
@@ -339,7 +340,7 @@ export const backendApiFamilies = [
     route: "/api/companies/:companySlug/integrations/v1/passports*",
     details: [
       "Creates, patches, archives, and deletes DPPs using standards-oriented payload names such as productIdentifier, uniqueProductIdentifier, granularity, economicOperatorId, and facilityId.",
-      "Uses the same backend permission model as dashboard write APIs and requires a company-scoped Bearer/session token.",
+      "Uses the same backend permission model as dashboard write APIs and requires the authenticated company user's JWT as a Bearer token; the JWT is issued by POST /api/users/me/token.",
       "Public released reads are handled by /api/public/passports/:dppId instead of this mutation namespace.",
     ],
   },
@@ -348,7 +349,7 @@ export const backendApiFamilies = [
     route: "/api/public/passports/:dppId/dynamic-values*, /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values, and /api/companies/:companyId/passports/:dppId/dynamic-values",
     details: [
       "Returns public live dynamic values and their history for released or obsolete passports; the same security group key unlocks selected restricted dynamic fields.",
-      "Accepts live-value pushes through the company integration namespace authenticated by Bearer token.",
+      "Accepts live-value pushes through the company integration namespace using the authenticated user's JWT from POST /api/users/me/token as a Bearer token.",
       "Supports manual overrides from the dashboard.",
     ],
   },
@@ -358,7 +359,7 @@ export const backendApiFamilies = [
     details: [
       "Runs inside the authenticated company dashboard for bulk updates on existing passports.",
       "Supports staged CSV, JSON, and ERP/API ingestion, then validates rows before pushing updates into the backend.",
-      "Uses the normal session or Bearer authentication model with company access checks and editor authorization for operational reads and writes.",
+      "Uses normal session or Bearer authentication. GET reads require company access; source fetch, preview, push, and job-changing POST/PATCH actions additionally require editor authorization.",
       "Includes saved jobs, recent runs, and scheduled server-side fetch-and-push flows; scheduled jobs retain only a credentialRef, never source headers or bodies.",
     ],
   },
@@ -367,7 +368,7 @@ export const backendApiFamilies = [
     route: "/api/companies/:companyId/api-keys*, /api/companies/:companyId/audit-logs*, /api/companies/:companyId/backup-*",
     details: [
       "Manages security group API keys, including standard and emergency revocation.",
-      "Provides append-only audit logs, integrity/root checks, and audit-log anchors.",
+      "The visible company activity and audit feeds contain company-member actions only; super-admin actions are available under /api/admin/audit-logs. Integrity, root, and anchor operations still protect the complete company-scoped hash chain.",
       "Controls backup providers, backup policies, passport backup replications, verification, and public handover activation/deactivation.",
     ],
   },
@@ -375,7 +376,7 @@ export const backendApiFamilies = [
     name: "Semantic dictionaries",
     route: "/api/dictionary/:family/:version/* and /dictionary/:family/:version/*",
     details: [
-      "Serves registered dictionary contexts, manifests, semantic classes, enums, units, field maps, and term details.",
+      "Serves registered dictionary contexts, manifests, semantic classes, enums, units, ontology and SHACL artifacts, field maps, and term details with owning domain and value range information.",
       "Feeds the public, user-dashboard, and admin-dashboard dictionary browser plus semantic export guidance for each passport type's selected model.",
       "Also exposes static JSON-LD/context aliases without requiring login.",
     ],
@@ -395,9 +396,9 @@ export const backendOperationFlows = [
   {
     title: "Company onboarding flow",
     steps: [
-      "Super admin creates a company from the Companies page.",
-      "Super admin sets the company's DPP policy: default granularity, whether overrides are allowed, DID minting flags, VC issuance, JSON-LD export, and semantic dictionary access.",
+      "Super admin enters the company identity and DPP policy together on the Companies page; one create request stores both records atomically.",
       "Super admin grants passport-type access for that company.",
+      "Asset Management is available automatically to the active company; editor or company-admin permissions and passport-type grants still control its operations.",
       "Company branding and repository assets are configured from Company Profile, while security groups, user sessions, and optional bearer tokens are handled from Security.",
       "The company's economic-operator identifier and managed facilities are configured before standards/DID-heavy integrations rely on them.",
       "Users are invited with one-time links and register into the assigned tenant.",
@@ -419,7 +420,7 @@ export const backendOperationFlows = [
       "The company DPP policy chooses default granularity: model, batch, or item.",
       "Passport creation stores uniqueProductIdentifier, granularity, economicOperatorId, and facilityId. The product DID should follow the real serial/business identifier rather than the internal local passport ID.",
       "Public DID URLs expose platform, company, product model/batch/item, DPP, and facility DID documents.",
-      "The `/resolve?did=...` endpoint redirects browsers to the public passport where possible and API clients to the DID document URL.",
+      "The `/resolve?did=...` endpoint returns a JSON resolution object for platform, company, product model/batch/item, DPP, and facility DIDs, with `publicUrl` and `didDocument` links where applicable.",
     ],
   },
   {
@@ -434,8 +435,8 @@ export const backendOperationFlows = [
   {
     title: "Dynamic data/device flow",
     steps: [
-      "A company integration uses a Bearer token for live dynamic-value writes.",
-      "External devices push live values using `Authorization: Bearer <company service token>` to the dynamic-value endpoints.",
+      "A signed-in company user issues a JWT through Dashboard > Security or POST `/api/users/me/token` for live dynamic-value writes.",
+      "External devices push live values using `Authorization: Bearer <token>` to the dynamic-value endpoint; there is no separate passport-specific device API key.",
       "Dashboard users can also override dynamic values manually from the same modal.",
       "The public viewer reads current values and history to render live charts and timeline visuals.",
     ],
@@ -486,11 +487,11 @@ export const securityKeyTable = {
       "External scripts, device pushes, and partner read-only API access",
     ],
     [
-      "Bearer token",
-      "Optional integration/testing token from /api/users/me/token while signed in",
+      "Authenticated-user JWT Bearer token",
+      "Dashboard > Security or POST /api/users/me/token while signed in",
       "Authorization header: Bearer <token>",
-      "Protected APIs that use the same session middleware when a browser cookie is not practical",
-      "External read-only sharing with partners or Bearer-token automation",
+      "Protected company APIs and create, patch, archive, delete, or dynamic-value integration writes when a browser cookie is not practical",
+      "External read-only sharing or restricted public-field unlocking; use a security group API key for those cases",
     ],
     [
       "Security group API key for read APIs",
@@ -498,13 +499,6 @@ export const securityKeyTable = {
       "X-API-Key header",
       "Read-only external API on /api/public/passports/:dppId, filtered to the passport type, optional selected passports, and selected restricted fields",
       "Creating, editing, deleting, releasing, scheduling changes, or broad company API access",
-    ],
-    [
-      "Company integration Bearer token",
-      "Company service account or authenticated company automation user",
-      "Authorization: Bearer <company service token>",
-      "Create, patch, archive, delete, and dynamic-value writes under /api/companies/:companySlug/integrations/v1/passports",
-      "Public restricted reads, dashboard administration, or another company's passports",
     ],
     [
       "Security group API key",
@@ -515,7 +509,7 @@ export const securityKeyTable = {
     ],
     [
       "Passport Data Management session or Bearer token",
-      "Log in through the dashboard or issue a company user Bearer token",
+      "Log in through the dashboard or issue an authenticated-user JWT with POST /api/users/me/token",
       "Browser cookie or Authorization: Bearer <token>",
       "Calling /api/companies/:companyId/passport-data-management/* within the user's company and role",
       "Public passport reads or restricted-field sharing",
@@ -560,8 +554,9 @@ export const apiGettingStartedFlows = [
   {
     title: "How a device or machine pushes live values",
     steps: [
-      "A company user opens Device Integration for the passport and copies the Bearer-token integration endpoint.",
-      "The device sends POST /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values with the Authorization: Bearer <company service token>.",
+      "A company user opens Device Integration for the passport and copies the Bearer-token integration endpoint and payload example.",
+      "While signed in, issue an authenticated-user JWT from Dashboard > Security or by calling POST /api/users/me/token. Device Integration does not create a separate passport-specific key.",
+      "The device sends POST /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values with Authorization: Bearer <token>.",
       "The body is a simple object such as { temperature: 22.4, mass: 18.1 }.",
       "Public viewers and dashboards can then read the latest values and history from the dynamic-value endpoints.",
     ],
@@ -569,10 +564,10 @@ export const apiGettingStartedFlows = [
   {
     title: "How Asset Management authentication works",
     steps: [
-      "A logged-in editor or company admin opens Asset Management from the normal dashboard.",
+      "A logged-in company member opens Asset Management from the normal dashboard; company access is enough for its GET read routes.",
       "The browser uses the same authenticated session as the rest of the company dashboard.",
-      "Scripts may use a company user Bearer token against /api/companies/:companyId/passport-data-management/*.",
-      "Every request is company-scoped, and write actions additionally require editor permissions.",
+      "Scripts may use the JWT from POST /api/users/me/token against /api/companies/:companyId/passport-data-management/*.",
+      "Every request is company-scoped; source fetch, preview, push, and job-changing actions additionally require editor permissions.",
     ],
   },
 ];
@@ -586,8 +581,8 @@ export const companyWriteApiTable = {
     ["Update one editable passport", "PATCH /api/companies/:companyId/passports/:dppId", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, granularity, uniqueProductIdentifier, economicOperatorId, facilityId, ...fieldsToChange }", "Updates one draft or in-revision passport. Released granularity cannot be changed in place."],
     ["Bulk update matched passports", "PATCH /api/companies/:companyId/passports", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, passports: [ { dppId or internalAliasId, ...fields }, ... ] } up to 500 rows", "Updates many existing editable passports. It does not create new ones."],
     ["Bulk update many records with the same value", "PATCH /api/companies/:companyId/passports/bulk-update-all", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, filter, update }", "Applies one update object to every matching editable passport. internalAliasId cannot be bulk-set."],
-    ["Upsert from CSV text", "POST /api/companies/:companyId/passports/upsert-csv", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, csv: \"...csv text...\" }", "Creates new passports when no dppId is present, or updates matching editable passports when dppId or internalAliasId matches."],
-    ["Upsert from JSON", "POST /api/companies/:companyId/passports/upsert-json", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, passports: [ {...}, {...} ] } or a raw array", "Creates new passports without dppId, or updates editable ones when dppId or internalAliasId matches."],
+    ["Upsert from CSV text", "POST /api/companies/:companyId/passports/upsert-csv", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, csv: \"...csv text...\" } up to 500 data rows", "Creates new passports when no dppId is present, or updates matching editable passports when dppId or internalAliasId matches."],
+    ["Upsert from JSON", "POST /api/companies/:companyId/passports/upsert-json", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, passports: [ {...}, {...} ] } or a raw array, up to 500 rows", "Creates new passports without dppId, or updates editable ones when dppId or internalAliasId matches."],
     ["Release one passport", "PATCH /api/companies/:companyId/passports/:dppId/release", "Session cookie or bearer token, company access, editor or company admin", "{ passportType }", "Moves an editable passport to released and stores signature/VC metadata."],
     ["Revise one released passport", "POST /api/companies/:companyId/passports/:dppId/revise", "Session cookie or bearer token, company access, editor or company admin", "{ passportType }", "Creates the next editable version from the latest released version."],
     ["Change granularity with a linked successor", "POST /api/companies/:companyId/passports/:dppId/granularity-transition", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, targetGranularity, reason }", "Creates a linked successor identifier when released DPP granularity must move between model, batch, and item levels."],
@@ -599,8 +594,8 @@ export const companyWriteApiTable = {
     ["Bulk archive passports", "POST /api/companies/:companyId/passports/bulk-archive", "Session cookie or bearer token, company access, editor or company admin", "{ items: [ { dppId, passportType } ] } up to 500", "Archives many passports at once and reports how many were archived or skipped."],
     ["Unarchive one passport", "POST /api/companies/:companyId/passports/:dppId/unarchive", "Session cookie or bearer token, company access, editor or company admin", "No body", "Restores all soft-deleted versions and removes the archive entries. The passport reappears in the active list."],
     ["Bulk unarchive passports", "POST /api/companies/:companyId/passports/bulk-unarchive", "Session cookie or bearer token, company access, editor or company admin", "{ dppIds: [ \"uuid\", ... ] } up to 500", "Restores many archived passports and reports how many were restored or skipped."],
-    ["Delete one editable passport", "DELETE /api/companies/:companyId/passports/:dppId", "Session cookie or bearer token, company access, editor or company admin", "{ passportType }", "Soft-deletes one draft or in-revision passport. Released passports cannot be deleted."],
-    ["Bulk delete editable passports", "DELETE /api/companies/:companyId/passports", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, identifiers: [ { dppId }, { internalAliasId } ] }", "Soft-deletes many editable passports and reports deleted, skipped, and failed rows."],
+    ["Delete one editable passport", "DELETE /api/companies/:companyId/passports/:dppId", "Session cookie or bearer token, company access, editor or company admin", "{ passportType }", "Permanently hard-deletes a draft, including its registry/dependent records. Other editable statuses such as inRevision are archived as a pre-delete snapshot and soft-deleted. Released passports cannot be deleted."],
+    ["Bulk delete editable passports", "DELETE /api/companies/:companyId/passports", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, identifiers: [ { dppId }, { internalAliasId } ] } up to 500", "Applies the same rule per match: drafts are hard-deleted, while other editable statuses are snapshotted and soft-deleted; released rows are skipped. Returns deleted, skipped, and failed details."],
   ],
 };
 
@@ -630,24 +625,24 @@ export const publicAndLiveApiTable = {
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What it returns or does"],
   rows: [
     ["Public passport read", "GET /api/public/passports/:dppId", "None for public fields; optional X-API-Key for selected restricted fields", "Optional query: version", "Returns public passport data and, when the key is valid, only the restricted fields selected for that security group."],
-    ["Integration create passport", "POST /api/companies/:companySlug/integrations/v1/passports", "Authorization: Bearer <company service token>", "{ passportType, productIdentifier, granularity, camelCaseFieldKey: value, ... }", "Creates a company-scoped DPP draft. Passport values use canonical semantic camelCase field keys directly at the top level."],
-    ["Integration patch passport", "PATCH /api/companies/:companySlug/integrations/v1/passports/:dppId", "Authorization: Bearer <company service token>", "{ camelCaseFieldKey: value, granularity, economicOperatorId, facilityId }", "Updates an editable company passport by DPP ID using canonical semantic camelCase field keys directly."],
-    ["Integration archive passport", "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/archive", "Authorization: Bearer <company service token>", "{ reason }", "Archives a released company passport."],
-    ["Integration delete passport", "DELETE /api/companies/:companySlug/integrations/v1/passports/:dppId", "Authorization: Bearer <company service token>", "No body", "Deletes an editable company passport or directs released records to archive."],
+    ["Integration create passport", "POST /api/companies/:companySlug/integrations/v1/passports", "Authorization: Bearer <JWT issued by POST /api/users/me/token>", "{ passportType, productIdentifier, granularity, camelCaseFieldKey: value, ... }", "Creates a company-scoped DPP draft. Passport values use canonical semantic camelCase field keys directly at the top level."],
+    ["Integration patch passport", "PATCH /api/companies/:companySlug/integrations/v1/passports/:dppId", "Authorization: Bearer <JWT issued by POST /api/users/me/token>", "{ camelCaseFieldKey: value, granularity, economicOperatorId, facilityId }", "Updates an editable company passport by DPP ID using canonical semantic camelCase field keys directly."],
+    ["Integration archive passport", "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/archive", "Authorization: Bearer <JWT issued by POST /api/users/me/token>", "No body", "Archives a released company passport."],
+    ["Integration delete passport", "DELETE /api/companies/:companySlug/integrations/v1/passports/:dppId", "Authorization: Bearer <JWT issued by POST /api/users/me/token>", "No body", "Hard-deletes a draft, soft-deletes another editable status after snapshotting it, or returns the archive endpoint for a released passport."],
     ["Canonical passport by DPP ID", "GET /api/public/passports/:dppId", "No auth", "Optional version query", "Canonical public-safe passport payload and linked-data references."],
     ["Public passport history", "GET /api/public/passports/:dppId/history", "None for public changes; optional X-API-Key for selected restricted fields", "No body", "Public version history plus changes to restricted fields selected for a valid security group."],
     ["Access restricted fields", "GET /api/public/passports/:dppId", "X-API-Key or X-Security-Group-Key header", "No body", "Returns only the restricted fields selected for that security group when the key applies to the passport."],
     ["Verify signature", "GET /api/public/passports/:dppId/signature", "No auth", "Optional query param: version", "Public verification status, signing key, hash, proof type, issuer, and credential ID metadata without exposing the stored credential payload."],
     ["Get current signing key", "GET /api/public/signing-key", "No auth", "No body", "The active public signing key metadata."],
     ["Get DID document", "GET /.well-known/did.json", "No auth", "No body", "A DID document that helps outside verifiers validate released passport signatures."],
-    ["Resolve DID", "GET /resolve?did=did:web:...", "No auth", "Accept header decides browser redirect or DID document redirect", "Universal resolver for platform, company, product subject, DPP, and facility DIDs."],
+    ["Resolve DID", "GET /resolve?did=did:web:...", "No auth", "DID query parameter; no body", "Returns a JSON resolution object for platform, company, product model/batch/item, DPP, and facility DIDs, including didDocument and publicUrl links where applicable. It does not redirect."],
     ["DID documents", "GET /did/company/:slug/did.json, /did/:passportType/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json", "No auth", "No body", "DID documents for companies, product subjects, DPP records, and facilities through canonical slug and stable-ID routes."],
     ["DPP JSON-LD context", "GET /contexts/dpp/v1", "No auth", "No body", "JSON-LD context for DPP linked-data payloads."],
     ["Read QR code", "GET /api/public/passports/:dppId/qrcode", "No auth", "No body", "Returns QR code and carrier authenticity metadata for a released or obsolete passport."],
     ["Save QR code", "POST /api/companies/:companyId/passports/:dppId/qrcode", "Session cookie or bearer token, company access, editor or company admin", "QR payload and optional carrierAuthenticity metadata", "Stores the passport QR code and carrier authenticity metadata."],
     ["Read latest live values", "GET /api/public/passports/:dppId/dynamic-values", "No auth", "No body", "The most recent public live value per dynamic field for a released or obsolete passport."],
     ["Read one live field history", "GET /api/public/passports/:dppId/dynamic-values/:fieldKey/history", "No auth", "Optional query param: limit", "Time-series history for one public dynamic field on a released or obsolete passport."],
-    ["Push live device values", "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values", "Authorization: Bearer <company service token>", "{ fieldKey: value, anotherField: value }", "Stores a new live reading per field."],
+    ["Push live device values", "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values", "Authorization: Bearer <JWT issued by POST /api/users/me/token>", "{ fieldKey: value, anotherField: value }", "Stores a new live reading per field; no passport-specific device API key is issued."],
     ["Manual live-value override", "PATCH /api/companies/:companyId/passports/:dppId/dynamic-values", "Session cookie or bearer token, company access, editor or company admin", "{ fieldKey: value }", "Lets a user save manual live values without a physical device push."],
   ],
 };
@@ -656,14 +651,15 @@ export const governanceSecurityApiTable = {
   title: "Governance, security groups, audit, backup, and operator identity APIs",
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What it controls"],
   rows: [
-    ["Read company compliance identity", "GET /api/companies/:companyId/compliance-identity", "Session cookie or bearer token and company access", "No body", "Returns economic-operator identifier details and related identity metadata."],
-    ["Update company compliance identity", "POST /api/companies/:companyId/compliance-identity", "Session cookie or bearer token, company access, editor/company admin", "{ economicOperatorIdentifier, economicOperatorIdentifierScheme }", "Stores the economic-operator identity used by DID, VC, JSON-LD, standards APIs, and audit actor identity."],
-    ["Add a managed facility", "POST /api/companies/:companyId/facilities", "Session cookie or bearer token, company access, editor/company admin", "{ facilityIdentifier, identifierScheme, displayName, metadataJson }", "Creates an active facility identifier that standards APIs can reference and facility DID documents can expose."],
-    ["Read audit logs and integrity", "GET /api/companies/:companyId/audit-logs, /integrity, /root, /anchors", "Session cookie or bearer token; integrity/root/anchors require company admin", "Query filters for audit logs", "Reads audit history, hash-chain state, root hash, and anchors."],
-    ["Create audit anchor", "POST /api/companies/:companyId/audit-logs/anchors", "Session cookie or bearer token, company admin", "{ anchorType, anchorReference, notes, metadata }", "Creates a new audit-log anchor for non-repudiation evidence."],
-    ["Read backup setup", "GET /api/admin/companies/:companyId/backup-policy, /backup-continuity-evidence, /identifier-persistence-policy", "Session cookie or bearer token, superAdmin", "No body", "Reads backup, continuity, and identifier persistence status."],
-    ["Manage backup providers", "POST /api/companies/:companyId/backup-providers, DELETE /api/companies/:companyId/backup-providers/:providerKey", "Session cookie or bearer token, superAdmin", "Provider config or provider key", "Adds or removes backup providers."],
-    ["Manage passport backup/handover", "GET/POST /api/companies/:companyId/passports/:dppId/backup-*", "Session cookie or bearer token; activation/deactivation requires company admin", "Replication, verify, handover activate/deactivate payloads", "Reads, creates, verifies, activates, or deactivates backup replications and public handover state."],
+    ["Read company compliance identity and facilities", "GET /api/companies/:companyId/compliance-identity", "Session cookie or bearer token and company-admin or super-admin role", "No body", "Returns economic-operator identifier details, related identity metadata, and managed facilities."],
+    ["Update company compliance identity", "POST /api/companies/:companyId/compliance-identity", "Session cookie or bearer token and company-admin or super-admin role", "{ economicOperatorIdentifier, economicOperatorIdentifierScheme }", "Stores the economic-operator identity used by DID, VC, JSON-LD, standards APIs, and audit actor identity."],
+    ["Add a managed facility", "POST /api/companies/:companyId/facilities", "Session cookie or bearer token and company-admin or super-admin role", "{ facilityIdentifier, identifierScheme, displayName, metadataJson }", "Creates an active facility identifier that standards APIs can reference and facility DID documents can expose."],
+    ["Read visible company audit logs", "GET /api/companies/:companyId/audit-logs", "Session cookie or bearer token and company access", "Optional limit and offset", "Returns company-member actions only. Super-admin actions do not appear in the company dashboard feed."],
+    ["Read audit integrity evidence", "GET /api/companies/:companyId/audit-logs/integrity, /root, /anchors", "Session cookie or bearer token and company-admin or super-admin role", "No body; anchors accepts an optional limit", "Checks and summarizes the complete company-scoped hash chain, including records hidden from the company activity feed, and lists its anchors."],
+    ["Create audit anchor", "POST /api/companies/:companyId/audit-logs/anchors", "Session cookie or bearer token, company admin or super admin", "{ anchorType, anchorReference, notes, metadata }", "Creates a new audit-log anchor for non-repudiation evidence."],
+    ["Read platform backup setup", "GET /api/admin/companies/:companyId/backup-policy, /backup-continuity-evidence, /identifier-persistence-policy", "Session cookie or bearer token and super-admin role", "No body", "Reads the platform-level backup, continuity, and identifier-persistence status."],
+    ["Read or manage company backup providers", "GET/POST /api/companies/:companyId/backup-providers and DELETE /api/companies/:companyId/backup-providers/:providerKey", "Session cookie or bearer token and company-admin or super-admin role", "No body for GET; provider config for POST; provider key in the DELETE path", "Lists, adds, updates, or revokes company backup providers."],
+    ["Manage passport backup and handover", "GET/POST /api/companies/:companyId/passports/:dppId/backup-*", "Session cookie or bearer token and company-admin or super-admin role for every company-scoped backup route", "No body for reads; operation-specific replication, verification, or handover payload for writes", "Reads, creates, verifies, activates, or deactivates backup replications and public handover state."],
     ["Record data-carrier verification", "POST /api/companies/:companyId/passports/:dppId/data-carrier-verifications", "Session cookie or bearer token, company access, editor/company admin", "Print grade, scanner tests, durability checks, placement checks, and evidence URIs", "Adds verification evidence to carrierAuthenticity and records a security event."],
     ["Security events", "GET /api/companies/:companyId/passports/:dppId/security-events", "Session cookie or bearer token and company access", "No body", "Reads public security reports tied to a passport."],
     ["Security group emergency revoke", "POST /api/companies/:companyId/api-keys/:keyId/emergency-revoke", "Session cookie or bearer token, company admin", "{ reason } optional", "Immediately disables a security group API key and records emergency revocation evidence."],
@@ -674,12 +670,13 @@ export const dictionaryApiTable = {
   title: "Semantic dictionary browser and API",
   columns: ["Action", "Endpoint or route", "Authentication", "What it gives you", "Where it is used"],
   rows: [
-    ["Open dictionary in user dashboard", "/dashboard/:companySlug/dictionary/:family/:version", "Signed-in dashboard session", "Searchable browser for semantic classes, terms, units, IRIs, field keys, confidentiality, and regulation references", "Company users checking field meanings and JSON-LD identifiers for passport types they can access."],
-    ["Open dictionary in admin dashboard", "/admin/dictionary/:family/:version", "Super-admin session", "The same dictionary browser inside the admin shell, with module/type context where available", "Super admins designing passport modules, custom types, and semantic mappings."],
+    ["Open dictionary in user dashboard", "/dashboard/:companySlug/dictionary/:family/:version", "Signed-in dashboard session", "Searchable browser for semantic classes, terms, owning domains, ranges, units, IRIs, field keys, confidentiality, and regulation references", "Company users checking field meaning and structural ownership for passport types they can access."],
+    ["Open dictionary in admin dashboard", "/admin/dictionary/:family/:version", "Super-admin session", "The same dictionary browser inside the admin shell, with module/type context where available", "Super admins reviewing passport modules, module-backed types, and semantic mappings."],
     ["Public dictionary browser", "/dictionary/:family/:version", "No login", "Public term browser and term detail pages", "External implementers and verifiers."],
+    ["List a company's available dictionaries", "GET /api/companies/:companyId/semantic-models", "Signed-in session or bearer token with company access", "Registered semantic models referenced by passport types granted to that company", "Building the company dashboard dictionary navigation without exposing unrelated models."],
     ["JSON-LD context", "GET /dictionary/:family/:version/context.jsonld or /api/dictionary/:family/:version/context.jsonld", "No login", "Canonical JSON-LD context", "Semantic exports and linked-data verification."],
-    ["Manifest and dictionary data", "GET /api/dictionary/:family/:version/manifest, /classes, /enums, /units", "No login", "Dictionary metadata, semantic classes, controlled enums, and unit definitions", "Dictionary browsing, export guidance, and documentation."],
-    ["Term JSON", "GET /api/dictionary/:family/:version/terms or /terms/:slug", "No login", "All terms, filtered terms, or one term detail record", "Dictionary search and direct term references."],
+    ["Manifest and dictionary data", "GET /api/dictionary/:family/:version/manifest, /classes, /enums, /units, /ontology.jsonld, /shapes.jsonld", "No login", "Dictionary metadata, semantic classes, controlled enums, unit definitions, OWL/RDFS ontology, and SHACL shapes", "Dictionary browsing, semantic validation, export guidance, and documentation."],
+    ["Term JSON", "GET /api/dictionary/:family/:version/terms or /terms/:slug", "No login", "All terms, terms filtered by ?class=<class-key-or-IRI> and/or ?search=<text>, or one term detail record", "Dictionary search, domain/range inspection, and direct term references."],
   ],
 };
 
@@ -692,11 +689,11 @@ export const assetManagementApiTable = {
     ["Fetch ERP or API rows", "POST /api/companies/:companyId/passport-data-management/source/fetch", "Session cookie or Bearer token, company access, and editor role", "{ sourceConfig } with url, method, optional transient headers/body, recordPath, fieldMap", "Fetches external rows and maps them into asset rows. Inline credentials are one-time only and are never saved."],
     ["Preview staged changes", "POST /api/companies/:companyId/passport-data-management/preview", "Session cookie or Bearer token, company access, and editor role", "{ passportType, records }", "Validates matching and field rules, then builds the JSON package without changing any passports."],
     ["Push staged changes", "POST /api/companies/:companyId/passport-data-management/push", "Session cookie or Bearer token, company access, and editor role", "{ passportType, records }", "Revalidates the rows on the server and writes the prepared changes into normal backend passport records."],
-    ["List saved jobs", "GET /api/companies/:companyId/passport-data-management/jobs", "Session cookie or Bearer token, company access, and editor role", "No body", "Returns saved schedules with sanitized source metadata for the current company."],
+    ["List saved jobs", "GET /api/companies/:companyId/passport-data-management/jobs", "Session cookie or Bearer token and company access", "No body", "Returns saved schedules with sanitized source metadata for the current company; this read does not require editor permission."],
     ["Create a job", "POST /api/companies/:companyId/passport-data-management/jobs", "Session cookie or Bearer token, company access, and editor role", "{ passportType, name, records, sourceKind, sourceConfig: { url, method, credentialRef, recordPath, fieldMap }, startAt, intervalMinutes, isActive }", "Saves a recurring job that can run later on the server. API jobs use a server-side credentialRef scoped to the company, exact URL, and GET/POST method; headers and bodies are rejected."],
     ["Update a job", "PATCH /api/companies/:companyId/passport-data-management/jobs/:jobId", "Session cookie or Bearer token, company access, and editor role", "Name, schedule, non-secret source config, records, and active state fields", "Edits an existing saved job without exposing credentials."],
     ["Run one job immediately", "POST /api/companies/:companyId/passport-data-management/jobs/:jobId/run", "Session cookie or Bearer token, company access, and editor role", "No body", "Executes the saved job immediately instead of waiting for its next schedule."],
-    ["See recent runs", "GET /api/companies/:companyId/passport-data-management/runs", "Session cookie or Bearer token, company access, and editor role", "No body", "Shows recent manual pushes and scheduled job summaries without request credentials or generated payloads."],
+    ["See recent runs", "GET /api/companies/:companyId/passport-data-management/runs", "Session cookie or Bearer token and company access", "No body", "Shows recent manual pushes and scheduled job summaries without request credentials or generated payloads; this read does not require editor permission."],
   ],
 };
 
@@ -707,20 +704,24 @@ export const adminPlatformApiTable = {
     ["List categories", "GET /api/admin/product-categories", "Session cookie or bearer token and super-admin role", "No body", "Reads the current productCategory product categories."],
     ["Create a category", "POST /api/admin/product-categories", "Session cookie or bearer token and super-admin role", "{ name, icon }", "Adds a new product category for the catalog tree."],
     ["Delete a category", "DELETE /api/admin/product-categories/:id", "Session cookie or bearer token and super-admin role", "{ password }", "Deletes a category if no passport type is still using it."],
-    ["List registered passport modules", "GET /api/admin/passport-type-modules", "Session cookie or bearer token and super-admin role", "No body", "Shows code-defined modules, selected semantic models, seeded status, and seed commands."],
-    ["List passport types", "GET /api/admin/passport-types", "Session cookie or bearer token and super-admin role", "No body", "Shows the seeded/module-backed and custom type catalog with metadata."],
-    ["Create a passport type", "POST /api/admin/passport-types", "Session cookie or bearer token and super-admin role", "Type metadata plus fieldsJson schema", "Creates a custom type and its runtime table. Stable production product lines should normally come from code modules and seeding."],
-    ["Update a passport type", "PATCH /api/admin/passport-types/:id", "Session cookie or bearer token and super-admin role", "Updated metadata and or fieldsJson", "Changes an existing custom type definition or editable metadata."],
+    ["List registered passport modules", "GET /api/admin/passport-type-modules", "Session cookie or bearer token and super-admin role", "No body", "Shows comprehensive code-defined modules, semantic models, canonical field counts, compiled types using each module, and the safe seed command."],
+    ["List passport types", "GET /api/admin/passport-types", "Session cookie or bearer token and super-admin role", "No body", "Shows seeded and Admin-created module-backed types with their catalog metadata."],
+    ["Create a passport type", "POST /api/admin/passport-types", "Session cookie or bearer token and super-admin role", "Type metadata, required sourceModule, and profile.includedFields with allowed required/confidentiality/presentation overrides", "Server-compiles a selected field tree and semantic graph from the canonical module, stores module/profile digests, and reconciles its runtime table."],
+    ["Update a passport type", "PATCH /api/admin/passport-types/:id", "Session cookie or bearer token and super-admin role", "Updated metadata and/or a module field profile", "Recompiles the profile from its module. Material changes to a type already used by passports, templates, or grants require a new version rather than changing its meaning in place."],
+    ["Read a type semantic profile", "GET /api/passport-types/:typeName/semantic-profile and its /context.jsonld, /terms, /classes, /enums, /units, /shapes.jsonld routes", "Public read", "No body", "Returns the selected type-specific semantic bundle; canonical /api/dictionary/:family/:version routes remain comprehensive."],
     ["Activate or deactivate a type", "PATCH /api/admin/passport-types/:id/activate or /deactivate", "Session cookie or bearer token and super-admin role", "No body", "Turns company-side usage on or off."],
-    ["Delete a passport type", "DELETE /api/admin/passport-types/:typeId", "Session cookie or bearer token and super-admin role", "No body", "Removes an obsolete type definition."],
-    ["Save or read builder draft", "GET, PUT, DELETE /api/admin/passport-type-draft", "Session cookie or bearer token and super-admin role", "Draft JSON body for PUT", "Stores unfinished builder work separately from published types."],
-    ["Create and list companies", "POST /api/admin/companies and GET /api/admin/companies", "Session cookie or bearer token and super-admin role", "{ companyName } for POST", "Creates tenants and reads the current tenant list."],
-    ["Delete a company", "DELETE /api/admin/companies/:companyId", "Session cookie or bearer token and super-admin role", "Confirmation handled by UI", "Removes a tenant and backend-owned tenant data through the cleanup path."],
+    ["Delete a passport type", "DELETE /api/admin/passport-types/:typeId", "Session cookie or bearer token and super-admin role", "{ password }", "Verifies the current super-admin password, then removes the type definition and its generated runtime table."],
+    ["Save or read builder draft", "GET, PUT, DELETE /api/admin/passport-type-draft", "Session cookie or bearer token and super-admin role", "{ draftJson } for PUT", "Stores unfinished builder work separately from published types."],
+    ["Create and list companies", "POST /api/admin/companies and GET /api/admin/companies", "Session cookie or bearer token and super-admin role", "Company identity, optional full country name up to 80 characters, and dppPolicy for POST", "Creates the tenant and its DPP policy atomically, then reads the current tenant list."],
+    ["Read or update company details", "GET, PUT /api/admin/companies/:companyId", "Session cookie or bearer token and super-admin role", "Company identity fields for PUT", "Reads or updates company details without clearing the separately stored DPP policy."],
+    ["Delete a company", "DELETE /api/admin/companies/:companyId", "Session cookie or bearer token and super-admin role", "{ password }", "Verifies the current super-admin password, then removes the tenant and backend-owned tenant data through the cleanup path."],
     ["Read or update company DPP policy", "GET, PUT /api/admin/companies/:id/dpp-policy", "Session cookie or bearer token and super-admin role", "Granularity, DID minting, VC, JSON-LD, and semantic dictionary flags", "Controls standards/DID issuance behavior for that company."],
-    ["Enable or disable Asset Management for a company", "PATCH /api/admin/companies/:companyId/asset-management", "Session cookie or bearer token and super-admin role", "{ enabled: true or false }", "Turns the company's Asset Management access on or off."],
-    ["Grant or revoke company type access", "POST /api/admin/company-access and DELETE /api/admin/company-access/:companyId/:typeId", "Session cookie or bearer token and super-admin role", "{ companyId, passportTypeId } for POST", "Controls which companies can use which passport types."],
+    ["Use Asset Management", "/api/companies/:companyId/passport-data-management/*", "Company session or bearer token and company access for reads; editor permission additionally required for operational POST/PATCH actions", "Operation-specific body", "Available to every active company; passport-type grants still control which schemas it can inspect or update."],
+    ["Read company type access", "GET /api/admin/companies/:companyId/passport-type-access", "Session cookie or bearer token and super-admin role", "No body", "Returns the company plus every passport type and whether access is currently granted."],
+    ["Grant or revoke company type access", "POST /api/admin/company-access and DELETE /api/admin/company-access/:companyId/:typeId", "Session cookie or bearer token and super-admin role", "{ companyId, passportTypeId } for POST", "Controls which companies can use which active passport types without deleting existing passport data."],
     ["Manage global symbols", "GET /api/symbols, GET /api/symbols/categories, POST /api/admin/symbols, DELETE /api/admin/symbols/:id", "Session cookie or bearer token; create/delete require super-admin role", "Multipart file for POST", "Manages global reusable symbols visible to form authors."],
     ["List system analytics", "GET /api/admin/analytics", "Session cookie or bearer token and super-admin role", "No body", "Reads system-wide company and passport metrics."],
+    ["Read super-admin audit logs", "GET /api/admin/audit-logs", "Session cookie or bearer token and super-admin role", "Optional limit, offset, companyId, action, actor, from, and to query parameters", "Returns super-admin actions only for the separate Admin > Audit Logs page."],
     ["Read company analytics", "GET /api/admin/companies/:companyId/analytics", "Session cookie or bearer token and super-admin role", "No body", "Reads one tenant's analytics and user distribution."],
     ["Change a tenant user's role", "PATCH /api/admin/users/:userId/role", "Session cookie or bearer token and super-admin role", "{ role }", "Support operation for tenant user role adjustments from admin analytics."],
     ["Manage super admins", "GET /api/admin/super-admins, POST /api/admin/super-admins/invite, PATCH /api/admin/super-admins/:userId/access", "Session cookie or bearer token and super-admin role", "Invite details or access state", "Adds, revokes, or restores platform operators."],

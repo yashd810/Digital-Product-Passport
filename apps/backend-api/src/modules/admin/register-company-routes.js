@@ -3,6 +3,9 @@
 const fs = require("fs");
 const path = require("path");
 const logger = require("../../services/logger");
+const { companyPolicyDefaults } = require("../../services/company-dpp-policy");
+
+const maxCountryLength = 80;
 
 const isPathInsideBase = (targetPath, baseDir) => {
   const basePath = path.resolve(baseDir);
@@ -44,8 +47,8 @@ module.exports = function registerCompanyRoutes(app, deps) {
       authorizedContactName: row.authorizedContactName ?? null,
       authorizedContactEmail: row.authorizedContactEmail ?? null,
       isActive: row.isActive ?? null,
-      assetManagementEnabled: row.assetManagementEnabled ?? null,
-      assetManagementRevokedAt: row.assetManagementRevokedAt ?? null,
+      assetManagementEnabled: true,
+      assetManagementRevokedAt: null,
       grantedTypeNames: row.grantedTypeNames ?? [],
       grantedTypes: row.grantedTypes ?? [],
       createdAt: row.createdAt ?? null,
@@ -60,10 +63,11 @@ module.exports = function registerCompanyRoutes(app, deps) {
     };
     const companyName = String(input.companyName || "").trim();
     const trustLevel = String(input.customerTrustLevel || "").trim();
+    const country = normalizeText(input.country);
     return {
       companyName,
       legalName: normalizeText(input.legalName),
-      country: normalizeText(input.country)?.toUpperCase() || null,
+      country: country && /^[a-z]{2}$/i.test(country) ? country.toUpperCase() : country,
       companyRegistrationNumber: normalizeText(input.companyRegistrationNumber),
       vatNumber: normalizeText(input.vatNumber),
       websiteDomain: normalizeText(input.websiteDomain),
@@ -73,21 +77,46 @@ module.exports = function registerCompanyRoutes(app, deps) {
     };
   }
 
+  function validateCompanyIdentity(companyIdentity) {
+    if (!companyIdentity.companyName) return "Company name required";
+    if (companyIdentity.country && Array.from(companyIdentity.country).length > maxCountryLength) {
+      return `Country must be ${maxCountryLength} characters or fewer`;
+    }
+    if (!companyTrustLevels.has(companyIdentity.customerTrustLevel)) {
+      return "Invalid customer trust level";
+    }
+    return null;
+  }
+
   function parseCompanyId(value) {
     const companyId = Number(value);
     return Number.isSafeInteger(companyId) && companyId > 0 ? companyId : null;
   }
 
   app.post("/api/admin/companies", authenticateToken, isSuperAdmin, async (req, res) => {
+    const companyIdentity = normalizeCompanyIdentity(req.body || {});
+    const identityError = validateCompanyIdentity(companyIdentity);
+    if (identityError) return res.status(400).json({ error: identityError });
+
+    const rawPolicy = req.body?.dppPolicy;
+    if (rawPolicy !== undefined && (!rawPolicy || typeof rawPolicy !== "object" || Array.isArray(rawPolicy))) {
+      return res.status(400).json({ error: "Invalid DPP policy" });
+    }
+    let policy;
     try {
-      const companyIdentity = normalizeCompanyIdentity(req.body || {});
-      if (!companyIdentity.companyName) {
-        return res.status(400).json({ error: "Company name required" });
-      }
-      if (!companyTrustLevels.has(companyIdentity.customerTrustLevel)) {
-        return res.status(400).json({ error: "Invalid customer trust level" });
-      }
-      const result = await pool.query(
+      policy = {
+        ...companyPolicyDefaults,
+        ...validateCompanyDppPolicyInput(rawPolicy || {}),
+      };
+    } catch {
+      return res.status(400).json({ error: "Invalid DPP policy" });
+    }
+
+    let client;
+    try {
+      client = await pool.connect();
+      await client.query("BEGIN");
+      const result = await client.query(
         `INSERT INTO companies (
           "companyName",
           "legalName",
@@ -114,13 +143,53 @@ module.exports = function registerCompanyRoutes(app, deps) {
           companyIdentity.authorizedContactEmail
         ]
       );
-      await ensureCompanyDppPolicy(result.rows[0].id);
-      res.status(201).json({ success: true, company: mapCompanyRow(result.rows[0]) });
+      const companyId = result.rows[0].id;
+      const policyResult = await client.query(
+        `INSERT INTO "companyDppPolicies" (
+          "companyId",
+          "defaultGranularity",
+          "allowGranularityOverride",
+          "mintModelDids",
+          "mintItemDids",
+          "mintFacilityDids",
+          "vcIssuanceEnabled",
+          "jsonldExportEnabled",
+          "semanticDictionaryEnabled"
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        RETURNING *`,
+        [
+          companyId,
+          policy.defaultGranularity,
+          policy.allowGranularityOverride,
+          policy.mintModelDids,
+          policy.mintItemDids,
+          policy.mintFacilityDids,
+          policy.vcIssuanceEnabled,
+          policy.jsonldExportEnabled,
+          policy.semanticDictionaryEnabled,
+        ]
+      );
+      await client.query("COMMIT");
+      res.status(201).json({
+        success: true,
+        company: mapCompanyRow(result.rows[0]),
+        dppPolicy: policyResult.rows[0],
+      });
     } catch (error) {
+      if (client) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          logger.error({ err: rollbackError }, "Failed to roll back company creation");
+        }
+      }
       if (error?.code === "23505") {
         return res.status(409).json({ error: "Company name already exists" });
       }
+      logger.error({ err: error }, "Company creation failed");
       res.status(500).json({ error: "Failed to create company" });
+    } finally {
+      client?.release();
     }
   });
 
@@ -167,12 +236,8 @@ module.exports = function registerCompanyRoutes(app, deps) {
         return res.status(400).json({ error: "Invalid company id" });
       }
       const companyIdentity = normalizeCompanyIdentity(req.body || {});
-      if (!companyIdentity.companyName) {
-        return res.status(400).json({ error: "Company name required" });
-      }
-      if (!companyTrustLevels.has(companyIdentity.customerTrustLevel)) {
-        return res.status(400).json({ error: "Invalid customer trust level" });
-      }
+      const identityError = validateCompanyIdentity(companyIdentity);
+      if (identityError) return res.status(400).json({ error: identityError });
 
       const updated = await pool.query(
         `UPDATE companies
@@ -270,7 +335,9 @@ module.exports = function registerCompanyRoutes(app, deps) {
             '{}'
           ) AS "grantedTypeNames"
         FROM companies c
-        LEFT JOIN "companyPassportAccess" cpa ON cpa."companyId" = c.id
+        LEFT JOIN "companyPassportAccess" cpa
+          ON cpa."companyId" = c.id
+         AND COALESCE(cpa."accessRevoked", false) = false
         LEFT JOIN "passportTypes" pt ON pt.id = cpa."passportTypeId"
         GROUP BY c.id
         ORDER BY c."createdAt" DESC
@@ -347,79 +414,6 @@ module.exports = function registerCompanyRoutes(app, deps) {
     } catch (error) {
       logger.error({ err: error, companyId }, "DPP policy update error");
       res.status(500).json({ error: "Failed to update DPP policy" });
-    }
-  });
-
-  app.patch("/api/admin/companies/:companyId/asset-management", authenticateToken, isSuperAdmin, async (req, res) => {
-    const companyId = Number(req.params.companyId);
-    const enabled = req.body?.enabled;
-    if (!Number.isSafeInteger(companyId) || companyId <= 0) {
-      return res.status(400).json({ error: "Invalid company ID" });
-    }
-    if (typeof enabled !== "boolean") {
-      return res.status(400).json({ error: "enabled must be a boolean" });
-    }
-
-    let client;
-    try {
-      client = await pool.connect();
-      await client.query("BEGIN");
-      const updated = await client.query(
-        `UPDATE companies
-            SET "assetManagementEnabled" = $1,
-                "assetManagementRevokedAt" = CASE WHEN $1 THEN NULL ELSE NOW() END,
-                "updatedAt" = NOW()
-          WHERE id = $2
-          RETURNING *`,
-        [enabled, companyId]
-      );
-      if (!updated.rows.length) {
-        await client.query("ROLLBACK");
-        return res.status(404).json({ error: "Company not found" });
-      }
-
-      let jobsDeactivated = 0;
-      if (!enabled) {
-        const jobs = await client.query(
-          `UPDATE "assetManagementJobs"
-              SET "isActive" = false,
-                  "nextRunAt" = NULL,
-                  "updatedAt" = NOW()
-            WHERE "companyId" = $1
-              AND "isActive" = true`,
-          [companyId]
-        );
-        jobsDeactivated = Number(jobs.rowCount) || 0;
-      }
-      await client.query("COMMIT");
-
-      const details = { enabled, jobsDeactivated };
-      await logAudit(
-        companyId,
-        req.user.userId,
-        "setAssetManagementEnabled",
-        "companies",
-        String(companyId),
-        null,
-        details
-      );
-      return res.json({
-        success: true,
-        company: mapCompanyRow(updated.rows[0]),
-        jobsDeactivated,
-      });
-    } catch (error) {
-      if (client) {
-        try {
-          await client.query("ROLLBACK");
-        } catch (rollbackError) {
-          logger.error({ err: rollbackError, companyId }, "Failed to roll back Asset Management access update");
-        }
-      }
-      logger.error({ err: error, companyId }, "Failed to update Asset Management access");
-      return res.status(500).json({ error: "Failed to update Asset Management access" });
-    } finally {
-      client?.release();
     }
   });
 

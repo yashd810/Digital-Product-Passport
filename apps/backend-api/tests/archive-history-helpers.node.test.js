@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createArchiveHistoryHelpers } = require("../src/modules/passports/archive-history-helpers");
+const { normalizePassportRow } = require("../src/shared/passports/passport-helpers");
 
 function createHistoryHelpers(queryLog, versionsOverride = null) {
   const versions = versionsOverride || [
@@ -167,4 +168,58 @@ test("authenticated passport history retains restricted changes and creator iden
     ["internalAliasId", "publicField", "restrictedField", "unclassifiedField"]
   );
   assert.equal(result.history[0].createdByName, "Private Editor");
+});
+
+test("archive snapshots persist only fields selected by the current passport type profile", async () => {
+  const inserts = [];
+  const helpers = createArchiveHistoryHelpers({
+    pool: {
+      query: async (sql, params) => {
+        inserts.push({ sql, params });
+        return { rows: [] };
+      },
+    },
+    logger: null,
+    systemPassportFields: [],
+    getWritablePassportColumns: () => [],
+    getStoredPassportValues: () => [],
+    quoteSqlIdentifier: (value) => value,
+    normalizePassportRow,
+    normalizeReleaseStatus: (value) => value,
+    isPublicHistoryStatus: () => true,
+    comparableHistoryFieldValue: (_field, value) => value,
+    formatHistoryFieldValue: (_field, value) => value,
+    getHistoryFieldDefs: () => [],
+    buildCurrentPublicPassportPath: () => null,
+    buildInactivePublicPassportPath: () => null,
+    getPassportLineageContext: async () => null,
+    getPassportVersionsByLineage: async () => [],
+    getCompanyNameMap: async () => new Map(),
+    getPassportTypeSchema: async () => ({
+      fieldsJson: {
+        sections: [{
+          key: "details",
+          fields: [{ key: "selectedField", type: "text", dataType: "string" }],
+        }],
+      },
+    }),
+  });
+
+  await helpers.archivePassportSnapshot({
+    passportType: "subsetPassportV1",
+    passport: {
+      id: 1,
+      dppId: "DPP-archive",
+      lineageId: "lineage-archive",
+      companyId: 7,
+      versionNumber: 1,
+      releaseStatus: "draft",
+      selectedField: "kept",
+      excludedLegacyField: "must not be archived",
+    },
+  });
+
+  const rowData = JSON.parse(inserts[0].params[9]);
+  assert.equal(rowData.selectedField, "kept");
+  assert.equal(Object.prototype.hasOwnProperty.call(rowData, "excludedLegacyField"), false);
 });

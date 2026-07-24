@@ -435,7 +435,8 @@ module.exports = function createAssetService({
     const companyPolicy = await getCompanyDppPolicy(companyId);
     const currentRows = await getLatestCompanyPassports({
       companyId,
-      passportType: typeSchema.typeName
+      passportType: typeSchema.typeName,
+      schema: typeSchema,
     });
     const currentByDppId = new Map(currentRows.map((row) => [row.dppId, row]));
     const currentByProductId = new Map(
@@ -978,7 +979,7 @@ module.exports = function createAssetService({
         }
 
         const dynamicEntries = Object.entries(dynamicValues).filter(([fieldKey]) =>
-        /^[a-z][A-Za-z0-9]{0,99}$/.test(fieldKey)
+        /^[a-z][A-Za-z0-9]{0,199}$/.test(fieldKey)
         );
 
         if (dynamicEntries.length) {
@@ -1177,11 +1178,10 @@ module.exports = function createAssetService({
       };
     } catch (error) {
       logger.error({ err: error, jobId: job.id || null, companyId: job.companyId }, "Asset management job failed");
-      const entitlementRevoked = error?.code === "assetManagementDisabled"
-        || error?.code === "assetManagementCompanyInactive"
+      const companyUnavailable = error?.code === "assetManagementCompanyInactive"
         || error?.code === "assetManagementCompanyNotFound";
       const failureMessage = getSafeErrorMessage(error, "Asset job failed.");
-      const nextRunAt = job.isActive && !entitlementRevoked ?
+      const nextRunAt = job.isActive && !companyUnavailable ?
       resolveAssetJobNextRunAt({
         startAt: job.startAt || new Date(),
         intervalMinutes: job.intervalMinutes,
@@ -1201,7 +1201,7 @@ module.exports = function createAssetService({
            WHERE id = $1`,
           [
           job.id,
-          entitlementRevoked ? "disabled" : "failed",
+          companyUnavailable ? "disabled" : "failed",
           JSON.stringify({ error: failureMessage }),
           nextRunAt,
           nextRunAt ? true : false]
@@ -1215,14 +1215,14 @@ module.exports = function createAssetService({
         passportType: job.passportType,
         triggerType,
         sourceKind: job.sourceKind,
-        status: entitlementRevoked ? "disabled" : "failed",
+        status: companyUnavailable ? "disabled" : "failed",
         summary: { error: failureMessage },
         requestJson: { options },
         generatedJson: null
       });
 
       return {
-        status: entitlementRevoked ? "disabled" : "failed",
+        status: companyUnavailable ? "disabled" : "failed",
         run,
         error
       };
@@ -1239,7 +1239,6 @@ module.exports = function createAssetService({
          JOIN companies c ON c.id = j."companyId"
          WHERE j."isActive" = true
            AND c."isActive" = true
-           AND c."assetManagementEnabled" = true
            AND j."nextRunAt" IS NOT NULL
            AND j."nextRunAt" <= NOW()
          ORDER BY j."nextRunAt" ASC

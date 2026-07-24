@@ -206,7 +206,7 @@ function createDppUseCase(deps) {
     }
 
     const createdPassport = {
-      ...normalizePassportRow(insertResult.rows[0]),
+      ...normalizePassportRow(insertResult.rows[0], typeSchema),
       passportType: resolvedPassportType,
     };
     const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
@@ -225,7 +225,7 @@ function createDppUseCase(deps) {
       granularity: requestedGranularity,
     });
     await archivePassportSnapshot({
-      passport: insertResult.rows[0],
+      passport: createdPassport,
       passportType: resolvedPassportType,
       archivedBy: req.user.userId,
       actorIdentifier: deps.getActorIdentifier(req.user),

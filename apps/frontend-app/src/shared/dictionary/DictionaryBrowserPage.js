@@ -45,19 +45,78 @@ function formatDataType(term) {
   return term.dataType?.jsonType || term.dataType?.format || "string";
 }
 
+export function getLocalSemanticLabel(value) {
+  const segments = String(value || "")
+    .split(/\s*>\s*/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  return segments.at(-1) || "";
+}
+
+function humanizeSemanticIdentifier(value) {
+  const words = String(value || "")
+    .trim()
+    .replace(/^.*:/, "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!words) return "";
+  const normalized = words
+    .split(" ")
+    .map((word) => /^[A-Z0-9]{2,}$/.test(word) ? word : word.toLowerCase())
+    .join(" ");
+  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
+}
+
+function cleanCurie(value) {
+  const curie = String(value || "").trim();
+  return /^[A-Za-z][A-Za-z0-9._-]*:[A-Za-z0-9][A-Za-z0-9._-]*$/.test(curie)
+    ? curie
+    : "";
+}
+
+export function getSemanticReferenceDisplay(reference, fallbackLabel = "") {
+  const label = getLocalSemanticLabel(reference?.label);
+  const curie = cleanCurie(reference?.curie);
+  const rawFallback = getLocalSemanticLabel(fallbackLabel);
+  const readableFallback = /^[a-z][A-Za-z0-9_-]*$/.test(rawFallback)
+    ? humanizeSemanticIdentifier(rawFallback)
+    : rawFallback;
+  const primary = label
+    || readableFallback
+    || humanizeSemanticIdentifier(reference?.key)
+    || humanizeSemanticIdentifier(curie);
+  return {
+    primary: primary || "Not specified",
+    secondary: curie && curie.toLowerCase() !== primary.toLowerCase() ? curie : "",
+  };
+}
+
+function SemanticReference({ reference, fallbackLabel = "" }) {
+  const display = getSemanticReferenceDisplay(reference, fallbackLabel);
+  return (
+    <span className="dictionary-semantic-reference">
+      <span className="dictionary-semantic-reference-label">{display.primary}</span>
+      {display.secondary && (
+        <code className="dictionary-semantic-reference-curie">{display.secondary}</code>
+      )}
+    </span>
+  );
+}
+
 function TermCard({ term, unitsByKey, termHref }) {
   const unitObj = unitsByKey.get(term.unit);
   const unitDisplay = term.unitDisplay || unitObj?.display || (term.unit === "none" ? "n.a." : term.unit || "n.a.");
-  const domainDisplay = term.domain?.curie || term.domain?.label || "";
-  const rangeDisplay = term.range?.curie || term.range?.label || "";
   const dataTypeDisplay = formatDataType(term);
+  const termLabel = getLocalSemanticLabel(term.label) || term.label;
 
   return (
     <article className="dictionary-term-card">
       <div className="dictionary-term-header">
         <div className="dictionary-term-main">
           <div className="dictionary-term-heading-row">
-            <strong className="dictionary-term-title">{term.label}</strong>
+            <strong className="dictionary-term-title">{termLabel}</strong>
           </div>
           <p className="dictionary-term-definition">{term.definition}</p>
           <div className="dictionary-term-meta-grid">
@@ -71,11 +130,11 @@ function TermCard({ term, unitsByKey, termHref }) {
             </div>
             <div className="dictionary-term-meta-block">
               <span className="dictionary-term-meta-label">Domain</span>
-              <strong className="dictionary-term-meta-mono">{domainDisplay || "Not specified"}</strong>
+              <SemanticReference reference={term.domain} />
             </div>
             <div className="dictionary-term-meta-block">
               <span className="dictionary-term-meta-label">Range</span>
-              <strong className="dictionary-term-meta-mono">{rangeDisplay || "Not specified"}</strong>
+              <SemanticReference reference={term.range} fallbackLabel={dataTypeDisplay} />
             </div>
           </div>
           <div className="dictionary-term-meta-line">
@@ -143,11 +202,11 @@ function DictionaryModelCard({ model, href }) {
 }
 
 function DictionaryDetail({ term, unitsByKey, manifest, basePath, apiPath }) {
-  const owningClassLabel = term.domain?.label || term.domain?.key || "n.a.";
+  const owningClass = getSemanticReferenceDisplay(term.domain);
+  const owningClassLabel = owningClass.primary;
   const unitDisplay = term.unitDisplay || unitsByKey.get(term.unit)?.display || (term.unit === "none" ? "n.a." : term.unit || "n.a.");
   const dataTypeDisplay = formatDataType(term);
-  const domainDisplay = term.domain?.curie || term.domain?.label || "";
-  const rangeDisplay = term.range?.curie || term.range?.label || "";
+  const termLabel = getLocalSemanticLabel(term.label) || term.label;
 
   return (
     <>
@@ -170,7 +229,7 @@ function DictionaryDetail({ term, unitsByKey, manifest, basePath, apiPath }) {
             <span className="dictionary-chip dictionary-chip-muted">{owningClassLabel}</span>
           </div>
 
-          <h1 className="dictionary-detail-title">{term.label}</h1>
+          <h1 className="dictionary-detail-title">{termLabel}</h1>
           <p className="dictionary-detail-subtitle">{term.definition}</p>
 
           <div className="dictionary-detail-grid">
@@ -179,8 +238,11 @@ function DictionaryDetail({ term, unitsByKey, manifest, basePath, apiPath }) {
             <DetailRow label="Data format" value={term.dataType?.format} />
             <DetailRow label="JSON type" value={term.dataType?.jsonType} />
             <DetailRow label="XSD datatype" value={term.dataType?.xsdType} mono />
-            <DetailRow label="Domain" value={domainDisplay} mono />
-            <DetailRow label="Range" value={rangeDisplay} mono />
+            <DetailRow label="Domain" value={<SemanticReference reference={term.domain} />} />
+            <DetailRow
+              label="Range"
+              value={<SemanticReference reference={term.range} fallbackLabel={dataTypeDisplay} />}
+            />
             <DetailRow label="Unit" value={unitDisplay} />
             <DetailRow label="Internal key" value={term.internalKey} mono />
           </div>
@@ -336,7 +398,7 @@ export default function DictionaryBrowserPage() {
   }, [classes, terms]);
 
   const activeClassLabel = useMemo(
-    () => classes.find((classDef) => classDef.key === activeClass)?.label || null,
+    () => getLocalSemanticLabel(classes.find((classDef) => classDef.key === activeClass)?.label) || null,
     [classes, activeClass]
   );
 
@@ -428,7 +490,7 @@ export default function DictionaryBrowserPage() {
             {manifest?.version && <span className="dictionary-chip dictionary-chip-muted">v{manifest.version}</span>}
           </div>
 
-          <h1>{isDetailView ? term?.label : (manifest?.name || "Semantic Dictionary")}</h1>
+          <h1>{isDetailView ? (getLocalSemanticLabel(term?.label) || term?.label) : (manifest?.name || "Semantic Dictionary")}</h1>
           <p className="dictionary-hero-subtitle">
             {isDetailView
               ? "Canonical dictionary metadata for this term, including its JSON-LD identifier and datatype contract."
@@ -442,7 +504,7 @@ export default function DictionaryBrowserPage() {
             </div>
             <div className="dictionary-meta-card">
               <span>{isDetailView ? "Owning class" : "Classes"}</span>
-              <strong>{isDetailView ? (term?.domain?.label || term?.domain?.key || "n.a.") : classes.length}</strong>
+              <strong>{isDetailView ? getSemanticReferenceDisplay(term?.domain).primary : classes.length}</strong>
             </div>
           </div>
         </div>
@@ -505,7 +567,7 @@ export default function DictionaryBrowserPage() {
                   onClick={() => setActiveClass(activeClass === classDef.key ? null : classDef.key)}
                   className={`dictionary-class-pill${activeClass === classDef.key ? " is-active" : ""}`}
                 >
-                  {classDef.label}
+                  {getLocalSemanticLabel(classDef.label) || classDef.label}
                   <span>{classCounts.get(classDef.key) || 0}</span>
                 </button>
               ))}

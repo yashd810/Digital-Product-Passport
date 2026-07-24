@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import { translateFieldValue, translateSchemaLabel } from "../../app/providers/i18n";
 import { normalizeSystemPassportHeader, resolveSystemHeaderEntries } from "../../admin/passport-types/builderHelpers";
 import { formatPassportStatus } from "../../passports/utils/passportStatus";
@@ -14,7 +14,6 @@ import { normalizeTableColumns, parseTableRows } from "../../shared/passports/ta
 import { resolveManagedSystemHeaderValue } from "../../shared/passports/systemHeaderManagedValues";
 import { flattenSchemaFieldsFromSections, normalizeSchemaSections } from "../../shared/passports/passportSchemaUtils";
 import SemanticGraphValue from "../../shared/passports/SemanticGraphValue";
-import { getRootSemanticProperty } from "../../shared/passports/semanticGraphUtils";
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable } from "./PieChart";
 import { FileCell, LiveBadge, LockedFieldCell, RefreshableImage, ViewerDomainIndicator } from "./ViewerBlocks";
@@ -388,9 +387,7 @@ function DataFieldValue({
 
   const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
   const { raw, isLocked, isDynamic, isPublic, dynEntry } = resolved;
-  const semanticProperty = field.rangeKind
-    ? (getRootSemanticProperty(semanticGraph, field.key) || field)
-    : null;
+  const semanticProperty = field.rangeKind && field.type !== "table" ? field : null;
   const pieItems = getCompositionItems(field, raw);
 
   useEffect(() => {
@@ -571,59 +568,68 @@ function DataFieldRows({ fields = [], ...fieldProps }) {
   );
 }
 
-function DataSubGroupContainer({ section, lang, ...fieldProps }) {
+export function DataNestedSection({
+  section,
+  sectionIndex = 0,
+  depth = 1,
+  defaultExpanded = depth === 1 && sectionIndex === 0,
+  lang,
+  ...fieldProps
+}) {
   const childSections = section.sections || [];
-  return (
-    <article className="data-subgroup-card">
-      <div className="data-subgroup-head">
-        <h4>{translateSchemaLabel(lang, section)}</h4>
-      </div>
-      <DataFieldRows fields={section.fields || []} lang={lang} {...fieldProps} />
-      {childSections.map((child, childIndex) => (
-        <DataSubGroupContainer
-          key={child.key || `${section.key || "section"}-${childIndex}`}
-          section={child}
-          lang={lang}
-          {...fieldProps}
-        />
-      ))}
-    </article>
-  );
-}
+  const [expanded, setExpanded] = useState(() => defaultExpanded);
+  const reactId = useId();
+  const contentId = `passport-data-section-${reactId.replace(/[^A-Za-z0-9_-]/g, "")}`;
+  const headingLevel = Math.min(depth + 3, 6);
+  const visualDepth = Math.min(depth, 4);
 
-function DataSecondLevelSection({ section, sectionIndex, lang, ...fieldProps }) {
-  const childSections = section.sections || [];
   return (
-    <details className="category data-section-dropdown" open={sectionIndex === 0}>
-      <summary>
-        <div className="cat-title">
-          <div>
-            <h3>{translateSchemaLabel(lang, section)}</h3>
-          </div>
-        </div>
-        <div className="cat-meta">
+    <details
+      className={`category data-section-dropdown data-nested-section data-nested-section-depth-${visualDepth}`}
+      data-section-depth={depth}
+      open={expanded}
+      onToggle={(event) => {
+        const nextExpanded = event.currentTarget.open;
+        if (nextExpanded !== expanded) setExpanded(nextExpanded);
+      }}
+    >
+      <summary aria-controls={contentId} aria-expanded={expanded}>
+        <span className="cat-title">
+          <span
+            className="data-nested-section-title"
+            role="heading"
+            aria-level={headingLevel}
+          >
+            {translateSchemaLabel(lang, section)}
+          </span>
+        </span>
+        <span className="cat-meta">
           <span className="chevron" aria-hidden="true" />
-        </div>
+        </span>
       </summary>
 
-      {(section.fields || []).length > 0 && (
-        <div className="data-direct-field-card">
-          <DataFieldRows fields={section.fields || []} lang={lang} {...fieldProps} />
-        </div>
-      )}
+      <div className="data-nested-section-content" id={contentId}>
+        {(section.fields || []).length > 0 && (
+          <div className="data-direct-field-card">
+            <DataFieldRows fields={section.fields || []} lang={lang} {...fieldProps} />
+          </div>
+        )}
 
-      {childSections.length > 0 && (
-        <div className="data-subgroup-stack">
-          {childSections.map((child, childIndex) => (
-            <DataSubGroupContainer
-              key={child.key || `${section.key || "section"}-${childIndex}`}
-              section={child}
-              lang={lang}
-              {...fieldProps}
-            />
-          ))}
-        </div>
-      )}
+        {childSections.length > 0 && (
+          <div className="data-nested-section-children">
+            {childSections.map((child, childIndex) => (
+              <DataNestedSection
+                key={child.key || `${section.key || "section"}-${childIndex}`}
+                section={child}
+                sectionIndex={childIndex}
+                depth={depth + 1}
+                lang={lang}
+                {...fieldProps}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </details>
   );
 }
@@ -1169,7 +1175,7 @@ export default function PublicPassportPortal({
 
                   <div className="category-stack">
                     {(selectedDataSection.sections || []).map((section, sectionIndex) => (
-                      <DataSecondLevelSection
+                      <DataNestedSection
                         key={section.key || sectionIndex}
                         section={section}
                         sectionIndex={sectionIndex}

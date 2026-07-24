@@ -105,7 +105,7 @@ function registerPassportSupportRoutes(app, deps) {
         if (!fieldKey || !passportType) {
           return res.status(400).json({ error: "fieldKey and passportType required" });
         }
-        if (!/^[a-z][A-Za-z0-9]{0,99}$/.test(fieldKey)) {
+        if (!/^[a-z][A-Za-z0-9]{0,199}$/.test(fieldKey)) {
           return res.status(400).json({ error: "Invalid fieldKey" });
         }
 
@@ -222,6 +222,8 @@ function registerPassportSupportRoutes(app, deps) {
         FROM "passportTypes" pt
         JOIN "companyPassportAccess" cpa ON pt.id = cpa."passportTypeId"
         WHERE cpa."companyId" = $1
+          AND COALESCE(cpa."accessRevoked", false) = false
+          AND pt."isActive" = true
         ORDER BY pt."productCategory", pt."displayName"
       `, [req.params.companyId]);
       res.json(r.rows.map(mapPassportTypeRow));

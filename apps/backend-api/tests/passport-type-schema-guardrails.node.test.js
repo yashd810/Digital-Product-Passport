@@ -54,6 +54,48 @@ test("nested section validation accepts canonical nested schemas", () => {
   assert.equal(validatePassportTypeSections(sections), null);
 });
 
+test("section validation accepts datetime fields with the canonical datetime data type", () => {
+  const sections = [{
+    key: "traceability",
+    label: "Traceability",
+    fields: [{
+      key: "latestUpdateAt",
+      label: "Latest update at",
+      type: "datetime",
+      dataType: "datetime",
+    }],
+  }];
+
+  assert.equal(validatePassportTypeSections(sections), null);
+
+  sections[0].fields[0].dataType = "date";
+  assert.equal(
+    validatePassportTypeSections(sections),
+    'Field "latestUpdateAt" type "datetime" requires dataType "datetime".'
+  );
+});
+
+test("section validation rejects empty leaf sections but allows subsection containers", () => {
+  const sections = [{
+    key: "composition",
+    label: "Composition",
+    fields: [],
+    sections: [{
+      key: "materials",
+      label: "Materials",
+      fields: [],
+    }],
+  }];
+
+  assert.equal(
+    validatePassportTypeSections(sections),
+    "A section without subsections needs at least one field."
+  );
+
+  sections[0].sections[0].fields.push(field("materialName", "Material name"));
+  assert.equal(validatePassportTypeSections(sections), null);
+});
+
 test("nested section validation bounds depth without recursive stack exhaustion", () => {
   const root = {
     key: "section1",
