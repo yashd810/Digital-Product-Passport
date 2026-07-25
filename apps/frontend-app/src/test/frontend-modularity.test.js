@@ -708,6 +708,7 @@ describe("frontend modularity helpers", () => {
     expect(pageSelectStyles).not.toMatch(/--select-(?:bg|hover)-layer/);
     expect(pageSelectStyles).not.toMatch(/background-image:\s*var\(--select-arrow-icon\)/);
     expect(adminStyles).not.toMatch(/\.admin-select-(?:trigger|menu)/);
+    expect(adminStyles).not.toMatch(/\.acpt-select-menu\s*\{\s*min-width:\s*100%/);
   });
 
   test("app-owned dropdown helpers retain option values and skip disabled choices", () => {
