@@ -113,6 +113,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         { label: "Entry point", value: "The green '+ Create Passport' button at the top of the sidebar, or /dashboard/create directly." },
         { label: "Step 1", value: "Select the passport type you want to create for." },
         { label: "Step 2", value: "Choose the creation method that matches your situation." },
+        { label: "Passport-type scope", value: "The hub and templates show only active passport types granted to your company. The same active grant is enforced by type-scoped create, import, update, lifecycle, read, export, and template APIs." },
         { label: "Viewer limitation", value: "Viewer accounts cannot access the create hub or any creation routes." },
       ],
       journeys: [
@@ -140,7 +141,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "Choose 'Bulk create (empty drafts)' and enter the number of passports you need (up to 500).",
             "All drafts are created immediately with auto-generated names. They can be renamed and filled later.",
-            "After bulk create, open the relevant passport list or My Passports, use Export to download the drafts as CSV or JSON, then re-import through the update flow once you have unit-level data ready.",
+            "After bulk create, open the relevant passport list or My Passports, use Export to download the drafts as CSV or JSON, then select the editable drafts and use Bulk Edit > CSV or JSON once you have unit-level data ready.",
             "Best for: when you need to generate serial numbers or unit IDs for a batch before data is available.",
           ],
         },
@@ -149,17 +150,18 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "In the hub, choose 'Create from a template', pick a template, then choose 'Bulk create from template'.",
             "This combines template pre-fill with bulk quantity  -  all passports are created pre-filled with model data.",
-            "Immediately after creation, open the passport list and use Export for CSV or JSON, add unit-level fields externally, then re-import through the update flow.",
+            "Immediately after creation, open the passport list and use Export for CSV or JSON, add unit-level fields externally, then select the editable drafts and use Bulk Edit > CSV or JSON to apply the updates.",
             "Best for: manufacturing or logistics teams generating a full product batch for a specific model.",
           ],
         },
         {
-          title: "Method 5  -  Import from CSV or JSON",
+          title: "Method 5  -  Import new drafts from CSV or JSON",
           items: [
             "Choose 'Import from CSV' to go directly to the import guide for the selected type.",
             "Download the template CSV, fill in one column per passport, then upload to create all records at once.",
-            "Choose 'Import / update via JSON or CSV' when you already have draft DPP IDs and want to update existing records: any row with a DPP ID patches the matching draft, rows without DPP IDs create new ones.",
-            "Best for: teams with data already in spreadsheets or ERP exports, or when updating a previously bulk-created batch.",
+            "The import guide creates new drafts from CSV or JSON. It accepts only the selected passport type's field keys and authorable values; semantic relationships are not importable company data.",
+            "To update existing editable records, select them in the passport list, choose Bulk Edit, then use its CSV or JSON tab. Each update row needs a dppId or internalAliasId plus exact field keys.",
+            "Best for: teams with data already in spreadsheets or ERP exports, or when creating a previously prepared batch.",
           ],
         },
         {
@@ -169,14 +171,14 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "In the Create Hub, choose that template and bulk create the quantity you need  -  all pre-filled with model data.",
             "Open the passport list for that type or My Passports and export the newly created drafts as CSV or JSON.",
             "Open the file in Excel or Sheets, fill in the unit-specific columns (serial number, manufacture date, etc.).",
-            "Upload through 'Import / update via JSON or CSV' in Update mode  -  each row with a DPP ID updates the matching draft, while rows without DPP IDs can create new drafts.",
+            "Select the target editable drafts in the passport list, choose Bulk Edit, and upload the CSV or JSON update file. Bulk Edit matches only the selected existing passports by dppId or internalAliasId; it does not create extra records from unmatched rows.",
           ],
         },
       ],
       links: [
         { label: "Open Create Hub", route: dashboardPath("create"), description: "The single entry point for all creation methods." },
         { label: "Open Templates", route: dashboardPath("templates"), description: "Manage reusable model templates for single and bulk creation." },
-        { label: "Open CSV Import Guide", route: csvRoute || dashboardPath("my-passports"), description: "Detailed import/update guide for the first available type." },
+        { label: "Open CSV Import Guide", route: csvRoute || dashboardPath("my-passports"), description: "Create new drafts from a CSV or JSON file for the first available type; use Bulk Edit from a passport list for updates." },
       ],
       previews: [
         buildPreview(
@@ -194,20 +196,20 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         ),
         buildPreview(
           "user-csv-guide",
-          "CSV and JSON import / update guide",
+          "CSV and JSON draft-import guide",
           csvRoute,
-          "Three tabs: create new passports, update existing by CSV, update existing by JSON.",
+          "Two tabs create new drafts from CSV or JSON. The selected-passport Bulk Edit dialog handles CSV and JSON updates.",
           csvRoute ? "" : "CSV guide previews need at least one granted passport type."
         ),
       ],
       tips: [
         "For any repeating product model, always create a template first. It saves time on every subsequent creation.",
-        "The most reliable large-batch pattern is create drafts first, export from the passport list, fill unit-specific data externally, then re-import in update mode.",
+        "The most reliable large-batch pattern is create drafts first, export from the passport list, fill unit-specific data externally, then use that list's Bulk Edit CSV or JSON tab to update the selected drafts.",
         "If your data is already in an ERP or spreadsheet, CSV import keeps column names consistent from day one.",
       ],
       warnings: [
         "Create, edit, and release actions are restricted by role. If the Create button is missing from the sidebar, your account may be set to Viewer.",
-        "Bulk-created drafts do not auto-fill unit-level data. Always follow up with a CSV/JSON import or manual editing.",
+        "Bulk-created drafts do not auto-fill unit-level data. Follow up with the passport list's Bulk Edit CSV/JSON flow or manual editing.",
       ],
     },
     {
@@ -337,9 +339,9 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       facts: [
         { label: "Best for", value: "Repeated model families, standard baseline values, and faster draft generation" },
         { label: "Template outputs", value: "Single create and bulk create with model data pre-filled" },
-        { label: "Update paths", value: "CSV and JSON imports can update template-generated drafts after creation" },
+        { label: "Update paths", value: "Select template-generated editable drafts in a passport list, then use Bulk Edit > CSV or JSON to update them" },
         { label: "Model data", value: "Fields marked as model data stay fixed when the template is reused" },
-        { label: "Template scope", value: "Templates store passport field values only; semantic relationship metadata is not an authorable template section" },
+        { label: "Template scope", value: "Templates store passport field values only and are available only for an active company-granted passport type; semantic relationship metadata is not an authorable template section" },
       ],
       journeys: [
         {
@@ -362,8 +364,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         {
           title: "Bring updated data back in",
           items: [
-            "Use CSV import when the external update naturally fits spreadsheet workflows.",
-            "Use JSON import when another system already emits structured payloads for draft enrichment.",
+            "Use the passport list's Bulk Edit > CSV tab when the external update naturally fits spreadsheet workflows.",
+            "Use the passport list's Bulk Edit > JSON tab when another system already emits structured payloads for draft enrichment.",
             "Keep template descriptions clear so teammates know which template is safe to reuse and which one is only for a special project.",
           ],
         },
@@ -797,7 +799,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       category: "API",
       audience: "Company admins and editors performing protected write operations",
       title: "Use the company write APIs for create, update, release, revise, and bulk handling",
-      summary: "These are the main protected endpoints for changing passport data from scripts, tools, or controlled internal integrations. Every endpoint in this section needs a browser session or bearer token plus company access, and most of them also require an editor or company-admin role.",
+      summary: "These are the main protected endpoints for changing passport data from scripts, tools, or controlled internal integrations. Every endpoint in this section needs a browser session or bearer token, company access, and an active grant for the target passport type; most also require an editor or company-admin role.",
       facts: [
         { label: "Dashboard auth", value: "Session cookie sent automatically by fetchWithAuth" },
         { label: "Script auth", value: "Authorization: Bearer <token> when you intentionally issue a token" },
@@ -835,9 +837,9 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       category: "API",
       audience: "Company users and integration teams that need controlled reads or exports",
       title: "Read, compare, and export passport data with the company APIs",
-      summary: "Not every integration is a write integration. Many teams simply need to read what already exists, fetch many passports by known IDs, export CSV or JSON, inspect version history, . These endpoints stay inside the normal company security boundary and therefore use dashboard session or bearer authentication.",
+      summary: "Not every integration is a write integration. Many teams simply need to read what already exists, fetch many passports by known IDs, export CSV or JSON-LD, or inspect version history. These endpoints stay inside the normal company security boundary and therefore use dashboard session or bearer authentication. Type-specific reads and exports also require an active grant for that type.",
       facts: [
-        { label: "Read auth", value: "Session cookie or bearer token with company access" },
+        { label: "Read auth", value: "Session cookie or bearer token with company access; type-scoped reads and exports also need an active grant for the requested type" },
         { label: "Best use case", value: "Internal tools, controlled exports, compare/history pages, and support diagnostics" },
         { label: "Export formats", value: "CSV and JSON-LD from the draft export endpoint" },
         { label: "Matching helper", value: "bulk-fetch lets you ask for many passports by dppId or internalAliasId in one request" },
@@ -874,6 +876,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       table: publicAndLiveApiTable,
       warnings: [
         "Public viewer access and API-key access are not the same thing. A public link does not grant company-wide API access.",
+        "Bearer-token standards create, patch, archive, and delete requests also need an active company grant for the relevant passport type. Revoking that grant does not unpublish an already released public passport.",
       ],
     },
     {
@@ -964,6 +967,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       summary: "Released passports become much more than rows in a table. Their public viewer can show introduction content, translations, charts, signatures, PDF previews, restricted-field unlocking, scan indicators, carrier authenticity evidence, suspicious-carrier reporting, and printable output for external audiences.",
       facts: [
         { label: "Public entry points", value: "Copied link or QR code into the canonical public `/dpp/:manufacturerSlug/:modelSlug/:dppId` route" },
+        { label: "Draft preview", value: "Draft and in-revision records open the protected dashboard `/dpp/preview/:manufacturerSlug/:modelSlug/:previewId` route. It is not a public or shareable viewer link." },
         { label: "Viewer structure", value: "Nested sections and subsections keep their parent-child hierarchy instead of being flattened" },
         { label: "Viewer features", value: "Introduction tabs, translated nested sections, time-series charts, any configured composition charts, PDF previews, QR display, print, signature badges, scan badges, and carrier authenticity indicators" },
         { label: "Restricted access", value: "Restricted fields stay hidden until unlocked with a matching security group API key" },
@@ -974,6 +978,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           title: "Prepare a passport for external viewing",
           items: [
             "Release the passport so the public route becomes available.",
+            "Use the protected Preview action while a record is still a draft or in revision; use the public link only after release.",
             "Use Company Profile introduction and branding settings to improve the context external viewers see first.",
             "Copy the passport link or print QR labels when the record needs to travel with the physical product.",
           ],

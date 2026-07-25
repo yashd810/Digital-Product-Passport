@@ -33,6 +33,12 @@ module.exports = function registerCatalogRoutes(app, deps) {
     getPassportTypeModules: listPassportTypeModules = getPassportTypeModules,
   } = deps;
 
+  const getAdminAuditOptions = (req) => ({
+    actorIdentifier: req.user?.actorIdentifier
+      || (req.user?.userId ? `user:${req.user.userId}` : null),
+    audience: "superAdmin",
+  });
+
   const sendSafeRouteError = (res, error, fallbackMessage) => {
     const statusCode = getSafeErrorStatus(error);
     const payload = {
@@ -210,6 +216,16 @@ module.exports = function registerCatalogRoutes(app, deps) {
         "INSERT INTO \"productCategories\" (name, icon) VALUES ($1, $2) RETURNING *",
         [name.trim(), icon]
       );
+      await logAudit(
+        null,
+        req.user.userId,
+        "createProductCategory",
+        "productCategories",
+        String(result.rows[0].id),
+        null,
+        { name: result.rows[0].name, icon: result.rows[0].icon },
+        getAdminAuditOptions(req)
+      );
       res.status(201).json(result.rows[0]);
     } catch (error) {
       if (error.code === "23505") return res.status(400).json({ error: "Category already exists" });
@@ -237,7 +253,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
       }
       await pool.query("DELETE FROM \"productCategories\" WHERE id = $1", [req.params.id]);
       await logAudit(null, req.user.userId, "deleteProductCategory", "productCategories", req.params.id, null,
-        { name: category.rows[0].name });
+        { name: category.rows[0].name }, getAdminAuditOptions(req));
       res.json({ success: true });
     } catch {
       res.status(500).json({ error: "Failed to delete category" });
@@ -417,7 +433,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
           updatedFields: updates,
           materialProfileChange,
           profileDigest: compiledFieldsJson?.profileDigest || currentType.fieldsJson?.profileDigest || null,
-        });
+        }, getAdminAuditOptions(req));
 
       if (compiledFieldsJson && materialProfileChange) {
         await createPassportTable(currentType.typeName, {
@@ -463,7 +479,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
       await pool.query(`DROP TABLE IF EXISTS ${tableName}`);
 
       await logAudit(null, req.user.userId, "deletePassportType", "passportTypes", null, null,
-        { typeName, displayName });
+        { typeName, displayName }, getAdminAuditOptions(req));
 
       res.json({ success: true });
     } catch (error) {
@@ -547,7 +563,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
           sourceModule,
           profileDigest: fieldsJson.profileDigest,
           includedFieldCount: fieldsJson.profile?.includedFields?.length || 0,
-        });
+        }, getAdminAuditOptions(req));
 
       res.status(201).json({
         success: true,
@@ -652,6 +668,16 @@ module.exports = function registerCatalogRoutes(app, deps) {
         "INSERT INTO symbols (name, category, \"storageKey\", \"storageProvider\", \"fileUrl\", \"createdBy\") VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
         [name.trim(), category.trim() || "General", stored.storageKey, stored.provider, stored.url, req.user.userId]
       );
+      await logAudit(
+        null,
+        req.user.userId,
+        "createSymbol",
+        "symbols",
+        String(result.rows[0].id),
+        null,
+        { name: result.rows[0].name, category: result.rows[0].category },
+        getAdminAuditOptions(req)
+      );
       res.status(201).json(result.rows[0]);
     } catch (error) {
       if (error.code === "storageDisabled") {
@@ -668,10 +694,20 @@ module.exports = function registerCatalogRoutes(app, deps) {
   app.delete("/api/admin/symbols/:id", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const result = await pool.query(
-        "UPDATE symbols SET \"isActive\" = false WHERE id = $1 RETURNING id",
+        "UPDATE symbols SET \"isActive\" = false WHERE id = $1 RETURNING id, name, category",
         [req.params.id]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Symbol not found" });
+      await logAudit(
+        null,
+        req.user.userId,
+        "deleteSymbol",
+        "symbols",
+        String(result.rows[0].id),
+        { name: result.rows[0].name, category: result.rows[0].category, isActive: true },
+        { name: result.rows[0].name, category: result.rows[0].category, isActive: false },
+        getAdminAuditOptions(req)
+      );
       res.json({ success: true });
     } catch {
       res.status(500).json({ error: "Failed to delete symbol" });
@@ -691,6 +727,16 @@ module.exports = function registerCatalogRoutes(app, deps) {
         [req.params.id]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Passport type not found" });
+      await logAudit(
+        null,
+        req.user.userId,
+        "deactivatePassportType",
+        "passportTypes",
+        String(result.rows[0].id),
+        { isActive: true },
+        { isActive: false, typeName: result.rows[0].typeName },
+        getAdminAuditOptions(req)
+      );
       res.json({ success: true, passportType: mapPassportTypeRow(result.rows[0]) });
     } catch {
       res.status(500).json({ error: "Failed to deactivate passport type" });
@@ -710,6 +756,16 @@ module.exports = function registerCatalogRoutes(app, deps) {
         [req.params.id]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Passport type not found" });
+      await logAudit(
+        null,
+        req.user.userId,
+        "activatePassportType",
+        "passportTypes",
+        String(result.rows[0].id),
+        { isActive: false },
+        { isActive: true, typeName: result.rows[0].typeName },
+        getAdminAuditOptions(req)
+      );
       res.json({ success: true, passportType: mapPassportTypeRow(result.rows[0]) });
     } catch {
       res.status(500).json({ error: "Failed to activate passport type" });

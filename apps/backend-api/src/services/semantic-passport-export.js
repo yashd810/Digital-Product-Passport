@@ -5,6 +5,7 @@ const { getPassportFieldDataTypeError } = require("../shared/passports/passport-
 const {
   coerceSemanticGraphPropertyValue,
   flattenSchemaFieldsFromSections,
+  normalizePassportRow,
   projectPassportRowToSchema,
 } = require("../shared/passports/passport-helpers");
 const {
@@ -234,8 +235,14 @@ function createSemanticPassportExportService({
         ? ["DigitalProductPassport", rootClass.semanticId]
         : "DigitalProductPassport",
     };
+    // Export paths can receive a raw database row (for example, bulk and
+    // template exports). Normalize it before coercion so deterministic
+    // physical SQL column names for long logical field keys are restored.
+    // Otherwise a valid selected field could be emitted under its hashed
+    // storage key instead of its schema/JSON-LD term.
+    const normalizedPassport = normalizePassportRow(passport, typeDef);
     const typedPassport = projectPassportRowToSchema(decoratePassportSemanticGraph(
-      coercePassportSchemaValues(passport, typeDef),
+      coercePassportSchemaValues(normalizedPassport, typeDef),
       typeDef
     ), typeDef);
     const resolvedPassportType = typedPassport?.passportType || passportType || null;

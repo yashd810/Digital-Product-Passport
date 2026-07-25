@@ -16,6 +16,7 @@ import { buildDashboardPath } from "../utils/dashboardRoutes";
 import { buildUserTemplateFields } from "./templatePayload";
 import RepositoryPicker from "../../../passports/form/components/RepositoryPicker";
 import SymbolRepositoryPicker from "../../../passports/form/components/SymbolRepositoryPicker";
+import AppSelect from "../../../shared/components/AppSelect";
 import "../../../shared/styles/Dashboard.css";
 import "../../../shared/styles/CreatePass.css";
 
@@ -399,15 +400,15 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
             {isEdit ? (
               <div className="tmpl-type-badge">{editingTemplate.passportType}</div>
             ) : (
-              <select className="tmpl-select" value={passportType}
-                onChange={e => setPassportType(e.target.value)}>
+              <AppSelect className="tmpl-select" value={passportType}
+                onChange={e => setPassportType(e.target.value)} aria-label="Passport type">
                 <option value="">— Select type —</option>
                 {passportTypes.map(pt => (
                   <option key={pt.id} value={pt.typeName}>
                     {pt.displayName || pt.typeName}
                   </option>
                 ))}
-              </select>
+              </AppSelect>
             )}
           </div>
           <div className="tmpl-meta-group tmpl-meta-flex">

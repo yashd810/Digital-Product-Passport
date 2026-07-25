@@ -2077,9 +2077,9 @@ textarea {
 }
 
 .workspace-message {
-  position: sticky;
-  top: 12px;
-  z-index: 30;
+  width: min(100%, 520px);
+  margin: 0;
+  text-align: left;
   box-shadow: 0 10px 24px rgba(17, 44, 72, 0.12);
 }
 

@@ -380,7 +380,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
             "In Module Info, choose a stable family, version, type name, display metadata, and semantic model key, and set Base URL to https://claros-dpp.online so generated dictionary links use the production web domain.",
             "In Sections & Fields, create top-level sections, then nested subsections and sub-subsections. Add authorable fields to their real owning section; use table columns for repeated row structures.",
             "Labels, UI/data types, units, confidentiality, definitions, cardinality, and table structure are the editable source inputs. Generated camelCase keys, semantic slugs, unit keys, and schema metadata follow those inputs.",
-            "Fields CSV v2 preserves nested label paths and ordering. Exported derived identifiers are reference-only on import and are regenerated rather than trusted.",
+            "Fields CSV v2 preserves nested label paths and ordering. Exported derived identifiers are reference-only on import and are regenerated rather than trusted. This is module-structure CSV, not a company passport-value import format.",
             "Use Export CSV to download the current nested field definition. The file includes explicit label paths and can be imported again without flattening subsections.",
             "In Viewer Layout, map the system header roles and add as many composition chart mappings as needed, one per applicable table field.",
             "Save a draft before major changes. Status messages appear on every generator tab even when the triggering button is on another page.",
@@ -412,7 +412,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
             "Admin UI path: open Create Passport Type and choose the package under Passport Module Source. Select the fields this type needs, then choose required flags, confidentiality, translations, and chart presentation. Canonical keys, types, units, table columns, dynamic behavior, and semantics stay locked.",
             "Direct one-to-one seed: make sure DB_* or DPP_ENV_FILE points to the intended database, then from apps/backend-api run npm run seed:passport-types -- --dry-run --module=<family>:<version> and rerun without --dry-run when the preview is correct.",
             "Use npm run bootstrap:passport-modules -- --module=<family>:<version> when database migration and direct seed should run together.",
-            "Grant access in Admin > Passport Types or the company's Access page. A direct seed can instead add --company-id=<id>, a comma-separated ID list, or --grant-all-active-companies.",
+            "Grant access in Admin > Passport Types or the company's Access page. A direct seed can instead add --company-id=<id>, a comma-separated ID list, or --grant-all-active-companies. The backend enforces that active grant for direct create, CSV/JSON import, single/bulk field updates, lifecycle/workflow actions, authenticated reads/exports, template operations, and standards integration create/patch/delete/archive; hiding a type in the UI is not the only protection. Revoking a grant does not unpublish an already released public passport.",
             "Finally sign in as the company and verify the type appears in Create Passport, its dictionary is available, and a draft can be created.",
           ],
         },
@@ -433,7 +433,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Types",
       audience: "Super admins designing schemas",
       title: "Configure a module-backed passport type in the Admin builder",
-      summary: "The in-app builder turns a comprehensive registered module into a selected, compiled passport type. The super admin chooses included fields, optional or required status, confidentiality, translations, and chart presentation while canonical keys, datatypes, units, tables, dynamic behavior, and semantics remain module-controlled.",
+      summary: "The in-app builder turns a comprehensive registered module into a selected, compiled passport type. The super admin chooses included fields, optional or required status, confidentiality, translations, and chart presentation while canonical keys, datatypes, units, tables, dynamic behavior, and semantics remain module-controlled. That saved profile drives company forms and templates, validation, viewer rendering, and JSON-LD export.",
       facts: [
         { label: "Required first choice", value: "Passport Module Source; the backend rejects passport-type creation without a registered sourceModule" },
         { label: "Locked by module", value: "Field and column keys, UI/data types, units, semantic identities, table structure, and dynamic behavior" },
@@ -509,7 +509,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       },
       facts: [
         { label: "Admin route", value: "/admin/dictionary/:family/:version" },
-        { label: "Semantic model", value: "Each passport type selects the dictionary model it needs" },
+        { label: "Semantic model", value: "Each module-backed passport type inherits its dictionary model from the source module; its compiled profile filters the selected terms" },
         { label: "Dictionary APIs", value: "Manifest, context, classes, enums, units, terms, and term details" },
         { label: "Public availability", value: "Registered dictionaries are also available at /dictionary/:family/:version without dashboard login" },
       ],
@@ -646,9 +646,9 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       facts: [
         { label: "Admin page", value: "/admin/audit-logs" },
         { label: "Admin API", value: "GET /api/admin/audit-logs" },
-        { label: "Server-side scope", value: "Only audit rows whose actor currently has the superAdmin role" },
+        { label: "Server-side scope", value: "Audit rows recorded as super-admin activity, with a current-role fallback for older records created before event audiences were stored" },
         { label: "Supported query filters", value: "limit, offset, companyId, action, actor, from, and to" },
-        { label: "Company separation", value: "Company /activity and /audit-logs endpoints return companyAdmin, editor, or viewer actors belonging to that company—not super admins" },
+        { label: "Company separation", value: "GET /api/companies/:companyId/activity and /audit-logs return companyAdmin, editor, or viewer actors belonging to that company—not super admins" },
       ],
       journeys: [
         {

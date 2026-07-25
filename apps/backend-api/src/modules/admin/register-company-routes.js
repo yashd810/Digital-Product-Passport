@@ -56,6 +56,20 @@ module.exports = function registerCompanyRoutes(app, deps) {
     };
   }
 
+  function buildCompanyIdentityAuditPayload(row = {}) {
+    return {
+      companyName: row.companyName ?? null,
+      legalName: row.legalName ?? null,
+      country: row.country ?? null,
+      companyRegistrationNumber: row.companyRegistrationNumber ?? null,
+      vatNumber: row.vatNumber ?? null,
+      websiteDomain: row.websiteDomain ?? null,
+      customerTrustLevel: row.customerTrustLevel ?? null,
+      authorizedContactName: row.authorizedContactName ?? null,
+      authorizedContactEmail: row.authorizedContactEmail ?? null,
+    };
+  }
+
   function normalizeCompanyIdentity(input = {}) {
     const normalizeText = (value) => {
       const normalized = String(value || "").trim();
@@ -169,6 +183,27 @@ module.exports = function registerCompanyRoutes(app, deps) {
           policy.semanticDictionaryEnabled,
         ]
       );
+      if (typeof logAudit === "function") {
+        await logAudit(
+          companyId,
+          req.user?.userId,
+          "createCompany",
+          "companies",
+          String(companyId),
+          null,
+          {
+            companyName: companyIdentity.companyName,
+            country: companyIdentity.country,
+            customerTrustLevel: companyIdentity.customerTrustLevel,
+            dppPolicy: policy,
+          },
+          {
+            client,
+            actorIdentifier: req.user?.actorIdentifier || (req.user?.userId ? `user:${req.user.userId}` : null),
+            audience: req.user?.role || "superAdmin",
+          }
+        );
+      }
       await client.query("COMMIT");
       res.status(201).json({
         success: true,
@@ -230,6 +265,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
   });
 
   app.put("/api/admin/companies/:companyId", authenticateToken, isSuperAdmin, async (req, res) => {
+    let client;
     try {
       const companyId = Number(req.params.companyId);
       if (!Number.isInteger(companyId) || companyId <= 0) {
@@ -239,7 +275,36 @@ module.exports = function registerCompanyRoutes(app, deps) {
       const identityError = validateCompanyIdentity(companyIdentity);
       if (identityError) return res.status(400).json({ error: identityError });
 
-      const updated = await pool.query(
+      client = await pool.connect();
+      await client.query("BEGIN");
+      const current = await client.query(
+        `SELECT id,
+                "companyName",
+                "legalName",
+                country,
+                "companyRegistrationNumber",
+                "vatNumber",
+                "websiteDomain",
+                "customerTrustLevel",
+                "verificationStatus",
+                "authorizedContactName",
+                "authorizedContactEmail",
+                "isActive",
+                "assetManagementEnabled",
+                "assetManagementRevokedAt",
+                "createdAt",
+                "updatedAt"
+           FROM companies
+          WHERE id = $1
+          FOR UPDATE`,
+        [companyId]
+      );
+      if (!current.rows.length) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      const updated = await client.query(
         `UPDATE companies
             SET "companyName" = $1,
                 "legalName" = $2,
@@ -266,15 +331,38 @@ module.exports = function registerCompanyRoutes(app, deps) {
           companyId
         ]
       );
-      if (!updated.rows.length) {
-        return res.status(404).json({ error: "Company not found" });
+      if (typeof logAudit === "function") {
+        await logAudit(
+          companyId,
+          req.user?.userId,
+          "updateCompany",
+          "companies",
+          String(companyId),
+          buildCompanyIdentityAuditPayload(current.rows[0]),
+          buildCompanyIdentityAuditPayload(updated.rows[0]),
+          {
+            client,
+            actorIdentifier: req.user?.actorIdentifier || (req.user?.userId ? `user:${req.user.userId}` : null),
+            audience: req.user?.role || "superAdmin",
+          }
+        );
       }
+      await client.query("COMMIT");
       res.json({ success: true, company: mapCompanyRow(updated.rows[0]) });
     } catch (error) {
+      if (client) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          logger.error({ err: rollbackError }, "Failed to roll back company update");
+        }
+      }
       if (error?.code === "23505") {
         return res.status(409).json({ error: "Company name already exists" });
       }
       res.status(500).json({ error: "Failed to update company" });
+    } finally {
+      client?.release();
     }
   });
 
@@ -407,7 +495,11 @@ module.exports = function registerCompanyRoutes(app, deps) {
         "companyDppPolicies",
         String(companyId),
         null,
-        updates
+        updates,
+        {
+          actorIdentifier: req.user?.actorIdentifier || `user:${req.user.userId}`,
+          audience: req.user?.role || "superAdmin",
+        }
       );
 
       res.json({ success: true, policy: updatedPolicy });

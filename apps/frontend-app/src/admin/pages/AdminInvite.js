@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
+import AppSelect from "../../shared/components/AppSelect";
 import "../styles/AdminDashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -88,7 +89,7 @@ function AdminInvite() {
             {/* Company selector */}
             <div className="form-group">
               <label htmlFor="inviteCompany">Select Company</label>
-              <select
+              <AppSelect
                 id="inviteCompany"
                 value={inviteCompanyId}
                 onChange={e => setInviteCompanyId(e.target.value)}
@@ -100,7 +101,7 @@ function AdminInvite() {
                 {companies.map(c => (
                   <option key={c.id} value={c.id}>{c.companyName}</option>
                 ))}
-              </select>
+              </AppSelect>
             </div>
 
             {/* Email */}

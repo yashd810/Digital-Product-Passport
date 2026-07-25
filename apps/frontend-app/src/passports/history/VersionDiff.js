@@ -4,6 +4,7 @@ import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../shared/passports/passportSchemaUtils";
 import { formatPassportStatus } from "../utils/passportStatus";
 import { toSafeInternalPath, toSafeResourceHref } from "../../shared/security/urlSafety";
+import AppSelect from "../../shared/components/AppSelect";
 import "../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -211,24 +212,24 @@ function VersionDiff({ companyId }) {
             <div className="diff-selectors">
               <div className="diff-sel-group">
                 <label>Compare from</label>
-                <select value={vA?.versionNumber || ""} onChange={(event) => setVA(versions.find((version) => version.versionNumber === parseInt(event.target.value, 10)))}>
+                <AppSelect value={vA?.versionNumber || ""} onChange={(event) => setVA(versions.find((version) => version.versionNumber === parseInt(event.target.value, 10)))} aria-label="Compare from version">
                   {versions.map((version) => (
                     <option key={`${version.dppId}-${version.versionNumber}`} value={version.versionNumber}>
                       v{version.versionNumber} — {formatPassportStatus(version.releaseStatus)}
                     </option>
                   ))}
-                </select>
+                </AppSelect>
               </div>
               <span className="diff-sel-arrow">↔</span>
               <div className="diff-sel-group">
                 <label>Compare to</label>
-                <select value={vB?.versionNumber || ""} onChange={(event) => setVB(versions.find((version) => version.versionNumber === parseInt(event.target.value, 10)))}>
+                <AppSelect value={vB?.versionNumber || ""} onChange={(event) => setVB(versions.find((version) => version.versionNumber === parseInt(event.target.value, 10)))} aria-label="Compare to version">
                   {versions.map((version) => (
                     <option key={`${version.dppId}-${version.versionNumber}`} value={version.versionNumber}>
                       v{version.versionNumber} — {formatPassportStatus(version.releaseStatus)}
                     </option>
                   ))}
-                </select>
+                </AppSelect>
               </div>
             </div>
           )}

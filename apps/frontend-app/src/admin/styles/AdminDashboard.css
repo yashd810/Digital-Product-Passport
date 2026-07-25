@@ -464,147 +464,32 @@
   letter-spacing: 0.4px;
 }
 .form-group input,
-.form-group select {
+.form-group .app-select__trigger {
   padding: 11px 14px;
   border: 1.5px solid var(--border);
   border-radius: 8px;
   font-size: 14px;
   font-family: var(--font);
   transition: all 0.25s ease;
-  background: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
 }
 [data-theme="light"] .form-group input,
-[data-theme="light"] .form-group select {
-  background: #ffffff;
+[data-theme="light"] .form-group .app-select__trigger {
+  background-color: #ffffff;
   color: var(--onyx);
   border-color: rgba(28, 55, 56, 0.2);
 }
 .form-group input:focus,
-.form-group select:focus {
+.form-group .app-select__trigger:focus {
   outline: none;
   border-color: var(--jet);
   box-shadow: 0 0 0 3px rgba(28, 55, 56, 0.15);
 }
 .form-group input:disabled,
-.form-group select:disabled {
+.form-group .app-select__trigger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-.admin-select {
-  position: relative;
-}
-.admin-select-trigger {
-  align-items: center;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-primary);
-  cursor: pointer;
-  display: flex;
-  font-family: var(--font);
-  font-size: 14px;
-  justify-content: space-between;
-  min-height: 48px;
-  padding: 11px 14px;
-  text-align: left;
-  transition: all 0.25s ease;
-  width: 100%;
-}
-[data-theme="light"] .admin-select-trigger {
-  background: #ffffff;
-  color: var(--onyx);
-  border-color: rgba(28, 55, 56, 0.2);
-}
-.admin-select-trigger:focus-visible,
-.admin-select-trigger.open {
-  outline: none;
-  border-color: var(--jet);
-  box-shadow: 0 0 0 3px rgba(28, 55, 56, 0.15);
-}
-.admin-select-trigger:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-.admin-select-trigger-label {
-  min-width: 0;
-}
-.admin-select-trigger-caret {
-  color: var(--text-secondary);
-  font-size: 12px;
-  margin-left: 12px;
-}
-.admin-select-menu {
-  background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.03),
-      rgba(255, 255, 255, 0.01)
-    ),
-    var(--bg-card);
-  border: 1px solid var(--border-strong);
-  border-radius: 16px;
-  box-shadow: 0 18px 34px rgba(0, 15, 8, 0.22);
-  left: 0;
-  margin-top: 8px;
-  overflow: hidden;
-  padding: 8px;
-  position: absolute;
-  right: 0;
-  top: 100%;
-  z-index: 40;
-}
-[data-theme="light"] .admin-select-menu {
-  background: #ffffff;
-  border-color: rgba(28, 55, 56, 0.12);
-  box-shadow: 0 16px 30px rgba(17, 44, 72, 0.12);
-}
-.admin-select-option {
-  align-items: center;
-  background: transparent;
-  border: none;
-  border-radius: 10px;
-  color: var(--text-primary);
-  cursor: pointer;
-  display: flex;
-  font-family: var(--font);
-  font-size: 14px;
-  font-weight: 600;
-  gap: 12px;
-  justify-content: space-between;
-  padding: 12px 14px;
-  text-align: left;
-  transition:
-    background 0.2s ease,
-    color 0.2s ease;
-  width: 100%;
-}
-.admin-select-option:hover,
-.admin-select-option:focus-visible {
-  background: rgba(13, 181, 176, 0.12);
-  color: var(--heading-strong);
-  outline: none;
-}
-.admin-select-option.selected {
-  background: rgba(13, 181, 176, 0.18);
-  color: var(--heading-strong);
-}
-[data-theme="light"] .admin-select-option:hover,
-[data-theme="light"] .admin-select-option:focus-visible {
-  background: rgba(13, 181, 176, 0.1);
-  color: #0f5f63;
-}
-[data-theme="light"] .admin-select-option.selected {
-  background: #dff8f5;
-  color: #0f5f63;
-}
-.admin-select-option-label {
-  min-width: 0;
-}
-.admin-select-option-check {
-  color: var(--accent-strong);
-  flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 800;
 }
 .create-btn {
   padding: 11px 24px;
@@ -2250,7 +2135,7 @@
   font-size: 12px;
   color: var(--charcoal);
   outline: none;
-  background: #fff;
+  background-color: #fff;
   cursor: pointer;
   min-width: 150px;
 }
@@ -2284,7 +2169,7 @@
 .acpt-select-option {
   font-size: 13px;
 }
-.acpt-select-error .admin-select-trigger {
+.acpt-select-error.app-select__trigger {
   border-color: #ef4444;
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
 }
@@ -2329,7 +2214,7 @@
   font-size: 12px;
   color: var(--text-secondary);
   outline: none;
-  background: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.05);
   cursor: pointer;
   min-width: 118px;
   max-width: 132px;
@@ -2343,7 +2228,7 @@
   color: var(--text-primary);
 }
 [data-theme="light"] .acpt-move-select {
-  background: rgba(255, 255, 255, 0.92);
+  background-color: rgba(255, 255, 255, 0.92);
   color: var(--charcoal);
   border-color: rgba(17, 44, 72, 0.16);
 }
@@ -2427,12 +2312,12 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
   font-size: 10px;
 }
 [data-theme="light"] .acpt-governance-select {
-  background: #ffffff;
+  background-color: #ffffff;
   color: var(--charcoal);
   border-color: rgba(17, 44, 72, 0.16);
 }
@@ -2636,7 +2521,6 @@
   padding: 4px 26px 4px 8px;
   width: 100%;
 }
-.acpt-field-options-grid .admin-select-trigger-label,
 .acpt-field-options-grid .acpt-required-label,
 .acpt-field-options-grid .acpt-composition-label,
 .acpt-field-options-grid .acpt-dynamic-label {
@@ -3068,7 +2952,7 @@
   min-width: 0;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
-  background: var(--bg-elevated);
+  background-color: var(--bg-elevated);
   color: var(--text-primary);
   font-size: 10px;
 }
@@ -4744,7 +4628,7 @@
   border-radius: 12px;
   font-size: 14px;
   font-family: var(--font);
-  background: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
   transition:
     border-color 0.2s ease,
@@ -4752,7 +4636,7 @@
     background 0.2s ease;
 }
 [data-theme="light"] .admin-select-input {
-  background: #ffffff;
+  background-color: #ffffff;
   color: var(--onyx);
   border-color: rgba(28, 55, 56, 0.18);
 }
@@ -5312,104 +5196,6 @@
   border-color: var(--brand-primary);
   outline: none;
 }
-.acpt-schema-review-card {
-  margin-top: 20px;
-}
-.acpt-schema-review-status {
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  padding: 6px 10px;
-  white-space: nowrap;
-}
-.acpt-schema-review-status.valid {
-  border-color: #0b8f6a;
-  color: #087257;
-}
-.acpt-schema-review-status.invalid {
-  border-color: #b45309;
-  color: #9a3412;
-}
-.acpt-schema-review-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 14px;
-}
-.acpt-schema-review-summary span {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  padding: 5px 9px;
-}
-.acpt-schema-review-issues {
-  margin-bottom: 14px;
-}
-.acpt-schema-review-issues ul {
-  margin: 6px 0 0;
-  padding-left: 20px;
-}
-.acpt-schema-review-path {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-.acpt-schema-review-details {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-.acpt-schema-review-details > summary {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  cursor: pointer;
-  font-weight: 700;
-  padding: 10px 12px;
-}
-.acpt-schema-review-tree {
-  overflow-x: auto;
-  padding: 10px 12px;
-}
-.acpt-schema-review-section {
-  border-left: 2px solid rgba(26, 68, 84, 0.22);
-  margin-left: calc(18px * var(--acpt-review-depth, 0));
-  padding: 5px 0 8px 10px;
-}
-.acpt-schema-review-section-title,
-.acpt-schema-review-field {
-  align-items: baseline;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-.acpt-schema-review-section-title {
-  color: var(--text-primary);
-  font-size: 13px;
-}
-.acpt-schema-review-section-title code,
-.acpt-schema-review-field code {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-.acpt-schema-review-section-title > span,
-.acpt-schema-review-field > span:not(:first-child) {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-.acpt-schema-review-field {
-  border-top: 1px dashed var(--border);
-  color: var(--text-primary);
-  font-size: 12px;
-  margin-top: 6px;
-  padding-top: 6px;
-}
-.acpt-schema-review-semantic {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-}
 .apt-fv-section-title-strong {
   display: flex;
   align-items: center;
@@ -5847,7 +5633,7 @@
 .acpt-table-col-input,
 .sec-input,
 .aca-role-select {
-  background: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
   border: 1.5px solid var(--border);
   border-radius: 10px;
@@ -5866,7 +5652,7 @@
 [data-theme="light"] .acpt-table-col-input,
 [data-theme="light"] .sec-input,
 [data-theme="light"] .aca-role-select {
-  background: #ffffff;
+  background-color: #ffffff;
   color: var(--onyx);
   border-color: rgba(28, 55, 56, 0.18);
 }
@@ -6601,92 +6387,4 @@
 [data-theme="light"] .apt-seed-guide-commands code {
   background: rgba(15, 23, 42, 0.05);
   border-color: rgba(148, 163, 184, 0.2);
-}
-
-/* Shared dropdown theme for admin native selects and custom select menus. */
-.form-group select,
-.admin-select-input,
-.aca-role-select,
-.acpt-type-select,
-.acpt-move-select,
-.acpt-governance-select {
-  appearance: none;
-  -webkit-appearance: none;
-  background-color: var(--select-bg);
-  background-image: var(--select-bg-layer), var(--select-arrow-icon);
-  background-position: 0 0, right 13px center;
-  background-repeat: no-repeat;
-  background-size: auto, 16px;
-  border-color: var(--select-border);
-  color: var(--select-text);
-  cursor: pointer;
-  padding-right: 42px;
-}
-
-.acpt-type-select,
-.acpt-move-select,
-.acpt-governance-select {
-  background-position: 0 0, right 9px center;
-  background-size: auto, 14px;
-  padding-right: 32px;
-}
-
-.form-group select:hover:not(:disabled),
-.admin-select-input:hover:not(:disabled),
-.aca-role-select:hover:not(:disabled),
-.acpt-type-select:hover:not(:disabled),
-.acpt-move-select:hover:not(:disabled),
-.acpt-governance-select:hover:not(:disabled) {
-  background-image: var(--select-hover-layer), var(--select-arrow-icon);
-  border-color: var(--select-border-hover);
-}
-
-.form-group select:focus,
-.admin-select-input:focus,
-.aca-role-select:focus,
-.acpt-type-select:focus,
-.acpt-move-select:focus,
-.acpt-governance-select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--select-focus-ring);
-  outline: none;
-}
-
-.form-group select option,
-.admin-select-input option,
-.aca-role-select option,
-.acpt-type-select option,
-.acpt-move-select option,
-.acpt-governance-select option {
-  background: var(--select-option-bg);
-  color: var(--select-option-text);
-}
-
-.admin-select-trigger {
-  background-color: var(--select-bg);
-  background-image: var(--select-bg-layer);
-  border-color: var(--select-border);
-  color: var(--select-text);
-}
-
-.admin-select-trigger:hover:not(:disabled) {
-  background-image: var(--select-hover-layer);
-  border-color: var(--select-border-hover);
-}
-
-.admin-select-trigger:focus-visible,
-.admin-select-trigger.open {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--select-focus-ring);
-}
-
-.admin-select-menu {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.01)), var(--select-option-bg);
-  border-color: var(--select-border-hover);
-  max-height: min(360px, 45vh);
-  overflow-y: auto;
-}
-
-[data-theme="light"] .admin-select-menu {
-  background: linear-gradient(180deg, rgba(13, 181, 176, 0.06), rgba(255, 255, 255, 0.98)), var(--select-option-bg);
 }

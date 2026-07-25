@@ -7,6 +7,9 @@ const os = require("os");
 const path = require("path");
 const createSemanticModelRegistry = require("../src/services/semantic-model-registry");
 const createSemanticPassportExportService = require("../src/services/semantic-passport-export");
+const {
+  toPassportStorageColumnKey,
+} = require("../src/shared/passports/passport-helpers");
 
 function createExportService() {
   return createSemanticPassportExportService({
@@ -404,4 +407,69 @@ test("semantic export uses immediate owner metadata for flat nested-section fiel
     includedFieldCount: 2,
     profilePath: "/api/passport-types/customProductPassportV3/semantic-profile",
   });
+});
+
+test("semantic export restores long logical field keys before applying the selected profile", () => {
+  const { buildPassportJsonLdExport } = createExportService();
+  const longKey = `measurement${"Value".repeat(20)}`;
+  const storageKey = toPassportStorageColumnKey(longKey);
+  const rootClassIri = "https://example.test/dictionary/custom-product/v3/classes/CustomProductPassport";
+  const semanticId = "https://example.test/dictionary/custom-product/v3/terms/long-measurement";
+  const typeDef = {
+    typeName: "customProductPassportV3",
+    fieldsJson: {
+      semanticGraph: {
+        schemaVersion: 1,
+        rootClassKey: "customProductPassport",
+        classes: [{
+          key: "customProductPassport",
+          label: "Custom Product Passport",
+          semanticId: rootClassIri,
+          root: true,
+          properties: [{
+            key: longKey,
+            label: "Long measurement",
+            semanticId,
+            domainClassKey: "customProductPassport",
+            domainClassIri: rootClassIri,
+            rangeKind: "scalar",
+            dataType: "string",
+            minCount: 0,
+            maxCount: 1,
+          }],
+        }],
+        enums: [],
+      },
+      sections: [{
+        key: "measurements",
+        label: "Measurements",
+        fields: [{
+          key: longKey,
+          label: "Long measurement",
+          type: "text",
+          dataType: "string",
+          objectType: "SingleValuedDataElement",
+          valueDataType: "String",
+          semanticId,
+          domainClassKey: "customProductPassport",
+          domainClassIri: rootClassIri,
+          rangeKind: "scalar",
+          rangeIri: "http://www.w3.org/2001/XMLSchema#string",
+          minCount: 0,
+          maxCount: 1,
+        }],
+      }],
+    },
+  };
+
+  const exported = buildPassportJsonLdExport([{
+    dppId: "dpp-long-field-1",
+    passportType: typeDef.typeName,
+    [storageKey]: "stored value",
+    excludedLegacyField: "must not leak",
+  }], typeDef.typeName, { typeDef });
+
+  assert.equal(exported["@graph"][0][longKey], "stored value");
+  assert.equal(Object.prototype.hasOwnProperty.call(exported["@graph"][0], storageKey), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(exported["@graph"][0], "excludedLegacyField"), false);
 });

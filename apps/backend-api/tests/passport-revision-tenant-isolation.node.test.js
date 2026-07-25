@@ -46,6 +46,8 @@ test("passport revision lookup is scoped to the requested company", async () => 
     checkCompanyAccess: noop,
     requireEditor: noop,
     getTable: () => '"batteryPassports"',
+    getPassportTypeSchema: async () => ({ typeName: "battery" }),
+    hasCompanyPassportTypeAccess: async () => true,
   });
 
   const route = routes.find((entry) =>

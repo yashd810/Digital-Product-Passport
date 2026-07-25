@@ -17,6 +17,8 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
     requireEditor,
     generateDppRecordId,
     normalizePassportRequestBody,
+    getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     getTable,
     normalizeReleaseStatus,
     toStoredPassportValue,
@@ -39,6 +41,23 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
     getPassportLineageContext,
     normalizePassportRow,
   } = deps;
+
+  async function getAccessiblePassportTypeSchema(req, companyId, requestedPassportType) {
+    const typeSchema = await getPassportTypeSchema(requestedPassportType);
+    if (!typeSchema) return null;
+    if (req.user?.role === "superAdmin") return typeSchema;
+    return (await hasCompanyPassportTypeAccess(companyId, typeSchema.typeName)) ? typeSchema : null;
+  }
+
+  async function getAccessiblePassportTypeSchemas(req, companyId, requestedPassportTypes) {
+    const schemasByRequestedType = new Map();
+    for (const requestedPassportType of new Set(requestedPassportTypes)) {
+      const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, requestedPassportType);
+      if (!typeSchema) return null;
+      schemasByRequestedType.set(requestedPassportType, typeSchema);
+    }
+    return schemasByRequestedType;
+  }
 
   app.post("/api/companies/:companyId/passports/bulk-revise", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
@@ -71,11 +90,24 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       );
 
       const registryByGuid = new Map(registryRes.rows.map((row) => [row.dppId, row.passportType]));
-      const resolvedItems = uniqueGuids
+      const registryItems = uniqueGuids
         .map((dppId) => ({ dppId, passportType: registryByGuid.get(dppId) || null }))
         .filter((item) => item.passportType);
 
-      if (!resolvedItems.length) return res.status(404).json({ error: "No matching passports were found for this company." });
+      if (!registryItems.length) return res.status(404).json({ error: "No matching passports were found for this company." });
+
+      const typeSchemasByRequestedType = await getAccessiblePassportTypeSchemas(
+        req,
+        companyId,
+        registryItems.map((item) => item.passportType)
+      );
+      if (!typeSchemasByRequestedType) {
+        return res.status(404).json({ error: "Passport type not found for this company" });
+      }
+      const resolvedItems = registryItems.map((item) => ({
+        ...item,
+        passportType: typeSchemasByRequestedType.get(item.passportType).typeName,
+      }));
 
       const passportTypes = [...new Set(resolvedItems.map((item) => item.passportType))];
       const batchPassportType = passportTypes.length === 1 ? passportTypes[0] : null;
@@ -286,6 +318,15 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       const invalid = items.filter((item) => !item?.dppId || !item?.passportType);
       if (invalid.length) return res.status(400).json({ error: `${invalid.length} item(s) missing dppId or passportType` });
 
+      const typeSchemasByRequestedType = await getAccessiblePassportTypeSchemas(
+        req,
+        companyId,
+        items.map((item) => item.passportType)
+      );
+      if (!typeSchemasByRequestedType) {
+        return res.status(404).json({ error: "Passport type not found for this company" });
+      }
+
       let released = 0;
       let skipped = 0;
       let failed = 0;
@@ -293,13 +334,14 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
 
       for (const item of items) {
         const dppId = item?.dppId;
-        const passportType = item?.passportType;
-        if (!dppId || !passportType) {
+        const requestedPassportType = item?.passportType;
+        if (!dppId || !requestedPassportType) {
           details.push({ dppId, status: "failed", message: "Missing dppId or passportType" });
           failed += 1;
           continue;
         }
         try {
+          const passportType = typeSchemasByRequestedType.get(requestedPassportType).typeName;
           const tableName = getTable(passportType);
           const currentRes = await pool.query(
             `SELECT *
@@ -326,6 +368,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             userId,
             releasedByEmail: req.user.email,
             actorIdentifier: getActorIdentifier(req.user),
+            audience: req.user?.role || "economicOperator",
             editableReleaseStatusesSql,
             typeDef: typeRes.rows[0] || null,
             releaseNote: item?.releaseNote || null,
@@ -389,16 +432,26 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       const invalid = items.filter((item) => !item?.dppId || !item?.passportType);
       if (invalid.length) return res.status(400).json({ error: `${invalid.length} item(s) missing dppId or passportType` });
 
+      const typeSchemasByRequestedType = await getAccessiblePassportTypeSchemas(
+        req,
+        companyId,
+        items.map((item) => item.passportType)
+      );
+      if (!typeSchemasByRequestedType) {
+        return res.status(404).json({ error: "Passport type not found for this company" });
+      }
+
       let archived = 0;
       let skipped = 0;
       for (const item of items) {
         const dppId = item?.dppId;
-        const passportType = item?.passportType;
-        if (!dppId || !passportType) {
+        const requestedPassportType = item?.passportType;
+        if (!dppId || !requestedPassportType) {
           skipped += 1;
           continue;
         }
         try {
+          const passportType = typeSchemasByRequestedType.get(requestedPassportType).typeName;
           const tableName = getTable(passportType);
           const lineageContext = await getPassportLineageContext({ dppId, passportType, companyId });
           if (!lineageContext?.lineageId) {
@@ -485,7 +538,16 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             skipped += 1;
             continue;
           }
-          const passportType = archiveRows.rows[0].passportType;
+          const typeSchema = await getAccessiblePassportTypeSchema(
+            req,
+            companyId,
+            archiveRows.rows[0].passportType
+          );
+          if (!typeSchema) {
+            skipped += 1;
+            continue;
+          }
+          const passportType = typeSchema.typeName;
           const tableName = getTable(passportType);
           await pool.query(`UPDATE ${tableName} SET "deletedAt" = NULL WHERE "lineageId" = $1 AND "companyId" = $2`, [lineageId, companyId]);
           await pool.query(

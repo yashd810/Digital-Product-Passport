@@ -37,6 +37,7 @@ function updateDppUseCase(deps) {
     resolveManagedFacilityId,
     mergePatchContentType,
     usesConfiguredGlobalProductIdentifierScheme,
+    hasCompanyPassportTypeAccess,
   } = deps;
 
   function resolvePolicyOwnedPatchFields({ editable, granularity }) {
@@ -79,6 +80,15 @@ function updateDppUseCase(deps) {
     }
     if (req.user.role !== "superAdmin" && Number(req.user.companyId) !== Number(editable.passport.companyId)) {
       return { statusCode: 403, body: { error: "Forbidden" } };
+    }
+    if (
+      req.user.role !== "superAdmin"
+      && !(await hasCompanyPassportTypeAccess(
+        editable.passport.companyId,
+        editable.passport.passportType || editable.typeDef?.typeName
+      ))
+    ) {
+      return { statusCode: 404, body: { error: "Passport type not found for this company" } };
     }
     if (!isEditablePassportStatus(editable.passport.releaseStatus)) {
       return { statusCode: 409, body: { error: "Passport is not editable" } };

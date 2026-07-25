@@ -1,4 +1,5 @@
 import React from "react";
+import AppSelect from "../../../../shared/components/AppSelect";
 
 export function PassportListFiltersBar({
   searchText,
@@ -14,13 +15,13 @@ export function PassportListFiltersBar({
   return (
     <div className="search-bar">
       <input type="text" placeholder="🔍 Search by serial number or model name…" value={searchText} onChange={(e) => setSearchText(e.target.value)} className="search-input" />
-      <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select">
+      <AppSelect value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select" aria-label="Filter passports by status">
         <option value="">All Statuses</option>
         <option value="draft">Draft</option>
         <option value="released">Released</option>
         <option value="inRevision">In Revision</option>
         <option value="obsolete">Obsolete</option>
-      </select>
+      </AppSelect>
       {(searchText || filterStatus) && (
         <button className="clear-filter-btn" onClick={() => { setSearchText(""); setFilterStatus(""); }}>
           ✕ Clear
@@ -37,11 +38,11 @@ export function PassportListFiltersBar({
       {!isFiltering && (
         <div className="passport-pagination-size">
           <label htmlFor="passportRowsPerPage" className="passport-pagination-label">Rows per page</label>
-          <select id="passportRowsPerPage" value={rowsPerPage} onChange={(e) => setRowsPerPage(Number(e.target.value))} className="filter-select passport-page-size-select">
+          <AppSelect id="passportRowsPerPage" value={rowsPerPage} onChange={(e) => setRowsPerPage(Number(e.target.value))} className="filter-select passport-page-size-select">
             <option value={10}>10</option>
             <option value={25}>25</option>
             <option value={50}>50</option>
-          </select>
+          </AppSelect>
         </div>
       )}
     </div>

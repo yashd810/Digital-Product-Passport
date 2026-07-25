@@ -10,25 +10,40 @@ module.exports = function registerHistoryReadRoutes(app, deps) {
     getPassportVersionsByLineage,
     buildPassportVersionHistory,
     productIdentifierService,
+    getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
   } = deps;
+
+  async function getAccessiblePassportTypeSchema(req, companyId, requestedPassportType) {
+    const typeSchema = await getPassportTypeSchema(requestedPassportType);
+    if (!typeSchema) return null;
+    if (req.user?.role === "superAdmin") return typeSchema;
+    return (await hasCompanyPassportTypeAccess(companyId, typeSchema.typeName)) ? typeSchema : null;
+  }
 
   app.get("/api/companies/:companyId/passports/:dppId/diff", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const { dppId } = req.params;
       const { passportType } = req.query;
       if (!passportType) return res.status(400).json({ error: "passportType required" });
+      const typeSchema = await getAccessiblePassportTypeSchema(req, req.params.companyId, passportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found for this company" });
 
-      const lineageContext = await getPassportLineageContext({ dppId, passportType, companyId: req.params.companyId });
+      const lineageContext = await getPassportLineageContext({
+        dppId,
+        passportType: typeSchema.typeName,
+        companyId: req.params.companyId,
+      });
       if (!lineageContext?.lineageId) return res.status(404).json({ error: "Passport not found" });
 
       const versions = await getPassportVersionsByLineage({
         lineageId: lineageContext.lineageId,
-        passportType,
+        passportType: typeSchema.typeName,
         companyId: req.params.companyId,
       });
       res.json({
         versions: [...versions].sort((a, b) => Number(a.versionNumber || 0) - Number(b.versionNumber || 0)),
-        passportType,
+        passportType: typeSchema.typeName,
       });
     } catch {
       res.status(500).json({ error: "Failed" });
@@ -46,7 +61,9 @@ module.exports = function registerHistoryReadRoutes(app, deps) {
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-      const passportType = reg.rows[0].passportType;
+      const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, reg.rows[0].passportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found for this company" });
+      const passportType = typeSchema.typeName;
       const historyPayload = await buildPassportVersionHistory({ dppId, passportType, companyId, publicOnly: false });
       res.json(historyPayload);
     } catch {
@@ -65,6 +82,8 @@ module.exports = function registerHistoryReadRoutes(app, deps) {
         [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
+      const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, reg.rows[0].passportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found for this company" });
 
       const links = await productIdentifierService.listIdentifierLineage({
         companyId,
@@ -75,7 +94,7 @@ module.exports = function registerHistoryReadRoutes(app, deps) {
         dppId,
         digitalProductPassportId: dppId,
         lineageId: reg.rows[0].lineageId,
-        passportType: reg.rows[0].passportType,
+        passportType: typeSchema.typeName,
         identifierLineage: links,
       });
     } catch (error) {

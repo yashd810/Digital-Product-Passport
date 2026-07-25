@@ -25,6 +25,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     didService,
     productIdentifierService,
     logAudit,
+    hasCompanyPassportTypeAccess,
   } = deps;
   const previewAppBaseUrl = getApiOrigin();
   const {
@@ -58,11 +59,26 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     return resolveCompanyPreviewPassport({ companyId, passportKey: dppId });
   }
 
+  async function hasPreviewPassportTypeAccess(req, passport) {
+    if (req.user?.role === "superAdmin") return true;
+    return hasCompanyPassportTypeAccess(
+      passport?.companyId ?? req.params.companyId,
+      passport?.passportType
+    );
+  }
+
+  function rejectUnavailablePassportType(res) {
+    return res.status(404).json({ error: "Passport type not found for this company" });
+  }
+
   app.get("/api/companies/:companyId/passports/:passportKey/preview", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const { companyId, passportKey } = req.params;
       const resolved = await resolveCompanyPreviewPassport({ companyId, passportKey });
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
+      if (!(await hasPreviewPassportTypeAccess(req, resolved.passport))) {
+        return rejectUnavailablePassportType(res);
+      }
 
       const sourcePassport = resolved.passport;
       const resolvedCompanyId = sourcePassport.companyId ?? companyId ?? null;
@@ -166,6 +182,9 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
 
       const resolved = await resolveCompanyPreviewPassport({ companyId, passportKey: dppId });
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
+      if (!(await hasPreviewPassportTypeAccess(req, resolved.passport))) {
+        return rejectUnavailablePassportType(res);
+      }
 
       const sourcePassport = resolved.passport;
       const resolvedCompanyId = sourcePassport.companyId ?? companyId ?? null;
@@ -246,6 +265,9 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     try {
       const resolved = await resolveCompanyPassport(req.params.companyId, req.params.dppId);
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
+      if (!(await hasPreviewPassportTypeAccess(req, resolved.passport))) {
+        return rejectUnavailablePassportType(res);
+      }
       const editors = await listActiveEditSessions(req.params.dppId, req.user.userId);
       res.json({ editors, timeoutHours: editSessionTimeoutHours, serverTime: new Date().toISOString() });
     } catch {
@@ -261,6 +283,9 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
 
       const resolved = await resolveCompanyPassport(companyId, dppId);
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
+      if (!(await hasPreviewPassportTypeAccess(req, resolved.passport))) {
+        return rejectUnavailablePassportType(res);
+      }
       if (String(passportType) !== String(resolved.passport.passportType)) {
         return res.status(400).json({ error: "passportType does not match the passport" });
       }
@@ -285,6 +310,9 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     try {
       const resolved = await resolveCompanyPassport(req.params.companyId, req.params.dppId);
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
+      if (!(await hasPreviewPassportTypeAccess(req, resolved.passport))) {
+        return rejectUnavailablePassportType(res);
+      }
       await pool.query(
         "DELETE FROM \"passportEditSessions\" WHERE \"passportDppId\" = $1 AND \"userId\" = $2",
         [req.params.dppId, req.user.userId]

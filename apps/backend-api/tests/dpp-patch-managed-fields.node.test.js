@@ -13,7 +13,7 @@ function createResponse() {
   };
 }
 
-function createUseCaseHarness() {
+function createUseCaseHarness({ hasCompanyPassportTypeAccess = async () => true } = {}) {
   let capturedUpdateData = null;
   const editable = {
     tableName: "exampleProductPassports",
@@ -107,6 +107,7 @@ function createUseCaseHarness() {
     resolveManagedFacilityId: async ({ requestedFields }) => requestedFields.facilityId || null,
     mergePatchContentType: "application/merge-patch+json",
     usesConfiguredGlobalProductIdentifierScheme: (value) => String(value || "").startsWith("did:"),
+    hasCompanyPassportTypeAccess,
   });
 
   return {
@@ -156,5 +157,29 @@ test("standards PATCH rejects the internal alias field name", async () => {
 
   assert.equal(result.statusCode, 400);
   assert.deepEqual(result.body.fields, ["internalAliasId"]);
+  assert.equal(getCapturedUpdateData(), null);
+});
+
+test("standards PATCH rejects a revoked company passport type grant before updating", async () => {
+  const accessCalls = [];
+  const { getCapturedUpdateData, updateDpp } = createUseCaseHarness({
+    hasCompanyPassportTypeAccess: async (companyId, passportType) => {
+      accessCalls.push([companyId, passportType]);
+      return false;
+    },
+  });
+  const result = await updateDpp({
+    req: {
+      params: { dppId: "dppPatchTest", companyId: "7" },
+      query: {},
+      body: { manufacturer: "Blocked manufacturer" },
+      user: { userId: 9, companyId: 7, role: "companyAdmin" },
+    },
+    res: createResponse(),
+  });
+
+  assert.equal(result.statusCode, 404);
+  assert.deepEqual(result.body, { error: "Passport type not found for this company" });
+  assert.deepEqual(accessCalls, [[7, "exampleProductPassportV1"]]);
   assert.equal(getCapturedUpdateData(), null);
 });

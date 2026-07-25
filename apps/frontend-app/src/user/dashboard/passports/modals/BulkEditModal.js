@@ -4,6 +4,7 @@ import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../../../shared/passports/passportSchemaUtils";
 import { isEditablePassportStatus } from "../../../../passports/utils/passportStatus";
 import { parseCsvText } from "../utils/passportListHelpers";
+import AppSelect from "../../../../shared/components/AppSelect";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -253,11 +254,11 @@ export function BulkEditModal({
     }
     if (field.type === "boolean") {
       return (
-        <select className="device-manual-input" value={row.value} onChange={(event) => updateChangeRow(row.id, { value: event.target.value })}>
+        <AppSelect className="device-manual-input" value={row.value} onChange={(event) => updateChangeRow(row.id, { value: event.target.value })} aria-label={`Value for ${field.label}`}>
           <option value="">Select…</option>
           <option value="true">True</option>
           <option value="false">False</option>
-        </select>
+        </AppSelect>
       );
     }
     if (field.type === "table") {
@@ -319,11 +320,11 @@ export function BulkEditModal({
       </div>
 
       <label className="device-manual-label">Passport Type</label>
-      <select className="device-manual-input" value={selectedType} onChange={(event) => setSelectedType(event.target.value)} disabled={submitting || availableTypes.length <= 1}>
+      <AppSelect className="device-manual-input" value={selectedType} onChange={(event) => setSelectedType(event.target.value)} disabled={submitting || availableTypes.length <= 1} aria-label="Passport type">
         {availableTypes.map((type) => (
           <option key={type} value={type}>{type}</option>
         ))}
-      </select>
+      </AppSelect>
 
       <div className="bulk-edit-tabs">
         <button type="button" className={tab === "form" ? "active" : ""} onClick={() => setTab("form")}>Direct form</button>
@@ -335,12 +336,12 @@ export function BulkEditModal({
         <form onSubmit={handleFormSubmit} className="bulk-edit-form">
           {changeRows.map((row) => (
             <div key={row.id} className="bulk-revise-row">
-              <select className="device-manual-input" value={row.key} onChange={(event) => updateChangeRow(row.id, { key: event.target.value, value: "" })}>
+              <AppSelect className="device-manual-input" value={row.key} onChange={(event) => updateChangeRow(row.id, { key: event.target.value, value: "" })} aria-label="Field to update">
                 <option value="">Choose field…</option>
                 {availableFields.map((field) => (
                   <option key={field.key} value={field.key}>{field.label}</option>
                 ))}
-              </select>
+              </AppSelect>
               {renderValueField(row)}
               <button type="button" className="dashboard-btn dashboard-btn-ghost" onClick={() => removeChangeRow(row.id)}>Remove</button>
             </div>

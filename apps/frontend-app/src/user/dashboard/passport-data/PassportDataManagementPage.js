@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
+import AppSelect from "../../../shared/components/AppSelect";
 import "../../../shared/styles/Dashboard.css";
 import "./PassportDataManagement.css";
 
@@ -702,15 +703,16 @@ function PassportDataManagementPage({ companyId, user }) {
 
     if (field.type === "boolean") {
       return (
-        <select
+        <AppSelect
           value={String(value)}
           disabled={disabled}
           onChange={(event) => setRowValue(rowIndex, field.key, event.target.value)}
+          aria-label={field.label || field.key}
         >
           <option value="">Blank</option>
           <option value="true">true</option>
           <option value="false">false</option>
-        </select>
+        </AppSelect>
       );
     }
 
@@ -778,22 +780,22 @@ function PassportDataManagementPage({ companyId, user }) {
           <div className="pdm-control-strip">
             <label>
               <span>Passport type</span>
-              <select value={selectedType} onChange={(event) => setSelectedType(event.target.value)}>
+              <AppSelect value={selectedType} onChange={(event) => setSelectedType(event.target.value)} aria-label="Passport type">
                 {passportTypes.map((type) => (
                   <option key={type.id || type.typeName} value={type.typeName}>
                     {type.displayName || type.typeName}
                   </option>
                 ))}
-              </select>
+              </AppSelect>
             </label>
             <label>
               <span>Template</span>
-              <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)} disabled={!canManagePassportData}>
+              <AppSelect value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)} disabled={!canManagePassportData} aria-label="Template">
                 <option value="">No template</option>
                 {templates.map((template) => (
                   <option key={template.id} value={template.id}>{template.name}</option>
                 ))}
-              </select>
+              </AppSelect>
             </label>
             <label>
               <span>Batch rows</span>
@@ -843,7 +845,7 @@ function PassportDataManagementPage({ companyId, user }) {
             </label>
             <label>
               <span>Status</span>
-              <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
+              <AppSelect value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} aria-label="Filter passport data by status">
                 <option value="all">All rows</option>
                 <option value="editable">Editable only</option>
                 <option value="locked">Locked only</option>
@@ -852,7 +854,7 @@ function PassportDataManagementPage({ companyId, user }) {
                 <option value="released">Released</option>
                 <option value="inReview">In review</option>
                 <option value="new">New</option>
-              </select>
+              </AppSelect>
             </label>
             <label>
               <span>Field value</span>
@@ -978,12 +980,12 @@ function PassportDataManagementPage({ companyId, user }) {
             <div className="pdm-source-block">
               <label>
                 <span>Preset</span>
-                <select onChange={(event) => applyPreset(event.target.value)} defaultValue="" disabled={!canManagePassportData}>
+                <AppSelect onChange={(event) => applyPreset(event.target.value)} defaultValue="" disabled={!canManagePassportData} aria-label="ERP preset">
                   <option value="">Choose preset</option>
                   {erpPresets.map((preset) => (
                     <option key={preset.key} value={preset.key}>{preset.label}</option>
                   ))}
-                </select>
+                </AppSelect>
               </label>
               <label>
                 <span>URL</span>
@@ -992,10 +994,10 @@ function PassportDataManagementPage({ companyId, user }) {
               <div className="pdm-source-row">
                 <label>
                   <span>Method</span>
-                  <select value={sourceConfig.method} onChange={(event) => setSourceConfig((current) => ({ ...current, method: event.target.value }))} disabled={!canManagePassportData}>
+                  <AppSelect value={sourceConfig.method} onChange={(event) => setSourceConfig((current) => ({ ...current, method: event.target.value }))} disabled={!canManagePassportData} aria-label="Source request method">
                     <option value="GET">GET</option>
                     <option value="POST">POST</option>
-                  </select>
+                  </AppSelect>
                 </label>
                 <label>
                   <span>Record path</span>

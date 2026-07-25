@@ -32,14 +32,14 @@ function createResponse() {
   };
 }
 
-function registerWithPool(pool) {
+function registerWithPool(pool, { logAudit = noop } = {}) {
   const { app, routes } = createRouteApp();
   registerCompanyRoutes(app, {
     pool,
     authenticateToken: noop,
     isSuperAdmin: noop,
     verifyPassword: noop,
-    logAudit: noop,
+    logAudit,
     backupProviderService: null,
     productIdentifierService: null,
     getTable: noop,
@@ -93,11 +93,15 @@ test("company creation stores a full country name and DPP policy in one transact
       released = true;
     },
   };
-  const routes = registerWithPool({ connect: async () => client });
+  const auditCalls = [];
+  const routes = registerWithPool({ connect: async () => client }, {
+    logAudit: async (...args) => auditCalls.push(args),
+  });
   const createRoute = routes.find((route) => route.method === "post" && route.routePath === "/api/admin/companies");
   const response = createResponse();
 
   await createRoute.handlers.at(-1)({
+    user: { userId: 11, role: "superAdmin", actorIdentifier: "admin@example.test" },
     body: {
       companyName: "Example Manufacturer",
       country: "United Kingdom of Great Britain and Northern Ireland",
@@ -127,22 +131,57 @@ test("company creation stores a full country name and DPP policy in one transact
   assert.equal(queries[1].params[2], "United Kingdom of Great Britain and Northern Ireland");
   assert.deepEqual(queries[2].params, [47, "batch", true, false, true, true, false, true, false]);
   assert.equal(released, true);
+  assert.equal(auditCalls.length, 1);
+  assert.deepEqual(auditCalls[0].slice(0, 5), [47, 11, "createCompany", "companies", "47"]);
+  assert.equal(auditCalls[0][6].companyName, "Example Manufacturer");
+  assert.equal(auditCalls[0][6].dppPolicy.defaultGranularity, "batch");
+  assert.deepEqual(auditCalls[0][7], {
+    client,
+    actorIdentifier: "admin@example.test",
+    audience: "superAdmin",
+  });
 });
 
 test("company update accepts an 80-character country value", async () => {
   const queries = [];
-  const routes = registerWithPool({
-    async query(sql, params) {
+  let released = false;
+  const client = {
+    async query(sql, params = []) {
       queries.push({ sql, params });
-      return {
-        rows: [{
-          id: 19,
-          companyName: params[0],
-          country: params[2],
-          customerTrustLevel: params[6],
-        }],
-      };
+      if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)) return { rows: [] };
+      if (sql.includes("FROM companies") && sql.includes("FOR UPDATE")) {
+        return {
+          rows: [{
+            id: 19,
+            companyName: "Previous Company",
+            country: "Sweden",
+            customerTrustLevel: "basic",
+          }],
+        };
+      }
+      if (sql.includes("UPDATE companies")) {
+        return {
+          rows: [{
+            id: 19,
+            companyName: params[0],
+            country: params[2],
+            customerTrustLevel: params[6],
+          }],
+        };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
     },
+    release() {
+      released = true;
+    },
+  };
+  const auditCalls = [];
+  const routes = registerWithPool({
+    async connect() {
+      return client;
+    },
+  }, {
+    logAudit: async (...args) => auditCalls.push(args),
   });
   const updateRoute = routes.find((route) => route.method === "put" && route.routePath === "/api/admin/companies/:companyId");
   const response = createResponse();
@@ -150,6 +189,7 @@ test("company update accepts an 80-character country value", async () => {
 
   await updateRoute.handlers.at(-1)({
     params: { companyId: "19" },
+    user: { userId: 11, role: "superAdmin", actorIdentifier: "admin@example.test" },
     body: {
       companyName: "Boundary Country Company",
       country,
@@ -159,7 +199,20 @@ test("company update accepts an 80-character country value", async () => {
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.company.country, country);
-  assert.equal(queries[0].params[2], country);
+  const updateQuery = queries.find(({ sql }) => sql.includes("UPDATE companies"));
+  assert.equal(updateQuery.params[2], country);
+  assert.equal(queries[0].sql, "BEGIN");
+  assert.equal(queries.at(-1).sql, "COMMIT");
+  assert.equal(released, true);
+  assert.equal(auditCalls.length, 1);
+  assert.deepEqual(auditCalls[0].slice(0, 5), [19, 11, "updateCompany", "companies", "19"]);
+  assert.equal(auditCalls[0][5].companyName, "Previous Company");
+  assert.equal(auditCalls[0][6].companyName, "Boundary Country Company");
+  assert.deepEqual(auditCalls[0][7], {
+    client,
+    actorIdentifier: "admin@example.test",
+    audience: "superAdmin",
+  });
 });
 
 test("company country validation rejects 81 characters before persistence", async () => {

@@ -63,6 +63,7 @@ async function releasePassportAtomically({
   userId,
   releasedByEmail = null,
   actorIdentifier = null,
+  audience = "economicOperator",
   editableReleaseStatusesSql,
   typeDef = null,
   releaseNote = null,
@@ -89,6 +90,7 @@ async function releasePassportAtomically({
   requireReleaseDependency(markOlderVersionsObsolete, "Obsolete-version transition");
 
   const resolvedActorIdentifier = buildActorIdentifier(userId, actorIdentifier, releasedByEmail);
+  const resolvedAudience = String(audience || "economicOperator").trim() || "economicOperator";
   const normalizedSnapshotSource = buildSnapshotSource(snapshotSource);
 
   return withTransaction(pool, async (client) => {
@@ -188,7 +190,7 @@ async function releasePassportAtomically({
       {
         client,
         actorIdentifier: resolvedActorIdentifier,
-        audience: "economicOperator",
+        audience: resolvedAudience,
       }
     );
 
@@ -224,7 +226,7 @@ async function releasePassportAtomically({
       {
         client,
         actorIdentifier: resolvedActorIdentifier,
-        audience: "economicOperator",
+        audience: resolvedAudience,
       }
     );
 

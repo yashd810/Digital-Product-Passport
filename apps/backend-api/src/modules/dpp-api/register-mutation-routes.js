@@ -52,6 +52,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     serializePolicyDefaultValue,
     resolveManagedFacilityId,
     mergePatchContentType,
+    hasCompanyPassportTypeAccess,
   } = deps;
 
   const createDpp = createDppUseCase(deps);
@@ -70,6 +71,14 @@ module.exports = function registerMutationRoutes(app, deps) {
   };
   const integrationPassportsBase = "/api/companies/:companySlug/integrations/v1/passports";
   const resolveIntegrationCompanySlug = createIntegrationCompanySlugResolver({ pool, logger });
+
+  async function hasActivePassportTypeAccess(req, passport) {
+    if (req.user?.role === "superAdmin") return true;
+    return hasCompanyPassportTypeAccess(
+      passport?.companyId,
+      passport?.passportType
+    );
+  }
 
   function requireIntegrationCompanyAccess(req, res, next) {
     const companyId = Number.parseInt(req.params.companyId, 10);
@@ -158,6 +167,9 @@ module.exports = function registerMutationRoutes(app, deps) {
           if (Number(released.passport.companyId) !== routeCompanyId) {
             return res.status(404).json({ error: "Released DPP not found for this company" });
           }
+          if (!(await hasActivePassportTypeAccess(req, released.passport))) {
+            return res.status(404).json({ error: "Passport type not found for this company" });
+          }
           return res.status(409).json({
             error: "releasedDppRequiresArchive",
             message: "Released DPPs must use the archive lifecycle action instead of DELETE.",
@@ -172,6 +184,9 @@ module.exports = function registerMutationRoutes(app, deps) {
       }
       if (req.user.role !== "superAdmin" && Number(req.user.companyId) !== Number(editable.passport.companyId)) {
         return res.status(403).json({ error: "Forbidden" });
+      }
+      if (!(await hasActivePassportTypeAccess(req, editable.passport))) {
+        return res.status(404).json({ error: "Passport type not found for this company" });
       }
       if (!isEditablePassportStatus(editable.passport.releaseStatus)) {
         return res.status(409).json({ error: "Passport is not editable" });
@@ -280,6 +295,9 @@ module.exports = function registerMutationRoutes(app, deps) {
       }
       if (req.user.role !== "superAdmin" && Number(req.user.companyId) !== Number(released.passport.companyId)) {
         return res.status(403).json({ error: "Forbidden" });
+      }
+      if (!(await hasActivePassportTypeAccess(req, released.passport))) {
+        return res.status(404).json({ error: "Passport type not found for this company" });
       }
 
       const lineageRows = await pool.query(

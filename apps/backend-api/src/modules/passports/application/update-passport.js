@@ -27,6 +27,7 @@ function updateEditablePassportUseCase(deps) {
     pool,
     normalizePassportRequestBody,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     assertPassportTypeStorageReady,
     getTable,
     validGranularities,
@@ -71,6 +72,12 @@ function updateEditablePassportUseCase(deps) {
     const requestedPassportType = passportType;
     const typeSchema = await getPassportTypeSchema(requestedPassportType);
     if (!typeSchema) throw Object.assign(new Error("Passport type not found"), { statusCode: 404 });
+    if (req.user?.role !== "superAdmin" && !await hasCompanyPassportTypeAccess(companyId, typeSchema.typeName)) {
+      const error = new Error("Passport type not found for this company");
+      error.statusCode = 404;
+      error.payload = {};
+      throw error;
+    }
     const builtInEditableFields = new Set([
       "modelName",
       "internalAliasId",

@@ -105,7 +105,13 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
   app.get("/api/admin/audit-logs", authenticateToken, isSuperAdmin, async (req, res) => {
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 100, 1), 500);
     const offset = Math.min(Math.max(Number.parseInt(req.query.offset, 10) || 0, 0), 1000000);
-    const conditions = ["u.role = 'superAdmin'"];
+    // Prefer the role recorded with the event. A user's current role can change
+    // after an administrative action, and that must not make a historic admin
+    // event disappear from the platform audit trail. The current-role branch
+    // keeps pre-audience legacy rows visible.
+    const conditions = [
+      "(al.audience = 'superAdmin' OR (NULLIF(al.audience, '') IS NULL AND u.role = 'superAdmin'))",
+    ];
     const params = [];
 
     const companyIdText = String(req.query.companyId ?? "").trim();

@@ -1,6 +1,7 @@
 import React from "react";
 import {
   formatPassportStatus,
+  getPassportLinkType,
   normalizePassportStatus,
 } from "../../../../passports/utils/passportStatus";
 import { CompletenessBar } from "./PassportListComponents";
@@ -37,6 +38,7 @@ export function PassportListRow({
   showError,
   showSuccess,
   getViewerPath,
+  getViewerDestination,
   calcCompleteness,
   togglePin,
 }) {
@@ -49,6 +51,13 @@ export function PassportListRow({
   const normalizedStatus = normalizePassportStatus(passport.releaseStatus);
   const showOlderVersionsToggle = hasOlderVersions && !isHistorical;
   const serialNumber = getPassportSerialNumberForType(passport, allPassportTypes);
+  const passportLinkType = getPassportLinkType(passport.releaseStatus);
+  const viewerActionLabel = passportLinkType === "passport"
+    ? "View passport"
+    : passportLinkType === "inactive"
+      ? "View historical passport"
+      : "Preview passport";
+  const viewerDestination = getViewerDestination(passport);
 
   return (
     <tr
@@ -127,6 +136,29 @@ export function PassportListRow({
           {passport.createdByName || "—"}
         </td>
       )}
+      <td className="passport-view-cell" onClick={e => e.stopPropagation()}>
+        {viewerDestination?.isPublicRoute ? (
+          <a
+            className="passport-view-btn"
+            href={viewerDestination.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${viewerActionLabel}: ${passport.modelName || passport.dppId} (opens in a new tab)`}
+          >
+            {viewerActionLabel}
+          </a>
+        ) : (
+          <button
+            type="button"
+            className="passport-view-btn"
+            onClick={() => openPassportViewer(passport)}
+            disabled={!viewerDestination}
+            aria-label={`${viewerActionLabel}: ${passport.modelName || passport.dppId}`}
+          >
+            {viewerActionLabel}
+          </button>
+        )}
+      </td>
       <td className="options-cell" onClick={e => e.stopPropagation()}>
         {user?.role !== "viewer" && (
           <div className="kebab-menu-container">

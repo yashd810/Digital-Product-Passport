@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import CompanyDppPolicyFields from "../components/CompanyDppPolicyFields";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
 import { buildCompanyDppPolicyForm } from "../utils/companyDppPolicy";
+import AppSelect from "../../shared/components/AppSelect";
 import "../styles/AdminDashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -34,35 +35,6 @@ function AdminCompanies() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [trustMenuOpen, setTrustMenuOpen] = useState(false);
-  const trustMenuRef = useRef(null);
-
-  const selectedTrustLevel = useMemo(
-    () => trustLevelOptions.find((option) => option.value === companyForm.customerTrustLevel) || trustLevelOptions[0],
-    [companyForm.customerTrustLevel]
-  );
-
-  useEffect(() => {
-    if (!trustMenuOpen) return undefined;
-
-    const handlePointerDown = (event) => {
-      if (trustMenuRef.current && !trustMenuRef.current.contains(event.target)) {
-        setTrustMenuOpen(false);
-      }
-    };
-
-    const handleEscape = (event) => {
-      if (event.key === "Escape") setTrustMenuOpen(false);
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [trustMenuOpen]);
-
   const handleCompanyFormChange = (field, value) => {
     setCompanyForm((prev) => ({ ...prev, [field]: value }));
     setCreatedCompany(null);
@@ -209,43 +181,14 @@ function AdminCompanies() {
             </div>
             <div className="form-group">
               <label htmlFor="customerTrustLevel">Trust Level</label>
-              <div className="admin-select" ref={trustMenuRef}>
-                <button
-                  id="customerTrustLevel"
-                  type="button"
-                  className={`admin-select-trigger${trustMenuOpen ? " open" : ""}`}
-                  onClick={() => !isLoading && setTrustMenuOpen((prev) => !prev)}
-                  disabled={isLoading}
-                  aria-haspopup="listbox"
-                  aria-expanded={trustMenuOpen}
-                >
-                  <span className="admin-select-trigger-label">{selectedTrustLevel.label}</span>
-                  <span className="admin-select-trigger-caret" aria-hidden="true">▾</span>
-                </button>
-                {trustMenuOpen && (
-                  <div className="admin-select-menu" role="listbox" aria-labelledby="customerTrustLevel">
-                    {trustLevelOptions.map((option) => {
-                      const selected = option.value === companyForm.customerTrustLevel;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          role="option"
-                          aria-selected={selected}
-                          className={`admin-select-option${selected ? " selected" : ""}`}
-                          onClick={() => {
-                            handleCompanyFormChange("customerTrustLevel", option.value);
-                            setTrustMenuOpen(false);
-                          }}
-                        >
-                          <span className="admin-select-option-label">{option.label}</span>
-                          {selected && <span className="admin-select-option-check" aria-hidden="true">✓</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <AppSelect
+                id="customerTrustLevel"
+                value={companyForm.customerTrustLevel}
+                onChange={(event) => handleCompanyFormChange("customerTrustLevel", event.target.value)}
+                options={trustLevelOptions}
+                disabled={isLoading}
+                className="admin-select-input"
+              />
             </div>
             <div className="form-group">
               <label htmlFor="authorizedContactName">Authorized Contact</label>

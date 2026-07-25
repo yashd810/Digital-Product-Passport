@@ -54,7 +54,7 @@ function createResponse() {
   };
 }
 
-function registerRoutes(pool) {
+function registerRoutes(pool, { hasCompanyPassportTypeAccess = async () => true } = {}) {
   const { app, routes } = createRouteApp();
   registerCompanyRoutes(app, {
     pool,
@@ -65,6 +65,7 @@ function registerRoutes(pool) {
     getTable: noop,
     getPassportFieldValue: noop,
     getPassportTypeSchema: async () => typeSchema,
+    hasCompanyPassportTypeAccess,
     normalizePassportRequestBody: noop,
     extractExplicitFacilityId: noop,
     normalizeInternalAliasIdValue: noop,
@@ -205,6 +206,38 @@ test("template detail API hides legacy semantic and unknown stored fields", asyn
   assert.deepEqual(response.body.fields, [
     { fieldKey: "modelName", fieldValue: "Battery A", isModelData: true },
   ]);
+});
+
+test("template APIs reject an ungranted passport type before exposing template data", async () => {
+  let queryCount = 0;
+  const pool = {
+    async query(sql) {
+      queryCount += 1;
+      if (sql.includes('FROM "passportTemplates"')) {
+        return { rows: [{ id: 9, companyId: 7, passportType: "batteryPassportV1", name: "Private template" }] };
+      }
+      throw new Error("template fields must not be queried without an active grant");
+    },
+  };
+  const routes = registerRoutes(pool, {
+    hasCompanyPassportTypeAccess: async () => false,
+  });
+  const route = routes.find((entry) => (
+    entry.method === "get" && entry.routePath === "/api/companies/:companyId/templates/:id"
+  ));
+  const response = createResponse();
+
+  await route.handlers.at(-1)({
+    params: { companyId: "7", id: "9" },
+    user: { role: "companyAdmin" },
+  }, response);
+
+  assert.equal(response.statusCode, 404);
+  assert.deepEqual(response.body, {
+    error: "Passport type not found for this company",
+    code: "templatePassportTypeNotFoundForCompany",
+  });
+  assert.equal(queryCount, 1);
 });
 
 test("template list model-field counts exclude semantic relationship metadata", async () => {

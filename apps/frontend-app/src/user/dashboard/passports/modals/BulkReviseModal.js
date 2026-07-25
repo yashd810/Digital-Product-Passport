@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../../../shared/passports/passportSchemaUtils";
 import { dedupeLatestReleasedPassports } from "../utils/passportListHelpers";
+import AppSelect from "../../../../shared/components/AppSelect";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -271,15 +272,16 @@ export function BulkReviseModal({
 
     if (field.type === "boolean") {
       return (
-        <select
+        <AppSelect
           className="device-manual-input"
           value={row.value}
           onChange={(e) => updateChangeRow(row.id, { value: e.target.value })}
+          aria-label={`Value for ${field.label}`}
         >
           <option value="">Select…</option>
           <option value="true">True</option>
           <option value="false">False</option>
-        </select>
+        </AppSelect>
       );
     }
 
@@ -382,7 +384,7 @@ export function BulkReviseModal({
         {availableTypes.length > 1 && (
           <div className="wf-select-group">
             <label>Passport type</label>
-            <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
+            <AppSelect value={selectedType} onChange={(e) => setSelectedType(e.target.value)} aria-label="Passport type">
               {availableTypes.map((typeName) => {
                 const typeMeta = allPassportTypes.find((type) => type.typeName === typeName);
                 return (
@@ -391,7 +393,7 @@ export function BulkReviseModal({
                   </option>
                 );
               })}
-            </select>
+            </AppSelect>
           </div>
         )}
 
@@ -406,10 +408,11 @@ export function BulkReviseModal({
               <div key={row.id} className="bulk-revise-change-row">
                 <div className="bulk-revise-field-select">
                   <label>Field {index + 1}</label>
-                  <select
+                  <AppSelect
                     className="device-manual-input"
                     value={row.key}
                     onChange={(e) => updateChangeRow(row.id, { key: e.target.value, value: "" })}
+                    aria-label={`Field ${index + 1}`}
                   >
                     <option value="">Choose field…</option>
                     {availableFields.map((field) => (
@@ -417,7 +420,7 @@ export function BulkReviseModal({
                         {field.label}
                       </option>
                     ))}
-                  </select>
+                  </AppSelect>
                 </div>
                 <div className="bulk-revise-field-value">
                   <label>New value</label>
@@ -464,18 +467,18 @@ export function BulkReviseModal({
           <>
             <div className="wf-select-group">
               <label>Reviewer <span className="wf-opt">(optional if approver selected)</span></label>
-              <select value={reviewerId} onChange={(e) => setReviewerId(e.target.value)} disabled={submitting}>
+              <AppSelect value={reviewerId} onChange={(e) => setReviewerId(e.target.value)} disabled={submitting} aria-label="Reviewer">
                 <option value="">— Skip review —</option>
                 {teamUsers.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.firstName} {member.lastName} — {member.role}
                   </option>
                 ))}
-              </select>
+              </AppSelect>
             </div>
             <div className="wf-select-group">
               <label>Approver <span className="wf-opt">(optional if reviewer selected)</span></label>
-              <select value={approverId} onChange={(e) => setApproverId(e.target.value)} disabled={submitting}>
+              <AppSelect value={approverId} onChange={(e) => setApproverId(e.target.value)} disabled={submitting} aria-label="Approver">
                 <option value="">— Skip approval —</option>
                 {teamUsers
                   .filter((member) => !reviewerId || String(member.id) !== reviewerId)
@@ -484,7 +487,7 @@ export function BulkReviseModal({
                       {member.firstName} {member.lastName} — {member.role}
                     </option>
                   ))}
-              </select>
+              </AppSelect>
             </div>
           </>
         )}

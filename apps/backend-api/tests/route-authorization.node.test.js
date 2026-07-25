@@ -90,7 +90,9 @@ test("passport template filtering uses the quoted canonical passport type column
 
   registerCompanyRoutes(app, {
     pool, authenticateToken: noop, checkCompanyAccess: noop, checkCompanyAdmin: noop, requireEditor: noop,
-    getTable: noop, getPassportFieldValue: noop, getPassportTypeSchema: noop,
+    getTable: noop, getPassportFieldValue: noop,
+    getPassportTypeSchema: async (typeName) => ({ typeName }),
+    hasCompanyPassportTypeAccess: async () => true,
     normalizePassportRequestBody: noop, extractExplicitFacilityId: noop,
     normalizeInternalAliasIdValue: noop, normalizeReleaseStatus: noop,
     isEditablePassportStatus: noop, findExistingPassportByInternalAliasId: noop,
@@ -107,6 +109,9 @@ test("passport template filtering uses the quoted canonical passport type column
   assert.ok(route);
   const handler = route.handlers.at(-1);
   const response = {
+    status() {
+      return this;
+    },
     json(body) {
       this.body = body;
       return this;

@@ -48,6 +48,7 @@ function createReleaseHarness({ initialReleaseStatus, failAt = null, workflow = 
     rollbacks: 0,
     releasedRow: null,
     calls: [],
+    auditAudiences: [],
     snapshotReasons: [],
   };
   let transactionState = null;
@@ -143,6 +144,7 @@ function createReleaseHarness({ initialReleaseStatus, failAt = null, workflow = 
     },
     logAudit: async (_companyId, _userId, action, _tableName, _dppId, _oldData, _newData, options) => {
       assert.equal(options.client, client, "audit events must use the release transaction client");
+      state.auditAudiences.push(options.audience);
       auditCount += 1;
       if ((auditCount === 1 && failAt === "signAudit") || (action === "release" && failAt === "releaseAudit")) {
         throw new Error("audit unavailable");
@@ -262,4 +264,14 @@ test("workflow release also rolls back its workflow status when the final workfl
   assert.equal(harness.state.workflowStatus, "inProgress");
   assert.equal(harness.state.commits, 0);
   assert.equal(harness.state.rollbacks, 1);
+});
+
+test("release audit events preserve an explicit super-admin actor audience", async () => {
+  const variant = releaseVariants[0];
+  const harness = createReleaseHarness({ initialReleaseStatus: variant.initialReleaseStatus });
+  await releasePassportAtomically({
+    ...buildReleaseOptions(variant, harness),
+    audience: "superAdmin",
+  });
+  assert.deepEqual(harness.state.auditAudiences, ["superAdmin", "superAdmin"]);
 });

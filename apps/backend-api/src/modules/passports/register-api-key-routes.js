@@ -316,7 +316,10 @@ module.exports = function registerApiKeyRoutes(app, deps) {
         },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-          audience: "companyAdmin",
+          // `checkCompanyAdmin` deliberately permits a super admin to help a
+          // tenant. Keep that event in the platform audit trail instead of
+          // labelling it as a tenant-admin action.
+          audience: req.user?.role === "superAdmin" ? "superAdmin" : "companyAdmin",
         }
       );
 
@@ -364,7 +367,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       { revoked: true, emergency, reason },
       {
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-        audience: "companyAdmin",
+        audience: req.user?.role === "superAdmin" ? "superAdmin" : "companyAdmin",
       }
     );
 

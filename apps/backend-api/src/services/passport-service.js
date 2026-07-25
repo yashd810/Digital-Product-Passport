@@ -86,6 +86,31 @@ module.exports = function createPassportService({
     };
   }
 
+  /**
+   * Returns whether a company has an active grant for a canonical passport
+   * type.  Route handlers intentionally resolve the type first, then use this
+   * check with the canonical typeName so display-name aliases cannot bypass a
+   * revoked grant.
+  */
+  async function hasCompanyPassportTypeAccess(companyId, passportType) {
+    const normalizedCompanyId = Number(companyId);
+    const normalizedType = String(passportType || "").trim();
+    if (!Number.isInteger(normalizedCompanyId) || normalizedCompanyId <= 0 || !normalizedType) return false;
+
+    const result = await pool.query(
+      `SELECT 1
+       FROM "companyPassportAccess" cpa
+       JOIN "passportTypes" pt ON pt.id = cpa."passportTypeId"
+       WHERE cpa."companyId" = $1
+         AND COALESCE(cpa."accessRevoked", false) = false
+         AND pt."isActive" = true
+         AND pt."typeName" = $2
+       LIMIT 1`,
+      [normalizedCompanyId, normalizedType]
+    );
+    return result.rows.length > 0;
+  }
+
   // ─── PASSPORT QUERIES ────────────────────────────────────────────────────
   const {
     findExistingPassportByInternalAliasId,
@@ -223,6 +248,7 @@ module.exports = function createPassportService({
     anchorAuditLogRoot,
     createNotification,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     findExistingPassportByInternalAliasId,
     getPassportLineageContext,
     getPassportVersionsByLineage,

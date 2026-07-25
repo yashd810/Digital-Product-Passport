@@ -10,4 +10,11 @@ describe("public viewer origin configuration", () => {
     expect(normalizePublicViewerOrigin("https://user:pass@viewer.example.test")).toBeNull();
     expect(normalizePublicViewerOrigin(" https://viewer.example.test")).toBeNull();
   });
+
+  test("allows a bare local origin when it is used as trusted viewer configuration", () => {
+    expect(normalizePublicViewerOrigin("http://localhost:3004")).toBe("http://localhost:3004");
+    expect(normalizePublicViewerOrigin("http://localhost:3004/")).toBe("http://localhost:3004");
+    expect(normalizePublicViewerOrigin("http://localhost:3004/dpp")).toBeNull();
+    expect(normalizePublicViewerOrigin("http://user:pass@localhost:3004")).toBeNull();
+  });
 });

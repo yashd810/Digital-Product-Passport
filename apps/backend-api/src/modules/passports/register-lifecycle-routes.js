@@ -49,6 +49,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
     submitPassportToWorkflow,
     validGranularities,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
   } = deps;
 
   const companyDppParamsSchema = {
@@ -82,6 +83,13 @@ module.exports = function registerLifecycleRoutes(app, deps) {
     },
   };
 
+  async function getAccessiblePassportTypeSchema(req, companyId, requestedPassportType) {
+    const typeSchema = await getPassportTypeSchema(requestedPassportType);
+    if (!typeSchema) return null;
+    if (req.user?.role === "superAdmin") return typeSchema;
+    return (await hasCompanyPassportTypeAccess(companyId, typeSchema.typeName)) ? typeSchema : null;
+  }
+
   function buildVerificationSummary(compliance = {}) {
     const completeness = compliance?.completeness || {};
     const missingMandatoryFields = Array.isArray(completeness?.missingMandatoryFields)
@@ -113,7 +121,9 @@ module.exports = function registerLifecycleRoutes(app, deps) {
   }), async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
-      const { passportType } = req.query;
+      const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, req.query.passportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found for this company" });
+      const passportType = typeSchema.typeName;
       const tableName = getTable(passportType);
       const result = await pool.query(
         `SELECT *
@@ -159,8 +169,11 @@ module.exports = function registerLifecycleRoutes(app, deps) {
   }), async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
-      const { passportType } = req.body;
-      if (!passportType) return res.status(400).json({ error: "passportType required in body" });
+      const requestedPassportType = req.body.passportType;
+      if (!requestedPassportType) return res.status(400).json({ error: "passportType required in body" });
+      const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, requestedPassportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found for this company" });
+      const passportType = typeSchema.typeName;
 
       const currentPassport = await loadLatestLivePassport({
         companyId,
@@ -189,6 +202,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         userId: req.user.userId,
         releasedByEmail: req.user.email,
         actorIdentifier: getActorIdentifier(req.user),
+        audience: req.user?.role || "economicOperator",
         editableReleaseStatusesSql,
         typeDef,
         releaseNote: req.body?.releaseNote || null,
@@ -229,10 +243,13 @@ module.exports = function registerLifecycleRoutes(app, deps) {
   }), async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
-      const { passportType } = req.body;
+      const requestedPassportType = req.body.passportType;
       const userId = req.user.userId;
 
-      if (!passportType) return res.status(400).json({ error: "passportType required in body" });
+      if (!requestedPassportType) return res.status(400).json({ error: "passportType required in body" });
+      const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, requestedPassportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found for this company" });
+      const passportType = typeSchema.typeName;
       const tableName = getTable(passportType);
 
       const current = await pool.query(
@@ -247,8 +264,6 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       );
       if (!current.rows.length) return res.status(404).json({ error: "Released passport not found" });
 
-      const typeSchema = await getPassportTypeSchema(passportType);
-      if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const src = restorePassportLogicalFieldKeys(current.rows[0], typeSchema);
       const dup = await pool.query(
         `SELECT id FROM ${tableName} WHERE "lineageId" = $1 AND "releaseStatus" IN ${revisionBlockingStatusesSql} AND "deletedAt" IS NULL`,
@@ -313,10 +328,13 @@ module.exports = function registerLifecycleRoutes(app, deps) {
   }), async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
-      const { passportType, granularity, reason = null } = normalizePassportRequestBody(req.body || {});
+      const { passportType: requestedPassportType, granularity, reason = null } = normalizePassportRequestBody(req.body || {});
       const userId = req.user.userId;
 
-      if (!passportType) return res.status(400).json({ error: "passportType required in body" });
+      if (!requestedPassportType) return res.status(400).json({ error: "passportType required in body" });
+      const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, requestedPassportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found for this company" });
+      const passportType = typeSchema.typeName;
       const requestedGranularity = String(granularity || "").trim().toLowerCase();
       if (!validGranularities.has(requestedGranularity)) {
         return res.status(400).json({ error: "granularity must be one of: model, batch, item" });
@@ -329,8 +347,6 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       );
       if (!current.rows.length) return res.status(404).json({ error: "Released passport not found" });
 
-      const typeSchema = await getPassportTypeSchema(passportType);
-      if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const src = restorePassportLogicalFieldKeys(current.rows[0], typeSchema);
       const currentGranularity = String(src.granularity || "item").trim().toLowerCase();
       if (requestedGranularity === currentGranularity) {
@@ -478,13 +494,20 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       for (const item of items) {
         const dppId = item?.dppId;
-        const passportType = item?.passportType;
-        if (!dppId || !passportType) {
+        const requestedPassportType = item?.passportType;
+        if (!dppId || !requestedPassportType) {
           details.push({ dppId, status: "failed", message: "Missing dppId or passportType" });
           failed += 1;
           continue;
         }
         try {
+          const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, requestedPassportType);
+          if (!typeSchema) {
+            details.push({ dppId, status: "skipped", message: "Passport type not found for this company" });
+            skipped += 1;
+            continue;
+          }
+          const passportType = typeSchema.typeName;
           await submitPassportToWorkflow({ companyId, dppId, passportType, userId, reviewerId, approverId });
           details.push({ dppId, status: "submitted" });
           submitted += 1;
@@ -508,9 +531,12 @@ module.exports = function registerLifecycleRoutes(app, deps) {
   app.post("/api/companies/:companyId/passports/:dppId/archive", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
-      const { passportType } = req.body;
+      const requestedPassportType = req.body.passportType;
       const userId = req.user.userId;
-      if (!passportType) return res.status(400).json({ error: "passportType required" });
+      if (!requestedPassportType) return res.status(400).json({ error: "passportType required" });
+      const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, requestedPassportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found for this company" });
+      const passportType = typeSchema.typeName;
 
       const tableName = getTable(passportType);
       const lineageContext = await getPassportLineageContext({ dppId, passportType, companyId });
@@ -579,7 +605,10 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       );
       if (!archiveRows.rows.length) return res.status(404).json({ error: "Archived passport not found" });
 
-      const passportType = archiveRows.rows[0].passportType;
+      const requestedPassportType = archiveRows.rows[0].passportType;
+      const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, requestedPassportType);
+      if (!typeSchema) return res.status(404).json({ error: "Archived passport not found" });
+      const passportType = typeSchema.typeName;
       const tableName = getTable(passportType);
 
       for (const archiveRow of archiveRows.rows) {

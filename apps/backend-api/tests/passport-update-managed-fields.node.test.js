@@ -40,6 +40,7 @@ function createHarness() {
       typeName: "exampleProductPassportV1",
       allowedKeys: new Set(["manufacturer"]),
     }),
+    hasCompanyPassportTypeAccess: async () => true,
     createPassportTable: async () => { ddlCalls += 1; },
     assertPassportTypeStorageReady: async (typeName) => storageReadinessCalls.push(typeName),
     getTable: () => "exampleProductPassports",

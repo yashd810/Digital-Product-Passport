@@ -42,6 +42,7 @@ module.exports = function registerDppApiRoutes(app, {
   joinQuotedSqlIdentifiers,
   toStoredPassportValue,
   getPassportTypeSchema,
+  hasCompanyPassportTypeAccess,
   findExistingPassportByInternalAliasId,
   complianceService,
   backupProviderService
@@ -153,6 +154,7 @@ module.exports = function registerDppApiRoutes(app, {
     requireEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     getTable,
     normalizePassportRow,
     normalizeInternalAliasIdValue,

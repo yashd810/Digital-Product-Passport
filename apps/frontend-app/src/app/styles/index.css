@@ -59,18 +59,21 @@
   --text-muted: #7a9ab8;
   --bg-hover: rgba(255, 255, 255, 0.06);
   --select-bg: var(--bg-card);
-  --select-bg-layer: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
-  --select-hover-layer: linear-gradient(180deg, rgba(13, 181, 176, 0.12), rgba(255, 255, 255, 0.025));
+  --select-hover-bg: #19334d;
   --select-text: var(--text-primary);
   --select-border: var(--border);
   --select-border-hover: rgba(13, 181, 176, 0.36);
   --select-focus-ring: rgba(13, 181, 176, 0.14);
   --select-disabled-bg: rgba(255, 255, 255, 0.035);
-  --select-option-bg: #132840;
   --select-option-text: var(--text-primary);
   --select-option-checked-bg: rgba(13, 181, 176, 0.24);
   --select-option-checked-text: #effefe;
-  --select-arrow-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2389a5bf' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --select-menu-bg: #10283d;
+  --select-menu-border: rgba(110, 164, 190, 0.38);
+  --select-menu-hover-bg: rgba(13, 181, 176, 0.14);
+  --select-menu-active-bg: rgba(13, 181, 176, 0.22);
+  --select-menu-selected-bg: rgba(13, 181, 176, 0.18);
+  --select-menu-shadow: 0 18px 46px rgba(1, 13, 24, 0.4), 0 2px 8px rgba(1, 13, 24, 0.3);
 
   --font: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -131,18 +134,21 @@
   --text-muted: #567a93;
   --bg-hover: rgba(23, 48, 74, 0.08);
   --select-bg: #ffffff;
-  --select-bg-layer: linear-gradient(180deg, rgba(13, 181, 176, 0.045), rgba(255, 255, 255, 0));
-  --select-hover-layer: linear-gradient(180deg, rgba(13, 181, 176, 0.09), rgba(255, 255, 255, 0.2));
+  --select-hover-bg: #f1fbfa;
   --select-text: #0b1826;
   --select-border: rgba(23, 48, 74, 0.16);
   --select-border-hover: rgba(11, 143, 151, 0.36);
   --select-focus-ring: rgba(11, 143, 151, 0.14);
   --select-disabled-bg: rgba(23, 48, 74, 0.045);
-  --select-option-bg: #ffffff;
   --select-option-text: #0b1826;
   --select-option-checked-bg: #dff8f5;
   --select-option-checked-text: #0b5f66;
-  --select-arrow-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23456177' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --select-menu-bg: #ffffff;
+  --select-menu-border: rgba(23, 48, 74, 0.2);
+  --select-menu-hover-bg: #effcfb;
+  --select-menu-active-bg: #dff8f5;
+  --select-menu-selected-bg: #e4f9f7;
+  --select-menu-shadow: 0 18px 46px rgba(17, 44, 72, 0.16), 0 2px 8px rgba(17, 44, 72, 0.08);
 }
 
 *, *::before, *::after {
@@ -183,56 +189,203 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-select:not([multiple]) {
+/*
+ * App-owned dropdowns replace browser/OS option popups. A native select is
+ * retained only as a transparent form/event proxy by AppSelect; the button and
+ * portalled listbox below are the visible, consistently themed controls.
+ */
+.app-select__native {
+  position: fixed;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-select__trigger {
+  align-items: center;
   appearance: none;
   -webkit-appearance: none;
-  background-color: var(--select-bg);
-  background-image: var(--select-bg-layer), var(--select-arrow-icon);
-  background-position: 0 0, right 13px center;
-  background-repeat: no-repeat;
-  background-size: auto, 16px;
-  border-color: var(--select-border);
-  color: var(--select-text);
-  color-scheme: dark;
+  background-color: var(--select-bg) !important;
+  border: 1px solid var(--select-border);
+  border-color: var(--select-border) !important;
+  border-radius: 0.65rem;
+  color: var(--select-text) !important;
   cursor: pointer;
-  padding-right: 42px;
+  display: inline-flex;
+  font: inherit;
+  gap: 0.7rem;
+  justify-content: space-between;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 2.65rem;
+  padding: 0.625rem 0.78rem;
+  text-align: left;
   transition:
     background-color 0.18s ease,
-    background-image 0.18s ease,
     border-color 0.18s ease,
-    box-shadow 0.18s ease;
+    box-shadow 0.18s ease,
+    transform 0.18s ease !important;
 }
 
-[data-theme="light"] select:not([multiple]) {
-  color-scheme: light;
+.app-select__trigger:hover:not(:disabled),
+.app-select__trigger.is-open:not(:disabled) {
+  background-color: var(--select-hover-bg) !important;
+  border-color: var(--select-border-hover) !important;
 }
 
-select:not([multiple]):hover:not(:disabled) {
-  background-image: var(--select-hover-layer), var(--select-arrow-icon);
-  border-color: var(--select-border-hover);
-}
-
-select:not([multiple]):focus {
+.app-select__trigger:focus-visible,
+.app-select__trigger.is-open:focus-visible {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--select-focus-ring);
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--select-focus-ring) !important;
 }
 
-select:not([multiple]):disabled {
-  background-color: var(--select-disabled-bg);
+.app-select__trigger.is-invalid {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.app-select__trigger:disabled {
+  background-color: var(--select-disabled-bg) !important;
   cursor: not-allowed;
   opacity: 0.68;
 }
 
-select option,
-select optgroup {
-  background: var(--select-option-bg);
-  color: var(--select-option-text);
+.app-select__value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-select option:checked {
-  background: var(--select-option-checked-bg);
+.app-select__chevron {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.74;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.app-select__trigger.is-open .app-select__chevron {
+  opacity: 1;
+  transform: rotate(180deg);
+}
+
+.app-select__menu {
+  position: fixed;
+  z-index: 12000;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0.35rem;
+  border: 1px solid var(--select-menu-border);
+  border-radius: 0.85rem;
+  background: var(--select-menu-bg);
+  color: var(--select-option-text);
+  box-shadow: var(--select-menu-shadow);
+  transform-origin: top center;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.app-select__menu[data-placement="top"] {
+  transform-origin: bottom center;
+}
+
+.app-select__menu[data-state="open"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.app-select__menu[data-state="closed"] {
+  opacity: 0;
+  transform: translateY(-0.25rem) scale(0.985);
+}
+
+.app-select__menu[data-placement="top"][data-state="closed"] {
+  transform: translateY(0.25rem) scale(0.985);
+}
+
+.app-select__option,
+.app-select__empty {
+  align-items: center;
+  border-radius: 0.58rem;
+  box-sizing: border-box;
+  color: inherit;
+  display: flex;
+  gap: 0.7rem;
+  justify-content: space-between;
+  min-height: 2.45rem;
+  padding: 0.56rem 0.68rem;
+}
+
+.app-select__option {
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.25;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.app-select__option:hover:not([data-disabled]),
+.app-select__option[data-active="true"] {
+  background-color: var(--select-menu-hover-bg);
+}
+
+.app-select__option[data-selected="true"] {
+  background-color: var(--select-menu-selected-bg);
   color: var(--select-option-checked-text);
+  font-weight: 700;
+}
+
+.app-select__option[data-active="true"][data-selected="true"] {
+  background-color: var(--select-menu-active-bg);
+}
+
+.app-select__option[data-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.app-select__option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-select__option-check {
+  flex: 0 0 auto;
+  font-weight: 800;
+}
+
+.app-select__empty {
+  color: var(--text-secondary);
+  font-size: 0.9em;
+}
+
+.app-select__validation-message {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-select__trigger,
+  .app-select__chevron,
+  .app-select__menu,
+  .app-select__option {
+    transition: none !important;
+  }
 }
 
 .alert {

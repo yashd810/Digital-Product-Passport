@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import React from "react";
 import { describe, expect, test } from "vitest";
 
 import {
@@ -32,6 +33,10 @@ import {
   flattenSchemaFieldsFromSections,
   normalizeSchemaSections,
 } from "../shared/passports/passportSchemaUtils";
+import {
+  getAppSelectOptions,
+  getNextEnabledOptionIndex,
+} from "../shared/components/AppSelect";
 
 describe("frontend modularity helpers", () => {
   test("admin serialization keeps generated semantic composition mappings", () => {
@@ -196,6 +201,22 @@ describe("frontend modularity helpers", () => {
     expect(adminStyles).toMatch(/\.back-link\s*\{[^}]*flex:\s*0 0 auto;/s);
   });
 
+  test("passport type editing keeps the compact field profile and removes the redundant bottom semantic review", () => {
+    const createPageSource = readFileSync(
+      new URL("../admin/passport-types/AdminCreatePassportTypePage.js", import.meta.url),
+      "utf8",
+    );
+    const adminStyles = readFileSync(
+      new URL("../admin/styles/AdminDashboard.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(createPageSource).toContain("<ModuleFieldProfile");
+    expect(createPageSource).not.toContain("Passport Type Profile Review");
+    expect(createPageSource).not.toContain("acpt-schema-review-card");
+    expect(adminStyles).not.toContain(".acpt-schema-review-card");
+  });
+
   test("system-header entries resolve configured schema fields", () => {
     const entries = resolveSystemHeaderEntries(
       [{
@@ -231,6 +252,29 @@ describe("frontend modularity helpers", () => {
     expect(appSource).toContain('path="/dpp/preview/:manufacturerSlug/:modelSlug/:previewId"');
     expect(appSource).toContain('path="/csv-import/:passportType/create-csv"');
     expect(appSource).toContain('path="/csv-import/:passportType/create-json"');
+  });
+
+  test("passport table exposes an explicit viewer action in addition to row navigation", () => {
+    const rowSource = readFileSync(
+      new URL("../user/dashboard/passports/components/PassportListRow.js", import.meta.url),
+      "utf8",
+    );
+    const tableSource = readFileSync(
+      new URL("../user/dashboard/passports/components/PassportListTable.js", import.meta.url),
+      "utf8",
+    );
+    const listStateSource = readFileSync(
+      new URL("../user/dashboard/passports/hooks/usePassportListState.js", import.meta.url),
+      "utf8",
+    );
+
+    expect(rowSource).toContain('className="passport-view-btn"');
+    expect(rowSource).toContain("View passport");
+    expect(rowSource).toContain("Preview passport");
+    expect(rowSource).toContain('target="_blank"');
+    expect(tableSource).toContain('scope="col">Viewer</th>');
+    expect(listStateSource).toContain("navigate(destination.path)");
+    expect(listStateSource).toContain("window.location.assign(destination.url)");
   });
 
   test("standalone public viewer retains only canonical public passport routes", () => {
@@ -614,5 +658,75 @@ describe("frontend modularity helpers", () => {
       icon: "SA",
       managed: false,
     });
+  });
+
+  test("app-owned dropdowns replace native option popups with one themed control", () => {
+    const appStyles = readFileSync(
+      new URL("../app/styles/index.css", import.meta.url),
+      "utf8",
+    );
+    const dashboardStyles = readFileSync(
+      new URL("../shared/styles/Dashboard.css", import.meta.url),
+      "utf8",
+    );
+    const createPassStyles = readFileSync(
+      new URL("../shared/styles/CreatePass.css", import.meta.url),
+      "utf8",
+    );
+    const auditStyles = readFileSync(
+      new URL("../shared/audit/AuditLogExplorer.css", import.meta.url),
+      "utf8",
+    );
+    const passportDataStyles = readFileSync(
+      new URL("../user/dashboard/passport-data/PassportDataManagement.css", import.meta.url),
+      "utf8",
+    );
+    const adminStyles = readFileSync(
+      new URL("../admin/styles/AdminDashboard.css", import.meta.url),
+      "utf8",
+    );
+    const appSelectSource = readFileSync(
+      new URL("../shared/components/AppSelect.jsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(appStyles).toContain(".app-select__menu {");
+    expect(appStyles).toContain("z-index: 12000;");
+    expect(appStyles).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(appStyles).not.toMatch(/select:not\(\[multiple\]\)/);
+    expect(appSelectSource).toContain("createPortal(menu, document.body)");
+    expect(appSelectSource).toContain('role="listbox"');
+    expect(appSelectSource).toContain('new Event("change", { bubbles: true })');
+
+    const pageSelectStyles = [
+      dashboardStyles,
+      createPassStyles,
+      auditStyles,
+      passportDataStyles,
+      adminStyles,
+    ].join("\n");
+    expect(pageSelectStyles).not.toMatch(/--select-(?:bg|hover)-layer/);
+    expect(pageSelectStyles).not.toMatch(/background-image:\s*var\(--select-arrow-icon\)/);
+    expect(adminStyles).not.toMatch(/\.admin-select-(?:trigger|menu)/);
+  });
+
+  test("app-owned dropdown helpers retain option values and skip disabled choices", () => {
+    const options = getAppSelectOptions(
+      React.createElement(React.Fragment, null,
+        React.createElement("option", { value: "" }, "All statuses"),
+        React.createElement("option", { value: "draft" }, "Draft"),
+        React.createElement("option", { value: "released", disabled: true }, "Released"),
+        React.createElement("option", { value: "obsolete" }, "Obsolete"),
+      ),
+    );
+
+    expect(options.map((option) => option.value)).toEqual([
+      "",
+      "draft",
+      "released",
+      "obsolete",
+    ]);
+    expect(getNextEnabledOptionIndex(options, 1, 1)).toBe(3);
+    expect(getNextEnabledOptionIndex(options, 0, -1)).toBe(3);
   });
 });

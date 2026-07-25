@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { applyTableControls, getNextSortDirection } from "../../../../shared/table/tableControls";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { isObsoletePassportStatus, normalizePassportStatus } from "../../../../passports/utils/passportStatus";
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
-import { safeWindowOpen } from "../../../../shared/security/urlSafety";
 import {
   calcCompleteness,
   formatPassportTypeLabel,
@@ -20,6 +19,7 @@ const api = import.meta.env.VITE_API_URL || "";
 
 export function usePassportListState({ user, companyId, filterByUser }) {
   const { passportType, productKey, productCategoryKey } = useParams();
+  const navigate = useNavigate();
 
   const [passports, setPassports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -101,15 +101,24 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     });
   }, [user?.companyName]);
 
-  const openPassportViewer = useCallback((passport, options = {}) => {
+  const getViewerDestination = useCallback((passport, options = {}) => {
     const path = getViewerPath(passport, options);
-    if (!path) return;
+    if (!path) return null;
     const normalizedStatus = normalizePassportStatus(passport?.releaseStatus);
     const isPublicRoute = !options.forcePreview && (normalizedStatus === "released" || isObsoletePassportStatus(normalizedStatus));
-    const url = isPublicRoute ? buildPublicViewerUrl(path) : `${window.location.origin}${path}`;
-    if (!url) return;
-    safeWindowOpen(url);
+    const url = isPublicRoute ? buildPublicViewerUrl(path) : path;
+    return url ? { path, url, isPublicRoute } : null;
   }, [getViewerPath]);
+
+  const openPassportViewer = useCallback((passport, options = {}) => {
+    const destination = getViewerDestination(passport, options);
+    if (!destination) return;
+    if (destination.isPublicRoute) {
+      window.location.assign(destination.url);
+      return;
+    }
+    navigate(destination.path);
+  }, [getViewerDestination, navigate]);
 
   useEffect(() => {
     if (!companyId || !user?.id) return;
@@ -445,6 +454,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     filteredAndSortedPassports,
     filterStatus,
     getViewerPath,
+    getViewerDestination,
     getVisiblePassportKeys,
     isFiltering,
     isLoading,

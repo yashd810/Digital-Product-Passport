@@ -326,38 +326,38 @@
 
 .form-group input,
 .form-group textarea,
-.form-group select {
+.form-group .app-select__trigger {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 14px;
   font-family: var(--font);
   transition: all 0.25s ease;
-  background: rgba(255,255,255,0.04);
+  background-color: rgba(255,255,255,0.04);
   color: var(--text-primary);
 }
 
 [data-theme="light"] .form-group input,
 [data-theme="light"] .form-group textarea,
-[data-theme="light"] .form-group select {
-  background: #fafffe;
+[data-theme="light"] .form-group .app-select__trigger {
+  background-color: #fafffe;
   color: var(--onyx);
   border-color: rgba(28,55,56,0.2);
 }
 
 .form-group input:focus,
 .form-group textarea:focus,
-.form-group select:focus {
+.form-group .app-select__trigger:focus {
   outline: none;
   border-color: var(--jet);
-  background: rgba(255,255,255,0.06);
+  background-color: rgba(255,255,255,0.06);
   box-shadow: 0 0 0 3px rgba(28,55,56,0.15);
 }
 
 [data-theme="light"] .form-group input:focus,
 [data-theme="light"] .form-group textarea:focus,
-[data-theme="light"] .form-group select:focus {
-  background: #ffffff;
+[data-theme="light"] .form-group .app-select__trigger:focus {
+  background-color: #ffffff;
 }
 
 .form-group textarea { resize: vertical; min-height: 100px; }
@@ -1256,38 +1256,7 @@
   .rp-cancel-btn { width: 100%; text-align: center; }
 }
 
-/* Shared dropdown theme for create and edit passport forms. */
-.form-group select {
-  appearance: none;
-  -webkit-appearance: none;
-  background-color: var(--select-bg);
-  background-image: var(--select-bg-layer), var(--select-arrow-icon);
-  background-position: 0 0, right 13px center;
-  background-repeat: no-repeat;
-  background-size: auto, 16px;
-  border-color: var(--select-border);
-  color: var(--select-text);
-  cursor: pointer;
-  padding-right: 42px;
-}
-
-.form-group select:hover:not(:disabled) {
-  background-image: var(--select-hover-layer), var(--select-arrow-icon);
-  border-color: var(--select-border-hover);
-}
-
-.form-group select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--select-focus-ring);
-  outline: none;
-}
-
-.form-group select option {
-  background: var(--select-option-bg);
-  color: var(--select-option-text);
-}
-
-/* Nested class/property editor generated from fieldsJson.semanticGraph. */
+/* Nested data-entry controls are generated from the compiled field structure. */
 .semantic-property-editor {
   display: grid;
   gap: 10px;
@@ -1295,14 +1264,12 @@
 }
 
 .semantic-root-property {
-  padding: 14px;
-  border: 1px solid color-mix(in srgb, var(--border, #2a4a5e) 80%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--bg-elevated, #152535) 72%, transparent);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .semantic-property-heading,
-.semantic-class-heading,
 .semantic-many-entry-heading {
   display: flex;
   align-items: center;
@@ -1310,8 +1277,7 @@
   gap: 12px;
 }
 
-.semantic-property-heading > div,
-.semantic-class-heading > div {
+.semantic-property-heading > div {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -1324,8 +1290,7 @@
   font-size: 13px;
 }
 
-.semantic-required,
-.semantic-cardinality {
+.semantic-required {
   display: inline-flex;
   align-items: center;
   min-height: 20px;
@@ -1337,20 +1302,6 @@
   font-weight: 700;
 }
 
-.semantic-cardinality {
-  color: var(--text-secondary);
-  border-color: var(--border);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.semantic-property-definition,
-.semantic-class-definition {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 .semantic-class-editor {
   display: grid;
   gap: 12px;
@@ -1359,16 +1310,6 @@
   border-left: 3px solid color-mix(in srgb, var(--accent) 58%, var(--border));
   border-radius: 9px;
   background: color-mix(in srgb, var(--bg-surface, #1a2e3b) 88%, transparent);
-}
-
-.semantic-class-heading code {
-  color: var(--text-secondary);
-  font-size: 10px;
-}
-
-.semantic-class-heading a {
-  color: var(--accent);
-  font-size: 11px;
 }
 
 .semantic-class-properties,
@@ -1442,11 +1383,7 @@
 }
 
 @media (max-width: 620px) {
-  .semantic-property-heading,
-  .semantic-class-heading {
+  .semantic-property-heading {
     align-items: flex-start;
-  }
-  .semantic-class-heading {
-    flex-direction: column;
   }
 }

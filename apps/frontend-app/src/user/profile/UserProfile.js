@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useI18n } from "../../app/providers/i18n";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
+import AppSelect from "../../shared/components/AppSelect";
 import {
   passwordMinLength,
   passwordRequirementText,
@@ -252,27 +253,27 @@ function UserProfile({
                     <div className="form-row-2">
                       <div className="form-group">
                         <label>Default Reviewer</label>
-                        <select value={defReviewer} disabled={saving}
-                          onChange={e => setDefReviewer(e.target.value)}>
+                        <AppSelect value={defReviewer} disabled={saving}
+                          onChange={e => setDefReviewer(e.target.value)} aria-label="Default reviewer">
                           <option value="">— None —</option>
                           {teamUsers.filter(u => u.id !== user?.id).map(u => (
                             <option key={u.id} value={u.id}>
                               {u.firstName} {u.lastName} ({u.email})
                             </option>
                           ))}
-                        </select>
+                        </AppSelect>
                       </div>
                       <div className="form-group">
                         <label>Default Approver</label>
-                        <select value={defApprover} disabled={saving}
-                          onChange={e => setDefApprover(e.target.value)}>
+                        <AppSelect value={defApprover} disabled={saving}
+                          onChange={e => setDefApprover(e.target.value)} aria-label="Default approver">
                           <option value="">— None —</option>
                           {teamUsers.filter(u => u.id !== user?.id).map(u => (
                             <option key={u.id} value={u.id}>
                               {u.firstName} {u.lastName} ({u.email})
                             </option>
                           ))}
-                        </select>
+                        </AppSelect>
                       </div>
                     </div>
                   </>

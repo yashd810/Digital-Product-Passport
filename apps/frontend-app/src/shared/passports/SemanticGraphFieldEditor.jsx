@@ -6,9 +6,8 @@ import {
   isManySemanticProperty,
   isPlainObject,
   parseSemanticGraphValue,
-  semanticPropertyCardinality,
 } from "./semanticGraphUtils";
-import { toSafeExternalHref } from "../security/urlSafety";
+import AppSelect from "../components/AppSelect";
 
 function ScalarInput({ property, value, disabled, onChange }) {
   if (property.dataType === "boolean") {
@@ -52,34 +51,27 @@ function ScalarInput({ property, value, disabled, onChange }) {
   );
 }
 
-function PropertyHeader({ property }) {
+function PropertyHeader({ property, showLabel = true }) {
+  if (!showLabel) return null;
   return (
     <div className="semantic-property-heading">
       <div>
         <strong>{property.label || property.key}</strong>
         {property.minCount > 0 && <span className="semantic-required">Required</span>}
       </div>
-      <span className="semantic-cardinality">{semanticPropertyCardinality(property)}</span>
     </div>
   );
 }
 
-function ClassEditor({ graph, classKey, value, disabled, onChange, depth }) {
+function ClassEditor({ graph, classKey, value, disabled, onChange, depth, hideHeading = false }) {
   const classDef = getSemanticGraphClass(graph, classKey);
   const objectValue = isPlainObject(value) ? value : {};
-  if (!classDef) return <p className="semantic-editor-error">Unknown semantic class: {classKey}</p>;
+  if (!classDef) return <p className="semantic-editor-error">This field configuration is unavailable.</p>;
   return (
     <div className="semantic-class-editor" data-depth={depth}>
-      <div className="semantic-class-heading">
-        <div>
-          <strong>{classDef.label}</strong>
-          <code>{classDef.key}</code>
-        </div>
-        {toSafeExternalHref(classDef.semanticId)
-          ? <a href={toSafeExternalHref(classDef.semanticId)} target="_blank" rel="noopener noreferrer">Class IRI</a>
-          : <span>Class IRI unavailable</span>}
-      </div>
-      {classDef.definition && <p className="semantic-class-definition">{classDef.definition}</p>}
+      {!hideHeading && classDef.label && (
+        <div className="semantic-class-heading"><strong>{classDef.label}</strong></div>
+      )}
       <div className="semantic-class-properties">
         {(classDef.properties || []).map((childProperty) => (
           <SemanticPropertyEditor
@@ -97,17 +89,17 @@ function ClassEditor({ graph, classKey, value, disabled, onChange, depth }) {
   );
 }
 
-function OneValueEditor({ graph, property, value, disabled, onChange, depth }) {
+function OneValueEditor({ graph, property, value, disabled, onChange, depth, hideClassHeading = false }) {
   if (property.rangeKind === "scalar") {
     return <ScalarInput property={property} value={value} disabled={disabled} onChange={onChange} />;
   }
   if (property.rangeKind === "enum") {
     const enumDef = getSemanticGraphEnum(graph, property.rangeEnumKey);
     return (
-      <select value={value ?? ""} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+      <AppSelect value={value ?? ""} disabled={disabled} onChange={(event) => onChange(event.target.value)} aria-label={property.label || property.key}>
         <option value="">Select {property.label || property.key}</option>
         {(enumDef?.values || []).map((entry) => <option key={entry.key} value={entry.key}>{entry.label}</option>)}
-      </select>
+      </AppSelect>
     );
   }
   if (property.relationshipType === "reference") {
@@ -130,16 +122,27 @@ function OneValueEditor({ graph, property, value, disabled, onChange, depth }) {
       disabled={disabled}
       onChange={onChange}
       depth={depth}
+      hideHeading={hideClassHeading}
     />
   );
 }
 
-function SemanticPropertyEditor({ graph, property, value, disabled, onChange, depth = 0, root = false }) {
+function SemanticPropertyEditor({
+  graph,
+  property,
+  value,
+  disabled,
+  onChange,
+  depth = 0,
+  root = false,
+  hideRootLabel = false,
+}) {
   const many = isManySemanticProperty(property);
   const parsedValue = parseSemanticGraphValue(value, many ? [] : value);
   const canRemoveSingleClass = property.rangeKind === "class"
     && property.relationshipType === "composition"
     && property.minCount === 0;
+  const showLabel = !root || !hideRootLabel;
 
   if (!many) {
     const hasClassValue = property.rangeKind !== "class"
@@ -147,8 +150,7 @@ function SemanticPropertyEditor({ graph, property, value, disabled, onChange, de
       || isPlainObject(parsedValue);
     return (
       <div className={`semantic-property-editor${root ? " semantic-root-property" : ""}`}>
-        <PropertyHeader property={property} />
-        {property.definition && <p className="semantic-property-definition">{property.definition}</p>}
+        <PropertyHeader property={property} showLabel={showLabel} />
         {!hasClassValue ? (
           <button
             type="button"
@@ -160,7 +162,15 @@ function SemanticPropertyEditor({ graph, property, value, disabled, onChange, de
           </button>
         ) : (
           <>
-            <OneValueEditor graph={graph} property={property} value={parsedValue} disabled={disabled} onChange={onChange} depth={depth} />
+            <OneValueEditor
+              graph={graph}
+              property={property}
+              value={parsedValue}
+              disabled={disabled}
+              onChange={onChange}
+              depth={depth}
+              hideClassHeading={root && hideRootLabel}
+            />
             {canRemoveSingleClass && (
               <button type="button" className="semantic-remove-button" disabled={disabled} onClick={() => onChange(null)}>
                 Remove {property.label || "details"}
@@ -176,8 +186,7 @@ function SemanticPropertyEditor({ graph, property, value, disabled, onChange, de
   const canAdd = property.maxCount === null || values.length < property.maxCount;
   return (
     <div className={`semantic-property-editor semantic-property-many${root ? " semantic-root-property" : ""}`}>
-      <PropertyHeader property={property} />
-      {property.definition && <p className="semantic-property-definition">{property.definition}</p>}
+      <PropertyHeader property={property} showLabel={showLabel} />
       <div className="semantic-many-list">
         {values.map((entry, index) => (
           <div className="semantic-many-entry" key={`${property.key}-${index}`}>

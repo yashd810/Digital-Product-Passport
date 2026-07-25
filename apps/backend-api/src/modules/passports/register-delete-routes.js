@@ -11,6 +11,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
     requireEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     getTable,
     normalizeInternalAliasIdValue,
     normalizeReleaseStatus,
@@ -21,6 +22,13 @@ module.exports = function registerDeleteRoutes(app, deps) {
     logAudit,
     editableReleaseStatusesSql,
   } = deps;
+
+  async function getAccessiblePassportTypeSchema(req, companyId, requestedPassportType) {
+    const typeSchema = await getPassportTypeSchema(requestedPassportType);
+    if (!typeSchema) return null;
+    if (req.user?.role === "superAdmin") return typeSchema;
+    return (await hasCompanyPassportTypeAccess(companyId, typeSchema.typeName)) ? typeSchema : null;
+  }
 
   async function hardDeleteDraftPassport(client, { dppId, tableName, companyId = null, rowId = null }) {
     await client.query("DELETE FROM \"passportDynamicValues\" WHERE \"passportDppId\" = $1", [dppId]);
@@ -55,8 +63,11 @@ module.exports = function registerDeleteRoutes(app, deps) {
   app.delete("/api/companies/:companyId/passports/:dppId", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
-      const { passportType } = req.body;
-      if (!passportType) return res.status(400).json({ error: "passportType required in body" });
+      const requestedPassportType = req.body.passportType;
+      if (!requestedPassportType) return res.status(400).json({ error: "passportType required in body" });
+      const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, requestedPassportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found for this company" });
+      const passportType = typeSchema.typeName;
 
       const tableName = getTable(passportType);
       const existingRes = await pool.query(
@@ -132,8 +143,9 @@ module.exports = function registerDeleteRoutes(app, deps) {
       if (!Array.isArray(identifiers) || !identifiers.length) return res.status(400).json({ error: "passports or identifiers array required" });
       if (identifiers.length > 500) return res.status(400).json({ error: "Max 500 per request" });
 
-      const typeSchema = await getPassportTypeSchema(passportType);
-      if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+      const typeSchema = await getAccessiblePassportTypeSchema(req, companyId, passportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found for this company" });
+      passportType = typeSchema.typeName;
       const tableName = getTable(typeSchema.typeName);
 
       let deleted = 0;

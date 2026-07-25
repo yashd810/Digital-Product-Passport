@@ -21,6 +21,7 @@
             <button type="button" id="restoreSession">Restore session</button>
             <button type="button" id="clearAll">Clear Module Info</button>
           </div>
+          <div id="message" class="message workspace-message hidden" role="status" aria-live="polite" aria-atomic="true"></div>
           <div class="status" id="status">Checking server...</div>
         </div>
       </header>
@@ -60,7 +61,6 @@
         </aside>
 
         <div class="workspace-main">
-      <div id="message" class="message workspace-message hidden" role="status" aria-live="polite" aria-atomic="true"></div>
       <section class="panel tool-step active" data-step="module">
         <div class="panel-head">
           <div>
@@ -83,7 +83,7 @@
             <input id="productIcon" value="EL" maxlength="4" placeholder="EL">
           </label>
           <label>Base URL *
-            <input id="baseUrl" value="" placeholder="https://your-dpp-domain.example" required>
+            <input id="baseUrl" value="https://claros-dpp.online" placeholder="https://claros-dpp.online" required>
           </label>
           <label class="span2">Dictionary description
             <input id="dictionaryDescription" value="Starter dictionary for a new Digital Product Passport module." placeholder="Short dictionary description">

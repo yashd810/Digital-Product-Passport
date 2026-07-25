@@ -15,6 +15,9 @@ describe("audit display helpers", () => {
     expect(formatAuditAction("grantPassportTypeAccess")).toBe("Granted passport type access");
     expect(formatAuditAction("update_company_policy")).toBe("Update company policy");
     expect(formatAuditAction("updateCompanyDppPolicy")).toBe("Updated company DPP policy");
+    expect(formatAuditAction("createCompany")).toBe("Created company");
+    expect(formatAuditAction("updateCompany")).toBe("Updated company");
+    expect(formatAuditAction("deleteCompany")).toBe("Deleted company");
     expect(formatAuditAction("setAssetManagementEnabled")).toBe("Updated asset management access");
     expect(formatAuditEntity("companyPassportAccess")).toBe("Company passport access");
     expect(formatAuditEntity("passport-scan-events")).toBe("Passport scan events");
@@ -85,6 +88,7 @@ describe("audit display helpers", () => {
 
   it("defensively excludes explicitly identified super-admin activity", () => {
     expect(isCompanyDashboardAuditEvent({ actorRole: "superAdmin" })).toBe(false);
+    expect(isCompanyDashboardAuditEvent({ audience: "superAdmin", actorRole: "companyAdmin" })).toBe(false);
     expect(isCompanyDashboardAuditEvent({ actorRole: "companyAdmin" })).toBe(true);
     expect(isCompanyDashboardAuditEvent({})).toBe(true);
   });

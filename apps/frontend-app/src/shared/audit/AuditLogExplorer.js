@@ -9,6 +9,7 @@ import {
   getAuditActionKind,
   getAuditActionOptions,
 } from "./auditDisplay";
+import AppSelect from "../components/AppSelect";
 import "./AuditLogExplorer.css";
 
 const actionIcons = {
@@ -146,7 +147,7 @@ function AuditLogExplorer({
 
           <div className="audit-explorer-filter-group">
             <label htmlFor={`${idPrefix}-action`}>Action</label>
-            <select
+            <AppSelect
               id={`${idPrefix}-action`}
               value={filterAction}
               onChange={(event) => setFilterAction(event.target.value)}
@@ -155,7 +156,7 @@ function AuditLogExplorer({
               {actionOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
-            </select>
+            </AppSelect>
           </div>
 
           <div className="audit-explorer-filter-group">

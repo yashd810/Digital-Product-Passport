@@ -88,9 +88,8 @@ const sample = {
       dppDid: "__managed__:internalManagedDppDid",
       companyDid: "__managed__:internalManagedCompanyDid",
     },
-    // A non-routable documentation origin keeps the sample self-contained.
-    // Real modules must always be generated with the deployment's explicit URL.
-    baseUrl: "https://example.invalid",
+    // The hosted DPP dictionary and public semantic links are rooted here.
+    baseUrl: "https://claros-dpp.online",
     dictionaryName: "Example Product Dictionary",
     dictionaryDescription: "Starter dictionary for a new Digital Product Passport module.",
   },
@@ -287,6 +286,7 @@ let derivedFieldsRefreshTimer = null;
 let refreshingDerivedFields = false;
 let suspendDerivedFieldsRefresh = false;
 let fieldsExplorerRenderQueued = false;
+let fieldsExplorerInputRenderTimer = null;
 let buildingSectionsDom = false;
 let graphExplorerRenderQueued = false;
 
@@ -746,7 +746,7 @@ function createBlankSpec() {
       systemHeaderFieldAssignments: Object.fromEntries(
         headerSlotDefinitions.map((slot) => [slot.slotKey, `__managed__:${slot.managedKey}`])
       ),
-      baseUrl: "",
+      baseUrl: "https://claros-dpp.online",
       dictionaryName: "",
       dictionaryDescription: "",
     },
@@ -875,6 +875,17 @@ function queueFieldsExplorerRender() {
     fieldsExplorerRenderQueued = false;
     renderFieldsExplorer();
   });
+}
+
+// Editing one field should not rebuild a large sidebar on every keystroke.
+// Structural changes and sidebar search still use the immediate render above;
+// this short debounce only applies to searchable text changing in the editor.
+function queueFieldsExplorerInputRender() {
+  if (fieldsExplorerInputRenderTimer) window.clearTimeout(fieldsExplorerInputRenderTimer);
+  fieldsExplorerInputRenderTimer = window.setTimeout(() => {
+    fieldsExplorerInputRenderTimer = null;
+    queueFieldsExplorerRender();
+  }, 120);
 }
 
 function queueGraphExplorerRender() {
@@ -1955,8 +1966,7 @@ function addSection(data = {}, { afterSection = null, parentSection = null, addB
   $("[data-add-subsection]", node).addEventListener("click", () => {
     focusFieldsElement(addManualSection({}, { parentSection: node, addBlankField: false }));
   });
-  getSectionLabelInput(node).addEventListener("input", queueFieldsExplorerRender);
-  getSectionKeyInput(node).addEventListener("input", queueFieldsExplorerRender);
+  getSectionLabelInput(node).addEventListener("input", queueFieldsExplorerInputRender);
   $("[data-remove-section]", node).addEventListener("click", () => {
     const parent = node.parentElement?.closest(".section-card");
     selectedFieldsNodeId = parent ? ensureFieldsNodeId(parent, "section") : "";
@@ -2045,9 +2055,7 @@ function addField(sectionNode, data = {}, { afterField = null, beforeField = nul
     syncFieldSchemaMetadata();
     queueDerivedFieldsRefresh();
   });
-  node.addEventListener("input", () => {
-    queueFieldsExplorerRender();
-  });
+  node.addEventListener("input", queueFieldsExplorerInputRender);
   node.addEventListener("change", () => {
     queueFieldsExplorerRender();
   });
@@ -2935,12 +2943,12 @@ function syncGraphSourceBindings({ populate = false } = {}) {
   }
 }
 
-function queueGraphSourceSync() {
+function queueGraphSourceSync({ immediate = false } = {}) {
   if (graphSourceSyncTimer) window.clearTimeout(graphSourceSyncTimer);
   graphSourceSyncTimer = window.setTimeout(() => {
     graphSourceSyncTimer = null;
     syncGraphSourceBindings({ populate: false });
-  }, 0);
+  }, immediate ? 0 : 120);
 }
 
 function ensureGraphNodeId(element, prefix) {
@@ -4053,6 +4061,10 @@ function clearFieldsStep() {
     window.clearTimeout(graphSourceSyncTimer);
     graphSourceSyncTimer = null;
   }
+  if (fieldsExplorerInputRenderTimer) {
+    window.clearTimeout(fieldsExplorerInputRenderTimer);
+    fieldsExplorerInputRenderTimer = null;
+  }
   $("#sections").innerHTML = "";
   updateWorkspaceMeta();
 }
@@ -4099,6 +4111,15 @@ function clearCurrentStep() {
     generate: clearGenerateStep,
   }[step] || (() => {}))();
   queueSessionSave();
+  const stepLabel = {
+    module: "Module Info",
+    fields: "Sections & Fields",
+    graph: "Semantic Graph",
+    viewer: "Viewer Layout",
+    defaults: "Managed Defaults",
+    generate: "Preview",
+  }[step] || "current page";
+  setMessage(`Cleared ${stepLabel}. Other generator steps are unchanged.`, "success");
 }
 
 function csvFileName(kind, { template = false } = {}) {
@@ -4510,7 +4531,10 @@ async function loadStatus() {
   }
 }
 
-$("#loadSample").addEventListener("click", () => loadSpec(sample));
+$("#loadSample").addEventListener("click", () => {
+  loadSpec(sample);
+  setMessage("Loaded the starter sample. You can now replace it with your module fields.", "success");
+});
 $("#addSection").addEventListener("click", () => {
   const selected = getSelectedFieldsItem();
   const currentSection = selected?.kind === "section"
@@ -4625,7 +4649,7 @@ document.addEventListener("input", (event) => {
   if (event.target.closest("#sections")) queueGraphSourceSync();
 }, true);
 document.addEventListener("change", (event) => {
-  if (event.target.closest("#sections")) queueGraphSourceSync();
+  if (event.target.closest("#sections")) queueGraphSourceSync({ immediate: true });
 }, true);
 document.addEventListener("input", queueSessionSave, true);
 document.addEventListener("change", () => {

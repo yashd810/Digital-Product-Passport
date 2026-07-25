@@ -17,6 +17,12 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
     generateOneTimeToken,
   } = deps;
 
+  const getAdminAuditOptions = (req) => ({
+    actorIdentifier: req.user?.actorIdentifier
+      || (req.user?.userId ? `user:${req.user.userId}` : null),
+    audience: "superAdmin",
+  });
+
   function buildSuperAdminResponse(row = {}) {
     return {
       id: row.id,
@@ -206,6 +212,17 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       );
       const inviteId = insertResult.rows[0]?.id;
 
+      await logAudit(
+        null,
+        req.user.userId,
+        "requestSuperAdminInvite",
+        "inviteTokens",
+        String(inviteId),
+        null,
+        { inviteeEmail: normalizedInviteeEmail, approvalStatus: "pending" },
+        getAdminAuditOptions(req)
+      );
+
       if (!isEmailConfigured()) {
         return res.status(201).json({
           success: true,
@@ -324,7 +341,8 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
         "inviteTokens",
         inviteId,
         null,
-        { inviteeEmail: invite.email }
+        { inviteeEmail: invite.email },
+        getAdminAuditOptions(req)
       );
 
       res.json({ success: true, message: `Invitation email sent to ${invite.email}` });
@@ -357,7 +375,8 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
         "inviteTokens",
         inviteId,
         null,
-        { inviteeEmail: result.rows[0].email }
+        { inviteeEmail: result.rows[0].email },
+        getAdminAuditOptions(req)
       );
 
       res.json({ success: true, message: `Invite request declined for ${result.rows[0].email}` });
@@ -401,7 +420,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       await logAudit(
         null, req.user.userId,
         active ? "restoreSuperAdminAccess" : "revokeSuperAdminAccess",
-        "users", null, { userId: userId }, { active }
+        "users", null, { userId: userId }, { active }, getAdminAuditOptions(req)
       );
 
       res.json({

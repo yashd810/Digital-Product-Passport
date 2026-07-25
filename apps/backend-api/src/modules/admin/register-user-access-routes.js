@@ -24,6 +24,13 @@ module.exports = function registerUserAccessRoutes(app, deps) {
     }
   };
 
+  const getAdminAuditOptions = (req, options = {}) => ({
+    ...options,
+    actorIdentifier: req.user?.actorIdentifier
+      || (req.user?.userId ? `user:${req.user.userId}` : null),
+    audience: "superAdmin",
+  });
+
   app.get("/api/admin/companies/:companyId/passport-type-access", authenticateToken, isSuperAdmin, async (req, res) => {
     const companyId = parsePositiveId(req.params.companyId);
     if (companyId === null) return res.status(400).json({ error: "Invalid company ID" });
@@ -75,14 +82,53 @@ module.exports = function registerUserAccessRoutes(app, deps) {
   app.patch("/api/admin/users/:userId/role", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const { role } = req.body;
+      const userId = parsePositiveId(req.params.userId);
       if (!["companyAdmin", "editor", "viewer"].includes(role)) {
         return res.status(400).json({ error: "Invalid role" });
       }
-      await pool.query(
-        'UPDATE users SET role = $1, "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $2',
-        [role, req.params.userId]
+      if (userId === null) return res.status(400).json({ error: "Invalid user ID" });
+
+      const target = await pool.query(
+        `SELECT id,
+                role,
+                "companyId" AS "companyId",
+                email
+           FROM users
+          WHERE id = $1
+            AND role IN ('companyAdmin', 'editor', 'viewer')
+          LIMIT 1`,
+        [userId]
       );
-      res.json({ success: true });
+      if (!target.rows.length) return res.status(404).json({ error: "Company user not found" });
+
+      const current = target.rows[0];
+      if (current.role === role) return res.json({ success: true });
+
+      const updated = await pool.query(
+        `UPDATE users
+            SET role = $1,
+                "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
+                "updatedAt" = NOW()
+          WHERE id = $2
+            AND role IN ('companyAdmin', 'editor', 'viewer')
+        RETURNING id, role, "companyId" AS "companyId", email`,
+        [role, userId]
+      );
+      if (!updated.rows.length) return res.status(404).json({ error: "Company user not found" });
+
+      if (typeof logAudit === "function") {
+        await logAudit(
+          current.companyId,
+          req.user?.userId,
+          "updateCompanyUserRole",
+          "users",
+          String(userId),
+          { role: current.role, companyId: current.companyId, email: current.email || null },
+          { role: updated.rows[0].role, companyId: current.companyId, email: updated.rows[0].email || current.email || null },
+          getAdminAuditOptions(req)
+        );
+      }
+      return res.json({ success: true });
     } catch {
       res.status(500).json({ error: "Failed" });
     }
@@ -160,11 +206,7 @@ module.exports = function registerUserAccessRoutes(app, deps) {
           `${companyId}:${passportTypeId}`,
           null,
           { companyId, passportTypeId, typeName, accessRevoked: false },
-          {
-            client,
-            actorIdentifier: req.user?.actorIdentifier || null,
-            audience: req.user?.role || "superAdmin",
-          }
+          getAdminAuditOptions(req, { client })
         );
       }
       await client.query("COMMIT");
@@ -231,11 +273,7 @@ module.exports = function registerUserAccessRoutes(app, deps) {
           `${companyId}:${passportTypeId}`,
           { companyId, passportTypeId, typeName, accessRevoked: false },
           { companyId, passportTypeId, typeName, accessRevoked: true },
-          {
-            client,
-            actorIdentifier: req.user?.actorIdentifier || null,
-            audience: req.user?.role || "superAdmin",
-          }
+          getAdminAuditOptions(req, { client })
         );
       }
       await client.query("COMMIT");

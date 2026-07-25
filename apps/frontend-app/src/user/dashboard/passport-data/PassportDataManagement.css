@@ -189,12 +189,12 @@
 }
 
 .pdm-control-strip input,
-.pdm-control-strip select,
+.pdm-control-strip .app-select__trigger,
 .pdm-toolbar input,
-.pdm-toolbar select,
-.pdm-field-picker select,
+.pdm-toolbar .app-select__trigger,
+.pdm-field-picker .app-select__trigger,
 .pdm-source-panel input,
-.pdm-source-panel select,
+.pdm-source-panel .app-select__trigger,
 .pdm-source-panel textarea,
 .pdm-batch-input textarea,
 .pdm-map-row input {
@@ -202,22 +202,22 @@
   min-width: 0;
   border: 1px solid var(--pdm-border);
   border-radius: 7px;
-  background: var(--pdm-input);
+  background-color: var(--pdm-input);
   color: var(--text-primary);
   font-size: 13px;
   line-height: 1.35;
   padding: 9px 10px;
   outline: none;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
 }
 
 .pdm-control-strip input:focus,
-.pdm-control-strip select:focus,
+.pdm-control-strip .app-select__trigger:focus,
 .pdm-toolbar input:focus,
-.pdm-toolbar select:focus,
-.pdm-field-picker select:focus,
+.pdm-toolbar .app-select__trigger:focus,
+.pdm-field-picker .app-select__trigger:focus,
 .pdm-source-panel input:focus,
-.pdm-source-panel select:focus,
+.pdm-source-panel .app-select__trigger:focus,
 .pdm-source-panel textarea:focus,
 .pdm-batch-input textarea:focus,
 .pdm-map-row input:focus {
@@ -226,12 +226,12 @@
 }
 
 .pdm-page input:disabled,
-.pdm-page select:disabled,
+.pdm-page .app-select__trigger:disabled,
 .pdm-page textarea:disabled {
   cursor: not-allowed;
 }
 
-.pdm-field-picker select {
+.pdm-field-picker .app-select__trigger {
   height: 42px;
   padding: 5px 8px;
 }
@@ -487,13 +487,13 @@
 }
 
 .pdm-table input,
-.pdm-table select,
+.pdm-table .app-select__trigger,
 .pdm-table textarea {
   width: 100%;
   min-height: 34px;
   border: 1px solid transparent;
   border-radius: 6px;
-  background: transparent;
+  background-color: transparent;
   color: var(--text-primary);
   font-size: 13px;
   padding: 6px;
@@ -502,14 +502,14 @@
 }
 
 .pdm-table input:focus,
-.pdm-table select:focus,
+.pdm-table .app-select__trigger:focus,
 .pdm-table textarea:focus {
   border-color: rgba(13, 181, 176, 0.62);
-  background: rgba(13, 181, 176, 0.08);
+  background-color: rgba(13, 181, 176, 0.08);
 }
 
 .pdm-table input:disabled,
-.pdm-table select:disabled,
+.pdm-table .app-select__trigger:disabled,
 .pdm-table textarea:disabled {
   color: var(--text-secondary);
   cursor: not-allowed;
@@ -844,49 +844,7 @@
   }
 }
 
-/* Native dropdowns on the passport-data workspace use the app theme. */
-.pdm-page select:not([multiple]) {
-  appearance: none;
-  -webkit-appearance: none;
-  background-color: var(--select-bg);
-  background-image: var(--select-bg-layer), var(--select-arrow-icon);
-  background-position: 0 0, right 11px center;
-  background-repeat: no-repeat;
-  background-size: auto, 15px;
-  border-color: var(--select-border);
-  color: var(--select-text);
-  cursor: pointer;
-  padding-right: 38px;
-}
-
-.pdm-page select:not([multiple]):hover:not(:disabled) {
-  background-image: var(--select-hover-layer), var(--select-arrow-icon);
-  border-color: var(--select-border-hover);
-}
-
-.pdm-page select:not([multiple]):focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--select-focus-ring);
-  outline: none;
-}
-
-.pdm-table select:not([multiple]) {
-  background-color: rgba(255, 255, 255, 0.035);
-  background-image: var(--select-arrow-icon);
-  background-position: right 8px center;
-  background-size: 14px;
-  border-color: transparent;
-  padding-right: 28px;
-}
-
-.pdm-table select:not([multiple]):hover:not(:disabled),
-.pdm-table select:not([multiple]):focus {
-  background-color: rgba(13, 181, 176, 0.08);
-  background-image: var(--select-arrow-icon);
-  border-color: rgba(13, 181, 176, 0.52);
-}
-
-.pdm-page select option {
-  background: var(--select-option-bg);
-  color: var(--select-option-text);
+.pdm-table .app-select__trigger {
+  min-height: 34px;
+  padding-inline-end: 0.55rem;
 }

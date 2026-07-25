@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 
 import {
   isTrustedApiRequestUrl,
+  safeWindowOpen,
   toSafeExternalHref,
   toSafeHttpOrigin,
   toSafeInternalPath,
@@ -56,6 +57,21 @@ describe("URL safety policy", () => {
     expect(isTrustedApiRequestUrl("/api/users/me")).toBe(true);
     expect(isTrustedApiRequestUrl("http://localhost:3000/api/users/me")).toBe(true);
     expect(toSafeExternalHref("http://127.0.0.1:3001/private")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  test("opens only trusted local passport viewer navigation", () => {
+    const open = vi.fn(() => ({}));
+    vi.stubGlobal("window", { location: { origin: "http://localhost:3000" }, open });
+    vi.stubEnv("VITE_PUBLIC_VIEWER_URL", "http://localhost:3004");
+
+    expect(safeWindowOpen("http://localhost:3000/dpp/preview/acme/model/dpp-preview")).not.toBeNull();
+    expect(safeWindowOpen("http://localhost:3004/dpp/acme/model/dpp-public", { viewer: true })).not.toBeNull();
+    expect(safeWindowOpen("http://localhost:3005/dpp/acme/model/dpp-public", { viewer: true })).toBeNull();
+    expect(safeWindowOpen("http://localhost:3004/dpp/%2e%2e/admin", { viewer: true })).toBeNull();
+    expect(open).toHaveBeenCalledTimes(2);
+
+    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
 });

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { toSafeImageSrc } from "../../../shared/security/urlSafety";
+import AppSelect from "../../../shared/components/AppSelect";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -175,13 +176,13 @@ function ManageTeam({ user, companyId }) {
             className="invite-email-input" required
           />
           {isAdmin && (
-            <select value={inviteRole} disabled={inviteLoading}
+            <AppSelect value={inviteRole} disabled={inviteLoading}
               onChange={e => setInviteRole(e.target.value)}
-              className="invite-role-select">
+              className="invite-role-select" aria-label="Role for invited team member">
               {roles.map(r => (
                 <option key={r.key} value={r.key}>{r.label}</option>
               ))}
-            </select>
+            </AppSelect>
           )}
           <button type="submit" className="invite-send-btn"
             disabled={inviteLoading}>
@@ -250,12 +251,12 @@ function ManageTeam({ user, companyId }) {
                     <td>
                       {isAdmin && editingId === m.id && !isSelf && !isSuperAdmin ? (
                         <div className="role-edit">
-                          <select value={editRole} onChange={e => setEditRole(e.target.value)}
-                            className="role-select-inline">
+                          <AppSelect value={editRole} onChange={e => setEditRole(e.target.value)}
+                            className="role-select-inline" aria-label={`Role for ${m.firstName} ${m.lastName}`}>
                             {roles.map(r => (
                               <option key={r.key} value={r.key}>{r.label}</option>
                             ))}
-                          </select>
+                          </AppSelect>
                           <button className="btn-save-role" onClick={() => handleRoleChange(m.id)}>✓</button>
                           <button className="btn-cancel-role" onClick={() => setEditingId(null)}>✕</button>
                         </div>

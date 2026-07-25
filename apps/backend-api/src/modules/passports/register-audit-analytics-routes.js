@@ -3,6 +3,7 @@ const companyMemberAuditActorPredicateSql = `
   AND al."userId" IS NOT NULL
   AND u."companyId" = $1
   AND u.role IN ('companyAdmin', 'editor', 'viewer')
+  AND COALESCE(NULLIF(al.audience, ''), u.role) <> 'superAdmin'
 `;
 
 function registerAuditAnalyticsRoutes(app, deps) {

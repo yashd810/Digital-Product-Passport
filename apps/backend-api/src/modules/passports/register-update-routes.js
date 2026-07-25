@@ -26,6 +26,7 @@ function registerUpdateRoutes(app, deps) {
     requireEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     assertPassportTypeStorageReady,
     getTable,
     getWritablePassportColumns,
@@ -95,6 +96,11 @@ function registerUpdateRoutes(app, deps) {
     },
   };
 
+  async function hasAuthoringAccess(req, companyId, typeSchema) {
+    if (req.user?.role === "superAdmin") return true;
+    return hasCompanyPassportTypeAccess(companyId, typeSchema.typeName);
+  }
+
   app.patch("/api/companies/:companyId/passports/bulk-update-all", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
     params: companyParamSchema,
     body: bulkUpdateAllSchema,
@@ -107,6 +113,9 @@ function registerUpdateRoutes(app, deps) {
       const requestedType = passportType;
       const typeSchema = await getPassportTypeSchema(requestedType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+      if (!await hasAuthoringAccess(req, companyId, typeSchema)) {
+        return res.status(404).json({ error: "Passport type not found for this company" });
+      }
       await assertPassportTypeStorageReady(typeSchema.typeName);
       const tableName = getTable(typeSchema.typeName);
 
@@ -257,6 +266,9 @@ function registerUpdateRoutes(app, deps) {
       }
       const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+      if (!await hasAuthoringAccess(req, companyId, typeSchema)) {
+        return res.status(404).json({ error: "Passport type not found for this company" });
+      }
       await assertPassportTypeStorageReady(typeSchema.typeName);
       const tableName = getTable(typeSchema.typeName);
 

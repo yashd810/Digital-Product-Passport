@@ -1,9 +1,9 @@
-import { toSafeHttpOrigin, toSafeInternalPath } from "../../shared/security/urlSafety";
+import { toSafeConfiguredHttpOrigin, toSafeInternalPath } from "../../shared/security/urlSafety";
 
 export function normalizePublicViewerOrigin(value) {
   const rawValue = String(value ?? "");
   if (!rawValue || rawValue.trim() !== rawValue) return null;
-  return toSafeHttpOrigin(rawValue);
+  return toSafeConfiguredHttpOrigin(rawValue);
 }
 
 export function getPublicViewerOrigin() {

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../shared/passports/passportSchemaUtils";
+import AppSelect from "../../shared/components/AppSelect";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -395,7 +396,7 @@ function SecurityCenter({ user, companyId }) {
 
                   <label className="security-group-field">
                     <span>Category</span>
-                    <select
+                    <AppSelect
                       value={selectedCategory}
                       onChange={(event) => {
                         setSelectedCategory(event.target.value);
@@ -408,12 +409,12 @@ function SecurityCenter({ user, companyId }) {
                       {categories.map((category) => (
                         <option key={category} value={category}>{category}</option>
                       ))}
-                    </select>
+                    </AppSelect>
                   </label>
 
                   <label className="security-group-field">
                     <span>Passport Type</span>
-                    <select
+                    <AppSelect
                       value={selectedPassportType}
                       onChange={(event) => setSelectedPassportType(event.target.value)}
                       disabled={generatingGroup || !selectedCategory}
@@ -423,7 +424,7 @@ function SecurityCenter({ user, companyId }) {
                       {passportTypesForCategory.map((type) => (
                         <option key={type.typeName} value={type.typeName}>{type.displayName || type.typeName}</option>
                       ))}
-                    </select>
+                    </AppSelect>
                   </label>
                 </div>
 

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import CompanyDppPolicyFields from "../components/CompanyDppPolicyFields";
+import AppSelect from "../../shared/components/AppSelect";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
 import { buildCompanyDppPolicyForm } from "../utils/companyDppPolicy";
 import "../styles/AdminDashboard.css";
@@ -299,7 +300,7 @@ function AdminEditCompanyPage() {
             </div>
             <div className="form-group">
               <label htmlFor="editCustomerTrustLevel">Trust Level</label>
-              <select
+              <AppSelect
                 id="editCustomerTrustLevel"
                 value={editForm.customerTrustLevel}
                 onChange={(event) => handleEditFormChange("customerTrustLevel", event.target.value)}
@@ -308,7 +309,7 @@ function AdminEditCompanyPage() {
                 {trustLevelOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
-              </select>
+              </AppSelect>
             </div>
             <div className="form-group">
               <label htmlFor="editAuthorizedContactName">Authorized Contact</label>

@@ -869,7 +869,10 @@ module.exports = function registerAuthRoutes(app, {
         { role, sessionVersion: updated.rows[0]?.sessionVersion || null },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-          audience: "companyAdmin",
+          // Super admins may perform this company-scoped action. Record the
+          // actor class, rather than the permission level required by the
+          // route, so the company feed never absorbs an administrative event.
+          audience: req.user?.role === "superAdmin" ? "superAdmin" : "companyAdmin",
         }
       );
       await replicateAccessControlEventToBackup({
@@ -907,7 +910,7 @@ module.exports = function registerAuthRoutes(app, {
         { isActive: false, sessionVersion: deactivated.rows[0]?.sessionVersion || null },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-          audience: "companyAdmin",
+          audience: req.user?.role === "superAdmin" ? "superAdmin" : "companyAdmin",
         }
       );
       await replicateAccessControlEventToBackup({
@@ -956,7 +959,7 @@ module.exports = function registerAuthRoutes(app, {
         { sessionVersion: updated.rows[0].sessionVersion, reason },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-          audience: "companyAdmin",
+          audience: req.user?.role === "superAdmin" ? "superAdmin" : "companyAdmin",
         }
       );
       await replicateAccessControlEventToBackup({

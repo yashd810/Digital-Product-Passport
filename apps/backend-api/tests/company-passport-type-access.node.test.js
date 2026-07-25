@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const registerCompanyRoutes = require("../src/modules/admin/register-company-routes");
 const registerUserAccessRoutes = require("../src/modules/admin/register-user-access-routes");
 const registerPassportSupportRoutes = require("../src/modules/passports/register-support-routes");
+const createPassportService = require("../src/services/passport-service");
 
 function createRouteApp() {
   const routes = [];
@@ -32,6 +33,54 @@ function createResponse() {
 
 const noop = () => {};
 
+function createPassportServiceForAccessCheck(pool) {
+  return createPassportService({
+    pool,
+    getTable: () => '"passports"',
+    normalizePassportRow: (value) => value,
+    normalizeReleaseStatus: (value) => value,
+    isPublicHistoryStatus: () => false,
+    isEditablePassportStatus: () => true,
+    generateInternalAliasIdValue: () => "",
+    inRevisionStatus: "inRevision",
+    systemPassportFields: new Set(),
+    getWritablePassportColumns: () => [],
+    getStoredPassportValues: () => [],
+    quoteSqlIdentifier: (value) => `"${value}"`,
+    joinQuotedSqlIdentifiers: () => "",
+    toStoredPassportValue: (value) => value,
+    coerceBulkFieldValue: (value) => value,
+    comparableHistoryFieldValue: (value) => value,
+    formatHistoryFieldValue: (value) => String(value ?? ""),
+    getHistoryFieldDefs: () => [],
+    flattenSchemaFieldsFromSections: () => [],
+    buildCurrentPublicPassportPath: () => "",
+    buildInactivePublicPassportPath: () => "",
+    createTransporter: null,
+    brandedEmail: () => "",
+    renderInfoTable: () => "",
+  });
+}
+
+test("central passport access check requires an active, non-revoked type grant", async () => {
+  const queries = [];
+  const service = createPassportServiceForAccessCheck({
+    async query(sql, params) {
+      queries.push({ sql, params });
+      return { rows: [{ present: true }] };
+    },
+  });
+
+  assert.equal(await service.hasCompanyPassportTypeAccess("7", "batteryV1"), true);
+  assert.equal(await service.hasCompanyPassportTypeAccess("not-a-company", "batteryV1"), false);
+  assert.equal(await service.hasCompanyPassportTypeAccess("7.5", "batteryV1"), false);
+  assert.equal(await service.hasCompanyPassportTypeAccess("7", ""), false);
+  assert.equal(queries.length, 1);
+  assert.deepEqual(queries[0].params, [7, "batteryV1"]);
+  assert.match(queries[0].sql, /COALESCE\(cpa\."accessRevoked", false\) = false/);
+  assert.match(queries[0].sql, /pt\."isActive" = true/);
+});
+
 test("passport type access routes require super-admin authorization", () => {
   const { app, routes } = createRouteApp();
   const authenticateToken = () => {};
@@ -54,6 +103,83 @@ test("passport type access routes require super-admin authorization", () => {
     assert.ok(route, `missing ${method.toUpperCase()} ${routePath}`);
     assert.deepEqual(route.handlers.slice(0, 2), [authenticateToken, isSuperAdmin]);
   }
+});
+
+test("super admins can change only company-member roles and the action stays in the admin audit trail", async () => {
+  const { app, routes } = createRouteApp();
+  const queries = [];
+  const audits = [];
+  const pool = {
+    async query(sql, params = []) {
+      queries.push({ sql, params });
+      if (sql.includes("FROM users") && sql.includes("role IN ('companyAdmin', 'editor', 'viewer')")) {
+        return { rows: [{ id: 14, role: "editor", companyId: 7, email: "editor@example.test" }] };
+      }
+      if (sql.includes("UPDATE users")) {
+        return { rows: [{ id: 14, role: "viewer", companyId: 7, email: "editor@example.test" }] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+  registerUserAccessRoutes(app, {
+    pool,
+    authenticateToken: noop,
+    isSuperAdmin: noop,
+    getTable: noop,
+    logAudit: async (...args) => audits.push(args),
+  });
+
+  const route = routes.find((entry) =>
+    entry.method === "patch" && entry.routePath === "/api/admin/users/:userId/role"
+  );
+  const response = createResponse();
+  await route.handlers.at(-1)({
+    params: { userId: "14" },
+    body: { role: "viewer" },
+    user: { userId: 99, role: "superAdmin", actorIdentifier: "admin@example.test" },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, { success: true });
+  assert.equal(queries.some(({ sql }) => sql.includes("UPDATE users")), true);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0][0], 7);
+  assert.equal(audits[0][2], "updateCompanyUserRole");
+  assert.deepEqual(audits[0][5], { role: "editor", companyId: 7, email: "editor@example.test" });
+  assert.equal(audits[0][7].audience, "superAdmin");
+});
+
+test("company role endpoint never converts a super-admin account into a company role", async () => {
+  const { app, routes } = createRouteApp();
+  let updateAttempted = false;
+  const pool = {
+    async query(sql) {
+      if (sql.includes("UPDATE users")) updateAttempted = true;
+      return { rows: [] };
+    },
+  };
+  const audits = [];
+  registerUserAccessRoutes(app, {
+    pool,
+    authenticateToken: noop,
+    isSuperAdmin: noop,
+    getTable: noop,
+    logAudit: async (...args) => audits.push(args),
+  });
+  const route = routes.find((entry) =>
+    entry.method === "patch" && entry.routePath === "/api/admin/users/:userId/role"
+  );
+  const response = createResponse();
+  await route.handlers.at(-1)({
+    params: { userId: "3" },
+    body: { role: "companyAdmin" },
+    user: { userId: 99, role: "superAdmin" },
+  }, response);
+
+  assert.equal(response.statusCode, 404);
+  assert.equal(response.body.error, "Company user not found");
+  assert.equal(updateAttempted, false);
+  assert.equal(audits.length, 0);
 });
 
 test("company access view returns explicit active and revoked state for every passport type", async () => {

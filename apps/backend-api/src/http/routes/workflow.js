@@ -64,6 +64,7 @@ module.exports = function registerWorkflowRoutes(app, {
       userId: user.userId,
       releasedByEmail: user.email,
       actorIdentifier: getActorIdentifier(user),
+      audience: user?.role || "economicOperator",
       editableReleaseStatusesSql: "('inReview')",
       typeDef,
       releaseNote: comment || null,

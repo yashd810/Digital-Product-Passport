@@ -3,6 +3,7 @@ import {
   companyDppPolicyBooleanFields,
   defaultCompanyDppPolicy,
 } from "../utils/companyDppPolicy";
+import AppSelect from "../../shared/components/AppSelect";
 
 function CompanyDppPolicyFields({
   policy,
@@ -15,7 +16,7 @@ function CompanyDppPolicyFields({
     <div className="company-policy-fields">
       <div className="form-group">
         <label htmlFor={`${idPrefix}-defaultGranularity`}>Default Granularity</label>
-        <select
+        <AppSelect
           id={`${idPrefix}-defaultGranularity`}
           value={currentPolicy.defaultGranularity}
           onChange={(event) => onChange("defaultGranularity", event.target.value)}
@@ -24,7 +25,7 @@ function CompanyDppPolicyFields({
           <option value="item">Item</option>
           <option value="batch">Batch</option>
           <option value="model">Model</option>
-        </select>
+        </AppSelect>
       </div>
 
       {companyDppPolicyBooleanFields.map(([field, label]) => (

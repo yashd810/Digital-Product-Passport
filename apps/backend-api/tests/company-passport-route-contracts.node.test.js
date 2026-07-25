@@ -39,7 +39,7 @@ function createResponse() {
   };
 }
 
-function registerReadRoutes(query) {
+function registerReadRoutes(query, { hasCompanyPassportTypeAccess = async () => true } = {}) {
   const { app, routes } = createRouteApp();
   registerCompanyPassportReadRoutes(app, {
     pool: { query },
@@ -55,6 +55,7 @@ function registerReadRoutes(query) {
       typeName: "batteryPassportV1",
       fieldsJson: { sections: [] },
     }),
+    hasCompanyPassportTypeAccess,
     inRevisionStatusesSql: "('inRevision')",
     isFullRepresentationRequest: () => false,
   });
@@ -106,6 +107,35 @@ test("company passport list applies exact, case-insensitive status filters", asy
     assert.match(queries[0].sql, contract.expectedSql, contract.status);
     assert.deepEqual(queries[0].params, contract.expectedParams, contract.status);
   }
+});
+
+test("company passport reads reject an ungranted type before querying passport rows", async () => {
+  let queryCount = 0;
+  const accessCalls = [];
+  const routes = registerReadRoutes(async () => {
+    queryCount += 1;
+    throw new Error("passport rows must not be queried without an active grant");
+  }, {
+    hasCompanyPassportTypeAccess: async (companyId, typeName) => {
+      accessCalls.push([companyId, typeName]);
+      return false;
+    },
+  });
+  const route = routes.find((entry) => (
+    entry.method === "get"
+    && entry.routePath === "/api/companies/:companyId/passports"
+  ));
+  const response = createResponse();
+  await route.handlers.at(-1)({
+    params: { companyId: "7" },
+    query: { passportType: "batteryPassportV1" },
+    user: { role: "companyAdmin" },
+  }, response);
+
+  assert.equal(response.statusCode, 404);
+  assert.deepEqual(response.body, { error: "Passport type not found for this company" });
+  assert.deepEqual(accessCalls, [["7", "batteryPassportV1"]]);
+  assert.equal(queryCount, 0);
 });
 
 test("company passport export keeps draft and inRevision as separate filters", async () => {
@@ -188,11 +218,14 @@ test("CSV upsert rejects more than 500 passport columns before any write", async
     checkCompanyAccess: noopMiddleware,
     checkCompanyAdmin: noopMiddleware,
     requireEditor: noopMiddleware,
+    getTable: () => '"batteryPassports"',
     getPassportTypeSchema: async () => ({
       typeName: "batteryPassportV1",
       allowedKeys: new Set(["internalAliasId"]),
       fieldsJson: { sections: [] },
     }),
+    hasCompanyPassportTypeAccess: async () => true,
+    assertPassportTypeStorageReady: async () => {},
     normalizePassportRequestBody: (value) => value,
     systemPassportFields: new Set(),
     complianceService: {},
@@ -216,5 +249,189 @@ test("CSV upsert rejects more than 500 passport columns before any write", async
 
   assert.equal(response.statusCode, 400);
   assert.deepEqual(response.body, { error: "Max 500 per request" });
+  assert.equal(queryCount, 0);
+});
+
+test("CSV and JSON upserts require an active company passport type grant", async () => {
+  const { app, routes } = createRouteApp();
+  const accessCalls = [];
+  let queryCount = 0;
+  registerCompanyRoutes(app, {
+    pool: {
+      async query() {
+        queryCount += 1;
+        throw new Error("access must be checked before any database write");
+      },
+    },
+    authenticateToken: noopMiddleware,
+    checkCompanyAccess: noopMiddleware,
+    checkCompanyAdmin: noopMiddleware,
+    requireEditor: noopMiddleware,
+    getTable: () => '"batteryPassports"',
+    getPassportTypeSchema: async () => ({
+      typeName: "batteryPassportV1",
+      allowedKeys: new Set(["internalAliasId"]),
+      fieldsJson: { sections: [] },
+    }),
+    hasCompanyPassportTypeAccess: async (companyId, typeName) => {
+      accessCalls.push([companyId, typeName]);
+      return false;
+    },
+    assertPassportTypeStorageReady: async () => {
+      throw new Error("storage must not be checked before a company grant");
+    },
+    normalizePassportRequestBody: (value) => value,
+    systemPassportFields: new Set(),
+    complianceService: {},
+    productIdentifierService: {},
+  });
+
+  const requests = [
+    {
+      path: "/api/companies/:companyId/passports/upsert-csv",
+      body: {
+        passportType: "batteryPassportV1",
+        csv: "Field Name,Passport 1\\nInternal Alias ID,BAT-1",
+      },
+    },
+    {
+      path: "/api/companies/:companyId/passports/upsert-json",
+      body: {
+        passportType: "batteryPassportV1",
+        passports: [{ internalAliasId: "BAT-1" }],
+      },
+    },
+  ];
+
+  for (const request of requests) {
+    const route = routes.find((entry) => entry.method === "post" && entry.routePath === request.path);
+    const response = createResponse();
+    await route.handlers.at(-1)({
+      params: { companyId: "7" },
+      body: request.body,
+      user: { userId: 9, role: "editor" },
+    }, response);
+    assert.equal(response.statusCode, 404);
+    assert.deepEqual(response.body, { error: "Passport type not found for this company" });
+  }
+
+  assert.deepEqual(accessCalls, [
+    ["7", "batteryPassportV1"],
+    ["7", "batteryPassportV1"],
+  ]);
+  assert.equal(queryCount, 0);
+});
+
+test("super-admin CSV and JSON upserts bypass company passport type grants", async () => {
+  const { app, routes } = createRouteApp();
+  registerCompanyRoutes(app, {
+    pool: {
+      async query() {
+        throw new Error("these requests should finish before any database query");
+      },
+    },
+    authenticateToken: noopMiddleware,
+    checkCompanyAccess: noopMiddleware,
+    checkCompanyAdmin: noopMiddleware,
+    requireEditor: noopMiddleware,
+    getTable: () => '"batteryPassports"',
+    getPassportTypeSchema: async () => ({
+      typeName: "batteryPassportV1",
+      allowedKeys: new Set(["internalAliasId"]),
+      fieldsJson: { sections: [] },
+    }),
+    hasCompanyPassportTypeAccess: async () => {
+      throw new Error("super-admin must not query a company grant");
+    },
+    assertPassportTypeStorageReady: async () => {},
+    normalizePassportRequestBody: (value) => value,
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
+    systemPassportFields: new Set(),
+    complianceService: {},
+    productIdentifierService: {},
+  });
+
+  const csvRoute = routes.find((entry) => (
+    entry.method === "post" && entry.routePath === "/api/companies/:companyId/passports/upsert-csv"
+  ));
+  const csvResponse = createResponse();
+  await csvRoute.handlers.at(-1)({
+    params: { companyId: "7" },
+    body: { passportType: "batteryPassportV1", csv: "Field Name,Passport 1" },
+    user: { userId: 1, role: "superAdmin" },
+  }, csvResponse);
+  assert.equal(csvResponse.statusCode, 400);
+  assert.deepEqual(csvResponse.body, { error: "CSV too short" });
+
+  const jsonRoute = routes.find((entry) => (
+    entry.method === "post" && entry.routePath === "/api/companies/:companyId/passports/upsert-json"
+  ));
+  const jsonResponse = createResponse();
+  await jsonRoute.handlers.at(-1)({
+    params: { companyId: "7" },
+    body: { passportType: "batteryPassportV1", passports: [{}] },
+    user: { userId: 1, role: "superAdmin" },
+  }, jsonResponse);
+  assert.equal(jsonResponse.statusCode, 200);
+  assert.deepEqual(jsonResponse.body.summary, { created: 0, updated: 0, skipped: 1, failed: 0 });
+});
+
+test("CSV and JSON upserts verify storage readiness before parsing or writing", async () => {
+  const { app, routes } = createRouteApp();
+  const readinessCalls = [];
+  let queryCount = 0;
+  registerCompanyRoutes(app, {
+    pool: {
+      async query() {
+        queryCount += 1;
+        throw new Error("storage readiness must run before database writes");
+      },
+    },
+    authenticateToken: noopMiddleware,
+    checkCompanyAccess: noopMiddleware,
+    checkCompanyAdmin: noopMiddleware,
+    requireEditor: noopMiddleware,
+    getTable: () => '"batteryPassports"',
+    getPassportTypeSchema: async () => ({
+      typeName: "batteryPassportV1",
+      allowedKeys: new Set(["internalAliasId"]),
+      fieldsJson: { sections: [] },
+    }),
+    hasCompanyPassportTypeAccess: async () => true,
+    assertPassportTypeStorageReady: async (typeName) => {
+      readinessCalls.push(typeName);
+      const error = new Error("Passport storage is not provisioned");
+      error.code = "passportTypeStorageNotReady";
+      error.statusCode = 503;
+      throw error;
+    },
+    normalizePassportRequestBody: (value) => value,
+    systemPassportFields: new Set(),
+    complianceService: {},
+    productIdentifierService: {},
+  });
+
+  for (const request of [
+    {
+      path: "/api/companies/:companyId/passports/upsert-csv",
+      body: { passportType: "batteryPassportV1", csv: "Field Name,Passport 1\\nInternal Alias ID,BAT-1" },
+    },
+    {
+      path: "/api/companies/:companyId/passports/upsert-json",
+      body: { passportType: "batteryPassportV1", passports: [{ internalAliasId: "BAT-1" }] },
+    },
+  ]) {
+    const route = routes.find((entry) => entry.method === "post" && entry.routePath === request.path);
+    const response = createResponse();
+    await route.handlers.at(-1)({
+      params: { companyId: "7" },
+      body: request.body,
+      user: { userId: 9, role: "editor" },
+    }, response);
+    assert.equal(response.statusCode, 503);
+    assert.deepEqual(response.body, { error: "passportTypeStorageNotReady" });
+  }
+
+  assert.deepEqual(readinessCalls, ["batteryPassportV1", "batteryPassportV1"]);
   assert.equal(queryCount, 0);
 });

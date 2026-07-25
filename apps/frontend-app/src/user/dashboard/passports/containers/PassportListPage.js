@@ -58,6 +58,7 @@ function PassportList({ user, companyId, filterByUser }) {
       showError={state.showError}
       showSuccess={state.showSuccess}
       getViewerPath={state.getViewerPath}
+      getViewerDestination={state.getViewerDestination}
       handleArchive={actions.handleArchive}
       handleDelete={actions.handleDelete}
       togglePin={state.togglePin}

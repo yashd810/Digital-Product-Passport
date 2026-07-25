@@ -16,26 +16,40 @@ const auditAcronyms = new Map([
 ]);
 
 const auditActionLabels = new Map([
+  ["activatePassportType", "Activated passport type"],
+  ["approveSuperAdminInvite", "Approved super-admin invitation"],
   ["archive", "Archived passport"],
   ["bulkHardDelete", "Permanently deleted passports in bulk"],
   ["bulkRevise", "Revised passports in bulk"],
   ["bulkUpdateAll", "Updated passports in bulk"],
   ["create", "Created passport"],
+  ["createCompany", "Created company"],
   ["createPassportType", "Created passport type"],
+  ["createProductCategory", "Created product category"],
+  ["createSymbol", "Created symbol"],
+  ["deactivatePassportType", "Deactivated passport type"],
   ["delete", "Deleted passport"],
+  ["deleteCompany", "Deleted company"],
   ["deletePassportType", "Deleted passport type"],
   ["deleteProductCategory", "Deleted product category"],
+  ["deleteSymbol", "Deleted symbol"],
+  ["declineSuperAdminInvite", "Declined super-admin invitation"],
   ["grantPassportTypeAccess", "Granted passport type access"],
   ["hardDelete", "Permanently deleted passport"],
   ["release", "Released passport"],
   ["revise", "Revised passport"],
+  ["restoreSuperAdminAccess", "Restored super-admin access"],
   ["revokePassportTypeAccess", "Revoked passport type access"],
+  ["revokeSuperAdminAccess", "Revoked super-admin access"],
+  ["requestSuperAdminInvite", "Requested super-admin invitation"],
   ["setAssetManagementEnabled", "Updated asset management access"],
   ["submitReview", "Submitted passport for review"],
   ["transitionGranularity", "Changed passport granularity"],
   ["unarchive", "Restored archived passport"],
   ["update", "Updated passport"],
+  ["updateCompany", "Updated company"],
   ["updateCompanyDppPolicy", "Updated company DPP policy"],
+  ["updateCompanyUserRole", "Updated company user role"],
   ["updateDynamicValues", "Updated dynamic values"],
   ["updatePassportTypeMetadata", "Updated passport type"],
   ["upload", "Uploaded file"],
@@ -155,6 +169,8 @@ export function filterAuditLogs(logs, {
 }
 
 export function isCompanyDashboardAuditEvent(log = {}) {
+  const audience = String(log.audience || "").trim().toLowerCase();
+  if (audience === "superadmin") return false;
   const actorRole = String(log.actorRole || log.userRole || "").trim().toLowerCase();
   return actorRole !== "superadmin";
 }

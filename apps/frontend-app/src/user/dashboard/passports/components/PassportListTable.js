@@ -55,6 +55,7 @@ export function PassportListTable({
             <th><SortableHeader columnKey="releaseStatus" label="Status" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
             <th><SortableHeader columnKey="completeness" label="Complete" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
             {!filterByUser && <th><SortableHeader columnKey="createdBy" label="Created By" sortConfig={sortConfig} toggleSort={toggleSort} /></th>}
+            <th scope="col">Viewer</th>
             <th>Options</th>
           </tr>
           {showFilters && (
@@ -69,6 +70,7 @@ export function PassportListTable({
               <th><input className="table-filter-input" value={columnFilters.releaseStatus || ""} onChange={(e) => updateColumnFilter("releaseStatus", e.target.value)} placeholder="Filter" /></th>
               <th><input className="table-filter-input" value={columnFilters.completeness || ""} onChange={(e) => updateColumnFilter("completeness", e.target.value)} placeholder="Filter" /></th>
               {!filterByUser && <th><input className="table-filter-input" value={columnFilters.createdBy || ""} onChange={(e) => updateColumnFilter("createdBy", e.target.value)} placeholder="Filter" /></th>}
+              <th></th>
               <th></th>
             </tr>
           )}

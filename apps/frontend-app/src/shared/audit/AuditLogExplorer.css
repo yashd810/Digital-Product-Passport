@@ -76,39 +76,24 @@
 }
 
 .audit-explorer-filter-group input,
-.audit-explorer-filter-group select {
+.audit-explorer-filter-group .app-select__trigger {
   width: 100%;
   min-height: 44px;
   box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 10px 13px;
-  background: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
   font: inherit;
   font-size: 14px;
-  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 
-.audit-explorer-filter-group select {
-  appearance: none;
-  padding-right: 40px;
-  background-image: var(--select-bg-layer), var(--select-arrow-icon);
-  background-position: 0 0, right 12px center;
-  background-repeat: no-repeat;
-  background-size: auto, 16px;
-}
-
-.audit-explorer-filter-group input:focus,
-.audit-explorer-filter-group select:focus {
+.audit-explorer-filter-group input:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(13, 181, 176, 0.14);
-}
-
-.audit-explorer-filter-group select option {
-  background: var(--select-option-bg);
-  color: var(--select-option-text);
 }
 
 .audit-explorer-filter-actions {
@@ -488,7 +473,7 @@
 }
 
 [data-theme="light"] .audit-explorer-filter-group input,
-[data-theme="light"] .audit-explorer-filter-group select,
+[data-theme="light"] .audit-explorer-filter-group .app-select__trigger,
 [data-theme="light"] .audit-explorer-secondary-btn,
 [data-theme="light"] .audit-explorer-entity,
 [data-theme="light"] .audit-explorer-company,

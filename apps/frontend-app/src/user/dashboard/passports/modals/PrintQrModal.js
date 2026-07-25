@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
+import AppSelect from "../../../../shared/components/AppSelect";
 
 export function PrintQrModal({ selectedCount, onClose, onConfirm, isExporting }) {
   const [widthMm, setWidthMm] = useState("50");
@@ -43,10 +44,10 @@ export function PrintQrModal({ selectedCount, onClose, onConfirm, isExporting })
           </div>
           <div className="form-group">
             <label>Format</label>
-            <select value={format} onChange={(e) => setFormat(e.target.value)} disabled={isExporting}>
+            <AppSelect value={format} onChange={(e) => setFormat(e.target.value)} disabled={isExporting} aria-label="Image format">
               <option value="png">PNG</option>
               <option value="jpeg">JPEG</option>
-            </select>
+            </AppSelect>
           </div>
           <p className="bulk-create-note">
             The total label size includes passport category on top, the QR code in the middle, and the passport DPP ID at the bottom.

@@ -28,6 +28,7 @@ function createDppUseCase(deps) {
     logger,
     validGranularities,
     usesConfiguredGlobalProductIdentifierScheme,
+    hasCompanyPassportTypeAccess,
   } = deps;
 
   return async function createDpp({ req }) {
@@ -38,18 +39,10 @@ function createDppUseCase(deps) {
     const requestedPassportType = normalizedBody.passportType;
     const typeSchema = await getPassportTypeSchema(requestedPassportType);
     if (!typeSchema) throw Object.assign(new Error("Passport type not found"), { statusCode: 404 });
-    const typeAccess = await pool.query(
-      `SELECT 1
-       FROM "companyPassportAccess" cpa
-       JOIN "passportTypes" pt ON pt.id = cpa."passportTypeId"
-       WHERE cpa."companyId" = $1
-         AND cpa."accessRevoked" = false
-         AND pt."typeName" = $2
-         AND pt."isActive" = true
-       LIMIT 1`,
-      [companyId, typeSchema.typeName]
-    );
-    if (!typeAccess.rows.length) {
+    if (
+      req.user?.role !== "superAdmin"
+      && !(await hasCompanyPassportTypeAccess(companyId, typeSchema.typeName))
+    ) {
       throw Object.assign(new Error("Passport type not found for this company"), { statusCode: 404 });
     }
 

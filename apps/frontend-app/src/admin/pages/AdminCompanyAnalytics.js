@@ -5,6 +5,7 @@ import { applyTableControls, getNextSortDirection, sortIndicator } from "../../s
 import { openAnalyticsPrintReport, renderBarChartSvg, renderLineChartSvg, renderPieChartSvg } from "../../shared/utils/analyticsPrintExport";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { statusColors } from "../../shared/utils/statusColors";
+import AppSelect from "../../shared/components/AppSelect";
 import AdminCompanyActions from "../components/AdminCompanyActions";
 import { buildCompanyAnalyticsPath, slugifyCompanyName as slugify } from "../utils/companyRoutes";
 import "../styles/AdminDashboard.css";
@@ -810,11 +811,11 @@ function AdminCompanyAnalytics() {
                     <td>
                       {editUserId === user.id ? (
                         <div className="aca-role-editor">
-                          <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="aca-role-select">
+                          <AppSelect value={editRole} onChange={(e) => setEditRole(e.target.value)} className="aca-role-select" aria-label={`Role for ${user.firstName} ${user.lastName}`}>
                             {roles.map((role) => (
                               <option key={role.key} value={role.key}>{role.label}</option>
                             ))}
-                          </select>
+                          </AppSelect>
                           <button onClick={() => handleRoleChange(user.id)} disabled={saving} className="aca-inline-btn aca-inline-btn-save">
                             {saving ? "…" : "✓"}
                           </button>

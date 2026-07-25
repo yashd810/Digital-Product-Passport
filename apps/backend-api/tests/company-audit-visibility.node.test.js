@@ -106,12 +106,13 @@ test("company Recent Updates and Audit Logs share the strict member-actor SQL fi
     assert.match(sql, /al\."userId" IS NOT NULL/);
     assert.match(sql, /u\."companyId" = \$1/);
     assert.match(sql, /u\.role IN \('companyAdmin', 'editor', 'viewer'\)/);
+    assert.match(sql, /COALESCE\(NULLIF\(al\.audience, ''\), u\.role\) <> 'superAdmin'/);
     assert.doesNotMatch(sql, /al\.action NOT IN/);
     assert.ok(sql.indexOf("u.\"companyId\" = $1") < sql.indexOf("LIMIT"));
   }
 });
 
-test("dedicated admin audit route is super-admin protected and returns only super-admin-authored events", async () => {
+test("dedicated admin audit route is super-admin protected and keeps event-time super-admin activity visible", async () => {
   const authenticateToken = () => {};
   const isSuperAdmin = () => {};
   const queries = [];
@@ -154,7 +155,8 @@ test("dedicated admin audit route is super-admin protected and returns only supe
 
   assert.equal(response.statusCode, 200);
   assert.equal(queries.length, 1);
-  assert.match(queries[0].sql, /u\.role = 'superAdmin'/);
+  assert.match(queries[0].sql, /al\.audience = 'superAdmin'/);
+  assert.match(queries[0].sql, /NULLIF\(al\.audience, ''\) IS NULL AND u\.role = 'superAdmin'/);
   assert.match(queries[0].sql, /LEFT JOIN companies c ON al\."companyId" = c\.id/);
   assert.doesNotMatch(queries[0].sql, /al\."companyId" IS NOT NULL/);
   assert.deepEqual(queries[0].params, [500, 1000000]);

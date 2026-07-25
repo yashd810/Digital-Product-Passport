@@ -16,6 +16,7 @@ module.exports = function registerCreateRoutes(app, deps) {
     requireEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     assertPassportTypeStorageReady,
     getTable,
     normalizeInternalAliasIdValue,
@@ -52,6 +53,11 @@ module.exports = function registerCreateRoutes(app, deps) {
     },
   };
 
+  async function hasAuthoringAccess(req, companyId, typeSchema) {
+    if (req.user?.role === "superAdmin") return true;
+    return hasCompanyPassportTypeAccess(companyId, typeSchema.typeName);
+  }
+
   app.post("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
     params: companyParamSchema,
     body: createPassportSchema,
@@ -66,6 +72,9 @@ module.exports = function registerCreateRoutes(app, deps) {
 
       const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+      if (!await hasAuthoringAccess(req, companyId, typeSchema)) {
+        return res.status(404).json({ error: "Passport type not found for this company" });
+      }
       await assertPassportTypeStorageReady(typeSchema.typeName);
 
       const resolvedPassportType = typeSchema.typeName;
@@ -109,6 +118,9 @@ module.exports = function registerCreateRoutes(app, deps) {
 
       const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+      if (!await hasAuthoringAccess(req, companyId, typeSchema)) {
+        return res.status(404).json({ error: "Passport type not found for this company" });
+      }
       await assertPassportTypeStorageReady(typeSchema.typeName);
 
       const resolvedPassportType = typeSchema.typeName;

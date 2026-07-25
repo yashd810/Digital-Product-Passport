@@ -17,8 +17,8 @@ Then open:
 http://127.0.0.1:5055
 ```
 
-For packages intended for the current hosted app, set **Base URL** in Module
-Info to `https://claros-dpp.online`. The generator adds
+For packages intended for the current hosted app, **Base URL** defaults to
+`https://claros-dpp.online` in Module Info. The generator adds
 `/dictionary/<family>/<version>` and `/api/dictionary/<family>/<version>` to
 that site root when it builds semantic links.
 
@@ -228,6 +228,13 @@ GET    /api/admin/companies/:companyId/passport-type-access
 POST   /api/admin/company-access
 DELETE /api/admin/company-access/:companyId/:typeId
 ```
+
+An active company grant is not only a UI filter. It is enforced on company
+create/import/update, verification, lifecycle and workflow actions, protected
+read/export/preview/history operations, template operations, and standards
+integration create/patch/delete/archive. Revoking the grant hides the
+company-side resources for that type, but does not unpublish an already
+released public passport or its public viewer route.
 
 Finally, verify the registered dictionary and its class ownership:
 

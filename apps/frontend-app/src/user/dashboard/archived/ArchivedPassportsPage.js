@@ -7,6 +7,7 @@ import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import { safeWindowOpen } from "../../../shared/security/urlSafety";
 import { renderPassportQrToCanvas } from "../../../passport-viewer/utils/QRcode";
 import { getPassportSerialNumberForType } from "../passports/utils/passportListHelpers";
+import AppSelect from "../../../shared/components/AppSelect";
 import "../../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -369,7 +370,7 @@ function ArchivedPassports({ user, companyId }) {
           showError("Archived passport link is unavailable for this version.");
           return;
         }
-        safeWindowOpen(archivedUrl);
+        safeWindowOpen(archivedUrl, { viewer: true });
       })
       .catch(() => showError("Failed to open archived passport"));
   };
@@ -489,12 +490,12 @@ function ArchivedPassports({ user, companyId }) {
       <div className="search-bar">
         <input type="text" placeholder="Search by serial number or model..."
           value={searchText} onChange={e => setSearchText(e.target.value)} className="search-input" />
-        <select value={filterType} onChange={e => setFilterType(e.target.value)} className="filter-select">
+        <AppSelect value={filterType} onChange={e => setFilterType(e.target.value)} className="filter-select" aria-label="Filter archived passports by type">
           <option value="">All Types</option>
           {passportTypes.map(t => (
             <option key={t.typeName} value={t.typeName}>{t.displayName || t.typeName}</option>
           ))}
-        </select>
+        </AppSelect>
         {(searchText || filterType) && (
           <button className="clear-filter-btn" onClick={() => { setSearchText(""); setFilterType(""); }}>
             Clear
@@ -510,11 +511,11 @@ function ArchivedPassports({ user, companyId }) {
         {!isFiltering && (
           <div className="passport-pagination-size">
             <label htmlFor="archivedRowsPerPage" className="passport-pagination-label">Rows per page</label>
-            <select id="archivedRowsPerPage" value={rowsPerPage} onChange={e => setRowsPerPage(Number(e.target.value))} className="filter-select passport-page-size-select">
+            <AppSelect id="archivedRowsPerPage" value={rowsPerPage} onChange={e => setRowsPerPage(Number(e.target.value))} className="filter-select passport-page-size-select">
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
-            </select>
+            </AppSelect>
           </div>
         )}
       </div>

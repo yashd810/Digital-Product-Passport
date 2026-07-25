@@ -470,6 +470,60 @@
   text-decoration: underline;
 }
 
+.passport-view-cell {
+  min-width: 9.75rem;
+}
+
+.passport-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.72rem;
+  border: 1px solid var(--accent, #0abab5);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--accent, #0abab5) 14%, transparent);
+  color: var(--accent, #18d5cf);
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.15;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.passport-view-btn:hover {
+  background: var(--accent, #0abab5);
+  border-color: var(--accent, #0abab5);
+  color: #062232;
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--accent, #0abab5) 28%, transparent);
+  transform: translateY(-1px);
+}
+
+.passport-view-btn:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent, #18d5cf) 54%, white);
+  outline-offset: 2px;
+}
+
+.passport-view-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
+[data-theme="light"] .passport-view-btn {
+  color: #087a78;
+  background: color-mix(in srgb, #0abab5 12%, white);
+}
+
+[data-theme="light"] .passport-view-btn:hover {
+  color: #062232;
+  background: #0abab5;
+}
+
 /* Kebab Menu */
 .options-cell {
   text-align: center;
@@ -878,14 +932,14 @@
   border-radius: 8px;
   font-size: 15px;
   font-family: var(--font);
-  background: var(--bg-card);
+  background-color: var(--bg-card);
   color: var(--text-primary);
   cursor: pointer;
   transition: border-color 0.25s;
 }
 
 [data-theme="light"] .filter-select {
-  background: #ffffff;
+  background-color: #ffffff;
   color: var(--onyx);
   border-color: rgba(28, 55, 56, 0.2);
 }
@@ -2006,7 +2060,7 @@
   color: var(--steel);
   text-transform: lowercase;
 }
-.wf-select-group select,
+.wf-select-group .app-select__trigger,
 .wf-select-group textarea {
   width: 100%;
   padding: 10px 12px;
@@ -2014,14 +2068,14 @@
   border-radius: 10px;
   font-size: 13px;
   font-family: var(--font);
-  background: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
 }
 .wf-select-group textarea {
   resize: vertical;
   min-height: 80px;
 }
-.wf-select-group select:focus,
+.wf-select-group .app-select__trigger:focus,
 .wf-select-group textarea:focus {
   outline: none;
   border-color: var(--accent);
@@ -2360,7 +2414,7 @@
   border-radius: 10px;
   font-size: 15px;
   font-family: var(--font);
-  background: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
   cursor: pointer;
 }
@@ -2498,7 +2552,7 @@
   border-radius: 8px;
   font-size: 13px;
   font-family: var(--font);
-  background: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
 }
 .btn-save-role,
@@ -2739,28 +2793,28 @@
 }
 .form-group input,
 .form-group textarea,
-.form-group select {
+.form-group .app-select__trigger {
   padding: 10px 12px;
   border: 1.5px solid var(--border);
   border-radius: 7px;
   font-size: 14px;
   font-family: var(--font);
-  background: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
   transition: border-color 0.2s;
 }
 
 [data-theme="light"] .form-group input,
 [data-theme="light"] .form-group textarea,
-[data-theme="light"] .form-group select {
-  background: #ffffff;
+[data-theme="light"] .form-group .app-select__trigger {
+  background-color: #ffffff;
   color: var(--onyx);
   border-color: rgba(28, 55, 56, 0.2);
 }
 
 .form-group input:focus,
 .form-group textarea:focus,
-.form-group select:focus {
+.form-group .app-select__trigger:focus {
   outline: none;
   border-color: var(--jet);
   box-shadow: 0 0 0 3px rgba(28, 55, 56, 0.15);
@@ -6229,13 +6283,13 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
   color: var(--text-secondary);
 }
 
-.diff-sel-group select {
+.diff-sel-group .app-select__trigger {
   padding: 10px 12px;
   border: 1.5px solid var(--border);
   border-radius: 10px;
   font-size: 13px;
   font-family: var(--font);
-  background: var(--bg-secondary);
+  background-color: var(--bg-secondary);
   color: var(--text-primary);
 }
 
@@ -7534,7 +7588,7 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
 }
 .tmpl-input,
 .tmpl-select {
-  background: var(--bg-secondary);
+  background-color: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 9px 12px;
@@ -7547,10 +7601,6 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
 .tmpl-select:focus {
   border-color: var(--mint);
 }
-.tmpl-select option {
-  background: var(--bg-card);
-}
-
 .tmpl-type-badge {
   background: rgba(13, 181, 176, 0.12);
   color: var(--mint);
@@ -7750,8 +7800,8 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
 }
 .form-group-locked input,
 .form-group-locked textarea,
-.form-group-locked select {
-  background: rgba(13, 181, 176, 0.05) !important;
+.form-group-locked .app-select__trigger {
+  background-color: rgba(13, 181, 176, 0.05) !important;
   border-color: rgba(13, 181, 176, 0.25) !important;
   color: var(--text-muted) !important;
   cursor: not-allowed;
@@ -8781,71 +8831,4 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
   .pv-history-change-arrow {
     display: none;
   }
-}
-
-/* Shared native dropdown theme for user-facing dashboard screens. */
-.filter-select,
-.invite-role-select,
-.role-select-inline,
-select.device-manual-input,
-.wf-select-group select,
-.diff-sel-group select,
-.tmpl-select,
-.passport-page-size-select,
-.form-group select,
-.form-group-locked select {
-  appearance: none;
-  -webkit-appearance: none;
-  background-color: var(--select-bg);
-  background-image: var(--select-bg-layer), var(--select-arrow-icon);
-  background-position: 0 0, right 13px center;
-  background-repeat: no-repeat;
-  background-size: auto, 16px;
-  border-color: var(--select-border);
-  color: var(--select-text);
-  cursor: pointer;
-  padding-right: 42px;
-}
-
-.filter-select:hover:not(:disabled),
-.invite-role-select:hover:not(:disabled),
-.role-select-inline:hover:not(:disabled),
-select.device-manual-input:hover:not(:disabled),
-.wf-select-group select:hover:not(:disabled),
-.diff-sel-group select:hover:not(:disabled),
-.tmpl-select:hover:not(:disabled),
-.passport-page-size-select:hover:not(:disabled),
-.form-group select:hover:not(:disabled),
-.form-group-locked select:hover:not(:disabled) {
-  background-image: var(--select-hover-layer), var(--select-arrow-icon);
-  border-color: var(--select-border-hover);
-}
-
-.filter-select:focus,
-.invite-role-select:focus,
-.role-select-inline:focus,
-select.device-manual-input:focus,
-.wf-select-group select:focus,
-.diff-sel-group select:focus,
-.tmpl-select:focus,
-.passport-page-size-select:focus,
-.form-group select:focus,
-.form-group-locked select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--select-focus-ring);
-  outline: none;
-}
-
-.filter-select option,
-.invite-role-select option,
-.role-select-inline option,
-select.device-manual-input option,
-.wf-select-group select option,
-.diff-sel-group select option,
-.tmpl-select option,
-.passport-page-size-select option,
-.form-group select option,
-.form-group-locked select option {
-  background: var(--select-option-bg);
-  color: var(--select-option-text);
 }

@@ -16,13 +16,13 @@ That means one module can power many passport types. For example, one `equipment
 
 After the module files are available to the backend, the super admin can open Create Passport Type and choose a Passport Module Source.
 
-The builder then prefills:
+The builder inherits these canonical module values while it builds the selected
+profile:
 
 - sections
 - fields
 - table columns
-- field semantics
-- table column semantics
+- field and table-column semantics
 - units and data types
 - composition pie chart column mapping
 
@@ -31,7 +31,7 @@ The passport type can then decide:
 - which fields stay included
 - which fields are required
 - which fields are optional
-- UI labels and display text
+- section and field translations
 - whether an included table (or generated object-list) field is shown as a composition chart
 
 Excluding a field also excludes its chart. It does not block the selection,
@@ -105,14 +105,26 @@ This is the preferred local workflow:
 3. Open the admin Create Passport Type page.
 4. Select the module in Passport Module Source.
 5. Include only the fields that apply to this passport type.
-6. Mark the remaining fields required or optional.
+6. Mark each included field required or optional.
 7. Save the passport type.
 
 The backend compiles the submitted profile against the registered module. It
 copies canonical field metadata from the module, retains the nested ancestors
 needed by selected fields, projects the semantic graph, applies required
 cardinality, and stores module/profile digests. The browser does not submit an
-independent replacement schema.
+independent replacement schema. The compiled profile—not the full module—then
+controls the company create and template forms, validation, viewer output,
+JSON-LD export, and other passport-type operations. Excluded fields and their
+charts are omitted rather than rendered as empty placeholders.
+
+Company users receive a type only after an active company access grant. The
+backend checks that grant in the dashboard and on direct create, import,
+single/bulk field update, verification, lifecycle/workflow actions,
+list/bulk-fetch, draft export, archive list, detail, compliance,
+preview/unlock, history/diff/lineage, edit-session, template, and standards
+integration create/patch/delete/archive operations. Revoking a grant hides
+those authenticated company resources but does not unpublish an already
+released public passport.
 
 Verify syntax first:
 
@@ -266,7 +278,7 @@ After the backend is deployed, use the production admin UI:
 
 1. Open Create Passport Type.
 2. Choose the new Passport Module Source.
-3. Keep/delete fields for that specific type.
+3. Include or exclude fields for that specific type.
 4. Mark required/optional fields.
 5. Save the passport type.
 6. Grant company access if needed.

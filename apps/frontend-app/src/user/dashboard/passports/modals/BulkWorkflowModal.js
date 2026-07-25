@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { isEditablePassportStatus } from "../../../../passports/utils/passportStatus";
+import AppSelect from "../../../../shared/components/AppSelect";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -73,17 +74,17 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
           {error && <div className="alert alert-error dashboard-alert-inline">{error}</div>}
           <div className="wf-select-group">
             <label>Reviewer <span className="wf-opt">(optional if approver selected)</span></label>
-            <select value={reviewerId} onChange={(e) => setReviewerId(e.target.value)} disabled={submitting}>
+            <AppSelect value={reviewerId} onChange={(e) => setReviewerId(e.target.value)} disabled={submitting} aria-label="Reviewer">
               <option value="">— Skip review —</option>
               {teamUsers.map((member) => <option key={member.id} value={member.id}>{member.firstName} {member.lastName} — {member.role}</option>)}
-            </select>
+            </AppSelect>
           </div>
           <div className="wf-select-group">
             <label>Approver <span className="wf-opt">(optional if reviewer selected)</span></label>
-            <select value={approverId} onChange={(e) => setApproverId(e.target.value)} disabled={submitting}>
+            <AppSelect value={approverId} onChange={(e) => setApproverId(e.target.value)} disabled={submitting} aria-label="Approver">
               <option value="">— Skip approval —</option>
               {teamUsers.map((member) => <option key={member.id} value={member.id}>{member.firstName} {member.lastName} — {member.role}</option>)}
-            </select>
+            </AppSelect>
           </div>
         </div>
         <div className="modal-footer dashboard-modal-actions dashboard-modal-actions-end">

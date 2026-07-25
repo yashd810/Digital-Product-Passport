@@ -104,6 +104,15 @@ function parseBrowserOrigin(value) {
   }
 }
 
+// Runtime origins are application configuration rather than user-provided
+// links. They still have to be a bare, credential-free HTTP(S) origin, but
+// development legitimately uses loopback addresses for the dashboard and the
+// dedicated public viewer. Keep this parser separate from `parseAbsoluteHttpUrl`
+// so untrusted external links continue to reject private-network destinations.
+function parseConfiguredHttpOrigin(value) {
+  return parseBrowserOrigin(value);
+}
+
 function hasUnsafePathTraversal(pathname) {
   let decoded = pathname;
   for (let index = 0; index < maxPathDecodePasses; index += 1) {
@@ -129,6 +138,7 @@ function parseSafeRelativePath(value) {
     || unsafeUrlCharacters.test(text)
     || !text.startsWith("/")
     || text.startsWith("//")
+    || hasUnsafePathTraversal(text.split(/[?#]/, 1)[0])
   ) {
     return null;
   }
@@ -166,6 +176,10 @@ export function toSafeHttpOrigin(value) {
   const parsed = parseAbsoluteHttpUrl(value);
   if (!parsed || parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
   return parsed.origin;
+}
+
+export function toSafeConfiguredHttpOrigin(value) {
+  return parseConfiguredHttpOrigin(value)?.origin || null;
 }
 
 export function toSafeNonNavigableIdentifier(value) {
@@ -260,8 +274,58 @@ export function isTrustedApiRequestUrl(value) {
   return [sameOrigin, apiOrigin].filter(Boolean).includes(parsed.origin);
 }
 
+function toSafeSameOriginNavigationHref(value) {
+  const browserOrigin = currentOrigin();
+  const text = normalizeText(value);
+  if (!browserOrigin || !text || unsafeUrlCharacters.test(text) || hasUnsafePathTraversal(text.split(/[?#]/, 1)[0])) return null;
+
+  try {
+    const parsed = new URL(text, browserOrigin);
+    if (
+      !httpProtocols.has(parsed.protocol)
+      || !parsed.hostname
+      || parsed.username
+      || parsed.password
+      || parsed.origin !== browserOrigin
+      || hasUnsafePathTraversal(parsed.pathname)
+    ) {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function toSafeConfiguredViewerHref(value) {
+  const viewerOrigin = toSafeConfiguredHttpOrigin(import.meta.env.VITE_PUBLIC_VIEWER_URL);
+  const text = normalizeText(value);
+  if (!viewerOrigin || !text || unsafeUrlCharacters.test(text) || hasUnsafePathTraversal(text.split(/[?#]/, 1)[0])) return null;
+
+  try {
+    const parsed = new URL(text);
+    if (
+      !httpProtocols.has(parsed.protocol)
+      || !parsed.hostname
+      || parsed.username
+      || parsed.password
+      || parsed.origin !== viewerOrigin
+      || hasUnsafePathTraversal(parsed.pathname)
+    ) {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function safeWindowOpen(value, options = {}) {
-  const href = options.resource === true ? toSafeResourceHref(value) : toSafeExternalHref(value);
+  const href = options.resource === true
+    ? toSafeResourceHref(value)
+    : options.viewer === true
+      ? (toSafeConfiguredViewerHref(value) || toSafeExternalHref(value))
+      : (toSafeExternalHref(value) || toSafeSameOriginNavigationHref(value));
   if (!href || typeof globalThis.window?.open !== "function") return null;
   return globalThis.window.open(href, options.target || "_blank", options.features || "noopener,noreferrer");
 }

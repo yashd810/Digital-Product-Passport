@@ -1097,6 +1097,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
           property={semanticProperty}
           value={val}
           disabled={disabled}
+          hideRootLabel
           onChange={(nextValue) => handleField(field.key, nextValue)}
         />
       );

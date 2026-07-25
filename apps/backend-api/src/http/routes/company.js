@@ -21,7 +21,7 @@ const {
   resolveCsvImportField,
 } = require("../../modules/passports/import-field-guardrails");
 const { normalizeSafeImageReference } = require("../../shared/passports/passport-uri");
-const { getSafeErrorMessage } = require("../../shared/http/error-response");
+const { getSafeErrorMessage, handleRouteError } = require("../../shared/http/error-response");
 const {
   buildTemplateFieldPolicy,
   filterStoredTemplateFields,
@@ -38,6 +38,8 @@ module.exports = function registerCompanyRoutes(app, {
   getTable,
   getPassportFieldValue,
   getPassportTypeSchema,
+  hasCompanyPassportTypeAccess,
+  assertPassportTypeStorageReady,
   normalizePassportRequestBody,
   extractExplicitFacilityId,
   normalizeInternalAliasIdValue,
@@ -86,6 +88,31 @@ module.exports = function registerCompanyRoutes(app, {
     return `Schema governance fields (${keys.join(", ")}) cannot be imported as passport row data. Configure confidentiality on the passport type in admin instead.`;
   }
 
+  async function hasAuthoringAccess(req, companyId, typeSchema) {
+    if (req.user?.role === "superAdmin") return true;
+    return hasCompanyPassportTypeAccess(companyId, typeSchema.typeName);
+  }
+
+  async function getAccessibleTemplateTypeSchema(req, companyId, passportType) {
+    const typeSchema = await getPassportTypeSchema(passportType);
+    if (!typeSchema || !(await hasAuthoringAccess(req, companyId, typeSchema))) return null;
+    return typeSchema;
+  }
+
+  async function getAccessibleTemplateFieldPolicy(req, companyId, passportType) {
+    const typeSchema = await getAccessibleTemplateTypeSchema(req, companyId, passportType);
+    if (!typeSchema) {
+      const error = new Error("Passport type not found for this company");
+      error.statusCode = 404;
+      error.code = "templatePassportTypeNotFoundForCompany";
+      throw error;
+    }
+    return {
+      typeSchema,
+      fieldPolicy: buildTemplateFieldPolicy(typeSchema),
+    };
+  }
+
   function createImportExcludedFieldSet(extraFields = []) {
     return new Set([
       ...importManagedFieldKeys,
@@ -124,17 +151,6 @@ module.exports = function registerCompanyRoutes(app, {
         ? Number.parseInt(row.modelFieldCount, 10) || 0
         : 0,
     };
-  }
-
-  async function getTemplateFieldPolicy(passportType, { requireSchema = false } = {}) {
-    const typeSchema = await getPassportTypeSchema(passportType);
-    if (!typeSchema && requireSchema) {
-      const error = new Error("Passport type not found");
-      error.statusCode = 400;
-      error.code = "templatePassportTypeNotFound";
-      throw error;
-    }
-    return buildTemplateFieldPolicy(typeSchema);
   }
 
   function sendTemplateRouteError(res, error, fallbackMessage = "Failed") {
@@ -367,6 +383,13 @@ module.exports = function registerCompanyRoutes(app, {
     try {
       const { companyId } = req.params;
       const passportTypeFilter = req.query.passportType;
+      let filterTypeSchema = null;
+      if (passportTypeFilter) {
+        filterTypeSchema = await getAccessibleTemplateTypeSchema(req, companyId, passportTypeFilter);
+        if (!filterTypeSchema) {
+          return res.status(404).json({ error: "Passport type not found for this company" });
+        }
+      }
       let q = `SELECT t.id,
                       t."companyId" AS "companyId",
                       t."passportType" AS "passportType",
@@ -381,15 +404,30 @@ module.exports = function registerCompanyRoutes(app, {
                LEFT JOIN users u ON u.id = t."createdBy"
                WHERE t."companyId" = $1`;
       const params = [companyId];
-      if (passportTypeFilter) {q += ` AND t."passportType" = $2`;params.push(passportTypeFilter);}
+      if (filterTypeSchema) {q += ` AND t."passportType" = $2`;params.push(filterTypeSchema.typeName);}
       q += ` ORDER BY t."passportType", t.name`;
       const r = await pool.query(q, params);
       const templates = r.rows.map(mapTemplateRow);
       if (!templates.length) return res.json([]);
 
-      const policyByPassportType = new Map();
+      const typeSchemaByPassportType = new Map();
       for (const passportType of [...new Set(templates.map((template) => template.passportType).filter(Boolean))]) {
-        policyByPassportType.set(passportType, await getTemplateFieldPolicy(passportType));
+        typeSchemaByPassportType.set(
+          passportType,
+          await getAccessibleTemplateTypeSchema(req, companyId, passportType)
+        );
+      }
+      const visibleTemplates = templates.filter((template) =>
+        typeSchemaByPassportType.get(template.passportType)
+      );
+      if (!visibleTemplates.length) return res.json([]);
+
+      const policyByPassportType = new Map();
+      for (const passportType of [...new Set(visibleTemplates.map((template) => template.passportType).filter(Boolean))]) {
+        policyByPassportType.set(
+          passportType,
+          buildTemplateFieldPolicy(typeSchemaByPassportType.get(passportType))
+        );
       }
       const modelFields = await pool.query(
         `SELECT "templateId" AS "templateId",
@@ -399,10 +437,10 @@ module.exports = function registerCompanyRoutes(app, {
          FROM "passportTemplateFields"
          WHERE "templateId" = ANY($1::int[])
            AND "isModelData" = true`,
-        [templates.map((template) => template.id)]
+        [visibleTemplates.map((template) => template.id)]
       );
       const modelCountByTemplate = new Map();
-      const templateById = new Map(templates.map((template) => [String(template.id), template]));
+      const templateById = new Map(visibleTemplates.map((template) => [String(template.id), template]));
       for (const field of modelFields.rows) {
         const template = templateById.get(String(field.templateId));
         const policy = policyByPassportType.get(template?.passportType);
@@ -412,7 +450,7 @@ module.exports = function registerCompanyRoutes(app, {
           (modelCountByTemplate.get(String(field.templateId)) || 0) + 1
         );
       }
-      res.json(templates.map((template) => ({
+      res.json(visibleTemplates.map((template) => ({
         ...template,
         modelFieldCount: modelCountByTemplate.get(String(template.id)) || 0,
       })));
@@ -436,6 +474,11 @@ module.exports = function registerCompanyRoutes(app, {
         [id, companyId]
       );
       if (!t.rows.length) return res.status(404).json({ error: "Not found" });
+      const { fieldPolicy } = await getAccessibleTemplateFieldPolicy(
+        req,
+        companyId,
+        t.rows[0].passportType
+      );
       const fields = await pool.query(
         `SELECT "fieldKey" AS "fieldKey",
                 "fieldValue" AS "fieldValue",
@@ -444,7 +487,6 @@ module.exports = function registerCompanyRoutes(app, {
          WHERE "templateId"=$1`,
         [id]
       );
-      const fieldPolicy = await getTemplateFieldPolicy(t.rows[0].passportType);
       const userFields = filterStoredTemplateFields(fields.rows, fieldPolicy);
       res.json({
         ...mapTemplateRow(t.rows[0]),
@@ -458,7 +500,7 @@ module.exports = function registerCompanyRoutes(app, {
       const { companyId } = req.params;
       const { passportType, name, description, fields } = req.body;
       if (!passportType || !name?.trim()) return res.status(400).json({ error: "passportType and name required" });
-      const fieldPolicy = await getTemplateFieldPolicy(passportType, { requireSchema: true });
+      const { typeSchema, fieldPolicy } = await getAccessibleTemplateFieldPolicy(req, companyId, passportType);
       const userFields = normalizeTemplateFieldsForStorage(fields, fieldPolicy);
 
       const t = await pool.query(
@@ -472,7 +514,7 @@ module.exports = function registerCompanyRoutes(app, {
                    "createdBy" AS "createdBy",
                    "createdAt" AS "createdAt",
                    "updatedAt" AS "updatedAt"`,
-        [companyId, passportType, name.trim(), description || null, req.user.userId]
+        [companyId, typeSchema.typeName, name.trim(), description || null, req.user.userId]
       );
       const tmplId = t.rows[0].id;
 
@@ -502,7 +544,11 @@ module.exports = function registerCompanyRoutes(app, {
         [id, companyId]
       );
       if (!existing.rows.length) return res.status(404).json({ error: "Not found" });
-      const fieldPolicy = await getTemplateFieldPolicy(existing.rows[0].passportType, { requireSchema: true });
+      const { fieldPolicy } = await getAccessibleTemplateFieldPolicy(
+        req,
+        companyId,
+        existing.rows[0].passportType
+      );
       const userFields = fields === undefined
         ? null
         : normalizeTemplateFieldsForStorage(fields, fieldPolicy);
@@ -555,9 +601,17 @@ module.exports = function registerCompanyRoutes(app, {
   app.delete("/api/companies/:companyId/templates/:id", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const { companyId, id } = req.params;
+      const existing = await pool.query(
+        `SELECT "passportType" AS "passportType"
+         FROM "passportTemplates"
+         WHERE id=$1 AND "companyId"=$2`,
+        [id, companyId]
+      );
+      if (!existing.rows.length) return res.status(404).json({ error: "Not found" });
+      await getAccessibleTemplateFieldPolicy(req, companyId, existing.rows[0].passportType);
       await pool.query("DELETE FROM \"passportTemplates\" WHERE id=$1 AND \"companyId\"=$2", [id, companyId]);
       res.json({ success: true });
-    } catch (e) {res.status(500).json({ error: "Failed" });}
+    } catch (e) {sendTemplateRouteError(res, e);}
   });
 
   app.get("/api/companies/:companyId/templates/:templateId/export-drafts", authenticateToken, checkCompanyAccess, async (req, res) => {
@@ -580,6 +634,11 @@ module.exports = function registerCompanyRoutes(app, {
       );
       if (!tmplRes.rows.length) return res.status(404).json({ error: "Template not found" });
       const tmpl = mapTemplateRow(tmplRes.rows[0]);
+      const { typeSchema, fieldPolicy } = await getAccessibleTemplateFieldPolicy(
+        req,
+        companyId,
+        tmpl.passportType
+      );
 
       const fieldRes = await pool.query(
         `SELECT "fieldKey" AS "fieldKey",
@@ -589,7 +648,6 @@ module.exports = function registerCompanyRoutes(app, {
          WHERE "templateId"=$1`,
         [templateId]
       );
-      const fieldPolicy = await getTemplateFieldPolicy(tmpl.passportType);
       const storedUserFields = filterStoredTemplateFields(fieldRes.rows, fieldPolicy);
       const templateFields = Object.fromEntries(storedUserFields.map((f) => [f.fieldKey, f.fieldValue]));
 
@@ -599,13 +657,13 @@ module.exports = function registerCompanyRoutes(app, {
                 "semanticModelKey" AS "semanticModelKey"
          FROM "passportTypes"
          WHERE "typeName"=$1`,
-        [tmpl.passportType]
+        [typeSchema.typeName]
       );
       const sections = typeRes.rows[0]?.fieldsJson?.sections || [];
       const schemaFields = flattenSchemaFieldsFromSections(sections).
       filter((f) => fieldPolicy.allowedFieldKeys.has(f.key) && f.type !== "file" && f.type !== "table");
 
-      const tableName = getTable(tmpl.passportType);
+      const tableName = getTable(typeSchema.typeName);
       const passRes = await pool.query(
         `SELECT * FROM ${tableName}
          WHERE "companyId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
@@ -618,13 +676,13 @@ module.exports = function registerCompanyRoutes(app, {
         res.setHeader("Content-Type", "application/ld+json");
         res.setHeader("Content-Disposition", `attachment; filename="${tmpl.passportType}_drafts.jsonld"`);
         const exportRows = rows.map((row) => buildExpandedPassportPayload(
-          { ...row, passportType: tmpl.passportType },
+          { ...row, passportType: typeSchema.typeName },
           typeRes.rows[0],
           {
             granularity: row.granularity || "model",
           }
         ));
-        return res.json(buildSemanticPassportJsonExport(exportRows, tmpl.passportType, {
+        return res.json(buildSemanticPassportJsonExport(exportRows, typeSchema.typeName, {
           semanticModelKey: typeRes.rows[0]?.semanticModelKey || null,
           productCategory: typeRes.rows[0]?.productCategory || null,
           typeDef: typeRes.rows[0]
@@ -670,6 +728,10 @@ module.exports = function registerCompanyRoutes(app, {
 
       const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+      if (!await hasAuthoringAccess(req, companyId, typeSchema)) {
+        return res.status(404).json({ error: "Passport type not found for this company" });
+      }
+      await assertPassportTypeStorageReady(typeSchema.typeName);
       const resolvedPassportType = typeSchema.typeName;
 
       const parseRow = (line) => {
@@ -742,7 +804,13 @@ module.exports = function registerCompanyRoutes(app, {
           }
         });
 
-        const { dppId: incomingGuid, modelName, internalAliasId, ...fields } = normalizeBulkPassportRecord(passport);
+        const {
+          dppId: incomingGuid,
+          passportType: _passportType,
+          modelName,
+          internalAliasId,
+          ...fields
+        } = normalizeBulkPassportRecord(passport);
         const normalizedProductId = normalizeInternalAliasIdValue(internalAliasId);
 
         try {
@@ -874,7 +942,7 @@ module.exports = function registerCompanyRoutes(app, {
       res.json({ summary: { created, updated, skipped, failed }, details });
     } catch (e) {
       logger.error("Upsert CSV error:", e.message);
-      res.status(500).json({ error: "Import failed" });
+      return handleRouteError(res, e, "Import failed");
     }
   });
 
@@ -898,6 +966,10 @@ module.exports = function registerCompanyRoutes(app, {
 
       const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+      if (!await hasAuthoringAccess(req, companyId, typeSchema)) {
+        return res.status(404).json({ error: "Passport type not found for this company" });
+      }
+      await assertPassportTypeStorageReady(typeSchema.typeName);
       const resolvedPassportType = typeSchema.typeName;
       const tableName = getTable(resolvedPassportType);
       const userId = req.user.userId;
@@ -908,7 +980,13 @@ module.exports = function registerCompanyRoutes(app, {
 
       for (const item of passports) {
         const normalizedItem = normalizePassportRequestBody(item || {});
-        const { dppId: incomingGuid, modelName, internalAliasId, ...fields } = normalizeBulkPassportRecord(normalizedItem);
+        const {
+          dppId: incomingGuid,
+          passportType: _passportType,
+          modelName,
+          internalAliasId,
+          ...fields
+        } = normalizeBulkPassportRecord(normalizedItem);
         const normalizedProductId = normalizeInternalAliasIdValue(internalAliasId);
         const governanceFieldKeys = Object.keys(fields).filter((key) => isSchemaGovernanceKey(key, typeSchema));
         const managedFieldKeys = getManagedImportFieldKeys(fields);
@@ -1078,7 +1156,7 @@ module.exports = function registerCompanyRoutes(app, {
       res.json({ summary: { created, updated, skipped, failed }, details });
     } catch (e) {
       logger.error("Upsert JSON error:", e.message);
-      res.status(500).json({ error: "Import failed" });
+      return handleRouteError(res, e, "Import failed");
     }
   });
 };

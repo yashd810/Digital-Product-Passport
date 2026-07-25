@@ -8,6 +8,7 @@ import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import { extractComplianceError } from "../../../shared/utils/complianceErrors";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import { safeWindowOpen } from "../../../shared/security/urlSafety";
+import AppSelect from "../../../shared/components/AppSelect";
 import "../../../admin/styles/AdminDashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -290,26 +291,26 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
             <>
               <div className="wf-select-group">
                 <label>🔍 Reviewer <span className="wf-opt">(optional)</span></label>
-                <select value={reviewerId} onChange={e => setReviewerId(e.target.value)} disabled={submitting}>
+                <AppSelect value={reviewerId} onChange={e => setReviewerId(e.target.value)} disabled={submitting} aria-label="Reviewer">
                   <option value="">— Skip review —</option>
                   {teamUsers.map(u => (
                     <option key={u.id} value={u.id}>
                       {u.firstName} {u.lastName} — {u.role}
                     </option>
                   ))}
-                </select>
+                </AppSelect>
               </div>
 
               <div className="wf-select-group">
                 <label>✅ Approver <span className="wf-opt">(optional)</span></label>
-                <select value={approverId} onChange={e => setApproverId(e.target.value)} disabled={submitting}>
+                <AppSelect value={approverId} onChange={e => setApproverId(e.target.value)} disabled={submitting} aria-label="Approver">
                   <option value="">— Skip approval —</option>
                   {teamUsers.filter(u => !reviewerId || String(u.id) !== reviewerId).map(u => (
                     <option key={u.id} value={u.id}>
                       {u.firstName} {u.lastName} — {u.role}
                     </option>
                   ))}
-                </select>
+                </AppSelect>
               </div>
 
               {!reviewerId && !approverId && (
@@ -513,7 +514,9 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
       ? buildPublicViewerUrl(path)
       : `${window.location.origin}${path}`;
     if (!url) return;
-    safeWindowOpen(url);
+    safeWindowOpen(url, {
+      viewer: normalizedStatus === "released" || isObsoletePassportStatus(normalizedStatus),
+    });
   };
 
   const renderRow = (wf, showActions, showActionColumn) => {

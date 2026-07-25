@@ -77,6 +77,7 @@ module.exports = function registerPassportRoutes(app, {
   // db helpers from passport-service.js
   logAudit,
   getPassportTypeSchema,
+  hasCompanyPassportTypeAccess,
   findExistingPassportByInternalAliasId,
   getPassportLineageContext,
   getPassportVersionsByLineage,
@@ -200,6 +201,7 @@ module.exports = function registerPassportRoutes(app, {
     generateDppRecordId,
     normalizePassportRequestBody,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     assertPassportTypeStorageReady,
     getTable,
     normalizeInternalAliasIdValue,
@@ -238,6 +240,7 @@ module.exports = function registerPassportRoutes(app, {
     normalizeReleaseStatus,
     normalizeInternalAliasIdValue,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     fetchCompanyPassportRecord,
     buildSemanticPassportJsonExport,
     buildExpandedPassportPayload,
@@ -270,6 +273,7 @@ module.exports = function registerPassportRoutes(app, {
     didService,
     productIdentifierService,
     logAudit,
+    hasCompanyPassportTypeAccess,
   });
 
   registerUpdateRoutes(app, {
@@ -280,6 +284,7 @@ module.exports = function registerPassportRoutes(app, {
     requireEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     assertPassportTypeStorageReady,
     getTable,
     getWritablePassportColumns,
@@ -344,6 +349,7 @@ module.exports = function registerPassportRoutes(app, {
     submitPassportToWorkflow,
     validGranularities,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
   });
 
   // ─── BULK REVISE ───────────────────────────────────────────────────────────
@@ -356,6 +362,8 @@ module.exports = function registerPassportRoutes(app, {
     requireEditor,
     generateDppRecordId,
     normalizePassportRequestBody,
+    getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     getTable,
     normalizeReleaseStatus,
     toStoredPassportValue,
@@ -387,6 +395,7 @@ module.exports = function registerPassportRoutes(app, {
     requireEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
     getTable,
     normalizeInternalAliasIdValue,
     normalizeReleaseStatus,
@@ -409,6 +418,8 @@ module.exports = function registerPassportRoutes(app, {
     getPassportVersionsByLineage,
     buildPassportVersionHistory,
     productIdentifierService,
+    getPassportTypeSchema,
+    hasCompanyPassportTypeAccess,
   });
   registerPassportSupportRoutes(app, {
     pool,
