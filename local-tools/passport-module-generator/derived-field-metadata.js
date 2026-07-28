@@ -235,7 +235,7 @@
         const dataType = fixedDataType || clean(field?.dataType) || defaultDataTypeForFieldType(fieldType);
         return {
           ...baseField,
-          ...(canonicalOverride ? { canonicalKeyOverride } : {}),
+          ...(canonicalOverride ? { canonicalKeyOverride: canonicalOverride } : {}),
           fieldKey: identity.key,
           semanticSlug: identity.semanticSlug,
           dataType,

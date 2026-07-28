@@ -36,6 +36,20 @@ test("derived field metadata always follows the editable field inputs", () => {
   });
 });
 
+test("canonical field overrides stay defined when imported fields are derived", () => {
+  const [section] = deriveSections([{
+    label: "Product identity",
+    fields: [{
+      fieldLabel: "Imported model identifier",
+      canonicalKeyOverride: "modelName",
+    }],
+  }]);
+
+  assert.equal(section.fields[0].fieldKey, "modelName");
+  assert.equal(section.fields[0].canonicalKeyOverride, "modelName");
+  assert.equal(section.fields[0].semanticSlug, "model-name");
+});
+
 test("repeated and reserved labels receive stable context-aware camelCase keys", () => {
   const derived = deriveSections([
     {
