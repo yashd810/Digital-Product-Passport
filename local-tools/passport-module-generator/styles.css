@@ -2168,6 +2168,84 @@ textarea {
   background: linear-gradient(180deg, #fff3e2 0%, #ffe9cd 100%);
 }
 
+body.app-modal-open {
+  overflow: hidden;
+}
+
+.app-confirm-modal {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.app-confirm-modal.hidden {
+  display: none;
+}
+
+.app-confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 35, 53, 0.48);
+  backdrop-filter: blur(4px);
+}
+
+.app-confirm-dialog {
+  position: relative;
+  width: min(100%, 580px);
+  display: grid;
+  gap: 14px;
+  padding: 26px;
+  border: 1px solid rgba(11, 143, 151, 0.28);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(13, 181, 176, 0.14), transparent 40%),
+    linear-gradient(180deg, #ffffff 0%, #f4fafc 100%);
+  box-shadow: 0 28px 70px rgba(15, 35, 53, 0.28);
+}
+
+.app-confirm-kicker {
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-confirm-dialog h2 {
+  color: var(--text);
+  font-size: 22px;
+}
+
+.app-confirm-summary {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.app-confirm-detail {
+  padding: 13px 14px;
+  border: 1px solid rgba(11, 143, 151, 0.16);
+  border-radius: 10px;
+  background: var(--accent-softer);
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.app-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.app-confirm-actions button {
+  min-width: 132px;
+}
+
 @media (max-width: 1080px) {
   .auto-group,
   .span2,
@@ -2353,6 +2431,24 @@ pre {
 
   .role-card-heading {
     display: grid;
+  }
+
+  .app-confirm-modal {
+    align-items: end;
+    padding: 16px;
+  }
+
+  .app-confirm-dialog {
+    padding: 22px;
+  }
+
+  .app-confirm-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .app-confirm-actions button {
+    width: 100%;
   }
 }
 

@@ -727,6 +727,75 @@ function clearMessage() {
   box.className = "message workspace-message hidden";
 }
 
+function confirmWithAppModal({
+  title = "Confirm replacement",
+  summary = "",
+  detail = "",
+  confirmLabel = "Confirm",
+} = {}) {
+  const modal = $("#appConfirmModal");
+  const dialog = $(".app-confirm-dialog", modal);
+  const titleNode = $("#appConfirmTitle", modal);
+  const summaryNode = $("#appConfirmSummary", modal);
+  const detailNode = $("#appConfirmDetail", modal);
+  const cancelButton = $("#appConfirmCancel", modal);
+  const acceptButton = $("#appConfirmAccept", modal);
+  if (!modal || !dialog || !titleNode || !summaryNode || !detailNode || !cancelButton || !acceptButton) {
+    return Promise.resolve(false);
+  }
+
+  titleNode.textContent = title;
+  summaryNode.textContent = summary;
+  detailNode.textContent = detail;
+  acceptButton.textContent = confirmLabel;
+
+  return new Promise((resolve) => {
+    const previousFocus = document.activeElement;
+    const focusableButtons = [cancelButton, acceptButton];
+    let settled = false;
+    const close = (accepted) => {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener("keydown", onKeydown, true);
+      modal.onclick = null;
+      cancelButton.onclick = null;
+      acceptButton.onclick = null;
+      modal.classList.add("hidden");
+      modal.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("app-modal-open");
+      previousFocus?.focus?.();
+      resolve(accepted);
+    };
+    const onKeydown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const activeIndex = focusableButtons.indexOf(document.activeElement);
+      if (event.shiftKey && activeIndex <= 0) {
+        event.preventDefault();
+        acceptButton.focus();
+      } else if (!event.shiftKey && activeIndex === focusableButtons.length - 1) {
+        event.preventDefault();
+        cancelButton.focus();
+      }
+    };
+
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("app-modal-open");
+    modal.onclick = (event) => {
+      if (event.target.matches("[data-app-confirm-cancel]")) close(false);
+    };
+    cancelButton.onclick = () => close(false);
+    acceptButton.onclick = () => close(true);
+    document.addEventListener("keydown", onKeydown, true);
+    acceptButton.focus();
+  });
+}
+
 function getCurrentStep() {
   return $(".tool-step.active")?.dataset.step || "module";
 }
@@ -3865,11 +3934,12 @@ async function importSemanticGraphCsvFile(file) {
     const cleanupText = sourceReconciliation.removedClassCount || sourceReconciliation.removedPropertyCount
       ? ` Before replacement, ${sourceReconciliation.removedClassCount} stale linked class${sourceReconciliation.removedClassCount === 1 ? "" : "es"} and ${sourceReconciliation.removedPropertyCount} stale linked propert${sourceReconciliation.removedPropertyCount === 1 ? "y" : "ies"} will be removed.`
       : " All source links match the current fields.";
-    const confirmed = window.confirm(
-      `Replace the current semantic graph with ${graphSummary.classCount} class${graphSummary.classCount === 1 ? "" : "es"}, `
-      + `${graphSummary.propertyCount} propert${graphSummary.propertyCount === 1 ? "y" : "ies"}, and ${graphSummary.enumCount} enum${graphSummary.enumCount === 1 ? "" : "s"} from this CSV?\n\n`
-      + `Sections and fields will stay in place.${cleanupText}`
-    );
+    const confirmed = await confirmWithAppModal({
+      title: "Replace semantic graph?",
+      summary: `Replace the current semantic graph with ${graphSummary.classCount} class${graphSummary.classCount === 1 ? "" : "es"}, ${graphSummary.propertyCount} propert${graphSummary.propertyCount === 1 ? "y" : "ies"}, and ${graphSummary.enumCount} enum${graphSummary.enumCount === 1 ? "" : "s"} from this CSV?`,
+      detail: `Sections and fields will stay in place.${cleanupText}`,
+      confirmLabel: "Replace graph",
+    });
     if (!confirmed) {
       setMessage("Semantic graph CSV replacement cancelled. The graph was not changed.", "info");
       return;
@@ -4446,11 +4516,12 @@ async function importFieldsCsvFile(file) {
       : graphReconciliation.removedClassCount || graphReconciliation.removedPropertyCount
         ? `The existing semantic graph will be preserved after removing ${graphReconciliation.removedClassCount} stale linked class${graphReconciliation.removedClassCount === 1 ? "" : "es"} and ${graphReconciliation.removedPropertyCount} stale linked propert${graphReconciliation.removedPropertyCount === 1 ? "y" : "ies"}.`
         : "The existing semantic graph will be preserved; all source links still match.";
-    const confirmed = window.confirm(
-      `Replace ${currentSummary.fieldCount} current field${currentSummary.fieldCount === 1 ? "" : "s"} in ${currentSummary.sectionCount} section${currentSummary.sectionCount === 1 ? "" : "s"} `
-      + `with ${parsed.fieldCount} field${parsed.fieldCount === 1 ? "" : "s"} in ${parsed.sectionCount} section${parsed.sectionCount === 1 ? "" : "s"} from ${formatLabel}?\n\n`
-      + `Fields that are not in the CSV will be removed. ${graphChoice}`
-    );
+    const confirmed = await confirmWithAppModal({
+      title: "Replace sections and fields?",
+      summary: `Replace ${currentSummary.fieldCount} current field${currentSummary.fieldCount === 1 ? "" : "s"} in ${currentSummary.sectionCount} section${currentSummary.sectionCount === 1 ? "" : "s"} with ${parsed.fieldCount} field${parsed.fieldCount === 1 ? "" : "s"} in ${parsed.sectionCount} section${parsed.sectionCount === 1 ? "" : "s"} from ${formatLabel}?`,
+      detail: `Fields that are not in the CSV will be removed. ${graphChoice}`,
+      confirmLabel: "Replace fields",
+    });
     if (!confirmed) {
       setMessage("Fields CSV replacement cancelled. The form was not changed.", "info");
       return;

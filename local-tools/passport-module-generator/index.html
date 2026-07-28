@@ -343,6 +343,20 @@
       </div>
     </main>
 
+    <div id="appConfirmModal" class="app-confirm-modal hidden" aria-hidden="true">
+      <div class="app-confirm-backdrop" data-app-confirm-cancel></div>
+      <section class="app-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle" aria-describedby="appConfirmSummary appConfirmDetail" tabindex="-1">
+        <span class="app-confirm-kicker">Confirm import</span>
+        <h2 id="appConfirmTitle">Replace current fields?</h2>
+        <p id="appConfirmSummary" class="app-confirm-summary"></p>
+        <p id="appConfirmDetail" class="app-confirm-detail"></p>
+        <div class="app-confirm-actions">
+          <button type="button" id="appConfirmCancel" data-app-confirm-cancel>Cancel</button>
+          <button type="button" id="appConfirmAccept" class="primary">Replace fields</button>
+        </div>
+      </section>
+    </div>
+
     <template id="sectionTemplate">
       <article class="section-card">
         <div class="section-head">
