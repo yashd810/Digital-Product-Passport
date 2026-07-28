@@ -52,16 +52,16 @@ const mime = {
 };
 
 const headerSlotDefinitions = [
-  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
-  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier" },
-  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId" },
-  { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity" },
-  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion" },
-  { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus" },
-  { slotKey: "lastUpdate", label: "Last Update", managedKey: "internalManagedLastUpdate" },
+  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId", managedOnly: true },
+  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier", managedOnly: true },
+  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId", managedOnly: true },
+  { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity", managedOnly: true },
+  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion", managedOnly: true },
+  { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus", managedOnly: true },
+  { slotKey: "lastUpdate", label: "Last Update", managedKey: "internalManagedLastUpdate", managedOnly: true },
   { slotKey: "economicOperatorId", label: "Economic Operator ID", managedKey: "internalManagedEconomicOperatorId" },
   { slotKey: "facilityId", label: "Facility ID", managedKey: "internalManagedFacilityId" },
-  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds" },
+  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds", managedOnly: true },
   { slotKey: "subjectDid", label: "Subject DID", managedKey: "internalManagedSubjectDid", managedOnly: true },
   { slotKey: "dppDid", label: "DPP DID", managedKey: "internalManagedDppDid", managedOnly: true },
   { slotKey: "companyDid", label: "Company DID", managedKey: "internalManagedCompanyDid", managedOnly: true },
@@ -372,7 +372,7 @@ function assertNoEmptyLeafSections(sections = []) {
   }
 }
 
-function assertNoReservedRuntimeFields(sections = [], semanticGraph = null) {
+function assertNoReservedRuntimeFields(sections = [], semanticGraph = null, allowedCanonicalFieldKeys = new Set()) {
   const rootClass = semanticGraph?.classes?.find(
     (classDef) => classDef.key === semanticGraph.rootClassKey
   );
@@ -388,7 +388,7 @@ function assertNoReservedRuntimeFields(sections = [], semanticGraph = null) {
         `Field "${fieldKey || "unknown"}" uses reserved semanticId "${semanticId}". Passport runtime/header fields are generated automatically and must not be added to a module.`
       );
     }
-    if (isReservedPassportFieldKey(fieldKey)) {
+    if (isReservedPassportFieldKey(fieldKey) && !allowedCanonicalFieldKeys.has(fieldKey)) {
       throw new Error(
         `Field key "${fieldKey}" is reserved for passport runtime/header data. This field is generated automatically and must not be added to a module.`
       );
@@ -1134,6 +1134,27 @@ function validateSpec(input) {
   const passportPolicyKey = clean(module.passportPolicyKey) || `${camelCase(family)}Dpp${pascalCase(version)}`;
   const defaultCarrierPolicyKey = clean(module.defaultCarrierPolicyKey || "webPublicEntryV1");
   const systemHeaderFieldAssignments = normalizeHeaderAssignments(module.systemHeaderFieldAssignments);
+  const modelNameSourceField = clean(roles.modelNameField || module.modelNameField);
+  if (!modelNameSourceField) {
+    throw new Error("Model name field is required.");
+  }
+  const canonicalFieldKeyBySource = new Map();
+  const assignCanonicalFieldKey = (sourceFieldKey, targetFieldKey, label) => {
+    const source = clean(sourceFieldKey);
+    if (!source) return;
+    const existingTarget = canonicalFieldKeyBySource.get(source);
+    if (existingTarget && existingTarget !== targetFieldKey) {
+      throw new Error(`${label} reuses a field already assigned to "${existingTarget}". Each system field needs its own section field.`);
+    }
+    canonicalFieldKeyBySource.set(source, targetFieldKey);
+  };
+  assignCanonicalFieldKey(modelNameSourceField, "modelName", "Model name field");
+  for (const slot of headerSlotDefinitions) {
+    const selectedValue = clean(systemHeaderFieldAssignments[slot.slotKey]);
+    if (selectedValue && !selectedValue.startsWith("__managed__:")) {
+      assignCanonicalFieldKey(selectedValue, slot.slotKey, `System field "${slot.label}"`);
+    }
+  }
   const systemHeaderFieldMappings = headerSlotDefinitions
     .map((slot) => {
       const selectedValue = clean(systemHeaderFieldAssignments[slot.slotKey]);
@@ -1150,7 +1171,7 @@ function validateSpec(input) {
         slotKey: slot.slotKey,
         label: slot.label,
         sourceType: "field",
-        fieldKey: selectedValue,
+        fieldKey: slot.slotKey,
       };
     })
     .filter(Boolean);
@@ -1161,16 +1182,21 @@ function validateSpec(input) {
   const dictionaryName = clean(module.dictionaryName) || `${titleCase(family)} Dictionary`;
   const dictionaryDescription = clean(module.dictionaryDescription)
     || `Internal ${family} passport dictionary used for Digital Product Passport implementations.`;
-  const businessIdentifierField = clean(roles.businessIdentifierField || module.businessIdentifierField);
+  const remapCanonicalFieldKey = (fieldKey) => canonicalFieldKeyBySource.get(clean(fieldKey)) || clean(fieldKey);
+  const businessIdentifierField = remapCanonicalFieldKey(roles.businessIdentifierField || module.businessIdentifierField);
+  const modelNameField = remapCanonicalFieldKey(modelNameSourceField);
   const rawSummaryRoles = roles.summaryRoles && typeof roles.summaryRoles === "object" ? roles.summaryRoles : {};
   const summaryRoles = Object.fromEntries(
     Object.entries(rawSummaryRoles)
-      .map(([fieldKey, role]) => [clean(fieldKey), normalizeSummaryRole(role)])
+      .map(([fieldKey, role]) => [remapCanonicalFieldKey(fieldKey), normalizeSummaryRole(role)])
       .filter(([fieldKey, role]) => fieldKey && role)
   );
-  const lifecycleRoles = roles.lifecycleRoles && typeof roles.lifecycleRoles === "object" ? roles.lifecycleRoles : {};
-  const objectTypes = roles.objectTypes && typeof roles.objectTypes === "object" ? roles.objectTypes : {};
-  const valueDataTypes = roles.valueDataTypes && typeof roles.valueDataTypes === "object" ? roles.valueDataTypes : {};
+  const remapRoleFieldMap = (roleMap = {}) => Object.fromEntries(
+    Object.entries(roleMap).map(([fieldKey, value]) => [remapCanonicalFieldKey(fieldKey), value])
+  );
+  const lifecycleRoles = remapRoleFieldMap(roles.lifecycleRoles && typeof roles.lifecycleRoles === "object" ? roles.lifecycleRoles : {});
+  const objectTypes = remapRoleFieldMap(roles.objectTypes && typeof roles.objectTypes === "object" ? roles.objectTypes : {});
+  const valueDataTypes = remapRoleFieldMap(roles.valueDataTypes && typeof roles.valueDataTypes === "object" ? roles.valueDataTypes : {});
   const rawCompositionCharts = Array.isArray(roles.compositionCharts)
     ? roles.compositionCharts
     : roles.compositionFieldKey
@@ -1182,7 +1208,7 @@ function validateSpec(input) {
       : [];
   const compositionCharts = rawCompositionCharts
     .map((chart) => ({
-      fieldKey: clean(chart?.fieldKey || chart?.compositionFieldKey),
+      fieldKey: remapCanonicalFieldKey(chart?.fieldKey || chart?.compositionFieldKey),
       labelColumnKey: normalizeTableColumnKey(
         chart?.labelColumnKey || chart?.compositionLabelColumnKey
       ),
@@ -1200,8 +1226,17 @@ function validateSpec(input) {
   const normalizeInputField = (field) => {
     const rawFieldKey = clean(field.fieldKey || field.key);
     const fieldLabel = clean(field.fieldLabel) || clean(field.label) || titleCase(rawFieldKey);
-    const semanticSlug = kebabCase(field.semanticSlug || fieldLabel || rawFieldKey);
-    const fieldKey = canonicalKeyFromSemanticSlug(semanticSlug, field.fieldKey || field.key || fieldLabel);
+    const derivedSourceKey = rawFieldKey || canonicalKeyFromSemanticSlug(
+      kebabCase(field.semanticSlug || fieldLabel || rawFieldKey),
+      fieldLabel
+    );
+    const assignedCanonicalKey = remapCanonicalFieldKey(derivedSourceKey);
+    const semanticSlug = assignedCanonicalKey !== derivedSourceKey
+      ? kebabCase(assignedCanonicalKey)
+      : kebabCase(field.semanticSlug || fieldLabel || rawFieldKey);
+    const fieldKey = assignedCanonicalKey !== derivedSourceKey
+      ? assignedCanonicalKey
+      : canonicalKeyFromSemanticSlug(semanticSlug, field.fieldKey || field.key || fieldLabel);
     const resolvedFieldLabel = fieldLabel || titleCase(fieldKey);
     const unitKey = clean(field.unitKey || field.unit || "none").toLowerCase() || "none";
     const unitSymbol = unitKey === "none" ? "n.a." : clean(field.unitSymbol || field.unitDisplay || unitKey);
@@ -1249,13 +1284,24 @@ function validateSpec(input) {
 
   if (!sections.length) throw new Error("At least one section with one field is required");
   assertNoEmptyLeafSections(sections);
+  const selectedModelField = flattenDraftFieldsFromSections(sections)
+    .find((field) => field.fieldKey === modelNameField);
+  if (!selectedModelField) {
+    throw new Error(`Model name field "${modelNameField}" must exist as a generated field.`);
+  }
+  if (selectedModelField.fieldType !== "text" || selectedModelField.dataType !== "string") {
+    throw new Error("Model name field must use the text UI type and string data type.");
+  }
+  // The model is the canonical passport-table label, so it must always be
+  // present in the form and its generated semantic property.
+  selectedModelField.required = true;
   const { semanticGraph } = buildSemanticGraphDraft(input.semanticGraph, {
     family,
     version,
     baseUrl,
     sections,
   });
-  assertNoReservedRuntimeFields(sections, semanticGraph);
+  assertNoReservedRuntimeFields(sections, semanticGraph, new Set(canonicalFieldKeyBySource.values()));
   const normalizedSectionTreeLimitError = getSectionTreeLimitError(sections);
   if (normalizedSectionTreeLimitError) throw new Error(normalizedSectionTreeLimitError);
   const sectionKeys = flattenDraftSections(sections).map((section) => section.key);
@@ -1275,6 +1321,7 @@ function validateSpec(input) {
     throw new Error("Business identifier field is required.");
   }
   requireKnownFieldKey(businessIdentifierField, "Business identifier field");
+  requireKnownFieldKey(modelNameField, "Model name field");
   for (const fieldKey of [
     ...Object.keys(summaryRoles),
     ...Object.keys(lifecycleRoles),
@@ -1470,6 +1517,7 @@ function validateSpec(input) {
       dictionaryName,
       dictionaryDescription,
       businessIdentifierField,
+      modelNameField,
     },
     sections,
     semanticGraph,
@@ -1851,6 +1899,7 @@ function buildModuleJs(spec) {
     passportPolicyKey,
     baseUrl,
     businessIdentifierField,
+    modelNameField,
     defaultCarrierPolicyKey,
     systemHeaderFieldMappings = [],
     systemHeaderFieldKeys = [],
@@ -1868,6 +1917,7 @@ function buildModuleJs(spec) {
         semanticId: field.semanticId || `${semanticBase}/${field.semanticSlug}`,
       };
       if (field.fieldType !== "text") args.type = field.fieldType;
+      if (field.required) args.required = true;
       if (field.confidentiality === "restricted") args.confidentiality = "restricted";
       if (field.unitKey !== "none") args.unit = field.unitSymbol;
       if (field.dataType !== "string") args.dataType = field.dataType === "integer" ? "integer" : field.dataType;
@@ -1956,6 +2006,7 @@ function field({
   semanticSlug,
   semanticId,
   type = "text",
+  required = false,
   confidentiality = "public",
   unit = "",
   dataType = "string",
@@ -1992,6 +2043,7 @@ function field({
     key: resolvedKey,
     label,
     type,
+    ...(required ? { required: true } : {}),
     confidentiality: confidentiality === "restricted" ? "restricted" : "public",
     semanticId: semanticId || term(semanticSlug),
     elementIdPath,
@@ -2056,6 +2108,7 @@ module.exports = {
   },
   identity: {
     businessIdentifierField: ${businessIdentifierField ? jsValue(businessIdentifierField) : "null"},
+    modelNameField: ${modelNameField ? jsValue(modelNameField) : "null"},
   },
   passportPolicy: {
     key: ${jsValue(passportPolicyKey)},

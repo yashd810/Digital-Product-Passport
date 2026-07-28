@@ -139,6 +139,107 @@ test("draft create stores a long logical key physically and returns and archives
   assert.equal(Object.hasOwn(archivedPassport, physicalFieldKey), false);
 });
 
+test("draft create stores the selected model and mapped operator fields once in their platform columns", async () => {
+  let insertQuery = null;
+  let identifierSource = null;
+  const typeSchemaWithCanonicalSystemFields = {
+    typeName: "exampleProductPassportV1",
+    allowedKeys: new Set(["modelName", "economicOperatorId"]),
+    schemaFields: [
+      { key: "modelName", type: "text", required: true },
+      { key: "economicOperatorId", type: "text", required: true },
+    ],
+    fieldsJson: {
+      identity: { businessIdentifierField: "modelName", modelNameField: "modelName" },
+      sections: [{
+        key: "identity",
+        fields: [
+          { key: "modelName", type: "text", required: true },
+          { key: "economicOperatorId", type: "text", required: true },
+        ],
+      }],
+    },
+  };
+  const client = {
+    async query(sql) {
+      if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
+      insertQuery = sql;
+      return {
+        rows: [{
+          id: 51,
+          dppId: "dpp-canonical-create",
+          lineageId: "dpp-canonical-create",
+          companyId: 7,
+          modelName: "Example Model",
+          economicOperatorId: "EO-001",
+          internalAliasId: "EX-001",
+          releaseStatus: "draft",
+          versionNumber: 1,
+          granularity: "item",
+        }],
+      };
+    },
+    release() {},
+  };
+  const createDraftPassport = createDraftPassportUseCase({
+    pool: { connect: async () => client },
+    generateDppRecordId: () => "dpp-canonical-create",
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
+    generateInternalAliasIdValue: (dppId) => dppId,
+    findExistingPassportByInternalAliasId: async () => null,
+    resolveGranularityForCreate: () => "item",
+    buildStoredProductIdentifiers: ({ internalAliasId, passportLike }) => {
+      identifierSource = passportLike;
+      return { internalAliasId, uniqueProductIdentifier: `did:example:${internalAliasId}` };
+    },
+    buildComplianceManagedFields: async () => ({
+      passportPolicyKey: "policy",
+      contentSpecificationIds: "[]",
+      carrierPolicyKey: null,
+      economicOperatorId: "EO-001",
+      economicOperatorIdentifierScheme: null,
+      facilityId: null,
+    }),
+    getWritablePassportColumns,
+    joinQuotedSqlIdentifiers,
+    toStoredPassportValue,
+    extractCarrierAuthenticityMutation: () => ({ provided: false, signCarrierPayload: false }),
+    applyCarrierAuthenticityMutation: () => null,
+    getCompanyNameMap: async () => new Map([["7", "Example Company"]]),
+    maybeSignCarrierPayload: async () => null,
+    buildCarrierAuthenticityStorageValue: () => null,
+    insertPassportRegistry: async () => {},
+    logAudit: async () => {},
+    archivePassportSnapshot: async () => {},
+    getActorIdentifier: () => "user:9",
+    normalizeReleaseStatus: (status) => status,
+    normalizePassportRow,
+    systemPassportFields,
+  });
+
+  const result = await createDraftPassport({
+    companyId: 7,
+    userId: 9,
+    reqUser: { userId: 9 },
+    typeSchema: typeSchemaWithCanonicalSystemFields,
+    resolvedPassportType: typeSchemaWithCanonicalSystemFields.typeName,
+    tableName: '"exampleProductPassportV1Passports"',
+    item: {
+      passportType: typeSchemaWithCanonicalSystemFields.typeName,
+      internalAliasId: "EX-001",
+      modelName: "Example Model",
+    },
+    companyPolicy: {},
+    snapshotReason: "afterCreate",
+  });
+
+  assert.equal(identifierSource.modelName, "Example Model");
+  assert.equal(insertQuery.match(/"modelName"/g)?.length, 1);
+  assert.equal(insertQuery.match(/"economicOperatorId"/g)?.length, 1);
+  assert.equal(result.passport.modelName, "Example Model");
+  assert.equal(result.passport.economicOperatorId, "EO-001");
+});
+
 test("editable update reads and returns a long logical key while writing through the logical API key", async () => {
   let capturedUpdateData = null;
   const archives = [];

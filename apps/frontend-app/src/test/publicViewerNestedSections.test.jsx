@@ -28,6 +28,22 @@ const nestedSections = [{
 }];
 
 describe("public viewer nested data sections", () => {
+  test("shows Data as the only viewer tab and does not render a separate header tab", () => {
+    const markup = renderToStaticMarkup(
+      <PublicPassportPortal
+        passport={{ passportType: "examplePassport", rootField: "Root value" }}
+        companyData={{ companyName: "Example Company" }}
+        typeDef={{ fieldsJson: { sections: nestedSections } }}
+        lang="en"
+      />
+    );
+
+    expect(markup.match(/role="tab"/g)).toHaveLength(1);
+    expect(markup).toContain(">Data<");
+    expect(markup).not.toContain(">Header<");
+    expect(markup).not.toContain("Passport Header");
+  });
+
   test("renders a composition chart for every configured field", () => {
     const compositionFields = [
       {

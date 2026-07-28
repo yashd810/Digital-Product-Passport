@@ -102,7 +102,8 @@ function createExampleProductModule() {
     productIcon: "MD",
     semanticModelKey: "exampleProductDictionaryV1",
     identity: {
-      businessIdentifierField: "modelIdentifier",
+      businessIdentifierField: "modelName",
+      modelNameField: "modelName",
     },
     systemHeader: createSystemHeader(),
     passportPolicy: {
@@ -137,9 +138,9 @@ function createExampleProductModule() {
           label: "Device Identity",
           semanticId: deviceIdentityClassIri,
           properties: [{
-            key: "modelIdentifier",
-            label: "Model Identifier",
-            semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/model-identifier",
+            key: "modelName",
+            label: "Model name",
+            semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/model-name",
             domainClassKey: "deviceIdentity",
             domainClassIri: deviceIdentityClassIri,
             rangeKind: "scalar",
@@ -156,18 +157,18 @@ function createExampleProductModule() {
       label: "Device Identity",
       fields: [
         {
-          key: "modelIdentifier",
-          label: "Model Identifier",
+          key: "modelName",
+          label: "Model name",
           type: "text",
           dataType: "string",
-          semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/model-identifier",
+          semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/model-name",
           domainClassKey: "deviceIdentity",
           domainClassIri: deviceIdentityClassIri,
           rangeKind: "scalar",
           rangeIri: "http://www.w3.org/2001/XMLSchema#string",
           minCount: 0,
           maxCount: 1,
-          elementIdPath: "deviceIdentity.modelIdentifier",
+          elementIdPath: "deviceIdentity.modelName",
           objectType: "SingleValuedDataElement",
           valueDataType: "String",
         },
@@ -257,8 +258,18 @@ test("seed script can discover and select an arbitrary future module package", a
 
 test("seed script rejects modules that duplicate reserved passport header fields", async () => withTempModules(async (packagesDir) => {
   const definition = createExampleProductModule();
-  definition.semanticGraph.classes[1].properties[0].key = "dppStatus";
-  definition.sections[0].fields[0].key = "dppStatus";
+  definition.semanticGraph.classes[1].properties.push({
+    ...definition.semanticGraph.classes[1].properties[0],
+    key: "dppStatus",
+    label: "DPP status",
+    semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/dpp-status",
+  });
+  definition.sections[0].fields.push({
+    ...definition.sections[0].fields[0],
+    key: "dppStatus",
+    label: "DPP status",
+    semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/dpp-status",
+  });
   writeModulePackage(packagesDir, definition);
 
   await assert.rejects(
@@ -336,7 +347,7 @@ test("existing curated passport type profiles are never overwritten by the seed"
       profile: {
         contractVersion: 1,
         selectionMode: "explicit",
-        includedFields: [{ sourceModuleFieldKey: "modelIdentifier" }],
+        includedFields: [{ sourceModuleFieldKey: "modelName" }],
       },
     },
   };
@@ -358,52 +369,6 @@ test("existing curated passport type profiles are never overwritten by the seed"
   assert.equal(result.displayName, "Curated Example Product Type");
   assert.equal(calls.some((call) => String(call.sql).startsWith("UPDATE \"passportTypes\"")), false);
   assert.equal(calls.some((call) => String(call.sql).startsWith("INSERT INTO \"passportTypes\"")), false);
-});
-
-test("an exact full legacy module type is safely backfilled to the compiled profile contract", async () => {
-  const definition = getPassportTypeModule("battery:v1");
-  const existing = {
-    id: 312,
-    typeName: definition.typeName,
-    displayName: definition.displayName,
-    isActive: true,
-    fieldsJson: {
-      sourceModule: definition.moduleKey,
-      schemaVersion: 4,
-      identity: definition.fieldsJson.identity,
-      systemHeader: definition.fieldsJson.systemHeader,
-      sections: definition.fieldsJson.sections,
-    },
-  };
-  const calls = [];
-  const pool = {
-    async query(sql, params = []) {
-      calls.push({ sql, params });
-      const normalized = String(sql).replace(/\s+/g, " ").trim();
-      if (normalized.startsWith("INSERT INTO \"productCategories\"")) return { rows: [] };
-      if (normalized.includes("FROM \"passportTypes\"") && normalized.includes("WHERE \"typeName\" = $1")) {
-        return { rows: [existing] };
-      }
-      if (normalized.startsWith("UPDATE \"passportTypes\"")) {
-        return {
-          rows: [{
-            ...existing,
-            fieldsJson: JSON.parse(params[1]),
-          }],
-        };
-      }
-      throw new Error(`Unexpected query: ${sql}`);
-    },
-  };
-
-  const result = await ensurePassportType(pool, definition);
-
-  assert.equal(result.seedAction, "backfilledFullProfile");
-  assert.equal(result.fieldsJson.schemaVersion, 4);
-  assert.equal(result.fieldsJson.profile.selectionMode, "explicit");
-  assert.ok(result.fieldsJson.moduleDigest);
-  assert.ok(result.fieldsJson.profileDigest);
-  assert.equal(calls.some((call) => String(call.sql).startsWith("UPDATE \"passportTypes\"")), true);
 });
 
 test("a legacy subset type is preserved rather than being expanded by the seed", async () => {

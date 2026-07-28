@@ -25,7 +25,7 @@
     "carrierCompatibilityProfiles", "physicalCarrierSecurityFeatures", "trustedViewerOrigin",
     "trustedViewerHost", "counterfeitRiskLevel", "antiCounterfeitInstructions",
     "safetyWarnings", "qrPrintSpecification", "signCarrierPayload", "createdByEmail",
-    "firstName", "lastName", "updatedBy", "updatedAt", "modelName", "internalAliasId",
+    "firstName", "lastName", "updatedBy", "updatedAt", "internalAliasId",
     "uniqueProductIdentifier", "passportPolicyKey", "contentSpecificationIds",
     "carrierPolicyKey", "economicOperatorId", "facilityId", "granularity",
     "digitalProductPassportId", "dppSchemaVersion", "dppStatus", "lastUpdate",
@@ -223,12 +223,19 @@
     const cloneSection = (section) => {
       const sectionIdentity = sectionIdentityByObject.get(section) || { key: "" };
       const fields = (Array.isArray(section?.fields) ? section.fields : []).map((field) => {
-        const identity = fieldIdentityByObject.get(field) || { key: "", semanticSlug: "", discriminator: "field" };
+        const generatedIdentity = fieldIdentityByObject.get(field) || { key: "", semanticSlug: "", discriminator: "field" };
+        const canonicalOverride = camelCaseFromWords(field?.canonicalKeyOverride);
+        const baseField = { ...(field || {}) };
+        delete baseField.canonicalKeyOverride;
+        const identity = canonicalOverride
+          ? { ...generatedIdentity, key: canonicalOverride, semanticSlug: slugFromValue(canonicalOverride) }
+          : generatedIdentity;
         const fieldType = clean(field?.fieldType) || "text";
         const fixedDataType = fixedDataTypeByFieldType[fieldType];
         const dataType = fixedDataType || clean(field?.dataType) || defaultDataTypeForFieldType(fieldType);
         return {
-          ...field,
+          ...baseField,
+          ...(canonicalOverride ? { canonicalKeyOverride } : {}),
           fieldKey: identity.key,
           semanticSlug: identity.semanticSlug,
           dataType,

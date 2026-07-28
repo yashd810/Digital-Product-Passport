@@ -271,6 +271,11 @@
                 <option value="">Select product identifier</option>
               </select>
             </label>
+            <label>Model name field
+              <select id="modelNameField">
+                <option value="">Select model name field</option>
+              </select>
+            </label>
           </article>
 
           <article class="role-card role-card-wide composition-role-card">
@@ -292,8 +297,8 @@
           </article>
 
           <article class="role-card role-card-wide">
-            <h3>Passport Header</h3>
-            <p>Choose which module field should fill each editable header slot. DID values are always generated and maintained by the platform.</p>
+            <h3>System field assignments</h3>
+            <p>Assign a section field to a platform slot. The selected field is exported with that slot's one canonical key; it does not keep a second source key. Platform-only values are generated automatically.</p>
             <div id="systemHeaderFields" class="presentation-list system-header-list"></div>
           </article>
         </div>
@@ -452,6 +457,7 @@
                 </select>
               </label>
               <input type="hidden" data-field="fieldKey">
+              <input type="hidden" data-field="canonicalKeyOverride">
               <label>Semantic slug <input data-field="semanticSlug" placeholder="manufacturer-name" readonly aria-readonly="true" title="Generated from the field label and nested section context."></label>
               <label>Unit key <input data-field="unitKey" value="none" placeholder="none" readonly aria-readonly="true" title="Generated from Unit label."></label>
             </div>

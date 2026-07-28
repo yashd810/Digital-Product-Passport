@@ -19,7 +19,10 @@ function generatorInput() {
       typeName: "batteryPassportV1",
       baseUrl: "https://claros-dpp.online",
     },
-    roles: { businessIdentifierField: "modelIdentifier" },
+    roles: {
+      businessIdentifierField: "modelIdentifier",
+      modelNameField: "modelIdentifier",
+    },
     sections: [
       {
         key: "generalInformation",

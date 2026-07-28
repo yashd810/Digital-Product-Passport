@@ -2,22 +2,20 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { getPassportTypeModule } = require("../src/services/passport-module-registry");
 const {
   compilePassportTypeProfile,
 } = require("../src/services/passport-type-profile");
 const {
   flattenSchemaFieldsFromSections,
 } = require("../src/shared/passports/passport-helpers");
+const { createPassportModuleFixture } = require("./passport-module-fixture");
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function getBatteryModule() {
-  const moduleDefinition = getPassportTypeModule("battery:v1");
-  assert.ok(moduleDefinition, "battery:v1 must be registered for profile tests");
-  return moduleDefinition;
+function getExampleModule() {
+  return createPassportModuleFixture();
 }
 
 function findSection(sections, key) {
@@ -44,7 +42,7 @@ function selection(fieldKey, overrides = {}) {
 }
 
 test("compiler prunes unselected fields while retaining nested ancestors and locked dependencies", () => {
-  const moduleDefinition = getBatteryModule();
+  const moduleDefinition = getExampleModule();
   const compiled = compilePassportTypeProfile({
     moduleDefinition,
     profile: {
@@ -59,19 +57,12 @@ test("compiler prunes unselected fields while retaining nested ancestors and loc
   const fields = flattenSchemaFieldsFromSections(compiled.sections);
   const keys = new Set(fields.map((field) => field.key));
   assert.equal(keys.has("economicOperatorAddressCountry"), true);
-  assert.equal(keys.has("batteryMass"), false);
-  assert.ok(findSection(compiled.sections, "generalInformation"));
+  assert.equal(keys.has("productMass"), false);
+  assert.ok(findSection(compiled.sections, "identity"));
   assert.ok(findSection(compiled.sections, "economicOperatorInformation"));
   assert.ok(findSection(compiled.sections, "economicOperatorAddress"));
 
-  for (const dependency of [
-    "uniqueDppIdentifier",
-    "uniqueBatteryIdentifier",
-    "dppGranularity",
-    "dateTimeOfLatestUpdateOfDpp",
-    "uniqueEconomicOperatorIdentifier",
-    "uniqueFacilityIdentifier",
-  ]) {
+  for (const dependency of ["modelName", "economicOperatorId"]) {
     assert.equal(keys.has(dependency), true, `${dependency} must stay included`);
   }
 
@@ -89,11 +80,11 @@ test("compiler prunes unselected fields while retaining nested ancestors and loc
 });
 
 test("multiple composition charts are independent and excluding a chart field is allowed", () => {
-  const moduleDefinition = getBatteryModule();
+  const moduleDefinition = getExampleModule();
   const chart = (fieldKey) => selection(fieldKey, {
     composition: true,
     compositionLabelColumnKey: "materialName",
-    compositionValueColumnKey: "composition",
+    compositionValueColumnKey: "materialComposition",
   });
   const withTwoCharts = compilePassportTypeProfile({
     moduleDefinition,
@@ -118,7 +109,7 @@ test("multiple composition charts are independent and excluding a chart field is
 });
 
 test("compiler preserves a module-defined object-list composition chart through its semantic range class", () => {
-  const moduleDefinition = clone(getBatteryModule());
+  const moduleDefinition = clone(getExampleModule());
   const sourceField = findFieldReference(moduleDefinition.fieldsJson.sections, "materialsUsedInCathode");
   assert.ok(sourceField);
   sourceField.type = "objectList";
@@ -136,11 +127,11 @@ test("compiler preserves a module-defined object-list composition chart through 
   assert.equal(compiledField.type, "objectList");
   assert.equal(compiledField.composition, true);
   assert.equal(compiledField.compositionLabelColumnKey, "materialName");
-  assert.equal(compiledField.compositionValueColumnKey, "composition");
+  assert.equal(compiledField.compositionValueColumnKey, "materialComposition");
 });
 
 test("compiler applies section translations without changing the material profile digest", () => {
-  const moduleDefinition = getBatteryModule();
+  const moduleDefinition = getExampleModule();
   const baseProfile = {
     includedFields: [selection("economicOperatorAddressCountry")],
   };
@@ -164,7 +155,7 @@ test("compiler applies section translations without changing the material profil
 });
 
 test("compiler rejects stale modules, canonical metadata overrides, and invalid chart fields", () => {
-  const moduleDefinition = getBatteryModule();
+  const moduleDefinition = getExampleModule();
   assert.throws(
     () => compilePassportTypeProfile({
       moduleDefinition,
@@ -176,8 +167,8 @@ test("compiler rejects stale modules, canonical metadata overrides, and invalid 
     () => compilePassportTypeProfile({
       moduleDefinition,
       profile: {
-        includedFields: [selection("uniqueBatteryIdentifier")],
-        identity: { businessIdentifierField: "batteryMass" },
+        includedFields: [selection("modelName")],
+        identity: { businessIdentifierField: "productMass", modelNameField: "productMass" },
       },
     }),
     (error) => error.code === "passportTypeProfileCanonicalMetadataMismatch"
@@ -186,7 +177,7 @@ test("compiler rejects stale modules, canonical metadata overrides, and invalid 
     () => compilePassportTypeProfile({
       moduleDefinition,
       profile: {
-        includedFields: [selection("batteryMass", { composition: true })],
+        includedFields: [selection("productMass", { composition: true })],
       },
     }),
     (error) => error.code === "passportTypeProfileCompositionFieldInvalid"
@@ -194,8 +185,8 @@ test("compiler rejects stale modules, canonical metadata overrides, and invalid 
 });
 
 test("module minCount invariants cannot be excluded or made optional", () => {
-  const moduleDefinition = clone(getBatteryModule());
-  const invariantField = findFieldReference(moduleDefinition.fieldsJson.sections, "batteryMass");
+  const moduleDefinition = clone(getExampleModule());
+  const invariantField = findFieldReference(moduleDefinition.fieldsJson.sections, "productMass");
   assert.ok(invariantField);
   invariantField.minCount = 1;
   invariantField.required = true;
@@ -206,7 +197,7 @@ test("module minCount invariants cannot be excluded or made optional", () => {
   assert.throws(
     () => compilePassportTypeProfile({
       moduleDefinition,
-      profile: { includedFields: [selection("uniqueBatteryIdentifier")] },
+      profile: { includedFields: [selection("modelName")] },
     }),
     (error) => error.code === "passportTypeProfileRequiredModuleFieldExcluded"
   );
@@ -215,8 +206,8 @@ test("module minCount invariants cannot be excluded or made optional", () => {
       moduleDefinition,
       profile: {
         includedFields: [
-          selection("uniqueBatteryIdentifier"),
-          selection("batteryMass", { required: false }),
+          selection("modelName"),
+          selection("productMass", { required: false }),
         ],
       },
     }),

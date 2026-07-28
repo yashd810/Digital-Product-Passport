@@ -129,19 +129,7 @@ function createDraftPassportUseCase(deps) {
       throw error;
     }
 
-    assertRequiredPassportFields(typeSchema, fields, { isBulk });
-
     const effectiveGranularity = resolveGranularityForCreate(companyPolicy, requestedGranularity);
-    const companyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";
-    const storedProductIdentifiers = buildStoredProductIdentifiers({
-      companyId,
-      companyName,
-      passportType: resolvedPassportType,
-      internalAliasId: normalizedProductId,
-      granularity: effectiveGranularity,
-      passportLike: { ...fields, internalAliasId: normalizedProductId },
-      typeDef: typeSchema.typeDef || typeSchema,
-    });
     const complianceManagedFields = await buildComplianceManagedFields({
       companyId,
       passportType: resolvedPassportType,
@@ -156,7 +144,30 @@ function createDraftPassportUseCase(deps) {
         facilityId,
       },
     });
+    // These keys are physical passport columns, but selected Local Tools fields
+    // use the same canonical keys. Validate the platform-resolved value so a
+    // locked field remains valid even if a client does not resend it.
+    const schemaValues = {
+      ...fields,
+      modelName,
+      economicOperatorId: complianceManagedFields.economicOperatorId,
+      economicOperatorIdentifierScheme: complianceManagedFields.economicOperatorIdentifierScheme,
+      facilityId: complianceManagedFields.facilityId,
+      granularity: effectiveGranularity,
+      contentSpecificationIds: complianceManagedFields.contentSpecificationIds,
+    };
+    assertRequiredPassportFields(typeSchema, schemaValues, { isBulk });
 
+    const companyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";
+    const storedProductIdentifiers = buildStoredProductIdentifiers({
+      companyId,
+      companyName,
+      passportType: resolvedPassportType,
+      internalAliasId: normalizedProductId,
+      granularity: effectiveGranularity,
+      passportLike: { ...fields, modelName, internalAliasId: normalizedProductId },
+      typeDef: typeSchema.typeDef || typeSchema,
+    });
     const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key) || builtInEditableFields.has(key));
     const schemaFieldsByKey = new Map((typeSchema.schemaFields || []).map((field) => [field.key, field]));
     const processedFields = Object.fromEntries(dataFields.map((key) => {

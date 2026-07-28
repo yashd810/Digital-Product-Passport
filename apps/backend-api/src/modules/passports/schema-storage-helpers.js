@@ -182,6 +182,11 @@ function createSchemaStorageHelpers({
     return "text";
   }
 
+  function isPlatformPassportStorageField(field) {
+    const storageKey = toPassportStorageColumnKey(String(field?.key || "").trim());
+    return livePassportSystemColumns.has(storageKey);
+  }
+
   function buildPassportTypeSchemaChange({ currentFieldsJson = {}, nextSections = [] } = {}) {
     const currentFields = new Map(flattenTypeFields(currentFieldsJson).map((field) => [field.key, field]));
     const nextFields = new Map(flattenTypeFields(nextSections).map((field) => [field.key, field]));
@@ -283,8 +288,9 @@ function createSchemaStorageHelpers({
     const fields = flattenTypeFields(typeRes.rows[0].fieldsJson || {});
     assertPassportStorageFieldKeys(typeName, fields);
 
+    const customFields = fields.filter((field) => !isPlatformPassportStorageField(field));
     const ddlCols = [];
-    for (const field of fields) {
+    for (const field of customFields) {
       const colType = getPassportFieldColumnType(field);
       ddlCols.push(`    ${quoteSqlIdentifier(field.key)} ${colType}`);
     }
@@ -332,11 +338,13 @@ function createSchemaStorageHelpers({
     const addedColumns = [];
     const indexedColumns = [];
     for (const field of fields) {
-      await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(field.key)} ${getPassportFieldColumnType(field)}`);
-      addedColumns.push({
-        key: field.key,
-        dataType: getPassportFieldDataType(field),
-      });
+      if (!isPlatformPassportStorageField(field)) {
+        await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(field.key)} ${getPassportFieldColumnType(field)}`);
+        addedColumns.push({
+          key: field.key,
+          dataType: getPassportFieldDataType(field),
+        });
+      }
       const indexName = await ensureQueryableFieldIndex({ tableName, field });
       if (indexName) indexedColumns.push({ key: field.key, indexName });
     }
@@ -394,7 +402,11 @@ function createSchemaStorageHelpers({
         issues.push({ type: "missingColumn", field: field.key, expectedDataType });
         continue;
       }
-      const normalizedActual = actualDataType === "boolean" ? "boolean" : actualDataType === "jsonb" ? "jsonb" : "text";
+      const normalizedActual = actualDataType === "boolean"
+        ? "boolean"
+        : actualDataType === "jsonb"
+          ? "jsonb"
+          : "text";
       if (normalizedActual !== expectedDataType) {
         issues.push({ type: "columnTypeMismatch", field: field.key, expectedDataType, actualDataType });
       }

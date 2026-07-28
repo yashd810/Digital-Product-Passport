@@ -140,6 +140,42 @@ test("controlled provisioning creates the deterministic physical column for a lo
   );
 });
 
+test("controlled provisioning reuses the platform model column for the canonical model field", async () => {
+  const calls = [];
+  const helpers = createHelpers({
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (sql.includes('SELECT "fieldsJson" AS "fieldsJson" FROM "passportTypes"')) {
+        return {
+          rows: [{
+            fieldsJson: {
+              sections: [{
+                key: "identity",
+                fields: [{ key: "modelName", type: "text", queryable: true }],
+              }],
+            },
+          }],
+        };
+      }
+      if (sql.includes('SELECT id FROM "passportTypes"')) return { rows: [{ id: 17 }] };
+      return { rows: [] };
+    },
+  });
+
+  await helpers.createPassportTable("batteryPassportV1");
+
+  const createStatement = calls.find(({ sql }) => sql.includes("CREATE TABLE IF NOT EXISTS"))?.sql || "";
+  assert.equal(createStatement.match(/"modelName"/g)?.length, 1);
+  assert.equal(
+    calls.some(({ sql }) => sql.includes('ADD COLUMN IF NOT EXISTS "modelName" TEXT')),
+    false
+  );
+  assert.equal(
+    calls.some(({ sql }) => sql.includes('("modelName") WHERE "deletedAt" IS NULL')),
+    true
+  );
+});
+
 test("schema changes fail closed when stored-record checks cannot query live storage", async () => {
   const helpers = createHelpers({
     async query(sql) {

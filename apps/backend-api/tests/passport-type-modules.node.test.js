@@ -71,7 +71,8 @@ function createModuleDefinition(overrides = {}) {
     productIcon: overrides.productIcon || "MD",
     semanticModelKey,
     identity: {
-      businessIdentifierField: "modelIdentifier",
+      businessIdentifierField: "modelName",
+      modelNameField: "modelName",
     },
     systemHeader: createSystemHeader(),
     passportPolicy: {
@@ -110,9 +111,9 @@ function createModuleDefinition(overrides = {}) {
           semanticId: deviceIdentityClassIri,
           properties: [
             {
-              key: "modelIdentifier",
-              label: "Model Identifier",
-              semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/model-identifier",
+              key: "modelName",
+              label: "Model name",
+              semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/model-name",
               domainClassKey: "deviceIdentity",
               domainClassIri: deviceIdentityClassIri,
               rangeKind: "scalar",
@@ -159,18 +160,18 @@ function createModuleDefinition(overrides = {}) {
         label: "Device Identity",
         fields: [
           {
-            key: "modelIdentifier",
-            label: "Model Identifier",
+            key: "modelName",
+            label: "Model name",
             type: "text",
             dataType: "string",
-            semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/model-identifier",
+            semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/model-name",
             domainClassKey: "deviceIdentity",
             domainClassIri: deviceIdentityClassIri,
             rangeKind: "scalar",
             rangeIri: "http://www.w3.org/2001/XMLSchema#string",
             minCount: 0,
             maxCount: 1,
-            elementIdPath: "deviceIdentity.modelIdentifier",
+            elementIdPath: "deviceIdentity.modelName",
             objectType: "SingleValuedDataElement",
             valueDataType: "String",
           },
@@ -201,6 +202,7 @@ function createModuleDefinition(overrides = {}) {
 function createNestedOwnershipDefinition() {
   const definition = createModuleDefinition();
   const rootClassIri = "https://example.test/dictionary/example-product/v1/classes/ExampleProductPassport";
+  const identityClassIri = "https://example.test/dictionary/example-product/v1/classes/Identity";
   const productDetailsClassIri = "https://example.test/dictionary/example-product/v1/classes/ProductDetails";
   const technicalDetailsClassIri = "https://example.test/dictionary/example-product/v1/classes/TechnicalDetails";
   const fieldSemanticId = "https://example.test/dictionary/example-product/v1/terms/technical-details/technical-details";
@@ -215,16 +217,46 @@ function createNestedOwnershipDefinition() {
         label: "Example Product Passport",
         semanticId: rootClassIri,
         root: true,
+        properties: [
+          {
+            key: "productDetails",
+            label: "Product Details",
+            semanticId: "https://example.test/dictionary/example-product/v1/terms/product-details",
+            domainClassKey: "exampleProductPassport",
+            domainClassIri: rootClassIri,
+            rangeKind: "class",
+            rangeClassKey: "productDetails",
+            relationshipType: "composition",
+            minCount: 0,
+            maxCount: 1,
+          },
+          {
+            key: "identity",
+            label: "Identity",
+            semanticId: "https://example.test/dictionary/example-product/v1/terms/identity",
+            domainClassKey: "exampleProductPassport",
+            domainClassIri: rootClassIri,
+            rangeKind: "class",
+            rangeClassKey: "identity",
+            relationshipType: "composition",
+            minCount: 0,
+            maxCount: 1,
+          },
+        ],
+      },
+      {
+        key: "identity",
+        label: "Identity",
+        semanticId: identityClassIri,
         properties: [{
-          key: "productDetails",
-          label: "Product Details",
-          semanticId: "https://example.test/dictionary/example-product/v1/terms/product-details",
-          domainClassKey: "exampleProductPassport",
-          domainClassIri: rootClassIri,
-          rangeKind: "class",
-          rangeClassKey: "productDetails",
-          relationshipType: "composition",
-          minCount: 0,
+          key: "modelName",
+          label: "Model name",
+          semanticId: "https://example.test/dictionary/example-product/v1/terms/identity/model-name",
+          domainClassKey: "identity",
+          domainClassIri: identityClassIri,
+          rangeKind: "scalar",
+          dataType: "string",
+          minCount: 1,
           maxCount: 1,
         }],
       },
@@ -288,6 +320,26 @@ function createNestedOwnershipDefinition() {
         valueDataType: "String",
       }],
     }],
+  }, {
+    key: "identity",
+    label: "Identity",
+    fields: [{
+      key: "modelName",
+      label: "Model name",
+      type: "text",
+      dataType: "string",
+      required: true,
+      semanticId: "https://example.test/dictionary/example-product/v1/terms/identity/model-name",
+      domainClassKey: "identity",
+      domainClassIri: identityClassIri,
+      rangeKind: "scalar",
+      rangeIri: "http://www.w3.org/2001/XMLSchema#string",
+      minCount: 1,
+      maxCount: 1,
+      elementIdPath: "identity.modelName",
+      objectType: "SingleValuedDataElement",
+      valueDataType: "String",
+    }],
   }];
   return definition;
 }
@@ -350,8 +402,18 @@ test("passport module registry rejects the retired groups schema alias", () => {
 
 test("passport module registry rejects reserved passport header keys and semantic IDs", () => {
   const reservedKeyDefinition = createModuleDefinition();
-  reservedKeyDefinition.semanticGraph.classes[1].properties[0].key = "dppStatus";
-  reservedKeyDefinition.sections[0].fields[0].key = "dppStatus";
+  reservedKeyDefinition.semanticGraph.classes[1].properties.push({
+    ...reservedKeyDefinition.semanticGraph.classes[1].properties[0],
+    key: "dppStatus",
+    label: "DPP status",
+    semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/dpp-status",
+  });
+  reservedKeyDefinition.sections[0].fields.push({
+    ...reservedKeyDefinition.sections[0].fields[0],
+    key: "dppStatus",
+    label: "DPP status",
+    semanticId: "https://example.test/dictionary/example-product/v1/terms/device-identity/dpp-status",
+  });
 
   assert.throws(
     () => normalizeModuleDefinition(reservedKeyDefinition),
@@ -359,8 +421,18 @@ test("passport module registry rejects reserved passport header keys and semanti
   );
 
   const reservedSemanticIdDefinition = createModuleDefinition();
-  reservedSemanticIdDefinition.semanticGraph.classes[1].properties[0].semanticId = "dpp:dppSchemaVersion";
-  reservedSemanticIdDefinition.sections[0].fields[0].semanticId = "dpp:dppSchemaVersion";
+  reservedSemanticIdDefinition.semanticGraph.classes[1].properties.push({
+    ...reservedSemanticIdDefinition.semanticGraph.classes[1].properties[0],
+    key: "schemaVersionCopy",
+    label: "Schema version copy",
+    semanticId: "dpp:dppSchemaVersion",
+  });
+  reservedSemanticIdDefinition.sections[0].fields.push({
+    ...reservedSemanticIdDefinition.sections[0].fields[0],
+    key: "schemaVersionCopy",
+    label: "Schema version copy",
+    semanticId: "dpp:dppSchemaVersion",
+  });
 
   assert.throws(
     () => normalizeModuleDefinition(reservedSemanticIdDefinition),
@@ -508,21 +580,16 @@ test("passport type module fields carry locked canonical source semantics", () =
 }));
 
 test("passport type module rejects fields that are absent from the semantic graph", () => withTempModules((packagesDir) => {
-  const invalidDefinition = createModuleDefinition({
-    sections: [{
-      key: "deviceIdentity",
-      label: "Device Identity",
-      fields: [{
-        key: "modelId",
-        label: "Model Identifier",
-        type: "text",
-        dataType: "string",
-        semanticId: "https://example.test/dictionary/example-product/v1/terms/model-identifier",
-        elementIdPath: "deviceIdentity.modelId",
-        objectType: "SingleValuedDataElement",
-        valueDataType: "String",
-      }],
-    }],
+  const invalidDefinition = createModuleDefinition();
+  invalidDefinition.sections[0].fields.push({
+    key: "modelId",
+    label: "Model Identifier",
+    type: "text",
+    dataType: "string",
+    semanticId: "https://example.test/dictionary/example-product/v1/terms/model-id",
+    elementIdPath: "deviceIdentity.modelId",
+    objectType: "SingleValuedDataElement",
+    valueDataType: "String",
   });
   writeModulePackage(packagesDir, "example-product-v1", invalidDefinition);
 
@@ -536,22 +603,41 @@ test("passport type modules accept logical field keys up to 200 characters", () 
   const definition = createModuleDefinition();
   const longFieldKey = `a${"b".repeat(199)}`;
   const semanticId = `https://example.test/dictionary/example-product/v1/terms/${longFieldKey}`;
-  definition.semanticGraph.classes[1].properties[0].key = longFieldKey;
-  definition.semanticGraph.classes[1].properties[0].semanticId = semanticId;
-  definition.sections[0].fields[0].key = longFieldKey;
-  definition.sections[0].fields[0].semanticId = semanticId;
+  definition.semanticGraph.classes[1].properties.push({
+    ...definition.semanticGraph.classes[1].properties[0],
+    key: longFieldKey,
+    label: "Long custom field",
+    semanticId,
+  });
+  definition.sections[0].fields.push({
+    ...definition.sections[0].fields[0],
+    key: longFieldKey,
+    label: "Long custom field",
+    semanticId,
+  });
 
-  assert.equal(normalizeModuleDefinition(definition).fieldsJson.sections[0].fields[0].key, longFieldKey);
+  assert.equal(
+    normalizeModuleDefinition(definition).fieldsJson.sections[0].fields.at(-1).key,
+    longFieldKey
+  );
 });
 
 test("passport type modules reject logical field keys longer than 200 characters", () => {
   const definition = createModuleDefinition();
   const longFieldKey = `a${"b".repeat(200)}`;
   const semanticId = `https://example.test/dictionary/example-product/v1/terms/${longFieldKey}`;
-  definition.semanticGraph.classes[1].properties[0].key = longFieldKey;
-  definition.semanticGraph.classes[1].properties[0].semanticId = semanticId;
-  definition.sections[0].fields[0].key = longFieldKey;
-  definition.sections[0].fields[0].semanticId = semanticId;
+  definition.semanticGraph.classes[1].properties.push({
+    ...definition.semanticGraph.classes[1].properties[0],
+    key: longFieldKey,
+    label: "Long custom field",
+    semanticId,
+  });
+  definition.sections[0].fields.push({
+    ...definition.sections[0].fields[0],
+    key: longFieldKey,
+    label: "Long custom field",
+    semanticId,
+  });
 
   assert.throws(() => normalizeModuleDefinition(definition), /at most 200 characters/);
 });

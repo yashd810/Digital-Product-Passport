@@ -23,16 +23,11 @@ import {
 } from "../../shared/passports/passportSchemaVisibility";
 import {
   normalizeSystemPassportHeader,
-  resolveSystemHeaderEntries,
 } from "../../admin/passport-types/builderHelpers";
 import SemanticGraphFieldEditor from "../../shared/passports/SemanticGraphFieldEditor";
 import {
   coerceSemanticGraphPropertyValue,
 } from "../../shared/passports/semanticGraphUtils";
-import {
-  buildPassportFormHeaderContext,
-  resolveManagedSystemHeaderValue,
-} from "../../shared/passports/systemHeaderManagedValues";
 import { toSafeImageSrc, toSafeResourceHref } from "../../shared/security/urlSafety";
 import { formatFieldLabelWithUnit, getFieldUnitLabel } from "../../passport-viewer/utils/viewerHelpers";
 import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
@@ -88,7 +83,7 @@ function mergePassportRepresentations(rawRecord = {}, fullRecord = {}) {
 
 function buildClonePrefill(record, sections) {
   if (!record || typeof record !== "object") {
-    return { modelName: "", internalAliasId: "", formData: {} };
+    return { internalAliasId: "", formData: {} };
   }
 
   const keyMap = buildSchemaFieldKeyMap(sections);
@@ -127,7 +122,6 @@ function buildClonePrefill(record, sections) {
   );
 
   return {
-    modelName: aligned?.modelName || record?.modelName || "",
     internalAliasId: "",
     formData,
   };
@@ -165,7 +159,6 @@ const nonEditableFormKeys = new Set([
   "subjectDid",
   "dppDid",
   "companyDid",
-  "modelName",
   "internalAliasId",
   "elements",
   "fields",
@@ -200,7 +193,6 @@ const nonPersistedPayloadKeys = new Set([
   "dppSchemaVersion",
   "dppStatus",
   "lastUpdate",
-  "economicOperatorId",
   "contentSpecificationIds",
   "subjectDid",
   "dppDid",
@@ -209,10 +201,6 @@ const nonPersistedPayloadKeys = new Set([
 ]);
 
 const managedEditableKeys = new Set([
-  "economicOperatorId",
-  "economicOperatorIdentifierScheme",
-  "facilityId",
-  "granularity",
   "productImage",
 ]);
 
@@ -263,7 +251,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   const sectionKeys = Object.keys(sections);
 
   const [expanded,       setExpanded]       = useState({});
-  const [modelName,      setModelName]      = useState("");
   const [internalAliasId,      setInternalAliasId]      = useState(() => mode === "create" ? generateDraftLocalPassportId() : "");
   const [formData,       setFormData]       = useState({});
   const [modelDataKeys,  setModelDataKeys]  = useState(new Set()); // fields locked from template
@@ -330,7 +317,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     if (typeof window === "undefined") return;
     if (!dirtyRef.current) return;
     const payload = {
-      modelName,
       internalAliasId,
       formData: formDataRef.current, // Use ref, not state (state updates are async)
       savedAt: new Date().toISOString(),
@@ -344,7 +330,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     if (!raw) return false;
     try {
       const draft = JSON.parse(raw);
-      setModelName(draft.modelName ?? initialData?.modelName ?? "");
       setInternalAliasId(draft.internalAliasId ?? initialData?.internalAliasId ?? "");
       const draftFormData = sanitizePassportFormData(
         draft.formData && typeof draft.formData === "object" ? draft.formData : (initialData || {}),
@@ -355,7 +340,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       dirtyRef.current = true;
       dirtyFieldsRef.current = new Set(
         [
-          "modelName",
           "internalAliasId",
           ...Object.keys(draftFormData),
         ]
@@ -384,7 +368,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     );
     const restored = allowDraftRestore ? restoreLocalDraft(alignedData) : false;
     if (!restored) {
-      setModelName(alignedData?.modelName || "");
       setInternalAliasId(alignedData?.internalAliasId || "");
       formDataRef.current = alignedData || {}; // ← Update ref
       setFormData(alignedData || {});
@@ -393,7 +376,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       setAutoSaveState("idle");
     }
     baselinePayloadRef.current = {
-      modelName: normalizePersistedComparisonValue(alignedData?.modelName || ""),
       internalAliasId: normalizePersistedComparisonValue(alignedData?.internalAliasId || ""),
       ...Object.fromEntries(
         Object.entries(canonicalizeRecordToSchemaKeys(alignedData || {}, sections)).map(([key, value]) => [
@@ -572,10 +554,9 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
       if (!source) return;
 
-      const { modelName: nextModelName, internalAliasId: nextProductId, formData: nextFormData } =
+      const { internalAliasId: nextProductId, formData: nextFormData } =
         buildClonePrefill(source, sections);
 
-      setModelName(nextModelName);
       setInternalAliasId(nextProductId);
       formDataRef.current = nextFormData; // Keep in sync
       setFormData(nextFormData);
@@ -608,7 +589,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     if (isLoading || loadingType) return;
     if (!draftHydratedRef.current) return;
     persistLocalDraft();
-  }, [mode, isLoading, loadingType, modelName, internalAliasId, draftStorageKey]);
+  }, [mode, isLoading, loadingType, internalAliasId, draftStorageKey]);
 
   useEffect(() => {
     if (mode !== "create") return;
@@ -634,9 +615,20 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     setFormData((p) => ({ ...p, [key]: val }));
   };
 
-  const handleModelNameChange = (value) => {
-    markFieldDirty("modelName");
-    setModelName(value);
+  const isSystemPrefilledField = (fieldKey) => {
+    const mappedFieldKeys = new Set(
+      (Array.isArray(systemHeader?.fieldMappings) ? systemHeader.fieldMappings : [])
+        .filter((mapping) => mapping?.sourceType === "field")
+        .map((mapping) => mapping.fieldKey)
+    );
+    if (!mappedFieldKeys.has(fieldKey)) return false;
+    if (fieldKey === "economicOperatorId") {
+      return Boolean(complianceContext.company?.economicOperatorIdentifier);
+    }
+    if (fieldKey === "facilityId") {
+      return (complianceContext.facilities || []).length === 1;
+    }
+    return false;
   };
 
   const handleFile = (key, file) => {
@@ -753,7 +745,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     const fullBody = {
       passportType: activePassportType,
       ...cleanData,
-      modelName: modelName.trim() || null,
       internalAliasId: internalAliasId.trim() || null,
     };
     if (!onlyDirty) return fullBody;
@@ -1063,7 +1054,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
         window.scrollTo({ top: 0, behavior: "smooth" });
         setSuccess("Passport created successfully");
         setTimeout(() => setSuccess(""), 4000);
-        setModelName("");
         setInternalAliasId(generateDraftLocalPassportId());
         formDataRef.current = {}; // Keep in sync
         setFormData({});
@@ -1084,7 +1074,8 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   const renderField = (field) => {
     const val      = formData[field.key] ?? "";
     const isLocked = mode === "create" && modelDataKeys.has(field.key);
-    const disabled = isSaving || (mode==="edit" && isLoading) || isLocked;
+    const isSystemPrefilled = isSystemPrefilledField(field.key);
+    const disabled = isSaving || (mode==="edit" && isLoading) || isLocked || isSystemPrefilled;
     const fieldLabel = formatFieldLabelWithUnit(field.label, field);
     const highlightMissing = isTemplateCreateMode && !isLocked && isFieldUnfilled(field);
     const fieldClassName = highlightMissing ? "pf-needs-input" : "";
@@ -1346,6 +1337,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
                 <label htmlFor={field.type === "file" ? `f-${field.key}` : field.key}>
                   {formatFieldLabelWithUnit(field.label, field)}
                   {isLocked && <span className="pf-model-badge">📌 Model data</span>}
+                  {isSystemPrefilledField(field.key) && <span className="pf-model-badge">System value</span>}
                   {needsInput && <span className="pf-required-badge">Needs input</span>}
                 </label>
               )}
@@ -1378,138 +1370,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
           </div>
         )}
       </section>
-    );
-  };
-
-  const getHeaderDisplayValue = (entry) => {
-    const value = entry.sourceType === "managed"
-      ? resolveManagedSystemHeaderValue(
-          entry.managedKey,
-          buildPassportFormHeaderContext({
-            formData,
-            modelName,
-            internalAliasId,
-            passportType: activePassportType,
-            systemHeader,
-          })
-        )
-      : formData[entry.fieldKey];
-    if (value === null || value === undefined || value === "") return "No value yet";
-    if (Array.isArray(value)) return value.join(", ");
-    return String(value);
-  };
-
-  const renderPassportHeaderSection = () => {
-    const section = systemHeader?.section || {};
-    const entries = resolveSystemHeaderEntries(Object.values(sections), systemHeader)
-      .filter((entry) => entry.sourceType === "managed" || entry.field?.key !== "internalAliasId");
-    if (!entries.length) return null;
-
-    return (
-      <div className="form-section passport-header-section">
-        <div className="section-header passport-header-static">
-          <span className="section-title">{section.label || "Passport Header"}</span>
-          <span className="pf-header-locked-pill">Standards header</span>
-        </div>
-        <div className="section-content">
-          <p className="section-hint">
-            These header values come from explicit passport-header mappings defined in the module.
-          </p>
-          <div className="pf-header-grid">
-            {entries.map((entry) => (
-              <div key={`${entry.sourceType}:${entry.managedKey || entry.fieldKey || entry.slotKey}`} className="pf-header-field-card">
-                <div className="pf-header-field-top">
-                  <div>
-                    <label>{entry.label}</label>
-                    <code>{entry.sourceType === "managed" ? entry.slotKey : entry.fieldKey}</code>
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  value={getHeaderDisplayValue(entry)}
-                  readOnly
-                  disabled
-                  className="pf-header-readonly-input"
-                />
-                {entry.required && <div className="pf-header-meta-row"><span>Required field</span></div>}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderManagedComplianceSection = () => {
-    const activeFacilities = Array.isArray(complianceContext.facilities) ? complianceContext.facilities : [];
-
-    return (
-      <div className="form-section pf-managed-section">
-        <div className="section-header passport-header-static">
-          <span className="section-title">Release Metadata</span>
-          <span className="pf-header-locked-pill">Passport managed</span>
-        </div>
-        <div className="section-content">
-          <p className="section-hint">
-            These release-critical values are stored on each passport record. Use them for passport-specific operator identities and facility selection.
-          </p>
-          <div className="form-grid">
-            <div className="form-group">
-              <label htmlFor="economic-operator-id">Economic Operator Identifier</label>
-              <input
-                id="economic-operator-id"
-                type="text"
-                className="passport-model-input"
-                value={formData.economicOperatorId || ""}
-                placeholder="Enter the operator identifier for this passport"
-                onChange={(e) => handleField("economicOperatorId", e.target.value)}
-                disabled={isSaving || (mode === "edit" && isLoading)}
-              />
-              <div className="pf-managed-hint">Can differ per passport if a subsidiary or delegated operator should be identified here.</div>
-            </div>
-            <div className="form-group">
-              <label htmlFor="economic-operator-scheme">Operator Identifier Scheme</label>
-              <input
-                id="economic-operator-scheme"
-                type="text"
-                className="passport-model-input"
-                value={formData.economicOperatorIdentifierScheme || ""}
-                placeholder="Enter the identifier scheme used for this passport"
-                onChange={(e) => handleField("economicOperatorIdentifierScheme", e.target.value)}
-                disabled={isSaving || (mode === "edit" && isLoading)}
-              />
-              <div className="pf-managed-hint">Examples: `VAT`, `EORI`, or the scheme required by your target regulation.</div>
-            </div>
-            <div className="form-group full-width">
-              <label htmlFor="facility-id">Facility</label>
-              <input
-                id="facility-id"
-                type="text"
-                className="passport-model-input"
-                value={formData.facilityId || ""}
-                onChange={(e) => handleField("facilityId", e.target.value)}
-                placeholder="Enter the facility identifier for this passport"
-                disabled={isSaving || (mode === "edit" && isLoading)}
-                list={activeFacilities.length ? "passport-facility-suggestions" : undefined}
-              />
-              {activeFacilities.length ? (
-                <datalist id="passport-facility-suggestions">
-                  {activeFacilities.map((facility) => {
-                    const identifier = facility?.facilityIdentifier || "";
-                    const displayName = facility?.displayName ? `${facility.displayName} (${identifier})` : identifier;
-                    return <option key={identifier} value={identifier} label={displayName} />;
-                  })}
-                </datalist>
-              ) : null}
-              <div className="pf-managed-hint">
-                {activeFacilities.length
-                  ? "Enter a passport-specific facility identifier, or pick from the company’s active facility suggestions if helpful."
-                  : "Enter the facility identifier for this passport. Passport-type compliance rules decide whether a facility is required before release."}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     );
   };
 
@@ -1579,23 +1439,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
             </div>
           )}
 
-          {/* Identity row */}
-          <div className="passport-identity-row">
-            <div className="passport-field-group">
-              <label htmlFor="modelName">Model Name</label>
-              <input id="modelName" type="text" value={modelName}
-                className="passport-model-input"
-                placeholder="Enter model name (optional)"
-                onChange={e => handleModelNameChange(e.target.value)} />
-            </div>
-            <div className="passport-field-group">
-              <label>Passport Type</label>
-              <div className="type-badge" style={{ padding:"11px 14px", display:"inline-block" }}>
-                {typeLabel.toUpperCase()}
-              </div>
-            </div>
-          </div>
-
           {renderProductImagePicker()}
 
           {templateName && (
@@ -1632,9 +1475,6 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
           {success && <div className="alert alert-success" role="status" aria-live="polite">{success}</div>}
 
           <form onSubmit={handleSubmit} className="createpass-form">
-            {renderManagedComplianceSection()}
-            {renderPassportHeaderSection()}
-
             {sectionKeys.map(sk => {
               const section = sections[sk];
               const sectionContentId = `passport-section-${sk}`;

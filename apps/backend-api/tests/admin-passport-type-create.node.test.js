@@ -5,9 +5,9 @@ const test = require("node:test");
 const express = require("express");
 const multer = require("multer");
 const registerCatalogRoutes = require("../src/modules/admin/register-catalog-routes");
-const { getPassportTypeModule } = require("../src/services/passport-module-registry");
 const { compilePassportTypeProfile } = require("../src/services/passport-type-profile");
 const { flattenSchemaFieldsFromSections } = require("../src/shared/passports/passport-helpers");
+const { createPassportModuleFixture } = require("./passport-module-fixture");
 
 function createMockResponse() {
   return {
@@ -310,7 +310,7 @@ test("admin rejects profile fields that are not in the registered module", async
   const calls = [];
   const createdTables = [];
   const audits = [];
-  const moduleDefinition = getPassportTypeModule("battery:v1");
+  const moduleDefinition = createPassportModuleFixture();
   const app = createCatalogApp({
     calls,
     createdTables,
@@ -328,7 +328,7 @@ test("admin rejects profile fields that are not in the registered module", async
       sourceModule: moduleDefinition.moduleKey,
       profile: {
         moduleDigest: moduleDefinition.moduleDigest,
-        includedFields: [{ sourceModuleFieldKey: "notARealBatteryField" }],
+        includedFields: [{ sourceModuleFieldKey: "notARealExampleField" }],
       },
     },
   });
@@ -345,7 +345,7 @@ test("admin compiles a selected nested module profile on the server", async () =
   const calls = [];
   const createdTables = [];
   const audits = [];
-  const moduleDefinition = getPassportTypeModule("battery:v1");
+  const moduleDefinition = createPassportModuleFixture();
   const app = createCatalogApp({
     calls,
     createdTables,
@@ -382,14 +382,14 @@ test("admin compiles a selected nested module profile on the server", async () =
   assert.equal(compiledFields.some((field) => field.key === "economicOperatorAddressCountry"), true);
   assert.equal(compiledFields.find((field) => field.key === "economicOperatorAddressCountry").required, true);
   assert.equal(compiledFields.find((field) => field.key === "economicOperatorAddressCountry").confidentiality, "restricted");
-  assert.equal(compiledFields.some((field) => field.key === "batteryMass"), false);
+  assert.equal(compiledFields.some((field) => field.key === "productMass"), false);
   assert.ok(fieldsJson.moduleDigest);
   assert.ok(fieldsJson.profileDigest);
   assert.equal(fieldsJson.profile.selectionMode, "explicit");
 });
 
 test("admin rejects browser-authored topology and semantic graph payloads", async () => {
-  const moduleDefinition = getPassportTypeModule("battery:v1");
+  const moduleDefinition = createPassportModuleFixture();
   const createRequest = {
     typeName: moduleDefinition.typeName,
     displayName: moduleDefinition.displayName,
@@ -399,7 +399,7 @@ test("admin rejects browser-authored topology and semantic graph payloads", asyn
     sourceModule: moduleDefinition.moduleKey,
     profile: {
       moduleDigest: moduleDefinition.moduleDigest,
-      includedFields: [{ sourceModuleFieldKey: "uniqueBatteryIdentifier" }],
+      includedFields: [{ sourceModuleFieldKey: "modelName" }],
     },
     sections: moduleDefinition.fieldsJson.sections,
     semanticGraph: moduleDefinition.fieldsJson.semanticGraph,
@@ -462,7 +462,7 @@ test("admin cannot clear or replace a passport type semantic model independently
   const calls = [];
   const createdTables = [];
   const audits = [];
-  const moduleDefinition = getPassportTypeModule("battery:v1");
+  const moduleDefinition = createPassportModuleFixture();
   const existingType = {
     id: 501,
     typeName: "truckBatteryV1",
@@ -472,7 +472,7 @@ test("admin cannot clear or replace a passport type semantic model independently
     semanticModelKey: moduleDefinition.semanticModelKey,
     fieldsJson: compilePassportTypeProfile({
       moduleDefinition,
-      profile: { includedFields: [{ sourceModuleFieldKey: "uniqueBatteryIdentifier" }] },
+      profile: { includedFields: [{ sourceModuleFieldKey: "modelName" }] },
     }),
   };
   const app = createCatalogApp({
@@ -499,10 +499,10 @@ test("admin profile updates recompile a safe unused type and advance its schema 
   const calls = [];
   const createdTables = [];
   const audits = [];
-  const moduleDefinition = getPassportTypeModule("battery:v1");
+  const moduleDefinition = createPassportModuleFixture();
   const currentFieldsJson = compilePassportTypeProfile({
     moduleDefinition,
-    profile: { includedFields: [{ sourceModuleFieldKey: "uniqueBatteryIdentifier" }] },
+    profile: { includedFields: [{ sourceModuleFieldKey: "modelName" }] },
     schemaVersion: 1,
   });
   const existingType = {
@@ -530,8 +530,8 @@ test("admin profile updates recompile a safe unused type and advance its schema 
       profile: {
         moduleDigest: moduleDefinition.moduleDigest,
         includedFields: [
-          { sourceModuleFieldKey: "uniqueBatteryIdentifier" },
-          { sourceModuleFieldKey: "batteryMass", required: true },
+          { sourceModuleFieldKey: "modelName" },
+          { sourceModuleFieldKey: "productMass", required: true },
         ],
       },
     },
@@ -542,14 +542,14 @@ test("admin profile updates recompile a safe unused type and advance its schema 
   const update = calls.find((call) => call.sql.includes('UPDATE "passportTypes" SET'));
   const fieldsJson = JSON.parse(update.params.find((value) => typeof value === "string" && value.startsWith("{")));
   assert.equal(fieldsJson.schemaVersion, 2);
-  assert.equal(flattenSchemaFieldsFromSections(fieldsJson.sections).some((field) => field.key === "batteryMass"), true);
+  assert.equal(flattenSchemaFieldsFromSections(fieldsJson.sections).some((field) => field.key === "productMass"), true);
 });
 
 test("admin rejects material profile changes once a passport type is in use", async () => {
   const calls = [];
   const createdTables = [];
   const audits = [];
-  const moduleDefinition = getPassportTypeModule("battery:v1");
+  const moduleDefinition = createPassportModuleFixture();
   const existingType = {
     id: 501,
     typeName: "truckBatteryV1",
@@ -559,7 +559,7 @@ test("admin rejects material profile changes once a passport type is in use", as
     semanticModelKey: moduleDefinition.semanticModelKey,
     fieldsJson: compilePassportTypeProfile({
       moduleDefinition,
-      profile: { includedFields: [{ sourceModuleFieldKey: "uniqueBatteryIdentifier" }] },
+      profile: { includedFields: [{ sourceModuleFieldKey: "modelName" }] },
     }),
   };
   const app = createCatalogApp({
@@ -579,8 +579,8 @@ test("admin rejects material profile changes once a passport type is in use", as
       profile: {
         moduleDigest: moduleDefinition.moduleDigest,
         includedFields: [
-          { sourceModuleFieldKey: "uniqueBatteryIdentifier" },
-          { sourceModuleFieldKey: "batteryMass" },
+          { sourceModuleFieldKey: "modelName" },
+          { sourceModuleFieldKey: "productMass" },
         ],
       },
     },
@@ -597,7 +597,7 @@ test("admin rejects material profile changes when templates or company access al
   const calls = [];
   const createdTables = [];
   const audits = [];
-  const moduleDefinition = getPassportTypeModule("battery:v1");
+  const moduleDefinition = createPassportModuleFixture();
   const existingType = {
     id: 501,
     typeName: "stationaryBatteryV1",
@@ -607,7 +607,7 @@ test("admin rejects material profile changes when templates or company access al
     semanticModelKey: moduleDefinition.semanticModelKey,
     fieldsJson: compilePassportTypeProfile({
       moduleDefinition,
-      profile: { includedFields: [{ sourceModuleFieldKey: "uniqueBatteryIdentifier" }] },
+      profile: { includedFields: [{ sourceModuleFieldKey: "modelName" }] },
     }),
   };
   const app = createCatalogApp({
@@ -627,8 +627,8 @@ test("admin rejects material profile changes when templates or company access al
       profile: {
         moduleDigest: moduleDefinition.moduleDigest,
         includedFields: [
-          { sourceModuleFieldKey: "uniqueBatteryIdentifier" },
-          { sourceModuleFieldKey: "batteryMass" },
+          { sourceModuleFieldKey: "modelName" },
+          { sourceModuleFieldKey: "productMass" },
         ],
       },
     },
@@ -646,10 +646,10 @@ test("presentation-only profile edits retain the version and do not reconcile st
   const calls = [];
   const createdTables = [];
   const audits = [];
-  const moduleDefinition = getPassportTypeModule("battery:v1");
+  const moduleDefinition = createPassportModuleFixture();
   const currentFieldsJson = compilePassportTypeProfile({
     moduleDefinition,
-    profile: { includedFields: [{ sourceModuleFieldKey: "uniqueBatteryIdentifier" }] },
+    profile: { includedFields: [{ sourceModuleFieldKey: "modelName" }] },
     schemaVersion: 3,
   });
   const existingType = {
@@ -670,8 +670,8 @@ test("presentation-only profile edits retain the version and do not reconcile st
     hasStoredRecords: true,
   });
   const profile = JSON.parse(JSON.stringify(currentFieldsJson.profile));
-  profile.includedFields.find((field) => field.sourceModuleFieldKey === "uniqueBatteryIdentifier")
-    .labelI18n = { sv: "Batteriidentifierare" };
+  profile.includedFields.find((field) => field.sourceModuleFieldKey === "modelName")
+    .labelI18n = { sv: "Modellnamn" };
 
   const response = await invokeRoute(app, {
     method: "patch",
@@ -688,8 +688,8 @@ test("presentation-only profile edits retain the version and do not reconcile st
   assert.equal(fieldsJson.profileDigest, currentFieldsJson.profileDigest);
   assert.deepEqual(
     flattenSchemaFieldsFromSections(fieldsJson.sections)
-      .find((field) => field.key === "uniqueBatteryIdentifier").labelI18n,
-    { sv: "Batteriidentifierare" },
+      .find((field) => field.key === "modelName").labelI18n,
+    { sv: "Modellnamn" },
   );
 });
 

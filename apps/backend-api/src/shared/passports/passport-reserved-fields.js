@@ -48,13 +48,13 @@ const isReservedPassportFieldKey = (fieldKey) =>
 const isReservedPassportSemanticId = (semanticId) =>
   reservedPassportSemanticIdSet.has(semanticId);
 
-function findReservedPassportHeaderFieldConflicts(sections = []) {
+function findReservedPassportHeaderFieldConflicts(sections = [], allowedCanonicalFieldKeys = new Set()) {
   const conflicts = [];
   walkSchemaSections(sections, (section, sectionPath) => {
     const sectionKeys = sectionPath.map((entry) => entry.key).filter(Boolean);
     for (const field of Array.isArray(section?.fields) ? section.fields : []) {
       if (!field || typeof field !== "object") continue;
-      if (isReservedPassportFieldKey(field.key)) {
+      if (isReservedPassportFieldKey(field.key) && !allowedCanonicalFieldKeys.has(field.key)) {
         conflicts.push({
           field: field.key,
           sectionPath: sectionKeys,

@@ -1,6 +1,5 @@
 import React, { useEffect, useId, useMemo, useState } from "react";
 import { translateFieldValue, translateSchemaLabel } from "../../app/providers/i18n";
-import { normalizeSystemPassportHeader, resolveSystemHeaderEntries } from "../../admin/passport-types/builderHelpers";
 import { formatPassportStatus } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import {
@@ -11,7 +10,6 @@ import {
   toSafeResourceHref,
 } from "../../shared/security/urlSafety";
 import { normalizeTableColumns, parseTableRows } from "../../shared/passports/tableSchemaUtils";
-import { resolveManagedSystemHeaderValue } from "../../shared/passports/systemHeaderManagedValues";
 import { flattenSchemaFieldsFromSections, normalizeSchemaSections } from "../../shared/passports/passportSchemaUtils";
 import SemanticGraphValue from "../../shared/passports/SemanticGraphValue";
 import { DynamicChart } from "./DynamicChart";
@@ -253,22 +251,6 @@ function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues,
       textLines: [updatedAt ? "Latest data, QR binding, and signature checked." : ""].filter(Boolean),
     },
   ];
-}
-
-function buildHeaderRows(passport, typeDef, companyData, lastUpdateAt) {
-  const systemHeader = normalizeSystemPassportHeader(typeDef?.fieldsJson?.systemHeader || typeDef?.systemHeader);
-  const sections = Array.isArray(typeDef?.fieldsJson?.sections) ? typeDef.fieldsJson.sections : [];
-  return resolveSystemHeaderEntries(sections, systemHeader)
-    .filter((entry) => entry.sourceType === "managed" || !isViewerHiddenField(entry.field))
-    .map((entry) => ({
-      key: entry.managedKey || entry.fieldKey || entry.slotKey,
-      label: entry.label || entry.fieldKey || entry.slotKey,
-      value: formatValue(
-        entry.sourceType === "managed"
-          ? resolveManagedSystemHeaderValue(entry.managedKey, { passport, typeDef, lastUpdateAt })
-          : appendUnitToDisplayValue(passport?.[entry.fieldKey], entry.field)
-      ),
-    }));
 }
 
 function buildTrustRows(passport, carrierAuthenticity, sigVerification) {
@@ -721,7 +703,7 @@ export default function PublicPassportPortal({
   canonicalPublicPath = "",
   lastUpdateAt = null,
 }) {
-  const [activePage, setActivePage] = useState("overview");
+  const [activePage, setActivePage] = useState("data");
   const [activeDataSectionKey, setActiveDataSectionKey] = useState("");
   const [previewImage, setPreviewImage] = useState(null);
   const [publicHistoryState, setPublicHistoryState] = useState(() => (
@@ -751,10 +733,6 @@ export default function PublicPassportPortal({
       setActiveDataSectionKey(first.key || translateSchemaLabel(lang, first));
     }
   }, [activeDataSectionKey, lang, sections, selectedDataSection]);
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [activePage]);
 
   useEffect(() => {
     if (!publicHistoryPayload) return;
@@ -823,7 +801,6 @@ export default function PublicPassportPortal({
   const lifecycleEvents = buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues, lastUpdateAt);
   const publicHistory = publicHistoryState.data || [];
   const compactPublicHistory = publicHistory.filter((entry) => entry.isCurrent || entry.inactivePath);
-  const headerRows = buildHeaderRows(passport, typeDef, companyData, lastUpdateAt);
   const trustRows = buildTrustRows(passport, carrierAuthenticity, sigVerification);
   const verificationRows = buildVerificationRows(verificationBundle);
   const documentItems = buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, lang);
@@ -834,13 +811,7 @@ export default function PublicPassportPortal({
     didDocumentUrl: toSafeExternalHref(verificationBundle?.didDocumentUrl),
   };
 
-  const pages = [
-    { key: "overview", label: "Overview" },
-    { key: "header", label: "Header" },
-    { key: "data", label: "Data" },
-    { key: "trustPage", label: "Trust" },
-    { key: "documents", label: "Documents" },
-  ];
+  const pages = [{ key: "data", label: "Data" }];
 
   const currentStatus = formatPassportStatus(passport?.releaseStatus || "");
   const heroMetrics = [
@@ -1113,27 +1084,6 @@ export default function PublicPassportPortal({
                 )}
               </div>
             </article>
-          </div>
-        </section>
-
-        <section className={`page${activePage === "header" ? " active" : ""}`} id="header" role="tabpanel" hidden={activePage !== "header"}>
-          <div className="page-head">
-            <div>
-              <span className="badge">Separate header tab</span>
-              <h2>DPP header</h2>
-              <p>This identity and schema context is platform-generated and always shown as the compliance header.</p>
-            </div>
-            <span className="badge ok">Active · public view</span>
-          </div>
-          <div className="header-panel">
-            <div className="header-grid">
-              {headerRows.map((row) => (
-                <div key={row.key} className="header-field">
-                  <span>{row.label}</span>
-                  <strong>{row.value || ""}</strong>
-                </div>
-              ))}
-            </div>
           </div>
         </section>
 

@@ -10,16 +10,16 @@ const defaultSystemPassportHeaderSection = {
 };
 
 const systemHeaderManagedDefinitions = [
-  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", semanticId: "dpp:digitalProductPassportId", managedKey: "internalManagedDigitalProductPassportId", required: true },
-  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", semanticId: "dpp:uniqueProductIdentifier", managedKey: "internalManagedUniqueProductIdentifier", required: true },
-  { slotKey: "internalAliasId", label: "Internal Alias ID", semanticId: "dpp:internalAliasId", managedKey: "internalManagedInternalAliasId", required: true },
-  { slotKey: "granularity", label: "Granularity", semanticId: "dpp:granularity", managedKey: "internalManagedGranularity", required: true },
-  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", semanticId: "dpp:dppSchemaVersion", managedKey: "internalManagedDppSchemaVersion", required: true },
-  { slotKey: "dppStatus", label: "DPP Status", semanticId: "dpp:dppStatus", managedKey: "internalManagedDppStatus", required: true },
-  { slotKey: "lastUpdate", label: "Last Update", semanticId: "dpp:lastUpdate", managedKey: "internalManagedLastUpdate", required: true },
+  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", semanticId: "dpp:digitalProductPassportId", managedKey: "internalManagedDigitalProductPassportId", required: true, managedOnly: true },
+  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", semanticId: "dpp:uniqueProductIdentifier", managedKey: "internalManagedUniqueProductIdentifier", required: true, managedOnly: true },
+  { slotKey: "internalAliasId", label: "Internal Alias ID", semanticId: "dpp:internalAliasId", managedKey: "internalManagedInternalAliasId", required: true, managedOnly: true },
+  { slotKey: "granularity", label: "Granularity", semanticId: "dpp:granularity", managedKey: "internalManagedGranularity", required: true, managedOnly: true },
+  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", semanticId: "dpp:dppSchemaVersion", managedKey: "internalManagedDppSchemaVersion", required: true, managedOnly: true },
+  { slotKey: "dppStatus", label: "DPP Status", semanticId: "dpp:dppStatus", managedKey: "internalManagedDppStatus", required: true, managedOnly: true },
+  { slotKey: "lastUpdate", label: "Last Update", semanticId: "dpp:lastUpdate", managedKey: "internalManagedLastUpdate", required: true, managedOnly: true },
   { slotKey: "economicOperatorId", label: "Economic Operator ID", semanticId: "dpp:economicOperatorId", managedKey: "internalManagedEconomicOperatorId", required: true },
   { slotKey: "facilityId", label: "Facility ID", semanticId: "dpp:facilityId", managedKey: "internalManagedFacilityId", required: false },
-  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", semanticId: "dpp:contentSpecificationIds", managedKey: "internalManagedContentSpecificationIds", required: true },
+  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", semanticId: "dpp:contentSpecificationIds", managedKey: "internalManagedContentSpecificationIds", required: true, managedOnly: true },
   { slotKey: "subjectDid", label: "Subject DID", semanticId: "dpp:subjectDid", managedKey: "internalManagedSubjectDid", required: true },
   { slotKey: "dppDid", label: "DPP DID", semanticId: "dpp:dppDid", managedKey: "internalManagedDppDid", required: true },
   { slotKey: "companyDid", label: "Company DID", semanticId: "dpp:companyDid", managedKey: "internalManagedCompanyDid", required: true },
@@ -115,6 +115,20 @@ function validateSystemPassportHeader(input = {}, sections = []) {
       valid: false,
       error: `Passport header mappings contain unknown managed keys: ${unknownManagedKeys.join(", ")}.`,
       unknownManagedKeys,
+    };
+  }
+
+  const definitionsBySlot = new Map(systemHeaderManagedDefinitions.map((definition) => [definition.slotKey, definition]));
+  const invalidFieldMappings = normalized.fieldMappings.filter((mapping) => {
+    if (mapping.sourceType !== "field") return false;
+    const definition = definitionsBySlot.get(mapping.slotKey);
+    return !definition || definition.managedOnly || mapping.fieldKey !== mapping.slotKey;
+  });
+  if (invalidFieldMappings.length) {
+    return {
+      valid: false,
+      error: "Mapped system fields must use the matching canonical slot key and cannot replace platform-managed values.",
+      invalidFieldMappings,
     };
   }
 

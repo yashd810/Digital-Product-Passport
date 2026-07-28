@@ -6,6 +6,7 @@ const { normalizeSystemPassportHeader, validateSystemPassportHeader } = require(
 const { canonicalKeyFromSemanticId } = require("../shared/passports/canonical-field-keys");
 const {
   assertCanonicalSchemaSections,
+  flattenSchemaFieldsFromSections,
   isSafePassportStorageFieldKey,
   isSafePassportTypeName,
   passportTypeNameMaxLength,
@@ -232,20 +233,11 @@ function normalizeModuleDefinition(moduleDefinition = {}) {
   }
   const sections = Array.isArray(definition.sections) ? definition.sections : [];
   assertCanonicalSchemaSections(sections);
-  const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections);
-  if (reservedFieldConflicts.length) {
-    const conflict = reservedFieldConflicts[0];
-    throw new Error(
-      `Passport module "${definition.moduleKey || definition.typeName || "unknown"}" contains a reserved passport registry/header field. ${conflict.message}`
-    );
-  }
   if (!isSafePassportTypeName(definition.typeName)) {
     throw new Error(
       `Passport module "${definition.moduleKey || definition.typeName || "unknown"}" typeName must be lower camelCase and 2-${passportTypeNameMaxLength} characters.`
     );
   }
-  const semanticGraph = normalizeAndValidateSemanticGraph(definition.semanticGraph, { required: true });
-  const passportPolicy = normalizePassportPolicy(definition.passportPolicy, definition);
   const sourceModuleKey = definition.moduleKey || null;
   const headerValidation = validateSystemPassportHeader(definition.systemHeader || {}, sections);
   if (!definition.systemHeader || !headerValidation.valid) {
@@ -253,6 +245,29 @@ function normalizeModuleDefinition(moduleDefinition = {}) {
       `Passport module "${definition.moduleKey || definition.typeName || "unknown"}" must define an explicit valid systemHeader.`
     );
   }
+  const canonicalHeaderFieldKeys = Array.isArray(definition.systemHeader?.fieldMappings)
+    ? definition.systemHeader.fieldMappings
+      .filter((mapping) => mapping?.sourceType === "field" && mapping.fieldKey === mapping.slotKey)
+      .map((mapping) => mapping.fieldKey)
+    : [];
+  const allowedCanonicalFieldKeys = new Set(["modelName", ...canonicalHeaderFieldKeys]);
+  const identityModelField = String(definition.identity?.modelNameField || "").trim();
+  if (identityModelField !== "modelName") {
+    throw new Error(`Passport module "${definition.moduleKey || definition.typeName || "unknown"}" must identify its model field with the canonical key "modelName".`);
+  }
+  const moduleFieldKeys = new Set(flattenSchemaFieldsFromSections(sections).map((field) => field?.key).filter(Boolean));
+  if (!moduleFieldKeys.has("modelName")) {
+    throw new Error(`Passport module "${definition.moduleKey || definition.typeName || "unknown"}" must include its selected Model name field as the canonical schema key "modelName".`);
+  }
+  const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections, allowedCanonicalFieldKeys);
+  if (reservedFieldConflicts.length) {
+    const conflict = reservedFieldConflicts[0];
+    throw new Error(
+      `Passport module "${definition.moduleKey || definition.typeName || "unknown"}" contains a reserved passport registry/header field. ${conflict.message}`
+    );
+  }
+  const semanticGraph = normalizeAndValidateSemanticGraph(definition.semanticGraph, { required: true });
+  const passportPolicy = normalizePassportPolicy(definition.passportPolicy, definition);
 
   const normalizedDefinition = {
     moduleKey: definition.moduleKey,

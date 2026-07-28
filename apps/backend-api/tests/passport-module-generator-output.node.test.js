@@ -25,6 +25,7 @@ function createGeneratorInput() {
     },
     roles: {
       businessIdentifierField: "modelIdentifier",
+      modelNameField: "modelIdentifier",
     },
     sections: [
       {
@@ -104,9 +105,52 @@ test("passport module generator emits camelCase module identifiers by default", 
   assert.deepEqual(generatedModule.passportPolicy.contentSpecificationIds, ["exampleProductDictionaryV1"]);
   assert.equal(
     generatedModule.sections[0].fields[0].semanticId,
-    "https://example.test/dictionary/example-product/v1/terms/product-identity/model-identifier"
+    "https://example.test/dictionary/example-product/v1/terms/product-identity/model-name"
   );
-  assert.equal(generatedModule.sections[0].fields[0].key, "modelIdentifier");
+  assert.equal(generatedModule.sections[0].fields[0].key, "modelName");
+  assert.equal(generatedModule.sections[0].fields[0].required, true);
+  assert.equal(generatedModule.identity.modelNameField, "modelName");
+});
+
+test("passport module generator requires the selected model name to be a text field", () => {
+  const input = createGeneratorInput();
+  input.sections[0].fields[0].fieldType = "textarea";
+
+  assert.throws(
+    () => validateSpec(input),
+    /Model name field must use the text UI type and string data type/
+  );
+});
+
+test("passport module generator assigns selected header fields their canonical storage key", () => {
+  const input = createGeneratorInput();
+  input.sections[0].fields.push({
+    fieldLabel: "Economic identifier",
+    fieldKey: "economicIdentifier",
+    semanticSlug: "economic-identifier",
+  });
+  input.module.systemHeaderFieldAssignments = {
+    economicOperatorId: "economicIdentifier",
+  };
+
+  const { artifacts, spec } = buildArtifacts(input);
+  const generatedModule = executeCommonJs(
+    artifacts.find((artifact) => artifact.path === generatedModulePath).content
+  );
+
+  assert.deepEqual(
+    spec.sections[0].fields.map((field) => field.fieldKey),
+    ["modelName", "economicOperatorId"]
+  );
+  assert.deepEqual(generatedModule.systemHeader.fieldMappings.find((mapping) => (
+    mapping.slotKey === "economicOperatorId"
+  )), {
+    slotKey: "economicOperatorId",
+    label: "Economic Operator ID",
+    sourceType: "field",
+    fieldKey: "economicOperatorId",
+  });
+  assert.equal(generatedModule.sections[0].fields.some((field) => field.key === "economicIdentifier"), false);
 });
 
 test("passport module generator requires an explicit deployment base URL", () => {
@@ -142,18 +186,24 @@ test("passport module generator derives the module key from its output folder id
 test("passport module generator accepts logical field keys longer than PostgreSQL identifiers", () => {
   const input = createGeneratorInput();
   const longFieldKey = `a${"b".repeat(63)}`;
-  input.sections[0].fields[0].fieldKey = longFieldKey;
-  input.sections[0].fields[0].semanticSlug = longFieldKey;
+  input.sections[0].fields.push({
+    fieldLabel: "Long custom field",
+    fieldKey: longFieldKey,
+    semanticSlug: longFieldKey,
+  });
   input.roles.businessIdentifierField = longFieldKey;
 
-  assert.equal(buildArtifacts(input).spec.sections[0].fields[0].fieldKey, longFieldKey);
+  assert.equal(buildArtifacts(input).spec.sections[0].fields[1].fieldKey, longFieldKey);
 });
 
 test("passport module generator rejects field keys longer than 200 characters", () => {
   const input = createGeneratorInput();
   const longFieldKey = `a${"b".repeat(200)}`;
-  input.sections[0].fields[0].fieldKey = longFieldKey;
-  input.sections[0].fields[0].semanticSlug = longFieldKey;
+  input.sections[0].fields.push({
+    fieldLabel: "Long custom field",
+    fieldKey: longFieldKey,
+    semanticSlug: longFieldKey,
+  });
   input.roles.businessIdentifierField = longFieldKey;
 
   assert.throws(() => buildArtifacts(input), /at most 200 characters/);
@@ -162,11 +212,11 @@ test("passport module generator rejects field keys longer than 200 characters", 
 test("passport module generator rejects reserved runtime and header field keys", () => {
   const input = createGeneratorInput();
   input.roles.businessIdentifierField = "dppStatus";
-  input.sections[0].fields[0] = {
+  input.sections[0].fields.push({
     fieldLabel: "DPP Status",
     semanticSlug: "dpp-status",
     definition: "Attempts to duplicate a managed passport header field.",
-  };
+  });
 
   assert.throws(
     () => buildArtifacts(input),
@@ -177,11 +227,11 @@ test("passport module generator rejects reserved runtime and header field keys",
 test("passport module generator rejects reserved runtime and header semantic IDs", () => {
   const input = createGeneratorInput();
   input.roles.businessIdentifierField = "dppStatus";
-  input.sections[0].fields[0] = {
+  input.sections[0].fields.push({
     fieldLabel: "DPP Status",
     semanticSlug: "dpp-status",
     definition: "Attempts to duplicate a managed passport header field.",
-  };
+  });
   input.semanticGraph.rootProperties = [{
     propertyKey: "dppStatus",
     propertyLabel: "DPP Status",
@@ -394,10 +444,15 @@ test("passport module generator rejects overly deep schemas before normalizing t
 test("passport module generator derives field and table column keys from semantic slugs", () => {
   const input = createGeneratorInput();
   input.roles.businessIdentifierField = "assetSerialNumber";
+  input.roles.modelNameField = "modelIdentifier";
   input.roles.compositionFieldKey = "materialComposition";
   input.roles.compositionLabelColumnKey = "materialName";
   input.roles.compositionValueColumnKey = "massPercent";
   input.sections[0].fields = [
+    {
+      fieldLabel: "Model Identifier",
+      definition: "Identifies the product model.",
+    },
     {
       fieldLabel: "Serial",
       semanticSlug: "asset-serial-number",
@@ -430,10 +485,10 @@ test("passport module generator derives field and table column keys from semanti
   const { artifacts, spec } = buildArtifacts(input);
   const moduleArtifact = artifacts.find((artifact) => artifact.path === generatedModulePath);
   const generatedModule = executeCommonJs(moduleArtifact.content);
-  const [serialField, tableField] = generatedModule.sections[0].fields;
+  const [, serialField, tableField] = generatedModule.sections[0].fields;
 
-  assert.equal(spec.sections[0].fields[0].fieldKey, "assetSerialNumber");
-  assert.equal(spec.sections[0].fields[0].confidentiality, "restricted");
+  assert.equal(spec.sections[0].fields[1].fieldKey, "assetSerialNumber");
+  assert.equal(spec.sections[0].fields[1].confidentiality, "restricted");
   assert.equal(serialField.key, "assetSerialNumber");
   assert.equal(serialField.confidentiality, "restricted");
   assert.equal(serialField.access, undefined);
@@ -496,11 +551,9 @@ test("passport module generator always keeps DID header slots system managed", (
     ["subjectDid", "dppDid", "companyDid"].includes(mapping.slotKey)
   );
 
-  assert.deepEqual(spec.module.systemHeaderFieldAssignments, {
-    subjectDid: "__managed__:internalManagedSubjectDid",
-    dppDid: "__managed__:internalManagedDppDid",
-    companyDid: "__managed__:internalManagedCompanyDid",
-  });
+  assert.equal(spec.module.systemHeaderFieldAssignments.subjectDid, "__managed__:internalManagedSubjectDid");
+  assert.equal(spec.module.systemHeaderFieldAssignments.dppDid, "__managed__:internalManagedDppDid");
+  assert.equal(spec.module.systemHeaderFieldAssignments.companyDid, "__managed__:internalManagedCompanyDid");
   assert.deepEqual(
     didMappings.map((mapping) => [mapping.slotKey, mapping.sourceType, mapping.managedKey]),
     [

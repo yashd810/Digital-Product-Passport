@@ -28,16 +28,16 @@ if (!csvImportReconciliation) {
 }
 
 const headerSlotDefinitions = [
-  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
-  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier" },
-  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId" },
-  { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity" },
-  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion" },
-  { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus" },
-  { slotKey: "lastUpdate", label: "Last Update", managedKey: "internalManagedLastUpdate" },
+  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId", managedOnly: true },
+  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier", managedOnly: true },
+  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId", managedOnly: true },
+  { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity", managedOnly: true },
+  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion", managedOnly: true },
+  { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus", managedOnly: true },
+  { slotKey: "lastUpdate", label: "Last Update", managedKey: "internalManagedLastUpdate", managedOnly: true },
   { slotKey: "economicOperatorId", label: "Economic Operator ID", managedKey: "internalManagedEconomicOperatorId" },
   { slotKey: "facilityId", label: "Facility ID", managedKey: "internalManagedFacilityId" },
-  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds" },
+  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds", managedOnly: true },
   { slotKey: "subjectDid", label: "Subject DID", managedKey: "internalManagedSubjectDid", managedOnly: true },
   { slotKey: "dppDid", label: "DPP DID", managedKey: "internalManagedDppDid", managedOnly: true },
   { slotKey: "companyDid", label: "Company DID", managedKey: "internalManagedCompanyDid", managedOnly: true },
@@ -95,6 +95,7 @@ const sample = {
   },
   roles: {
     businessIdentifierField: "modelIdentifier",
+    modelNameField: "modelIdentifier",
     summaryRoles: {
       modelIdentifier: "card1",
       performanceScore: "card2",
@@ -752,6 +753,7 @@ function createBlankSpec() {
     },
     roles: {
       businessIdentifierField: "",
+      modelNameField: "",
       summaryRoles: {},
       lifecycleRoles: {},
       compositionCharts: [],
@@ -1751,6 +1753,7 @@ function renderSystemHeaderFields(fields) {
       "Leave empty"
     );
     select.dataset.systemHeaderSlot = slot.slotKey;
+    select.addEventListener("change", () => queueDerivedFieldsRefresh());
     row.appendChild(select);
     row.title = "Choose a managed passport value or map a real module field into this header slot.";
     container.appendChild(row);
@@ -1853,6 +1856,9 @@ function syncRoleOptions() {
   const fields = getAllFieldsFromDom();
   const fieldOptions = fieldOptionEntries(fields);
   setSelectOptions($("#businessIdentifierField"), fieldOptions, "Select product identifier");
+  setSelectOptions($("#modelNameField"), fieldOptions, "Select model name field");
+  const modelNameSelect = $("#modelNameField");
+  if (modelNameSelect) modelNameSelect.onchange = () => queueDerivedFieldsRefresh();
   renderPresentationFields(fields);
   renderSystemHeaderFields(fields);
   syncCompositionChartRoleOptions();
@@ -2103,8 +2109,12 @@ function readField(row) {
   if (field.fieldType === "table") {
     field.tableColumns = readTableColumns(row);
   }
-  field.semanticSlug = slugFromValue(field.semanticSlug || field.fieldLabel || field.fieldKey);
-  field.fieldKey = canonicalKeyFromSemanticSlug(field.semanticSlug || field.fieldLabel || field.fieldKey);
+  const canonicalOverride = canonicalKeyFromSemanticSlug(field.canonicalKeyOverride || "");
+  field.canonicalKeyOverride = canonicalOverride;
+  field.semanticSlug = canonicalOverride
+    ? slugFromValue(canonicalOverride)
+    : slugFromValue(field.semanticSlug || field.fieldLabel || field.fieldKey);
+  field.fieldKey = canonicalOverride || canonicalKeyFromSemanticSlug(field.semanticSlug || field.fieldLabel || field.fieldKey);
   return field;
 }
 
@@ -2119,6 +2129,7 @@ function remapDerivedRoleState(roleState, fieldKeyMap, columnKeyMap) {
     Object.entries(roleMap || {}).map(([fieldKey, role]) => [remapField(fieldKey), role])
   );
   roles.businessIdentifierField = remapField(roles.businessIdentifierField);
+  roles.modelNameField = remapField(roles.modelNameField);
   roles.summaryRoles = remapRoleMap(roles.summaryRoles);
   roles.lifecycleRoles = remapRoleMap(roles.lifecycleRoles);
   if (roles.objectTypes) roles.objectTypes = remapRoleMap(roles.objectTypes);
@@ -2155,6 +2166,7 @@ function applyRoleStateSelections(roles, assignments) {
   renderCompositionCharts(normalizeCompositionCharts(roles));
   syncRoleOptions();
   setFormValue("businessIdentifierField", roles?.businessIdentifierField);
+  setFormValue("modelNameField", roles?.modelNameField);
   Object.entries(roles?.summaryRoles || {}).forEach(([fieldKey, value]) => {
     const select = $(`[data-summary-role-slot="${normalizeProductOverviewCardRole(value)}"]`);
     if (select) select.value = fieldKey;
@@ -2192,6 +2204,7 @@ function applyDerivedSectionsToDom(derivedSections) {
       }
       if (keyInput) keyInput.value = field.fieldKey || "";
       const values = {
+        canonicalKeyOverride: field.canonicalKeyOverride,
         semanticSlug: field.semanticSlug,
         unitKey: field.unitKey,
         dataType: field.dataType,
@@ -2236,6 +2249,45 @@ function applyDerivedSectionsToDom(derivedSections) {
   return { fieldKeyMap, columnKeyMap };
 }
 
+function assignCanonicalSystemFieldOverridesFromDom(roles, assignments) {
+  const canonicalKeys = new Set(["modelName", ...headerSlotDefinitions.map((slot) => slot.slotKey)]);
+  const rows = $$(".field-row");
+  const rowsByCurrentKey = new Map();
+  rows.forEach((row) => {
+    const field = readField(row);
+    if (field.fieldKey) rowsByCurrentKey.set(field.fieldKey, row);
+  });
+
+  const requestedAssignments = [];
+  const modelNameField = String(roles?.modelNameField || "").trim();
+  if (modelNameField) requestedAssignments.push(["modelName", modelNameField]);
+  for (const slot of headerSlotDefinitions) {
+    const value = String(assignments?.[slot.slotKey] || "").trim();
+    if (!value || value.startsWith("__managed__:")) continue;
+    requestedAssignments.push([slot.slotKey, value]);
+  }
+
+  const seenRows = new Set();
+  for (const [targetKey, selectedKey] of requestedAssignments) {
+    const row = rowsByCurrentKey.get(selectedKey);
+    if (!row) continue;
+    if (seenRows.has(row)) {
+      throw new Error(`A section field cannot be assigned to both "${targetKey}" and another system field.`);
+    }
+    seenRows.add(row);
+  }
+
+  rows.forEach((row) => {
+    const input = $("[data-field='canonicalKeyOverride']", row);
+    if (input && canonicalKeys.has(input.value)) input.value = "";
+  });
+  for (const [targetKey, selectedKey] of requestedAssignments) {
+    const row = rowsByCurrentKey.get(selectedKey);
+    const input = row ? $("[data-field='canonicalKeyOverride']", row) : null;
+    if (input) input.value = targetKey;
+  }
+}
+
 function refreshDerivedFieldsMetadata() {
   if (refreshingDerivedFields || suspendDerivedFieldsRefresh) return;
   refreshingDerivedFields = true;
@@ -2244,6 +2296,7 @@ function refreshDerivedFieldsMetadata() {
     const assignments = $$(".field-row").length
       ? readSystemHeaderAssignmentsFromDom()
       : preservedSystemHeaderAssignments || {};
+    assignCanonicalSystemFieldOverridesFromDom(roles, assignments);
     const sourceSections = getTopLevelSectionNodes().map(readSection);
     const derivedSections = derivedFieldMetadata.deriveSections(sourceSections);
     const { fieldKeyMap, columnKeyMap } = applyDerivedSectionsToDom(derivedSections);
@@ -3859,6 +3912,7 @@ function readRoleStateFromDom() {
   }));
   return {
     businessIdentifierField: getFormValue("businessIdentifierField"),
+    modelNameField: getFormValue("modelNameField"),
     summaryRoles: Object.fromEntries(summaryRoleEntries),
     lifecycleRoles: Object.fromEntries(lifecycleRoleEntries),
     compositionCharts,
@@ -4082,6 +4136,7 @@ function clearViewerStep() {
   };
   preservedSystemHeaderAssignments = getManagedOnlyHeaderAssignments();
   setFormValue("businessIdentifierField", "");
+  setFormValue("modelNameField", "");
   renderCompositionCharts([]);
   $$("[data-summary-role-slot], [data-lifecycle-role-slot], [data-system-header-slot]")
     .forEach((select) => {
@@ -4158,6 +4213,7 @@ function reconcileFieldsImportDependencies(spec, sections) {
   );
 
   roles.businessIdentifierField = keepField(roles.businessIdentifierField);
+  roles.modelNameField = keepField(roles.modelNameField);
   roles.summaryRoles = filterRoleMap(roles.summaryRoles);
   roles.lifecycleRoles = filterRoleMap(roles.lifecycleRoles);
   if (roles.objectTypes) roles.objectTypes = filterRoleMap(roles.objectTypes);

@@ -26,6 +26,7 @@ function generatorInput() {
     },
     roles: {
       businessIdentifierField: "modelIdentifier",
+      modelNameField: "modelIdentifier",
       compositionCharts: [
         {
           fieldKey: "materialComposition",
