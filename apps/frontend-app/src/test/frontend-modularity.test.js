@@ -289,6 +289,19 @@ describe("frontend modularity helpers", () => {
     expect(viewerSource).toContain('path="/dpp/:manufacturerSlug/:modelSlug/:dppId"');
   });
 
+  test("passport preview exposes overview, data, trust, and documents pages", () => {
+    const portalSource = readFileSync(
+      new URL("../passport-viewer/components/PublicPassportPortal.js", import.meta.url),
+      "utf8",
+    );
+
+    expect(portalSource).toContain('useState("overview")');
+    expect(portalSource).toContain('{ key: "overview", label: "Overview" }');
+    expect(portalSource).toContain('{ key: "data", label: "Data" }');
+    expect(portalSource).toContain('{ key: "trustPage", label: "Trust" }');
+    expect(portalSource).toContain('{ key: "documents", label: "Documents" }');
+  });
+
   test("passport data apply submits raw rows for server-side validation", () => {
     const pageSource = readFileSync(
       new URL("../user/dashboard/passport-data/PassportDataManagementPage.js", import.meta.url),

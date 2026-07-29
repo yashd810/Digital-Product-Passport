@@ -703,7 +703,7 @@ export default function PublicPassportPortal({
   canonicalPublicPath = "",
   lastUpdateAt = null,
 }) {
-  const [activePage, setActivePage] = useState("data");
+  const [activePage, setActivePage] = useState("overview");
   const [activeDataSectionKey, setActiveDataSectionKey] = useState("");
   const [previewImage, setPreviewImage] = useState(null);
   const [publicHistoryState, setPublicHistoryState] = useState(() => (
@@ -811,7 +811,12 @@ export default function PublicPassportPortal({
     didDocumentUrl: toSafeExternalHref(verificationBundle?.didDocumentUrl),
   };
 
-  const pages = [{ key: "data", label: "Data" }];
+  const pages = [
+    { key: "overview", label: "Overview" },
+    { key: "data", label: "Data" },
+    { key: "trustPage", label: "Trust" },
+    { key: "documents", label: "Documents" },
+  ];
 
   const currentStatus = formatPassportStatus(passport?.releaseStatus || "");
   const heroMetrics = [
