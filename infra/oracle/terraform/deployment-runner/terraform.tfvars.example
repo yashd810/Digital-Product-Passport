@@ -8,10 +8,10 @@ network_security_group_ids = [
   "ocid1.networksecuritygroup.oc1..replace-me",
 ]
 image_ocid           = "ocid1.image.oc1.eu-stockholm-1.replace-me"
-shape                = "VM.Standard.E5.Flex"
+shape                = "VM.Standard.A1.Flex"
 shape_config = {
   ocpus         = 1
-  memory_in_gbs = 8
+  memory_in_gbs = 6
 }
 admin_ssh_public_key = "ssh-ed25519 replace-with-bastion-admin-public-key"
 

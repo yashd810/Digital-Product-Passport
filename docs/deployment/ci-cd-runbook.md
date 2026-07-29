@@ -32,6 +32,9 @@ holds the local SSH deployment identity, and is not an application host.
 - `scripts/deploy/install-deployment-runner-config.sh` installs a runner-local
   OCI deployment configuration and rewrites workstation-only key paths.
 - `infra/oracle/terraform/deployment-runner/` creates the private runner VM.
+  Its example configuration uses a 1 OCPU / 6 GB ARM64 `VM.Standard.A1.Flex`
+  instance, which fits within OCI Always Free allocation when that capacity is
+  available in the tenancy's home region.
 
 ## One-Time OCI Setup
 
@@ -53,6 +56,8 @@ and an OCI administrator who can approve the network rules.
 5. Copy `terraform.tfvars.example` outside the repository as `terraform.tfvars`
    and supply the actual tenancy values. It contains infrastructure metadata,
    so keep its mode at `600` even though it contains no private key.
+   Select an ARM-compatible Linux image OCID (for example, Oracle Linux for
+   Arm) because the example shape is `VM.Standard.A1.Flex`.
 
 Provision the VM only after reviewing the plan:
 
@@ -73,12 +78,12 @@ the Terraform output private IP to verify it.
 
 ### Safety gate for the current repository
 
-`yashd810/Digital-Product-Passport` is currently public. Do **not** attach a
-self-hosted runner to it while it is public: a pull request can change a
-workflow to target that runner. Before continuing, make the repository private
-in GitHub (**Settings → General → Danger Zone → Change repository visibility**)
-and confirm that only trusted maintainers have write access. The deployed web
-application remains publicly reachable; this changes only source-code access.
+Before continuing, ensure `yashd810/Digital-Product-Passport` is private. Do
+**not** attach a self-hosted runner while it is public: a pull request can
+change a workflow to target that runner. In GitHub, use **Settings → General →
+Danger Zone → Change repository visibility** and confirm that only trusted
+maintainers have write access. The deployed web application remains publicly
+reachable; this changes only source-code access.
 
 If the repository must remain public, stop this runbook here. The secure design
 is then a separate private deployment-control repository that owns the runner;
@@ -88,7 +93,7 @@ credentials to this public repository.
 In GitHub repository settings:
 
 1. Go to **Settings → Actions → Runners → New self-hosted runner**, select
-   **Linux** and **x64**, and generate a short-lived registration token. This
+   **Linux** and **ARM64**, and generate a short-lived registration token. This
    user-owned repository uses GitHub's built-in `Default` runner group; the
    dedicated `dpp-production-deploy` label selects the runner for production.
    Do not store the token in

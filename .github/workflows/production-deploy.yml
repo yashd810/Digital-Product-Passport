@@ -99,7 +99,7 @@ jobs:
     runs-on:
       - self-hosted
       - Linux
-      - X64
+      - ARM64
       - dpp-production-deploy
     timeout-minutes: 120
     env:

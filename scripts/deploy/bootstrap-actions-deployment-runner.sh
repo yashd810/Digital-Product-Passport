@@ -13,6 +13,7 @@ RUNNER_VERSION="${DPP_GITHUB_RUNNER_VERSION:-}"
 RUNNER_SHA256="${DPP_GITHUB_RUNNER_SHA256:-}"
 RUNNER_NAME="${DPP_GITHUB_RUNNER_NAME:-$(hostname)-dpp-production-deploy}"
 RUNNER_LABELS="${DPP_GITHUB_RUNNER_LABELS:-dpp-production-deploy}"
+RUNNER_ARCH="${DPP_GITHUB_RUNNER_ARCH:-arm64}"
 # This runner is registered to one repository (the URL validation below
 # intentionally rejects organization URLs). Repository-scoped runners live in
 # GitHub's built-in Default group; the dedicated label is what selects it.
@@ -48,6 +49,7 @@ esac
 [[ "$RUNNER_TOKEN" =~ ^[A-Za-z0-9._-]{20,}$ ]] || fail "DPP_GITHUB_RUNNER_TOKEN is missing or malformed"
 [[ "$RUNNER_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]] || fail "DPP_GITHUB_RUNNER_NAME is invalid"
 [[ "$RUNNER_LABELS" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*(,[A-Za-z0-9][A-Za-z0-9_.-]*)*$ ]] || fail "DPP_GITHUB_RUNNER_LABELS is invalid"
+[[ "$RUNNER_ARCH" =~ ^(arm64|x64)$ ]] || fail "DPP_GITHUB_RUNNER_ARCH must be arm64 or x64"
 [[ "$RUNNER_GROUP" =~ $RUNNER_GROUP_PATTERN ]] || fail "DPP_GITHUB_RUNNER_GROUP is invalid"
 
 for command in curl tar git ssh scp sudo; do
@@ -74,7 +76,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-archive_url="https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+archive_url="https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz"
 curl --fail --location --proto '=https' --tlsv1.2 --output "$archive" "$archive_url"
 actual_sha256="$(file_sha256 "$archive" | tr '[:upper:]' '[:lower:]')"
 expected_sha256="$(printf '%s' "$RUNNER_SHA256" | tr '[:upper:]' '[:lower:]')"
