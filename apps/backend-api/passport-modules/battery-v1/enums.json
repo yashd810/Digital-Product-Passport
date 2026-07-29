@@ -1,0 +1,28 @@
+[
+  {
+    "key": "batteryStatus",
+    "label": "Battery Status",
+    "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus",
+    "definition": "Status for battery",
+    "values": [
+      {
+        "key": "original",
+        "label": "Original",
+        "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus/original",
+        "definition": ""
+      },
+      {
+        "key": "remanufactured",
+        "label": "Remanufactured",
+        "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus/remanufactured",
+        "definition": ""
+      },
+      {
+        "key": "repurposed",
+        "label": "Repurposed",
+        "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus/repurposed",
+        "definition": ""
+      }
+    ]
+  }
+]
