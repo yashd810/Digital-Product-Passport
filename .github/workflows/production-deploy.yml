@@ -1,0 +1,153 @@
+name: Production Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - Security And Smoke
+    branches:
+      - main
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deploy one host or the complete split production release
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - backend
+          - frontend
+      revision:
+        description: Optional 40-character commit SHA reachable from origin/main (use only for an approved rollback)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+# One production deployment may run at a time. GitHub retains the newest pending
+# release while allowing an already-running deployment to finish safely.
+concurrency:
+  group: dpp-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  resolve-release:
+    # workflow_run is accepted only after CI passed for a push to protected main.
+    # workflow_dispatch is intentionally limited to commits reachable from main.
+    # The repository variable is set to true only after the runner group and
+    # protected production Environment have been verified.
+    if: >-
+      vars.DPP_PRODUCTION_DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main'))
+    runs-on: ubuntu-24.04
+    outputs:
+      release_sha: ${{ steps.release.outputs.release_sha }}
+      target: ${{ steps.release.outputs.target }}
+    steps:
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          fetch-depth: 0
+      - id: release
+        name: Resolve an approved main revision
+        env:
+          REQUESTED_REVISION: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.revision }}
+          REQUESTED_TARGET: ${{ inputs.target || 'all' }}
+        run: |
+          set -euo pipefail
+
+          case "$REQUESTED_TARGET" in
+            all|backend|frontend) ;;
+            *)
+              echo "Unsupported deployment target: $REQUESTED_TARGET" >&2
+              exit 1
+              ;;
+          esac
+
+          git fetch --no-tags origin main
+          if [ -n "$REQUESTED_REVISION" ]; then
+            if ! [[ "$REQUESTED_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "revision must be a full 40-character Git SHA" >&2
+              exit 1
+            fi
+            release_sha="$REQUESTED_REVISION"
+          else
+            release_sha="$(git rev-parse origin/main)"
+          fi
+
+          git cat-file -e "$release_sha^{commit}"
+          if ! git merge-base --is-ancestor "$release_sha" origin/main; then
+            echo "Refusing a release revision that is not reachable from origin/main" >&2
+            exit 1
+          fi
+
+          printf 'release_sha=%s\n' "$release_sha" >> "$GITHUB_OUTPUT"
+          printf 'target=%s\n' "$REQUESTED_TARGET" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: resolve-release
+    # Configure this environment in GitHub with required reviewers, protected
+    # main-only deployments, and no self-approval. No production secret is
+    # stored in GitHub; the dedicated OCI runner holds its local deployment key.
+    environment:
+      name: production
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - dpp-production-deploy
+    timeout-minutes: 120
+    env:
+      DPP_DEPLOY_CONFIG_FILE: /etc/dpp-deployer/oci-deploy.env
+      DPP_DEPLOY_RUNNER_USER: dpp-deploy
+      DEPLOY_TARGET: ${{ needs.resolve-release.outputs.target }}
+      RELEASE_SHA: ${{ needs.resolve-release.outputs.release_sha }}
+    steps:
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          ref: ${{ needs.resolve-release.outputs.release_sha }}
+          fetch-depth: 0
+      - name: Verify dedicated deployment runner
+        run: bash scripts/deploy/check-deployment-runner.sh
+      - name: Verify checked-out release revision
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+      - name: Deploy approved release
+        run: |
+          set -euo pipefail
+
+          deploy_target() {
+            DPP_DEPLOY_TARGET="$1" bash scripts/deploy/deploy-to-oci.sh
+          }
+
+          case "$DEPLOY_TARGET" in
+            all)
+              deploy_target backend
+              deploy_target frontend
+              ;;
+            backend|frontend)
+              deploy_target "$DEPLOY_TARGET"
+              ;;
+            *)
+              echo "Unsupported deployment target: $DEPLOY_TARGET" >&2
+              exit 1
+              ;;
+          esac
+      - name: Record deployment evidence
+        if: always()
+        run: |
+          {
+            echo "## Production deployment"
+            echo
+            echo "- Release: \`$RELEASE_SHA\`"
+            echo "- Target: \`$DEPLOY_TARGET\`"
+            echo "- Runner: \`$(hostname)\`"
+          } >> "$GITHUB_STEP_SUMMARY"

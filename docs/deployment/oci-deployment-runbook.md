@@ -21,6 +21,7 @@ It is not a second architecture guide. Use it when you are already dealing with 
 | `infra/oracle/Caddyfile*.template` | source templates for edge routing / reverse proxy config |
 | `infra/oracle/render-caddyfile.sh` | validates public origins and renders the target-specific Caddyfile |
 | `infra/oracle/deploy-prod.sh` | deployment helper script |
+| `infra/oracle/terraform/deployment-runner/*` | private CI/CD deployment-runner infrastructure |
 | `infra/oracle/db-backup.sh` | backup job script |
 | `infra/oracle/install-db-backup-jobs.sh` | installs backup timers/services |
 | `infra/oracle/systemd/*` | systemd units for backup automation |
@@ -87,6 +88,15 @@ The deployment and troubleshooting helpers require a non-symlinked private key
 that is not group/world-readable and a pre-verified `known_hosts` file. Verify
 the OCI instance fingerprint in the OCI Console before adding it; do not rely on
 trust-on-first-use during production deployment.
+
+## Team CI/CD Deployment Runner
+
+Production deployment does not need to originate from a developer workstation.
+Use the dedicated private OCI runner defined in
+[`ci-cd-runbook.md`](ci-cd-runbook.md) for protected GitHub Actions releases.
+It holds the runner-local deployment identity and connects to the frontend and
+backend private addresses. Keep human break-glass access through OCI Bastion
+separate from this automated deployment path.
 
 ## Docker Build Toolchain
 

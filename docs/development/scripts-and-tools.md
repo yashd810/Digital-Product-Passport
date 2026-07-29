@@ -48,6 +48,9 @@ Examples:
 
 - `scripts/restart-local-stack.sh`
 - `scripts/deploy/deploy-to-oci.sh`
+- `scripts/deploy/check-deployment-runner.sh`
+- `scripts/deploy/bootstrap-actions-deployment-runner.sh`
+- `scripts/deploy/install-deployment-runner-config.sh`
 - `scripts/troubleshoot-oci.sh`
 - `infra/oracle/generate-env-secrets.sh`
 - `infra/oracle/check-marketing-public-content.sh`
@@ -78,6 +81,11 @@ transcript.
 `check-marketing-public-content.sh` is a production deployment preflight for
 the public marketing site. It rejects known placeholder legal and contact data;
 it does not invent company, address, jurisdiction, or support-contact details.
+
+The dedicated production Actions runner is documented in
+[`../deployment/ci-cd-runbook.md`](../deployment/ci-cd-runbook.md). It is not a
+general-purpose CI runner: only the approval-gated production deployment
+workflow may use its `dpp-production-deploy` label.
 
 ## Recommended Verification Commands
 

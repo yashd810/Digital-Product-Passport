@@ -1,0 +1,21 @@
+# Copy outside the repository as terraform.tfvars, fill in the existing VCN
+# values, and keep the file mode 600. The runner has no public IP.
+region              = "eu-stockholm-1"
+compartment_ocid    = "ocid1.compartment.oc1..replace-me"
+availability_domain = "replace-with-availability-domain"
+subnet_ocid         = "ocid1.subnet.oc1..replace-me"
+network_security_group_ids = [
+  "ocid1.networksecuritygroup.oc1..replace-me",
+]
+image_ocid           = "ocid1.image.oc1.eu-stockholm-1.replace-me"
+shape                = "VM.Standard.E5.Flex"
+shape_config = {
+  ocpus         = 1
+  memory_in_gbs = 8
+}
+admin_ssh_public_key = "ssh-ed25519 replace-with-bastion-admin-public-key"
+
+freeform_tags = {
+  service = "dpp"
+  role    = "deployment-runner"
+}

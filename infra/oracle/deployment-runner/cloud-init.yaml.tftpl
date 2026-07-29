@@ -1,0 +1,23 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - openssh-client
+  - tar
+
+users:
+  - default
+  - name: ${runner_user}
+    system: true
+    shell: /bin/bash
+    lock_passwd: true
+
+runcmd:
+  - install -d -o ${runner_user} -g ${runner_user} -m 0750 /opt/actions-runner
+  - install -d -o root -g ${runner_user} -m 0750 /etc/dpp-deployer
+
+final_message: "DPP deployment-runner base ready. Register the Actions runner with scripts/deploy/bootstrap-actions-deployment-runner.sh, then install its OCI deployment identity."

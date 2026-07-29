@@ -47,6 +47,14 @@ apps/marketing-site/nginx.conf
 *.log
 npm-debug.log*
 
+# Terraform state and local infrastructure inputs
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
 # Editor / local tools
 .vscode/
 .idea/
