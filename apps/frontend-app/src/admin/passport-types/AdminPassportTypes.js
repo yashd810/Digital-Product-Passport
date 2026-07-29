@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildProductCategoryOptions } from "./builderHelpers";
 import { formatSemanticModelLabel } from "./semanticTermCatalog";

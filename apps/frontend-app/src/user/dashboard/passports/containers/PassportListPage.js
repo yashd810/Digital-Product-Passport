@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { PassportListTableSection } from "../components/PassportListTableSection";
 import { PassportListModalStack } from "../components/PassportListModalStack";
 import { PassportListRow } from "../components/PassportListRow";

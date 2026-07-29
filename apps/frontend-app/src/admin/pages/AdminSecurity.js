@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../shared/table/tableControls";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import UserProfile from "../../user/profile/UserProfile";

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { generateQRCodeBundle, saveQRCodeToDatabase } from "../utils/QRcode";
 import { getViewerBrandTheme } from "../../app/providers/ThemeContext";
 import { isObsoletePassportStatus, isReleasedPassportStatus } from "../../passports/utils/passportStatus";

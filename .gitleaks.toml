@@ -15,3 +15,15 @@ paths = [
   '''(^|/)docker/\.env\.prod\.example$''',
   '''(^|/)infra/oracle/oci\.env\.example$''',
 ]
+
+[[allowlists]]
+description = "Public battery dictionary semantic model identifier"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "match"
+paths = [
+  '''(^|/)apps/backend-api/passport-modules/battery-v1/(manifest\.json|module\.js)$''',
+]
+regexes = [
+  '''(?i)semanticModelKey["']?\s*[:=]\s*["']batteryDictionaryV1["']?''',
+]

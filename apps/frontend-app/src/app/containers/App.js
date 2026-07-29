@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useState, useEffect } from "react";
-import { Routes, Route, Navigate, useParams } from "react-router-dom";
+import { Routes, Route, Navigate, useParams } from "react-router";
 import "../styles/App.css";
 import { I18nProvider } from "../providers/i18n";
 import { useSessionAuth } from "../hooks/useSessionAuth";

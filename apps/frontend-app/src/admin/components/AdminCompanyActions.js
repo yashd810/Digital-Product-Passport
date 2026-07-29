@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
 import { buildCompanyDppPolicyForm } from "../utils/companyDppPolicy";

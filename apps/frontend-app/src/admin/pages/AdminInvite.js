@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import AppSelect from "../../shared/components/AppSelect";
 import "../styles/AdminDashboard.css";

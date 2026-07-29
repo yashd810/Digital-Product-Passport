@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate } from "react-router";
 import { applyTheme, getStoredTheme } from "../../app/providers/ThemeContext";
 import "../styles/AdminDashboard.css";
 

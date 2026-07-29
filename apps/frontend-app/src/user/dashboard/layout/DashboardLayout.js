@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Outlet, NavLink, useNavigate, useLocation, useParams } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation, useParams } from "react-router";
 import NotificationsPanel from "../notifications/NotificationsPanel";
 import { applyTheme, getStoredTheme } from "../../../app/providers/ThemeContext";
 import { useI18n } from "../../../app/providers/i18n";

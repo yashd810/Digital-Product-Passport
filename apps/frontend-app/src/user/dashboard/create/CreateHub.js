@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router";
 import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath } from "../utils/dashboardRoutes";

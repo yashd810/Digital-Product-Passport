@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { PieChart } from "../../passport-viewer/components/PieChart";
 import { openAnalyticsPrintReport, renderClusteredBarChartSvg, renderPieChartSvg } from "../../shared/utils/analyticsPrintExport";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";

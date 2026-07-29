@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import CompanyDppPolicyFields from "../components/CompanyDppPolicyFields";
 import AppSelect from "../../shared/components/AppSelect";

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { useNavigate, useParams, NavLink } from "react-router-dom";
+import { useNavigate, useParams, NavLink } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../../shared/passports/passportSchemaUtils";
 import { buildDashboardPath } from "../utils/dashboardRoutes";

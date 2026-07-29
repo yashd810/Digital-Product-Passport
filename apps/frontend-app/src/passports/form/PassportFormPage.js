@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import {
   alignRecordToSchemaKeys,

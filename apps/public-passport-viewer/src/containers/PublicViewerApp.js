@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router";
 
 const PassportViewer = lazy(() => import("@frontend/passport-viewer/containers/PassportViewerPage"));
 

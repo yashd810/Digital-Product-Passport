@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { formatSemanticModelLabel } from "../passport-types/semanticTermCatalog";
 import "../styles/AdminDashboard.css";

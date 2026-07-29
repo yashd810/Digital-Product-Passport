@@ -1,5 +1,5 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router";
 import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 
 export function ProtectedRoute({ isAuthenticated, authReady, children }) {

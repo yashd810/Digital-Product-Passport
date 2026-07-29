@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import CompanyLogoUpload from "./CompanyLogoUpload";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../shared/styles/Dashboard.css";

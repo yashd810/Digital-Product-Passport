@@ -1,5 +1,5 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { toSafeHttpOrInternalHref } from "../../shared/security/urlSafety";
 import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { NavLink, useParams } from "react-router-dom";
+import { NavLink, useParams } from "react-router";
 import { fetchWithAuth } from "../../../shared/api/authHeaders";
 import { isTrustedApiRequestUrl, toSafeImageSrc, toSafeResourceHref } from "../../../shared/security/urlSafety";
 import { buildDashboardPath } from "../utils/dashboardRoutes";

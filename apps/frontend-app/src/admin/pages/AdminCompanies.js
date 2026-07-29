@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import CompanyDppPolicyFields from "../components/CompanyDppPolicyFields";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";

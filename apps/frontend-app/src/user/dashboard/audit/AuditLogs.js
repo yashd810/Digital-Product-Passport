@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import AuditLogExplorer from "../../../shared/audit/AuditLogExplorer";
 import { isCompanyDashboardAuditEvent } from "../../../shared/audit/auditDisplay";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";

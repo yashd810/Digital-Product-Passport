@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router";
 import { PieChart } from "../../passport-viewer/components/PieChart";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../shared/table/tableControls";
 import { openAnalyticsPrintReport, renderBarChartSvg, renderLineChartSvg, renderPieChartSvg } from "../../shared/utils/analyticsPrintExport";

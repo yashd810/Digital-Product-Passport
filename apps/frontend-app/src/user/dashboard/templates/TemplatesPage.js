@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { toSafeImageSrc, toSafeResourceHref } from "../../../shared/security/urlSafety";
 import {

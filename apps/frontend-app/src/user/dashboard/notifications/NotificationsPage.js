@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../shared/styles/Dashboard.css";
 

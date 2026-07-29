@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router";
 import { applyTableControls, getNextSortDirection } from "../../../../shared/table/tableControls";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { isObsoletePassportStatus, normalizePassportStatus } from "../../../../passports/utils/passportStatus";
