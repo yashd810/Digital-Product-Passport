@@ -4757,6 +4757,22 @@
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+  max-width: 100%;
+}
+.aca-header-actions .admin-company-actions-inline,
+.aca-header-actions .aca-manage-access-btn,
+.aca-header-actions .aca-export-btn {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+.aca-header-actions .aca-manage-access-btn,
+.aca-header-actions .aca-export-btn {
+  box-sizing: border-box;
+  min-height: 46px;
+  width: auto;
+}
+.aca-header-actions .aca-manage-access-btn {
+  min-width: 228px;
 }
 .admin-company-actions-inline {
   display: flex;
@@ -4766,6 +4782,22 @@
 .admin-company-actions-inline .manage-btn {
   min-width: 140px;
   width: auto;
+}
+@media (max-width: 600px) {
+  .aca-header-actions {
+    align-items: stretch;
+    justify-content: stretch;
+    width: 100%;
+  }
+  .aca-header-actions .admin-company-actions-inline,
+  .aca-header-actions .aca-manage-access-btn,
+  .aca-header-actions .aca-export-btn {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .aca-header-actions .admin-company-actions-inline .manage-btn {
+    width: 100%;
+  }
 }
 .admin-company-action-inline-btn-primary {
   align-items: center;

@@ -1791,6 +1791,31 @@ function renderSystemHeaderFields(fields) {
   );
   container.innerHTML = "";
 
+  const createGroup = ({ title, description, className }) => {
+    const group = document.createElement("section");
+    group.className = className;
+    const heading = document.createElement("div");
+    heading.className = "system-header-group-heading";
+    const titleNode = document.createElement("h4");
+    titleNode.textContent = title;
+    const descriptionNode = document.createElement("p");
+    descriptionNode.textContent = description;
+    heading.append(titleNode, descriptionNode);
+    group.appendChild(heading);
+    return group;
+  };
+
+  const mappedFieldsGroup = createGroup({
+    title: "Fields from Sections & Fields",
+    description: "Select the field whose entered value should populate this header value.",
+    className: "system-header-group system-header-editable-group",
+  });
+  const managedFieldsGroup = createGroup({
+    title: "Platform-managed header values",
+    description: "These values are generated or resolved by the platform and cannot be replaced by a form field.",
+    className: "system-header-group system-header-managed-group",
+  });
+
   for (const slot of headerSlotDefinitions) {
     if (slot.managedOnly) {
       const row = document.createElement("div");
@@ -1802,7 +1827,7 @@ function renderSystemHeaderFields(fields) {
       badge.textContent = "System managed";
       row.append(text, badge);
       row.title = "This DID is generated and maintained by the platform.";
-      container.appendChild(row);
+      managedFieldsGroup.appendChild(row);
       continue;
     }
     const row = document.createElement("label");
@@ -1825,8 +1850,17 @@ function renderSystemHeaderFields(fields) {
     select.addEventListener("change", () => queueDerivedFieldsRefresh());
     row.appendChild(select);
     row.title = "Choose a managed passport value or map a real module field into this header slot.";
-    container.appendChild(row);
+    mappedFieldsGroup.appendChild(row);
   }
+
+  if (!fields.length) {
+    const empty = document.createElement("p");
+    empty.className = "system-header-empty";
+    empty.textContent = "Add fields in Sections & Fields first; they will appear here as mapping choices.";
+    mappedFieldsGroup.appendChild(empty);
+  }
+
+  container.append(mappedFieldsGroup, managedFieldsGroup);
 }
 
 function normalizeCompositionCharts(roles = {}) {

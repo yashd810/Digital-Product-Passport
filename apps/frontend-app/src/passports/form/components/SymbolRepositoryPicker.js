@@ -4,7 +4,15 @@ import "../../../shared/styles/CreatePass.css";
 
 const api = import.meta.env.VITE_API_URL || "";
 
-function SymbolRepositoryPicker({ companyId, onSelect, onClose }) {
+function SymbolRepositoryPicker({
+  companyId,
+  onSelect,
+  onClose,
+  title = "🔣 Pick a Symbol",
+  rootLabel = "Symbols",
+  emptyMessage = "No symbols in repository yet.",
+  itemLabel = "symbol",
+}) {
   const [items, setItems] = useState([]);
   const [breadcrumbs, setBreadcrumbs] = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -66,14 +74,14 @@ function SymbolRepositoryPicker({ companyId, onSelect, onClose }) {
     <div className="rp-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="rp-modal">
         <div className="rp-modal-header">
-          <h3>🔣 Pick a Symbol</h3>
+          <h3>{title}</h3>
           <button className="rp-close-btn" onClick={onClose}>✕</button>
         </div>
 
         {error && <div className="alert alert-error" style={{ margin: "0 16px 12px" }}>{error}</div>}
 
         <nav className="rp-breadcrumb">
-          <button className="rp-crumb" onClick={() => navigateTo(null)}>🏠 Symbols</button>
+          <button className="rp-crumb" onClick={() => navigateTo(null)}>🏠 {rootLabel}</button>
           {breadcrumbs.map((crumb) => (
             <React.Fragment key={crumb.id}>
               <span className="rp-crumb-sep">/</span>
@@ -97,7 +105,7 @@ function SymbolRepositoryPicker({ companyId, onSelect, onClose }) {
             <div className="rp-empty">Loading…</div>
           ) : items.length === 0 ? (
             <div className="rp-empty">
-              {currentFolder ? "This folder is empty." : "No symbols in repository yet."}
+              {currentFolder ? "This folder is empty." : emptyMessage}
             </div>
           ) : (
             items.map((item) => (
@@ -121,7 +129,7 @@ function SymbolRepositoryPicker({ companyId, onSelect, onClose }) {
 
         <div className="rp-footer">
           <span className="rp-footer-note">
-            Click a symbol to link it — the file stays in the repository.
+            Click an {itemLabel} to link it — the file stays in the repository.
           </span>
           <button className="rp-cancel-btn" onClick={onClose}>Cancel</button>
         </div>

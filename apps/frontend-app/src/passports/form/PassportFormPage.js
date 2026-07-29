@@ -257,6 +257,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   const [templateName,   setTemplateName]   = useState("");
   const [templateFieldFilter, setTemplateFieldFilter] = useState("full");
   const [fileSelections, setFileSelections] = useState({});
+  const [fileDisplayNames, setFileDisplayNames] = useState({});
   const [uploadProgress, setUploadProgress] = useState({});
   const [repoPicker,     setRepoPicker]     = useState(null);  // field.key being picked, or null
   const [symbolPicker,   setSymbolPicker]   = useState(null);  // field.key being picked, or null
@@ -638,6 +639,28 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     setError("");
     markDirty();
     setFileSelections(p => ({ ...p, [key]: file }));
+    setFileDisplayNames(p => ({ ...p, [key]: file.name }));
+  };
+
+  const setFileDisplayName = (key, name) => {
+    const normalizedName = String(name || "").trim();
+    setFileDisplayNames((previous) => {
+      if (normalizedName) return { ...previous, [key]: normalizedName };
+      if (!Object.prototype.hasOwnProperty.call(previous, key)) return previous;
+      const next = { ...previous };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const clearFileSelection = (key) => {
+    setFileSelections((previous) => {
+      if (!Object.prototype.hasOwnProperty.call(previous, key)) return previous;
+      const next = { ...previous };
+      delete next[key];
+      return next;
+    });
+    setFileDisplayName(key, "");
   };
 
   const isTemplateCreateMode = mode === "create" && !!templateId;
@@ -791,9 +814,9 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
               type="button"
               className="file-upload-label"
               disabled={disabled}
-              onClick={() => setRepoPicker("productImage")}
+              onClick={() => setSymbolPicker("productImage")}
             >
-              <span className="file-placeholder">🖼 Link Product Image from Repository</span>
+              <span className="file-placeholder">🖼 Link Product Image from Symbols</span>
             </button>
           )}
           {linkedUrl && (
@@ -801,7 +824,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
               type="button"
               className="file-upload-label file-replace-label"
               disabled={disabled}
-              onClick={() => setRepoPicker("productImage")}
+              onClick={() => setSymbolPicker("productImage")}
             >
               <span className="file-placeholder">↺ Change</span>
             </button>
@@ -1051,6 +1074,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
           if (file) await uploadFile(key, file, passportDppId);
         }
         setFileSelections({});
+        setFileDisplayNames({});
         window.scrollTo({ top: 0, behavior: "smooth" });
         setSuccess("Passport created successfully");
         setTimeout(() => setSuccess(""), 4000);
@@ -1106,16 +1130,21 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
     if (field.type === "file") {
       const linkedUrl  = toSafeResourceHref(val);
-      const fileName   = linkedUrl ? linkedUrl.split("/").pop() : null;
+      const selectedFile = fileSelections[field.key];
+      const fileName = selectedFile?.name || fileDisplayNames[field.key] || (linkedUrl ? "Linked document" : null);
       return (
         <div className="file-upload-widget">
-          {linkedUrl ? (
+          {linkedUrl || selectedFile ? (
             <div className="file-existing">
-              <a href={linkedUrl} target="_blank" rel="noopener noreferrer" className="file-existing-link">
-                📄 {decodeURIComponent(fileName || "Document")}
-              </a>
+              {linkedUrl ? (
+                <a href={linkedUrl} target="_blank" rel="noopener noreferrer" className="file-existing-link">
+                  📄 {fileName || "Document"}
+                </a>
+              ) : (
+                <span className="file-existing-link">📄 {fileName || "Document"}</span>
+              )}
               <button type="button" className="file-clear-btn" disabled={disabled}
-                onClick={() => handleField(field.key, "")}>✕ Remove</button>
+                onClick={() => { clearFileSelection(field.key); handleField(field.key, ""); }}>✕ Remove</button>
             </div>
           ) : (
             <button type="button" className="file-upload-label" disabled={disabled}
@@ -1140,18 +1169,18 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
               onPaste={(e) => {
                 const text = e.clipboardData.getData("text").trim();
                 const safeUrl = toSafeResourceHref(text);
-                if (safeUrl) { e.preventDefault(); handleField(field.key, safeUrl); }
+                if (safeUrl) { e.preventDefault(); clearFileSelection(field.key); handleField(field.key, safeUrl); }
               }}
               onBlur={(e) => {
                 const text = e.target.value.trim();
                 const safeUrl = toSafeResourceHref(text);
-                if (safeUrl) { handleField(field.key, safeUrl); e.target.value = ""; }
+                if (safeUrl) { clearFileSelection(field.key); handleField(field.key, safeUrl); e.target.value = ""; }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   const text = e.target.value.trim();
                   const safeUrl = toSafeResourceHref(text);
-                  if (safeUrl) { handleField(field.key, safeUrl); e.target.value = ""; }
+                  if (safeUrl) { clearFileSelection(field.key); handleField(field.key, safeUrl); e.target.value = ""; }
                 }
               }}
             />
@@ -1532,7 +1561,15 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       {repoPicker && (
         <RepositoryPicker
           companyId={effectiveCompanyId}
-          onSelect={(url) => { const safeUrl = toSafeResourceHref(url); if (safeUrl) handleField(repoPicker, safeUrl); setRepoPicker(null); }}
+          onSelect={(url, fileName) => {
+            const safeUrl = toSafeResourceHref(url);
+            if (safeUrl) {
+              clearFileSelection(repoPicker);
+              setFileDisplayName(repoPicker, fileName);
+              handleField(repoPicker, safeUrl);
+            }
+            setRepoPicker(null);
+          }}
           onClose={() => setRepoPicker(null)}
         />
       )}
@@ -1541,6 +1578,10 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       {symbolPicker && (
         <SymbolRepositoryPicker
           companyId={effectiveCompanyId}
+          title={symbolPicker === "productImage" ? "🖼 Pick Product Image" : undefined}
+          rootLabel={symbolPicker === "productImage" ? "Product images" : undefined}
+          emptyMessage={symbolPicker === "productImage" ? "No product images in Symbols yet." : undefined}
+          itemLabel={symbolPicker === "productImage" ? "image" : undefined}
           onSelect={(url) => { const safeUrl = toSafeResourceHref(url); if (safeUrl) handleField(symbolPicker, safeUrl); setSymbolPicker(null); }}
           onClose={() => setSymbolPicker(null)}
         />

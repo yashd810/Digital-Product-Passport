@@ -264,6 +264,22 @@
           </div>
         </div>
         <div class="role-grid">
+          <article class="role-card role-card-wide passport-header-mapping-card">
+            <div class="role-card-heading">
+              <div>
+                <p class="role-card-kicker">Passport record</p>
+                <h3>Passport header mapping</h3>
+                <p>Map the fields created in <strong>2. Sections &amp; Fields</strong> into the passport header. The selected field keeps its label and is exported with the canonical header key that the create form and viewer use.</p>
+              </div>
+              <span class="header-mapping-status">Select source fields below</span>
+            </div>
+            <div class="header-mapping-guidance">
+              <strong>How it works</strong>
+              <span>Choose one source field for each header value. Model name is mapped in Identity; platform identifiers and DIDs remain system managed.</span>
+            </div>
+            <div id="systemHeaderFields" class="presentation-list system-header-list"></div>
+          </article>
+
           <article class="role-card">
             <h3>Identity</h3>
             <label>Product identifier field
@@ -296,11 +312,6 @@
             <div id="presentationFields" class="presentation-list placement-slot-layout"></div>
           </article>
 
-          <article class="role-card role-card-wide">
-            <h3>System field assignments</h3>
-            <p>Assign a section field to a platform slot. The selected field is exported with that slot's one canonical key; it does not keep a second source key. Platform-only values are generated automatically.</p>
-            <div id="systemHeaderFields" class="presentation-list system-header-list"></div>
-          </article>
         </div>
       </section>
 

@@ -1559,6 +1559,48 @@ textarea {
   grid-column: 1 / -1;
 }
 
+.passport-header-mapping-card {
+  border: 1px solid #8fcedf;
+  box-shadow: 0 12px 30px rgba(18, 131, 153, 0.12);
+}
+
+.role-card-kicker {
+  margin: 0 0 4px;
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.header-mapping-status {
+  flex: 0 0 auto;
+  border: 1px solid #9fd5e2;
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 800;
+  background: #ecfbff;
+}
+
+.header-mapping-guidance {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 12px;
+  padding: 11px 12px;
+  border-left: 4px solid var(--accent);
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  background: #f3fbfd;
+}
+
+.header-mapping-guidance strong {
+  color: var(--text);
+}
+
 .role-card-heading {
   display: flex;
   align-items: flex-start;
@@ -1687,8 +1729,47 @@ textarea {
 }
 
 .system-header-list {
+  grid-template-columns: 1fr;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.system-header-group {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #c9d9e8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.system-header-editable-group {
+  border-color: #8fcedf;
+  background: linear-gradient(180deg, #f4fdff 0%, #ffffff 100%);
+}
+
+.system-header-managed-group {
   grid-template-columns: repeat(2, minmax(320px, 1fr));
-  align-items: start;
+  background: #f8fbfd;
+}
+
+.system-header-group-heading {
+  grid-column: 1 / -1;
+}
+
+.system-header-group-heading h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.system-header-group-heading p,
+.system-header-empty {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .system-header-list .presentation-row {
@@ -2385,6 +2466,7 @@ pre {
   .role-inline,
   .composition-chart-row,
   .presentation-list,
+  .system-header-managed-group,
   .placement-slot-layout,
   .placement-slot-row,
   .presentation-row,
