@@ -71,17 +71,33 @@ the Terraform output private IP to verify it.
 
 ## Register The Dedicated GitHub Runner
 
+### Safety gate for the current repository
+
+`yashd810/Digital-Product-Passport` is currently public. Do **not** attach a
+self-hosted runner to it while it is public: a pull request can change a
+workflow to target that runner. Before continuing, make the repository private
+in GitHub (**Settings → General → Danger Zone → Change repository visibility**)
+and confirm that only trusted maintainers have write access. The deployed web
+application remains publicly reachable; this changes only source-code access.
+
+If the repository must remain public, stop this runbook here. The secure design
+is then a separate private deployment-control repository that owns the runner;
+that requires a small follow-up integration rather than attaching production
+credentials to this public repository.
+
 In GitHub repository settings:
 
-1. Create a runner group named `DPP Production Deployment` and scope it only
-   to this repository.
-2. Generate a short-lived runner registration token. Do not store the token in
+1. Go to **Settings → Actions → Runners → New self-hosted runner**, select
+   **Linux** and **x64**, and generate a short-lived registration token. This
+   user-owned repository uses GitHub's built-in `Default` runner group; the
+   dedicated `dpp-production-deploy` label selects the runner for production.
+   Do not store the token in
    a repository, Actions secret, shell history, or ticket.
-3. Create a `production` Environment. Require production reviewers, disallow
+2. Create a `production` Environment. Require production reviewers, disallow
    self-approval, and restrict deployment branches to protected `main`.
-4. Ensure pull-request workflows continue to use GitHub-hosted runners. The
+3. Ensure pull-request workflows continue to use GitHub-hosted runners. The
    `dpp-production-deploy` label must be available only to the dedicated runner.
-5. Only after the runner completes its local preflight, create the repository
+4. Only after the runner completes its local preflight, create the repository
    Actions variable `DPP_PRODUCTION_DEPLOY_ENABLED` with the exact value
    `true`. Until then, the production workflow is skipped even after CI passes.
 

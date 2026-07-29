@@ -13,7 +13,10 @@ RUNNER_VERSION="${DPP_GITHUB_RUNNER_VERSION:-}"
 RUNNER_SHA256="${DPP_GITHUB_RUNNER_SHA256:-}"
 RUNNER_NAME="${DPP_GITHUB_RUNNER_NAME:-$(hostname)-dpp-production-deploy}"
 RUNNER_LABELS="${DPP_GITHUB_RUNNER_LABELS:-dpp-production-deploy}"
-RUNNER_GROUP="${DPP_GITHUB_RUNNER_GROUP:-DPP Production Deployment}"
+# This runner is registered to one repository (the URL validation below
+# intentionally rejects organization URLs). Repository-scoped runners live in
+# GitHub's built-in Default group; the dedicated label is what selects it.
+RUNNER_GROUP="${DPP_GITHUB_RUNNER_GROUP:-Default}"
 RUNNER_GROUP_PATTERN='^[A-Za-z0-9][A-Za-z0-9 _.:-]{0,79}$'
 
 fail() {

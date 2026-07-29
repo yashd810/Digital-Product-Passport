@@ -37,8 +37,8 @@ jobs:
   resolve-release:
     # workflow_run is accepted only after CI passed for a push to protected main.
     # workflow_dispatch is intentionally limited to commits reachable from main.
-    # The repository variable is set to true only after the runner group and
-    # protected production Environment have been verified.
+    # The repository variable is set to true only after the dedicated runner
+    # and protected production Environment have been verified.
     if: >-
       vars.DPP_PRODUCTION_DEPLOY_ENABLED == 'true' &&
       (github.event_name == 'workflow_dispatch' ||
