@@ -52,19 +52,19 @@ const mime = {
 };
 
 const headerSlotDefinitions = [
-  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId", managedOnly: true },
-  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier", managedOnly: true },
-  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId", managedOnly: true },
-  { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity", managedOnly: true },
-  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion", managedOnly: true },
-  { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus", managedOnly: true },
-  { slotKey: "lastUpdate", label: "Last Update", managedKey: "internalManagedLastUpdate", managedOnly: true },
+  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
+  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier" },
+  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId", platformManaged: true },
+  { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity" },
+  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion" },
+  { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus" },
+  { slotKey: "lastUpdate", label: "Last Update", managedKey: "internalManagedLastUpdate" },
   { slotKey: "economicOperatorId", label: "Economic Operator ID", managedKey: "internalManagedEconomicOperatorId" },
   { slotKey: "facilityId", label: "Facility ID", managedKey: "internalManagedFacilityId" },
-  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds", managedOnly: true },
-  { slotKey: "subjectDid", label: "Subject DID", managedKey: "internalManagedSubjectDid", managedOnly: true },
-  { slotKey: "dppDid", label: "DPP DID", managedKey: "internalManagedDppDid", managedOnly: true },
-  { slotKey: "companyDid", label: "Company DID", managedKey: "internalManagedCompanyDid", managedOnly: true },
+  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds" },
+  { slotKey: "subjectDid", label: "Subject DID", managedKey: "internalManagedSubjectDid", platformManaged: true },
+  { slotKey: "dppDid", label: "DPP DID", managedKey: "internalManagedDppDid", platformManaged: true },
+  { slotKey: "companyDid", label: "Company DID", managedKey: "internalManagedCompanyDid", platformManaged: true },
 ];
 
 function sendJson(res, status, data) {
@@ -305,10 +305,29 @@ function normalizeHeaderAssignments(value) {
       .map(([slotKey, fieldKey]) => [clean(slotKey), clean(fieldKey)])
       .filter(([slotKey, fieldKey]) => slotKey && fieldKey)
   );
-  headerSlotDefinitions.filter((slot) => slot.managedOnly).forEach((slot) => {
+  headerSlotDefinitions.filter((slot) => slot.platformManaged).forEach((slot) => {
     assignments[slot.slotKey] = `__managed__:${slot.managedKey}`;
   });
   return assignments;
+}
+
+function isModuleFieldHeaderAssignment(value) {
+  const selected = clean(value);
+  return Boolean(selected) && !selected.startsWith("__managed__:");
+}
+
+function normalizeHeaderFieldConfirmations(value, assignments) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return Object.fromEntries(headerSlotDefinitions.map((slot) => {
+    const selected = assignments[slot.slotKey];
+    const hasExplicitConfirmation = Object.prototype.hasOwnProperty.call(source, slot.slotKey);
+    // Older specs predate the confirmation control, and every field assignment
+    // in those specs was already intended to be an applied header mapping.
+    const confirmed = !slot.platformManaged
+      && isModuleFieldHeaderAssignment(selected)
+      && (hasExplicitConfirmation ? source[slot.slotKey] === true : true);
+    return [slot.slotKey, confirmed];
+  }));
 }
 
 function getSectionChildren(section) {
@@ -1134,6 +1153,10 @@ function validateSpec(input) {
   const passportPolicyKey = clean(module.passportPolicyKey) || `${camelCase(family)}Dpp${pascalCase(version)}`;
   const defaultCarrierPolicyKey = clean(module.defaultCarrierPolicyKey || "webPublicEntryV1");
   const systemHeaderFieldAssignments = normalizeHeaderAssignments(module.systemHeaderFieldAssignments);
+  const systemHeaderFieldConfirmations = normalizeHeaderFieldConfirmations(
+    module.systemHeaderFieldConfirmations,
+    systemHeaderFieldAssignments
+  );
   const modelNameSourceField = clean(roles.modelNameField || module.modelNameField);
   if (!modelNameSourceField) {
     throw new Error("Model name field is required.");
@@ -1151,7 +1174,7 @@ function validateSpec(input) {
   assignCanonicalFieldKey(modelNameSourceField, "modelName", "Model name field");
   for (const slot of headerSlotDefinitions) {
     const selectedValue = clean(systemHeaderFieldAssignments[slot.slotKey]);
-    if (selectedValue && !selectedValue.startsWith("__managed__:")) {
+    if (systemHeaderFieldConfirmations[slot.slotKey] && isModuleFieldHeaderAssignment(selectedValue)) {
       assignCanonicalFieldKey(selectedValue, slot.slotKey, `System field "${slot.label}"`);
     }
   }
@@ -1167,6 +1190,7 @@ function validateSpec(input) {
           managedKey: slot.managedKey,
         };
       }
+      if (!systemHeaderFieldConfirmations[slot.slotKey]) return null;
       return {
         slotKey: slot.slotKey,
         label: slot.label,
@@ -1511,6 +1535,7 @@ function validateSpec(input) {
       passportPolicyKey,
       defaultCarrierPolicyKey,
       systemHeaderFieldAssignments,
+      systemHeaderFieldConfirmations,
       systemHeaderFieldMappings,
       systemHeaderFieldKeys: [...new Set(systemHeaderFieldKeys)],
       baseUrl,

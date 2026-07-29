@@ -24,5 +24,37 @@
         "definition": ""
       }
     ]
+  },
+  {
+    "key": "dppStatus",
+    "label": "DPP Status",
+    "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus",
+    "definition": "DPP Status controlled vocabulary.",
+    "values": [
+      {
+        "key": "active",
+        "label": "Active",
+        "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/active",
+        "definition": ""
+      },
+      {
+        "key": "inActive",
+        "label": "InActive",
+        "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/in-active",
+        "definition": ""
+      },
+      {
+        "key": "archieved",
+        "label": "Archieved",
+        "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/archieved",
+        "definition": ""
+      },
+      {
+        "key": "obeslete",
+        "label": "Obeslete",
+        "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/obeslete",
+        "definition": ""
+      }
+    ]
   }
 ]

@@ -11,22 +11,22 @@
         "dppAdministration": {
           "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/general-information/dpp-administration",
           "@context": {
-            "dppSchema": {
-              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-schema"
+            "dppSchemaVersion": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-schema-version"
             },
-            "generalInformationDppAdministrationDppStatus": {
-              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/general-information-dpp-administration-dpp-status",
+            "dppStatus": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-status",
               "@type": "@id"
             },
-            "dppGranularity": {
-              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-granularity"
+            "granularity": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/granularity"
             },
-            "dateTimeOfLatestUpdateOfDpp": {
-              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/date-time-of-latest-update-of-dpp",
+            "lastUpdate": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/last-update",
               "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
             },
-            "uniqueDppIdentifier": {
-              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/unique-dpp-identifier",
+            "digitalProductPassportId": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/digital-product-passport-id",
               "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
             }
           }
@@ -34,8 +34,8 @@
         "batteryIdentification": {
           "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/general-information/battery-identification",
           "@context": {
-            "uniqueBatteryIdentifier": {
-              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/unique-battery-identifier",
+            "uniqueProductIdentifier": {
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/unique-product-identifier",
               "@type": "http://www.w3.org/2001/XMLSchema#anyURI"
             },
             "modelName": {
@@ -52,7 +52,8 @@
               "@type": "http://www.w3.org/2001/XMLSchema#decimal"
             },
             "batteryStatus": {
-              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/battery-status"
+              "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/battery-status",
+              "@type": "@id"
             },
             "manufacturingDate": {
               "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/manufacturing-date",

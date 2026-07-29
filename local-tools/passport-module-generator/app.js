@@ -28,37 +28,57 @@ if (!csvImportReconciliation) {
 }
 
 const headerSlotDefinitions = [
-  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId", managedOnly: true },
-  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier", managedOnly: true },
-  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId", managedOnly: true },
-  { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity", managedOnly: true },
-  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion", managedOnly: true },
-  { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus", managedOnly: true },
-  { slotKey: "lastUpdate", label: "Last Update", managedKey: "internalManagedLastUpdate", managedOnly: true },
+  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
+  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier" },
+  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId", platformManaged: true },
+  { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity" },
+  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion" },
+  { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus" },
+  { slotKey: "lastUpdate", label: "Last Update", managedKey: "internalManagedLastUpdate" },
   { slotKey: "economicOperatorId", label: "Economic Operator ID", managedKey: "internalManagedEconomicOperatorId" },
   { slotKey: "facilityId", label: "Facility ID", managedKey: "internalManagedFacilityId" },
-  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds", managedOnly: true },
-  { slotKey: "subjectDid", label: "Subject DID", managedKey: "internalManagedSubjectDid", managedOnly: true },
-  { slotKey: "dppDid", label: "DPP DID", managedKey: "internalManagedDppDid", managedOnly: true },
-  { slotKey: "companyDid", label: "Company DID", managedKey: "internalManagedCompanyDid", managedOnly: true },
+  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds" },
+  { slotKey: "subjectDid", label: "Subject DID", managedKey: "internalManagedSubjectDid", platformManaged: true },
+  { slotKey: "dppDid", label: "DPP DID", managedKey: "internalManagedDppDid", platformManaged: true },
+  { slotKey: "companyDid", label: "Company DID", managedKey: "internalManagedCompanyDid", platformManaged: true },
 ];
-
-function getManagedOnlyHeaderAssignments() {
-  return Object.fromEntries(
-    headerSlotDefinitions
-      .filter((slot) => slot.managedOnly)
-      .map((slot) => [slot.slotKey, `__managed__:${slot.managedKey}`])
-  );
-}
 
 function normalizeSystemHeaderAssignments(assignments = {}) {
   const source = assignments && typeof assignments === "object" && !Array.isArray(assignments)
     ? assignments
     : {};
-  return {
-    ...source,
-    ...getManagedOnlyHeaderAssignments(),
-  };
+  const normalized = Object.fromEntries(Object.entries(source).map(([slotKey, value]) => [
+    slotKey,
+    String(value || "").startsWith("__managed__:") ? "" : value,
+  ]));
+  headerSlotDefinitions
+    .filter((slot) => slot.platformManaged)
+    .forEach((slot) => {
+      normalized[slot.slotKey] = `__managed__:${slot.managedKey}`;
+    });
+  return normalized;
+}
+
+function isModuleFieldHeaderAssignment(value) {
+  const selected = String(value || "").trim();
+  return Boolean(selected) && !selected.startsWith("__managed__:");
+}
+
+function normalizeSystemHeaderFieldConfirmations(confirmations = {}, assignments = {}) {
+  const source = confirmations && typeof confirmations === "object" && !Array.isArray(confirmations)
+    ? confirmations
+    : {};
+  const normalizedAssignments = normalizeSystemHeaderAssignments(assignments);
+  return Object.fromEntries(headerSlotDefinitions.map((slot) => {
+    const selected = normalizedAssignments[slot.slotKey];
+    const hasExplicitConfirmation = Object.prototype.hasOwnProperty.call(source, slot.slotKey);
+    // Existing saved drafts contained only confirmed field mappings. Preserve that
+    // meaning when they are loaded, while new selections remain pending until ✓.
+    const confirmed = !slot.platformManaged
+      && isModuleFieldHeaderAssignment(selected)
+      && (hasExplicitConfirmation ? source[slot.slotKey] === true : true);
+    return [slot.slotKey, confirmed];
+  }));
 }
 
 const sample = {
@@ -73,21 +93,8 @@ const sample = {
     semanticModelKey: "exampleProductDictionaryV1",
     passportPolicyKey: "exampleProductDppV1",
     defaultCarrierPolicyKey: "webPublicEntryV1",
-    systemHeaderFieldAssignments: {
-      digitalProductPassportId: "__managed__:internalManagedDigitalProductPassportId",
-      uniqueProductIdentifier: "__managed__:internalManagedUniqueProductIdentifier",
-      internalAliasId: "__managed__:internalManagedInternalAliasId",
-      granularity: "__managed__:internalManagedGranularity",
-      dppSchemaVersion: "__managed__:internalManagedDppSchemaVersion",
-      dppStatus: "__managed__:internalManagedDppStatus",
-      lastUpdate: "__managed__:internalManagedLastUpdate",
-      economicOperatorId: "__managed__:internalManagedEconomicOperatorId",
-      facilityId: "__managed__:internalManagedFacilityId",
-      contentSpecificationIds: "__managed__:internalManagedContentSpecificationIds",
-      subjectDid: "__managed__:internalManagedSubjectDid",
-      dppDid: "__managed__:internalManagedDppDid",
-      companyDid: "__managed__:internalManagedCompanyDid",
-    },
+    systemHeaderFieldAssignments: {},
+    systemHeaderFieldConfirmations: {},
     // The hosted DPP dictionary and public semantic links are rooted here.
     baseUrl: "https://claros-dpp.online",
     dictionaryName: "Example Product Dictionary",
@@ -272,6 +279,7 @@ let syncingGraphSources = false;
 let graphSourceSyncTimer = null;
 let preservedRoleState = null;
 let preservedSystemHeaderAssignments = null;
+let preservedSystemHeaderFieldConfirmations = null;
 let graphNodeSequence = 0;
 let selectedGraphNodeId = "root";
 let fieldsNodeSequence = 0;
@@ -813,9 +821,8 @@ function createBlankSpec() {
       semanticModelKey: "",
       passportPolicyKey: "",
       defaultCarrierPolicyKey: "webPublicEntryV1",
-      systemHeaderFieldAssignments: Object.fromEntries(
-        headerSlotDefinitions.map((slot) => [slot.slotKey, `__managed__:${slot.managedKey}`])
-      ),
+      systemHeaderFieldAssignments: {},
+      systemHeaderFieldConfirmations: {},
       baseUrl: "https://claros-dpp.online",
       dictionaryName: "",
       dictionaryDescription: "",
@@ -1789,6 +1796,14 @@ function renderSystemHeaderFields(fields) {
   const previousSelections = Object.fromEntries(
     $$("[data-system-header-slot]", container).map((select) => [select.dataset.systemHeaderSlot, select.value])
   );
+  const selectedAssignments = {
+    ...normalizeSystemHeaderAssignments(preservedSystemHeaderAssignments || {}),
+    ...previousSelections,
+  };
+  const confirmations = normalizeSystemHeaderFieldConfirmations(
+    preservedSystemHeaderFieldConfirmations || {},
+    selectedAssignments
+  );
   container.innerHTML = "";
 
   const createGroup = ({ title, description, className }) => {
@@ -1806,50 +1821,64 @@ function renderSystemHeaderFields(fields) {
   };
 
   const mappedFieldsGroup = createGroup({
-    title: "Fields from Sections & Fields",
-    description: "Select the field whose entered value should populate this header value.",
+    title: "Header fields",
+    description: "Every header starts blank. Select a field, then confirm it to rename that field to the header key used by the app. Use × to restore a confirmed field to a key derived from its label.",
     className: "system-header-group system-header-editable-group",
   });
-  const managedFieldsGroup = createGroup({
-    title: "Platform-managed header values",
-    description: "These values are generated or resolved by the platform and cannot be replaced by a form field.",
-    className: "system-header-group system-header-managed-group",
-  });
 
-  for (const slot of headerSlotDefinitions) {
-    if (slot.managedOnly) {
-      const row = document.createElement("div");
-      row.className = "presentation-row system-header-managed-row";
-      const text = document.createElement("span");
-      text.textContent = slot.label;
-      const badge = document.createElement("span");
-      badge.className = "system-managed-badge";
-      badge.textContent = "System managed";
-      row.append(text, badge);
-      row.title = "This DID is generated and maintained by the platform.";
-      managedFieldsGroup.appendChild(row);
-      continue;
-    }
-    const row = document.createElement("label");
-    row.className = "presentation-row";
+  for (const slot of headerSlotDefinitions.filter((slot) => !slot.platformManaged)) {
+    const row = document.createElement("div");
+    row.className = "presentation-row system-header-mappable-row";
     const text = document.createElement("span");
     text.textContent = slot.label;
     row.appendChild(text);
     const optionPairs = [
-      [`__managed__:${slot.managedKey}`, "Use managed value"],
       ...fieldOptionEntries(fields).map(({ value, label }) => [value, label]),
     ];
     const select = createFieldSelect(
       "systemHeaderSlot",
       slot.slotKey,
-      previousSelections[slot.slotKey] || `__managed__:${slot.managedKey}`,
+      selectedAssignments[slot.slotKey] || "",
       optionPairs,
       "Leave empty"
     );
     select.dataset.systemHeaderSlot = slot.slotKey;
-    select.addEventListener("change", () => queueDerivedFieldsRefresh());
+    select.addEventListener("change", () => {
+      handleSystemHeaderFieldSelectionChange(slot.slotKey);
+    });
     row.appendChild(select);
-    row.title = "Choose a managed passport value or map a real module field into this header slot.";
+
+    const actions = document.createElement("div");
+    actions.className = "system-header-mapping-actions";
+    const selection = String(selectedAssignments[slot.slotKey] || "").trim();
+    const isFieldSelection = isModuleFieldHeaderAssignment(selection);
+    const isConfirmed = confirmations[slot.slotKey] === true && isFieldSelection;
+    const status = document.createElement("span");
+    status.className = `system-header-mapping-status${isConfirmed ? " is-confirmed" : ""}`;
+    status.textContent = isConfirmed
+      ? "Confirmed"
+      : isFieldSelection
+        ? "Pending confirmation"
+        : "Not mapped";
+    const confirmButton = document.createElement("button");
+    confirmButton.type = "button";
+    confirmButton.className = "system-header-mapping-confirm";
+    confirmButton.textContent = "✓";
+    confirmButton.title = `Confirm ${slot.label} mapping and use the ${slot.slotKey} field key`;
+    confirmButton.setAttribute("aria-label", confirmButton.title);
+    confirmButton.disabled = !isFieldSelection || isConfirmed;
+    confirmButton.addEventListener("click", () => confirmSystemHeaderFieldMapping(slot.slotKey));
+    const restoreButton = document.createElement("button");
+    restoreButton.type = "button";
+    restoreButton.className = "system-header-mapping-restore";
+    restoreButton.textContent = "×";
+    restoreButton.title = `Clear ${slot.label} mapping and restore a label-derived field key`;
+    restoreButton.setAttribute("aria-label", restoreButton.title);
+    restoreButton.disabled = !isFieldSelection;
+    restoreButton.addEventListener("click", () => restoreSystemHeaderFieldMapping(slot.slotKey));
+    actions.append(status, confirmButton, restoreButton);
+    row.appendChild(actions);
+    row.title = "A selected field stays unchanged until it is confirmed. Confirmed mappings use the app's header key; × safely restores the label-derived key.";
     mappedFieldsGroup.appendChild(row);
   }
 
@@ -1860,7 +1889,72 @@ function renderSystemHeaderFields(fields) {
     mappedFieldsGroup.appendChild(empty);
   }
 
-  container.append(mappedFieldsGroup, managedFieldsGroup);
+  container.append(mappedFieldsGroup);
+}
+
+function getSystemHeaderFieldConfirmations(assignments = {}) {
+  return normalizeSystemHeaderFieldConfirmations(
+    preservedSystemHeaderFieldConfirmations || {},
+    assignments
+  );
+}
+
+function handleSystemHeaderFieldSelectionChange(slotKey) {
+  const assignments = readSystemHeaderAssignmentsFromDom();
+  const confirmations = getSystemHeaderFieldConfirmations(assignments);
+  confirmations[slotKey] = false;
+  preservedSystemHeaderAssignments = assignments;
+  preservedSystemHeaderFieldConfirmations = confirmations;
+  // Changing a confirmed selection immediately restores the old field before
+  // the newly selected field can be confirmed.
+  refreshDerivedFieldsMetadata({ headerAssignments: assignments, headerConfirmations: confirmations });
+  queueSessionSave();
+}
+
+function confirmSystemHeaderFieldMapping(slotKey) {
+  const assignments = readSystemHeaderAssignmentsFromDom();
+  const selectedFieldKey = String(assignments[slotKey] || "").trim();
+  if (!isModuleFieldHeaderAssignment(selectedFieldKey)) {
+    setMessage("Select a module field before confirming a header mapping.", "error");
+    return;
+  }
+  const confirmations = getSystemHeaderFieldConfirmations(assignments);
+  const conflictingSlot = Object.entries(confirmations).find(([otherSlotKey, confirmed]) => (
+    confirmed === true
+    && otherSlotKey !== slotKey
+    && assignments[otherSlotKey] === selectedFieldKey
+  ));
+  if (conflictingSlot) {
+    const header = headerSlotDefinitions.find((slot) => slot.slotKey === conflictingSlot[0]);
+    setMessage(`This field is already confirmed for ${header?.label || conflictingSlot[0]}. Restore it there before reusing it.`, "error");
+    return;
+  }
+  confirmations[slotKey] = true;
+  preservedSystemHeaderAssignments = assignments;
+  preservedSystemHeaderFieldConfirmations = confirmations;
+  refreshDerivedFieldsMetadata({ headerAssignments: assignments, headerConfirmations: confirmations });
+  const header = headerSlotDefinitions.find((slot) => slot.slotKey === slotKey);
+  setMessage(`Confirmed ${header?.label || slotKey}. The field now uses the ${slotKey} key.`, "success");
+  queueSessionSave();
+}
+
+function restoreSystemHeaderFieldMapping(slotKey) {
+  const assignments = readSystemHeaderAssignmentsFromDom();
+  const confirmations = getSystemHeaderFieldConfirmations(assignments);
+  const wasConfirmed = confirmations[slotKey] === true;
+  assignments[slotKey] = "";
+  confirmations[slotKey] = false;
+  preservedSystemHeaderAssignments = assignments;
+  preservedSystemHeaderFieldConfirmations = confirmations;
+  refreshDerivedFieldsMetadata({ headerAssignments: assignments, headerConfirmations: confirmations });
+  const header = headerSlotDefinitions.find((slot) => slot.slotKey === slotKey);
+  setMessage(
+    wasConfirmed
+      ? `Restored the field previously mapped to ${header?.label || slotKey} using its label-derived key.`
+      : `Cleared the pending ${header?.label || slotKey} mapping.`,
+    "success"
+  );
+  queueSessionSave();
 }
 
 function normalizeCompositionCharts(roles = {}) {
@@ -2259,13 +2353,17 @@ function remapDerivedHeaderAssignments(assignments, fieldKeyMap) {
   );
 }
 
-function applyRoleStateSelections(roles, assignments) {
+function applyRoleStateSelections(roles, assignments, confirmations = null) {
   preservedRoleState = {
     ...(roles || {}),
     summaryRoles: { ...(roles?.summaryRoles || {}) },
     lifecycleRoles: { ...(roles?.lifecycleRoles || {}) },
   };
   preservedSystemHeaderAssignments = normalizeSystemHeaderAssignments(assignments);
+  preservedSystemHeaderFieldConfirmations = normalizeSystemHeaderFieldConfirmations(
+    confirmations || preservedSystemHeaderFieldConfirmations || {},
+    preservedSystemHeaderAssignments
+  );
   renderCompositionCharts(normalizeCompositionCharts(roles));
   syncRoleOptions();
   setFormValue("businessIdentifierField", roles?.businessIdentifierField);
@@ -2352,7 +2450,7 @@ function applyDerivedSectionsToDom(derivedSections) {
   return { fieldKeyMap, columnKeyMap };
 }
 
-function assignCanonicalSystemFieldOverridesFromDom(roles, assignments) {
+function assignCanonicalSystemFieldOverridesFromDom(roles, assignments, confirmations) {
   const canonicalKeys = new Set(["modelName", ...headerSlotDefinitions.map((slot) => slot.slotKey)]);
   const rows = $$(".field-row");
   const rowsByCurrentKey = new Map();
@@ -2366,7 +2464,7 @@ function assignCanonicalSystemFieldOverridesFromDom(roles, assignments) {
   if (modelNameField) requestedAssignments.push(["modelName", modelNameField]);
   for (const slot of headerSlotDefinitions) {
     const value = String(assignments?.[slot.slotKey] || "").trim();
-    if (!value || value.startsWith("__managed__:")) continue;
+    if (!confirmations?.[slot.slotKey] || !isModuleFieldHeaderAssignment(value)) continue;
     requestedAssignments.push([slot.slotKey, value]);
   }
 
@@ -2391,21 +2489,22 @@ function assignCanonicalSystemFieldOverridesFromDom(roles, assignments) {
   }
 }
 
-function refreshDerivedFieldsMetadata() {
+function refreshDerivedFieldsMetadata({ headerAssignments = null, headerConfirmations = null } = {}) {
   if (refreshingDerivedFields || suspendDerivedFieldsRefresh) return;
   refreshingDerivedFields = true;
   try {
     const roles = $$(".field-row").length ? readRoleStateFromDom() : preservedRoleState || {};
-    const assignments = $$(".field-row").length
+    const assignments = headerAssignments || ($$(".field-row").length
       ? readSystemHeaderAssignmentsFromDom()
-      : preservedSystemHeaderAssignments || {};
-    assignCanonicalSystemFieldOverridesFromDom(roles, assignments);
+      : preservedSystemHeaderAssignments || {});
+    const confirmations = headerConfirmations || getSystemHeaderFieldConfirmations(assignments);
+    assignCanonicalSystemFieldOverridesFromDom(roles, assignments, confirmations);
     const sourceSections = getTopLevelSectionNodes().map(readSection);
     const derivedSections = derivedFieldMetadata.deriveSections(sourceSections);
     const { fieldKeyMap, columnKeyMap } = applyDerivedSectionsToDom(derivedSections);
     const remappedRoles = remapDerivedRoleState(roles, fieldKeyMap, columnKeyMap);
     const remappedAssignments = remapDerivedHeaderAssignments(assignments, fieldKeyMap);
-    applyRoleStateSelections(remappedRoles, remappedAssignments);
+    applyRoleStateSelections(remappedRoles, remappedAssignments, confirmations);
     renderFieldsExplorer();
     queueGraphSourceSync();
   } finally {
@@ -4079,10 +4178,17 @@ function readSpec() {
   if (hasFields || !preservedRoleState) {
     preservedRoleState = readRoleStateFromDom();
     preservedSystemHeaderAssignments = readSystemHeaderAssignmentsFromDom();
+    preservedSystemHeaderFieldConfirmations = getSystemHeaderFieldConfirmations(
+      preservedSystemHeaderAssignments
+    );
   }
   const roles = preservedRoleState || readRoleStateFromDom();
   const systemHeaderFieldAssignments = normalizeSystemHeaderAssignments(
     preservedSystemHeaderAssignments || readSystemHeaderAssignmentsFromDom()
+  );
+  const systemHeaderFieldConfirmations = normalizeSystemHeaderFieldConfirmations(
+    preservedSystemHeaderFieldConfirmations || {},
+    systemHeaderFieldAssignments
   );
   return {
     module: {
@@ -4097,6 +4203,7 @@ function readSpec() {
       passportPolicyKey: getFormValue("passportPolicyKey"),
       defaultCarrierPolicyKey: getFormValue("defaultCarrierPolicyKey"),
       systemHeaderFieldAssignments: { ...systemHeaderFieldAssignments },
+      systemHeaderFieldConfirmations: { ...systemHeaderFieldConfirmations },
       baseUrl: getFormValue("baseUrl"),
       dictionaryName: getFormValue("dictionaryName"),
       dictionaryDescription: getFormValue("dictionaryDescription"),
@@ -4117,6 +4224,10 @@ function loadSpec(spec) {
   assertCanonicalSectionsSpec(spec);
   const roles = spec.roles || {};
   const assignments = normalizeSystemHeaderAssignments(spec.module?.systemHeaderFieldAssignments);
+  const confirmations = normalizeSystemHeaderFieldConfirmations(
+    spec.module?.systemHeaderFieldConfirmations,
+    assignments
+  );
   suspendDerivedFieldsRefresh = true;
   try {
     preservedRoleState = {
@@ -4125,6 +4236,7 @@ function loadSpec(spec) {
       lifecycleRoles: { ...(roles.lifecycleRoles || {}) },
     };
     preservedSystemHeaderAssignments = assignments;
+    preservedSystemHeaderFieldConfirmations = confirmations;
     Object.entries(spec.module || {}).forEach(([key, value]) => setFormValue(key, value));
     const objectTypes = roles.objectTypes && typeof roles.objectTypes === "object" ? roles.objectTypes : {};
     const valueDataTypes = roles.valueDataTypes && typeof roles.valueDataTypes === "object" ? roles.valueDataTypes : {};
@@ -4140,7 +4252,7 @@ function loadSpec(spec) {
     }
     maybeAutoModuleValues();
     loadSemanticGraphDraft(spec.semanticGraph);
-    applyRoleStateSelections(roles, assignments);
+    applyRoleStateSelections(roles, assignments, confirmations);
   } finally {
     suspendDerivedFieldsRefresh = false;
   }
@@ -4215,6 +4327,9 @@ function clearModuleStep() {
 function clearFieldsStep() {
   preservedRoleState = readRoleStateFromDom();
   preservedSystemHeaderAssignments = readSystemHeaderAssignmentsFromDom();
+  preservedSystemHeaderFieldConfirmations = getSystemHeaderFieldConfirmations(
+    preservedSystemHeaderAssignments
+  );
   if (graphSourceSyncTimer) {
     window.clearTimeout(graphSourceSyncTimer);
     graphSourceSyncTimer = null;
@@ -4238,7 +4353,8 @@ function clearViewerStep() {
     summaryRoles: {},
     lifecycleRoles: {},
   };
-  preservedSystemHeaderAssignments = getManagedOnlyHeaderAssignments();
+  preservedSystemHeaderAssignments = {};
+  preservedSystemHeaderFieldConfirmations = {};
   setFormValue("businessIdentifierField", "");
   setFormValue("modelNameField", "");
   renderCompositionCharts([]);
@@ -4348,22 +4464,32 @@ function reconcileFieldsImportDependencies(spec, sections) {
   spec.roles = roles;
 
   const assignments = normalizeSystemHeaderAssignments(spec.module?.systemHeaderFieldAssignments);
+  const confirmations = normalizeSystemHeaderFieldConfirmations(
+    spec.module?.systemHeaderFieldConfirmations,
+    assignments
+  );
   const reconciledAssignments = {};
+  const reconciledConfirmations = {};
   for (const slot of headerSlotDefinitions) {
     const managedValue = `__managed__:${slot.managedKey}`;
     const value = assignments[slot.slotKey] || "";
-    if (slot.managedOnly) {
+    if (slot.platformManaged) {
       reconciledAssignments[slot.slotKey] = managedValue;
+      reconciledConfirmations[slot.slotKey] = false;
     } else if (!value || value === managedValue || fieldsByKey.has(value)) {
       reconciledAssignments[slot.slotKey] = value;
+      reconciledConfirmations[slot.slotKey] = confirmations[slot.slotKey] === true
+        && isModuleFieldHeaderAssignment(value);
     } else {
-      reconciledAssignments[slot.slotKey] = managedValue;
+      reconciledAssignments[slot.slotKey] = "";
+      reconciledConfirmations[slot.slotKey] = false;
       clearedMappingCount += 1;
     }
   }
   spec.module = {
     ...(spec.module || {}),
     systemHeaderFieldAssignments: reconciledAssignments,
+    systemHeaderFieldConfirmations: reconciledConfirmations,
   };
   return { clearedMappingCount };
 }

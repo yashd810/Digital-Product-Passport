@@ -199,7 +199,7 @@
       "sh:property": [
         {
           "sh:path": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-schema"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-schema-version"
           },
           "sh:name": "DPP Schema",
           "sh:minCount": 0,
@@ -210,7 +210,7 @@
         },
         {
           "sh:path": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/general-information-dpp-administration-dpp-status"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-status"
           },
           "sh:name": "DPP Status",
           "sh:minCount": 0,
@@ -221,20 +221,23 @@
           "sh:in": {
             "@list": [
               {
-                "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus/original"
+                "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/active"
               },
               {
-                "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus/remanufactured"
+                "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/in-active"
               },
               {
-                "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus/repurposed"
+                "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/archieved"
+              },
+              {
+                "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/obeslete"
               }
             ]
           }
         },
         {
           "sh:path": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-granularity"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/granularity"
           },
           "sh:name": "DPP Granularity",
           "sh:minCount": 0,
@@ -245,7 +248,7 @@
         },
         {
           "sh:path": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/date-time-of-latest-update-of-dpp"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/last-update"
           },
           "sh:name": "Date-time of latest update of DPP",
           "sh:minCount": 0,
@@ -256,7 +259,7 @@
         },
         {
           "sh:path": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/unique-dpp-identifier"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/digital-product-passport-id"
           },
           "sh:name": "Unique DPP identifier",
           "sh:minCount": 0,
@@ -284,7 +287,7 @@
       "sh:property": [
         {
           "sh:path": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/unique-battery-identifier"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/unique-product-identifier"
           },
           "sh:name": "Unique Battery Identifier",
           "sh:minCount": 0,
@@ -344,8 +347,21 @@
           "sh:name": "Battery status",
           "sh:minCount": 0,
           "sh:maxCount": 1,
-          "sh:datatype": {
-            "@id": "http://www.w3.org/2001/XMLSchema#string"
+          "sh:nodeKind": {
+            "@id": "sh:IRI"
+          },
+          "sh:in": {
+            "@list": [
+              {
+                "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus/original"
+              },
+              {
+                "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus/remanufactured"
+              },
+              {
+                "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus/repurposed"
+              }
+            ]
           }
         },
         {

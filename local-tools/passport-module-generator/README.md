@@ -138,11 +138,15 @@ what will be cleared, such as **Clear Module Info** or **Clear Semantic Graph**.
 Clearing one page preserves the other pages, saved drafts, and the rest of the
 current browser session.
 
-The Viewer Layout page always keeps Subject DID, DPP DID, and Company DID
-system-managed. Those slots are displayed as locked platform values and cannot
-be mapped to module fields. The server enforces the same rule for preview,
-download, and artifact generation even when an older draft contains custom DID
-assignments.
+The Viewer Layout page starts every user-mappable header slot blank. Choose a
+field from **Sections & Fields** for the header you want, then use **✓** to
+confirm the mapping. Confirmation is the only action that changes the field
+key to the header key expected by the app. A selection left pending keeps its
+label-derived field key and is not emitted as a header mapping. Use **×** to
+remove a pending or confirmed mapping; a confirmed field is regenerated from
+its visible label so it can be mapped correctly. Internal Alias ID, Subject
+DID, DPP DID, and Company DID are created by the platform and are intentionally
+not shown as Local Tools mapping choices.
 
 Viewer Layout supports any number of composition pie charts. Add one mapping
 per table field and choose that table's text label column and numeric value

@@ -392,11 +392,11 @@
   {
     "number": 14,
     "specRef": "BAT-014",
-    "slug": "dpp-administration-dpp-schema",
-    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-schema",
+    "slug": "dpp-administration-dpp-schema-version",
+    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-schema-version",
     "label": "DPP Schema",
     "definition": "The reference standard the DPP instance schema refers to",
-    "internalKey": "dppSchema",
+    "internalKey": "dppSchemaVersion",
     "dataType": {
       "format": "String",
       "jsonType": "string",
@@ -422,11 +422,11 @@
   {
     "number": 15,
     "specRef": "BAT-015",
-    "slug": "dpp-administration-general-information-dpp-administration-dpp-status",
-    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/general-information-dpp-administration-dpp-status",
+    "slug": "dpp-administration-dpp-status",
+    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-status",
     "label": "DPP Status",
     "definition": "The current status of the DPP as a digital resource",
-    "internalKey": "generalInformationDppAdministrationDppStatus",
+    "internalKey": "dppStatus",
     "dataType": {
       "format": "String",
       "jsonType": "string",
@@ -441,8 +441,8 @@
       "label": "DPP Administration"
     },
     "range": {
-      "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus",
-      "label": "Battery Status",
+      "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus",
+      "label": "DPP Status",
       "jsonType": "string"
     },
     "minCount": 0,
@@ -451,11 +451,11 @@
   {
     "number": 16,
     "specRef": "BAT-016",
-    "slug": "dpp-administration-dpp-granularity",
-    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-granularity",
+    "slug": "dpp-administration-granularity",
+    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/granularity",
     "label": "DPP Granularity",
     "definition": "The required level of information with regard to product item, batch or model",
-    "internalKey": "dppGranularity",
+    "internalKey": "granularity",
     "dataType": {
       "format": "String",
       "jsonType": "string",
@@ -481,11 +481,11 @@
   {
     "number": 17,
     "specRef": "BAT-017",
-    "slug": "dpp-administration-date-time-of-latest-update-of-dpp",
-    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/date-time-of-latest-update-of-dpp",
+    "slug": "dpp-administration-last-update",
+    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/last-update",
     "label": "Date-time of latest update of DPP",
     "definition": "Date and time of the latest update of the battery passport",
-    "internalKey": "dateTimeOfLatestUpdateOfDpp",
+    "internalKey": "lastUpdate",
     "dataType": {
       "format": "DateTime",
       "jsonType": "string",
@@ -511,11 +511,11 @@
   {
     "number": 18,
     "specRef": "BAT-018",
-    "slug": "dpp-administration-unique-dpp-identifier",
-    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/unique-dpp-identifier",
+    "slug": "dpp-administration-digital-product-passport-id",
+    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/digital-product-passport-id",
     "label": "Unique DPP identifier",
     "definition": "The unique identifier of a battery passport, equivalent to the unique DPP identifier in JTC-24 draft standards",
-    "internalKey": "uniqueDppIdentifier",
+    "internalKey": "digitalProductPassportId",
     "dataType": {
       "format": "URI/URL",
       "jsonType": "string",
@@ -541,11 +541,11 @@
   {
     "number": 19,
     "specRef": "BAT-019",
-    "slug": "battery-identification-unique-battery-identifier",
-    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/unique-battery-identifier",
+    "slug": "battery-identification-unique-product-identifier",
+    "iri": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/unique-product-identifier",
     "label": "Unique Battery Identifier",
     "definition": "The unique identifier of the battery item, equivalent to the unique product identifier in JTC-24 draft standards",
-    "internalKey": "uniqueBatteryIdentifier",
+    "internalKey": "uniqueProductIdentifier",
     "dataType": {
       "format": "URI/URL",
       "jsonType": "string",
@@ -702,7 +702,7 @@
       "xsdType": "xsd:string"
     },
     "unit": "none",
-    "rangeKind": "scalar",
+    "rangeKind": "enum",
     "domain": {
       "iri": "https://claros-dpp.online/dictionary/battery/v1/classes/BatteryIdentification",
       "curie": "battery:batteryIdentification",
@@ -710,9 +710,8 @@
       "label": "Battery Identification"
     },
     "range": {
-      "iri": "http://www.w3.org/2001/XMLSchema#string",
-      "curie": "xsd:string",
-      "label": "String",
+      "iri": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus",
+      "label": "Battery Status",
       "jsonType": "string"
     },
     "minCount": 0,

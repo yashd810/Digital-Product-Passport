@@ -1772,12 +1772,66 @@ textarea {
   line-height: 1.4;
 }
 
-.system-header-list .presentation-row {
+.system-header-list .system-header-mappable-row {
+  grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1fr) auto;
+}
+
+.system-header-list .system-header-managed-row {
   grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1fr);
 }
 
 .system-header-managed-row {
   min-height: 58px;
+}
+
+.system-header-mapping-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 210px;
+}
+
+.system-header-mapping-status {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.system-header-mapping-status.is-confirmed {
+  color: #13795b;
+}
+
+.system-header-mapping-confirm,
+.system-header-mapping-restore {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border-radius: 7px;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.system-header-mapping-confirm {
+  border-color: #71c5a6;
+  background: #ecfaf4;
+  color: #13795b;
+}
+
+.system-header-mapping-restore {
+  border-color: #e8a8a8;
+  background: #fff4f4;
+  color: #b4261d;
+}
+
+.system-header-mapping-confirm:disabled,
+.system-header-mapping-restore:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .system-managed-badge {

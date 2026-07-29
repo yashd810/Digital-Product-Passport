@@ -317,7 +317,7 @@
         {
           "@type": "owl:Restriction",
           "owl:onProperty": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-schema"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-schema-version"
           },
           "owl:maxCardinality": {
             "@value": 1,
@@ -327,7 +327,7 @@
         {
           "@type": "owl:Restriction",
           "owl:onProperty": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/general-information-dpp-administration-dpp-status"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-status"
           },
           "owl:maxCardinality": {
             "@value": 1,
@@ -337,7 +337,7 @@
         {
           "@type": "owl:Restriction",
           "owl:onProperty": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-granularity"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/granularity"
           },
           "owl:maxCardinality": {
             "@value": 1,
@@ -347,7 +347,7 @@
         {
           "@type": "owl:Restriction",
           "owl:onProperty": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/date-time-of-latest-update-of-dpp"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/last-update"
           },
           "owl:maxCardinality": {
             "@value": 1,
@@ -357,7 +357,7 @@
         {
           "@type": "owl:Restriction",
           "owl:onProperty": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/unique-dpp-identifier"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/digital-product-passport-id"
           },
           "owl:maxCardinality": {
             "@value": 1,
@@ -367,7 +367,7 @@
       ]
     },
     {
-      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-schema",
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-schema-version",
       "@type": "owl:DatatypeProperty",
       "rdfs:label": "DPP Schema",
       "rdfs:comment": "The reference standard the DPP instance schema refers to",
@@ -379,7 +379,7 @@
       }
     },
     {
-      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/general-information-dpp-administration-dpp-status",
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-status",
       "@type": "owl:ObjectProperty",
       "rdfs:label": "DPP Status",
       "rdfs:comment": "The current status of the DPP as a digital resource",
@@ -387,11 +387,11 @@
         "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/DppAdministration"
       },
       "rdfs:range": {
-        "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus"
+        "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus"
       }
     },
     {
-      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/dpp-granularity",
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/granularity",
       "@type": "owl:DatatypeProperty",
       "rdfs:label": "DPP Granularity",
       "rdfs:comment": "The required level of information with regard to product item, batch or model",
@@ -403,7 +403,7 @@
       }
     },
     {
-      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/date-time-of-latest-update-of-dpp",
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/last-update",
       "@type": "owl:DatatypeProperty",
       "rdfs:label": "Date-time of latest update of DPP",
       "rdfs:comment": "Date and time of the latest update of the battery passport",
@@ -415,7 +415,7 @@
       }
     },
     {
-      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/unique-dpp-identifier",
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/dpp-administration/digital-product-passport-id",
       "@type": "owl:DatatypeProperty",
       "rdfs:label": "Unique DPP identifier",
       "rdfs:comment": "The unique identifier of a battery passport, equivalent to the unique DPP identifier in JTC-24 draft standards",
@@ -435,7 +435,7 @@
         {
           "@type": "owl:Restriction",
           "owl:onProperty": {
-            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/unique-battery-identifier"
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/unique-product-identifier"
           },
           "owl:maxCardinality": {
             "@value": 1,
@@ -509,7 +509,7 @@
       ]
     },
     {
-      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/unique-battery-identifier",
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/unique-product-identifier",
       "@type": "owl:DatatypeProperty",
       "rdfs:label": "Unique Battery Identifier",
       "rdfs:comment": "The unique identifier of the battery item, equivalent to the unique product identifier in JTC-24 draft standards",
@@ -570,14 +570,14 @@
     },
     {
       "@id": "https://claros-dpp.online/dictionary/battery/v1/terms/battery-identification/battery-status",
-      "@type": "owl:DatatypeProperty",
+      "@type": "owl:ObjectProperty",
       "rdfs:label": "Battery status",
       "rdfs:comment": "Current status of the battery item in its life cycle",
       "rdfs:domain": {
         "@id": "https://claros-dpp.online/dictionary/battery/v1/classes/BatteryIdentification"
       },
       "rdfs:range": {
-        "@id": "http://www.w3.org/2001/XMLSchema#string"
+        "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus"
       }
     },
     {
@@ -4770,6 +4770,60 @@
         "https://claros-dpp.online/dictionary/battery/v1/enums/BatteryStatus"
       ],
       "rdfs:label": "Repurposed"
+    },
+    {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus",
+      "@type": "owl:Class",
+      "rdfs:label": "DPP Status",
+      "rdfs:comment": "DPP Status controlled vocabulary.",
+      "owl:oneOf": {
+        "@list": [
+          {
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/active"
+          },
+          {
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/in-active"
+          },
+          {
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/archieved"
+          },
+          {
+            "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/obeslete"
+          }
+        ]
+      }
+    },
+    {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/active",
+      "@type": [
+        "owl:NamedIndividual",
+        "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus"
+      ],
+      "rdfs:label": "Active"
+    },
+    {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/in-active",
+      "@type": [
+        "owl:NamedIndividual",
+        "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus"
+      ],
+      "rdfs:label": "InActive"
+    },
+    {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/archieved",
+      "@type": [
+        "owl:NamedIndividual",
+        "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus"
+      ],
+      "rdfs:label": "Archieved"
+    },
+    {
+      "@id": "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus/obeslete",
+      "@type": [
+        "owl:NamedIndividual",
+        "https://claros-dpp.online/dictionary/battery/v1/enums/DppStatus"
+      ],
+      "rdfs:label": "Obeslete"
     }
   ]
 }
