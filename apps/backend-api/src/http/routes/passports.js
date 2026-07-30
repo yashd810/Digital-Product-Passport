@@ -309,6 +309,7 @@ module.exports = function registerPassportRoutes(app, {
     buildCarrierAuthenticityStorageValue,
     getCompanyNameMap,
     buildComplianceManagedFields,
+    productIdentifierService,
     systemPassportFields,
     normalizePassportRow,
   });

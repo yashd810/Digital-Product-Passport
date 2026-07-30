@@ -38,7 +38,10 @@ function createHarness() {
     normalizePassportRequestBody: (body) => body || {},
     getPassportTypeSchema: async () => ({
       typeName: "exampleProductPassportV1",
-      allowedKeys: new Set(["manufacturer"]),
+      allowedKeys: new Set(["manufacturer", "uniqueProductIdentifier"]),
+      fieldsJson: {
+        identity: { businessIdentifierField: "uniqueProductIdentifier" },
+      },
     }),
     hasCompanyPassportTypeAccess: async () => true,
     createPassportTable: async () => { ddlCalls += 1; },
@@ -48,10 +51,13 @@ function createHarness() {
     editableReleaseStatusesSql: "('draft', 'inRevision')",
     hasReleasedLineageVersion: async () => false,
     normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
-    buildStoredProductIdentifiers: ({ internalAliasId }) => ({
+    buildStoredProductIdentifiers: ({ internalAliasId, passportLike }) => ({
       internalAliasId,
-      uniqueProductIdentifier: `did:web:example.test:did:example-product-passport-v1:item:${internalAliasId}`,
+      uniqueProductIdentifier: `did:web:example.test:did:example-product-passport-v1:item:${passportLike?.uniqueProductIdentifier || internalAliasId}`,
     }),
+    productIdentifierService: {
+      getBusinessIdentifierField: () => "uniqueProductIdentifier",
+    },
     findExistingPassportByInternalAliasId: async () => null,
     normalizeReleaseStatus: (status) => status,
     getCompanyNameMap: async () => new Map([["7", "Acme Devices"]]),
@@ -112,6 +118,25 @@ test("regular passport update reconciles policy-owned fields from managed policy
   assert.equal(getCapturedUpdateData().contentSpecificationIds, JSON.stringify(["exampleProductDictionaryV1"]));
   assert.equal(result.passport.passportPolicyKey, "exampleProductDppV1");
   assert.equal(result.passport.contentSpecificationIds, JSON.stringify(["exampleProductDictionaryV1"]));
+});
+
+test("regular passport updates regenerate the canonical identifier from its mapped schema field", async () => {
+  const { getCapturedUpdateData, updateEditablePassport } = createHarness();
+
+  const result = await updateEditablePassport({
+    req: {
+      params: { companyId: "7", dppId: "dppRegularPatchTest" },
+      user: { userId: 9, companyId: 7, role: "companyAdmin" },
+      body: {
+        passportType: "exampleProductPassportV1",
+        uniqueProductIdentifier: "BUSINESS-ID-002",
+      },
+    },
+  });
+
+  const expected = "did:web:example.test:did:example-product-passport-v1:item:BUSINESS-ID-002";
+  assert.equal(getCapturedUpdateData().uniqueProductIdentifier, expected);
+  assert.equal(result.passport.uniqueProductIdentifier, expected);
 });
 
 test("regular passport updates scope the editable-record lookup to the route company", async () => {
