@@ -14,6 +14,17 @@ const {
   runSeed,
 } = require("../scripts/seed-passport-types");
 const { getPassportTypeModule } = require("../src/services/passport-module-registry");
+const { compilePassportTypeProfile } = require("../src/services/passport-type-profile");
+
+function findFieldByKey(sections, fieldKey) {
+  for (const section of sections || []) {
+    const direct = (section.fields || []).find((field) => field.key === fieldKey);
+    if (direct) return direct;
+    const nested = findFieldByKey(section.sections || [], fieldKey);
+    if (nested) return nested;
+  }
+  return null;
+}
 
 function createMockPool() {
   const calls = [];
@@ -207,6 +218,7 @@ test("parseOptions supports explicit company access targets", () => {
   ]), {
     dryRun: false,
     skipStorage: true,
+    refreshModuleProfile: false,
     requestedModule: "example-product:v1",
     companyIds: [7, 8],
     grantAllActiveCompanies: false,
@@ -369,6 +381,46 @@ test("existing curated passport type profiles are never overwritten by the seed"
   assert.equal(result.displayName, "Curated Example Product Type");
   assert.equal(calls.some((call) => String(call.sql).startsWith("UPDATE \"passportTypes\"")), false);
   assert.equal(calls.some((call) => String(call.sql).startsWith("INSERT INTO \"passportTypes\"")), false);
+});
+
+test("an explicit module profile refresh reapplies corrected module metadata", async () => {
+  const definition = getPassportTypeModule("battery:v1");
+  const staleFieldsJson = JSON.parse(JSON.stringify(compilePassportTypeProfile({
+    moduleDefinition: definition,
+    schemaVersion: 1,
+  })));
+  findFieldByKey(staleFieldsJson.sections, "dateOfPuttingTheBatteryIntoService").confidentiality = "restricted";
+  staleFieldsJson.profile.includedFields.find((field) =>
+    field.sourceModuleFieldKey === "dateOfPuttingTheBatteryIntoService"
+  ).confidentiality = "restricted";
+  const existing = {
+    id: 314,
+    typeName: definition.typeName,
+    displayName: definition.displayName,
+    isActive: true,
+    fieldsJson: staleFieldsJson,
+  };
+  const pool = {
+    async query(sql, params = []) {
+      if (String(sql).startsWith("INSERT INTO \"productCategories\"")) return { rows: [] };
+      if (String(sql).includes("FROM \"passportTypes\"") && String(sql).includes("WHERE \"typeName\" = $1")) {
+        return { rows: [existing] };
+      }
+      if (String(sql).startsWith("UPDATE \"passportTypes\"")) {
+        return { rows: [{ ...existing, fieldsJson: JSON.parse(params[1]) }] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+
+  const result = await ensurePassportType(pool, definition, { refreshModuleProfile: true });
+
+  assert.equal(result.seedAction, "refreshedProfile");
+  assert.equal(result.fieldsJson.schemaVersion, 2);
+  assert.equal(
+    findFieldByKey(result.fieldsJson.sections, "dateOfPuttingTheBatteryIntoService").confidentiality,
+    "public"
+  );
 });
 
 test("a legacy subset type is preserved rather than being expanded by the seed", async () => {

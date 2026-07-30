@@ -1095,6 +1095,10 @@ function createCanonicalPassportSerializer({
       contentSpecificationIds: Array.isArray(contentSpecificationIds) ? contentSpecificationIds : [],
       passportPolicyKey: passport.passportPolicyKey || null,
       carrierPolicyKey: passport.carrierPolicyKey || null,
+      // Product imagery is platform-managed presentation metadata rather than
+      // a semantic dictionary field, so carry it alongside the canonical
+      // payload instead of discarding it during schema-field serialization.
+      productImage: passport.productImage || null,
       ...buildCarrierAuthenticityResponseFields(passport.carrierAuthenticity),
       subjectDid,
       dppDid,

@@ -92,6 +92,19 @@ function filterViewerSections(sections = []) {
     .filter((section) => (section.fields || []).length || (section.sections || []).length);
 }
 
+function filterDataViewerSections(sections = []) {
+  return (Array.isArray(sections) ? sections : [])
+    .map((section) => ({
+      ...section,
+      // Symbols belong to the product overview, where they can be previewed
+      // alongside the other visual product information. Do not duplicate
+      // them in the textual Data tab.
+      fields: (section.fields || []).filter((field) => field?.type !== "symbol"),
+      sections: filterDataViewerSections(section.sections || []),
+    }))
+    .filter((section) => (section.fields || []).length || (section.sections || []).length);
+}
+
 function flattenSections(sections) {
   return flattenSchemaFieldsFromSections(sections)
     .filter((field) => !isViewerHiddenField(field))
@@ -539,11 +552,12 @@ function DataFieldRow({
   );
 }
 
-function DataFieldRows({ fields = [], ...fieldProps }) {
-  if (!fields.length) return null;
+export function DataFieldRows({ fields = [], ...fieldProps }) {
+  const dataFields = fields.filter((field) => field?.type !== "symbol");
+  if (!dataFields.length) return null;
   return (
     <ul className="field-list">
-      {fields.map((field) => (
+      {dataFields.map((field) => (
         <DataFieldRow key={field.key} field={field} {...fieldProps} />
       ))}
     </ul>
@@ -631,6 +645,7 @@ function DocumentCard({
   const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
   const documentValue = !isLocked && isFilled(resolved.raw) ? resolved.raw : null;
   const safeDocumentHref = toSafeResourceHref(documentValue);
+  const isPdfDocument = Boolean(documentValue) && (field.type === "file" || isPdfLikeUrl(documentValue));
   const handleOpenDocument = async (e) => {
     if (typeof onRefreshFieldUrl !== "function") return;
     e.preventDefault();
@@ -640,13 +655,19 @@ function DocumentCard({
 
   return (
     <article className="doc-card">
-      <div className="doc-icon">{field.type === "symbol" ? "IMG" : field.type === "file" ? "PDF" : "LINK"}</div>
+      <div className="doc-icon">{field.type === "symbol" ? "IMG" : isPdfDocument ? "PDF" : "LINK"}</div>
       <div>
         <h3>{fieldLabel}</h3>
       </div>
       <span className="badge neutral">{field.type}</span>
       <div className="doc-preview-area">
-        {documentValue && (field.type === "symbol" || isImageLikeUrl(documentValue)) ? (
+        {isPdfDocument ? (
+          <FileCell
+            url={documentValue}
+            label={fieldLabel}
+            onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(field.key, documentValue) : null}
+          />
+        ) : documentValue && (field.type === "symbol" || isImageLikeUrl(documentValue)) ? (
           <div className="doc-asset-shell">
             <div className="doc-asset-visual">
               <RefreshableImage
@@ -717,22 +738,26 @@ export default function PublicPassportPortal({
     () => filterViewerSections(typeDef?.fieldsJson?.sections || typeDef?.sections || []),
     [typeDef]
   );
+  const dataSections = useMemo(() => filterDataViewerSections(sections), [sections]);
   const fields = useMemo(() => flattenSections(sections), [sections]);
   const semanticGraph = typeDef?.fieldsJson?.semanticGraph || null;
-  const selectedDataSection = sections.find((section) => (section.key || translateSchemaLabel(lang, section)) === activeDataSectionKey)
-    || sections[0]
+  const selectedDataSection = dataSections.find((section) => (section.key || translateSchemaLabel(lang, section)) === activeDataSectionKey)
+    || dataSections[0]
     || null;
 
   useEffect(() => {
-    if (!sections.length) {
+    if (!dataSections.length) {
       if (activeDataSectionKey) setActiveDataSectionKey("");
       return;
     }
-    if (!selectedDataSection) {
-      const first = sections[0];
+    const hasActiveDataSection = dataSections.some((section) =>
+      (section.key || translateSchemaLabel(lang, section)) === activeDataSectionKey
+    );
+    if (!hasActiveDataSection) {
+      const first = dataSections[0];
       setActiveDataSectionKey(first.key || translateSchemaLabel(lang, first));
     }
-  }, [activeDataSectionKey, lang, sections, selectedDataSection]);
+  }, [activeDataSectionKey, dataSections, lang, selectedDataSection]);
 
   useEffect(() => {
     if (!publicHistoryPayload) return;
@@ -1096,7 +1121,7 @@ export default function PublicPassportPortal({
           <h2 className="data-title">Passport data</h2>
           <div className="data-browser">
             <aside className="data-section-nav" aria-label="Passport data sections">
-              {sections.map((section, sectionIndex) => {
+              {dataSections.map((section, sectionIndex) => {
                 const isActive = selectedDataSection === section;
                 return (
                   <button

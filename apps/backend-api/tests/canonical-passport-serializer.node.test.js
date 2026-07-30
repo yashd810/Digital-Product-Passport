@@ -159,6 +159,7 @@ test("canonical serializer resolves terms from explicit semantic field metadata"
     lineageId: "MD-LINEAGE-001",
     companyId: 42,
     internalAliasId: "DEVICE-001",
+    productImage: "https://assets.example.test/device-001.png",
     releaseStatus: "released",
     updatedAt: "2026-06-02T08:00:00.000Z",
     contentSpecificationIds: ["exampleProductDictionaryV1"],
@@ -179,6 +180,7 @@ test("canonical serializer resolves terms from explicit semantic field metadata"
 
   assert.equal(canonical.fields.deviceMaterial, "Surgical steel");
   assert.equal(canonical.fields.sterilizationCycles, 12);
+  assert.equal(canonical.productImage, "https://assets.example.test/device-001.png");
   assert.equal(Object.prototype.hasOwnProperty.call(canonical.fields, "excludedLegacyField"), false);
   assert.deepEqual(canonical.semanticProfile, {
     typeName: "exampleProductPassportV1",

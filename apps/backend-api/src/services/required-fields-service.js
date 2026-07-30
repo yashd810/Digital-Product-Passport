@@ -149,7 +149,9 @@ module.exports = function createRequiredFieldsService({
   }
 
   function buildCompleteness(fields, passport) {
-    const requiredFields = (fields || []).filter((field) => field?.required === true);
+    const requiredFields = (fields || []).filter((field) =>
+      field?.required === true || Number(field?.minCount) > 0
+    );
     const missingFields = [];
     let filledFields = 0;
     const applicableFieldDetails = [];

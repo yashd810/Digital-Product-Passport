@@ -23,5 +23,9 @@ describe("passport form system field handling", () => {
     expect(source).not.toContain("renderManagedComplianceSection");
     expect(source).not.toMatch(/\bsetModelName\b/);
     expect(source).not.toContain("buildPassportFormHeaderContext");
+    expect(source).not.toContain("canonicalizeRecordToSchemaKeys");
+    expect(source).toMatch(/const persistedFormData = formDataRef\.current/);
+    const nonPersistedBlock = source.match(/const nonPersistedPayloadKeys = new Set\(\[([\s\S]*?)\]\);/);
+    expect(nonPersistedBlock?.[1]).not.toContain("uniqueProductIdentifier");
   });
 });

@@ -168,7 +168,13 @@ function createDraftPassportUseCase(deps) {
       passportLike: { ...fields, modelName, internalAliasId: normalizedProductId },
       typeDef: typeSchema.typeDef || typeSchema,
     });
-    const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key) || builtInEditableFields.has(key));
+    // `uniqueProductIdentifier` may be the user-selected business identifier
+    // field. Its canonical, platform-resolved value is written through the
+    // dedicated column below, so it must not be added twice to this INSERT.
+    const dataFields = getWritablePassportColumns(fields).filter((key) =>
+      key !== "uniqueProductIdentifier"
+      && (typeSchema.allowedKeys.has(key) || builtInEditableFields.has(key))
+    );
     const schemaFieldsByKey = new Map((typeSchema.schemaFields || []).map((field) => [field.key, field]));
     const processedFields = Object.fromEntries(dataFields.map((key) => {
       const fieldDefinition = schemaFieldsByKey.get(key);

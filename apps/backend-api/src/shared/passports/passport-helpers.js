@@ -522,7 +522,7 @@ const getPassportFieldValue = (passport, fieldKey) => {
 };
 
 const toStoredPassportValue = (value) =>
-  (Array.isArray(value) || (typeof value === "object" && value !== null))
+  (Array.isArray(value) || Object.prototype.toString.call(value) === "[object Object]")
     ? JSON.stringify(value)
     : value;
 

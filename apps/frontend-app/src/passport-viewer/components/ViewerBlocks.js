@@ -4,7 +4,6 @@ import { normalizePublicViewerOrigin } from "../../passports/utils/publicViewerU
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import {
   isTrustedApiRequestUrl,
-  safeWindowOpen,
   toSafeImageSrc,
   toSafeResourceHref,
 } from "../../shared/security/urlSafety";
@@ -128,27 +127,14 @@ export function FileCell({ url, label, onRefreshUrl = null }) {
     }
   };
 
-  const handleOpen = async (event) => {
-    event.preventDefault();
-    setError(null);
-    try {
-      const activeUrl = await tryResolveUrl();
-      if (!safeWindowOpen(activeUrl, { resource: true })) {
-        throw new Error("File link is unavailable");
-      }
-    } catch (caught) {
-      setError(caught.message || "Could not open file");
-    }
-  };
-
   return (
     <div className="pdf-cell">
       {error && <div className="pdf-err" role="alert">{error}</div>}
       {open && blobUrl && <iframe id={previewId} src={blobUrl} title={label} className="pdf-iframe" />}
       <div className="pdf-cell-actions">
         {safeInitialUrl ? (
-          <a href={safeInitialUrl} target="_blank" rel="noopener noreferrer" className="pdf-open-link" onClick={handleOpen}>
-            Open
+          <a href={safeInitialUrl} target="_blank" rel="noopener noreferrer" className="pdf-open-link">
+            Open full PDF
           </a>
         ) : <span className="pdf-err">File link unavailable</span>}
         <button
@@ -159,7 +145,7 @@ export function FileCell({ url, label, onRefreshUrl = null }) {
           aria-expanded={open}
           aria-controls={previewId}
         >
-          {loading ? "Loading…" : open ? "Hide preview" : "Show preview"}
+          {loading ? "Loading…" : open ? "Hide preview" : "Preview PDF"}
         </button>
       </div>
     </div>

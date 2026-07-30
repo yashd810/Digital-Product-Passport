@@ -101,3 +101,24 @@ test("complete required fields allow release without category rules", async () =
   assert.equal(result.workflowReleaseAllowed, true);
   assert.equal(result.directReleaseAllowed, true);
 });
+
+test("semantic minCount requirements contribute to release completeness", async () => {
+  const typeDef = createFixturePassportType();
+  typeDef.fieldsJson.sections[0].fields = [{
+    key: "productionDate",
+    label: "Production date",
+    type: "date",
+    minCount: 1,
+  }];
+  const service = createRequiredFieldsService({
+    pool: createMockPool(typeDef),
+  });
+
+  const result = await service.evaluatePassport({
+    passportType: typeDef.typeName,
+    granularity: "item",
+  }, typeDef.typeName, typeDef);
+
+  assert.equal(result.completeness.percentage, 0);
+  assert.equal(result.requiredFieldIssues[0].key, "productionDate");
+});

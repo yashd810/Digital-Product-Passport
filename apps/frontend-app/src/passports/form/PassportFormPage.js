@@ -4,7 +4,6 @@ import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import {
   alignRecordToSchemaKeys,
   buildSchemaFieldKeyMap,
-  canonicalizeRecordToSchemaKeys,
   extractFieldValuesFromElements,
 } from "../../shared/passports/schemaKeyUtils";
 import {
@@ -109,8 +108,6 @@ function buildClonePrefill(record, sections) {
     "fields",
     "linkedData",
     "companyProfile",
-    "digitalProductPassportId",
-    "uniqueProductIdentifier",
     "subjectDid",
     "dppDid",
     "companyDid",
@@ -154,8 +151,6 @@ const nonEditableFormKeys = new Set([
   "deletedAt",
   "passportType",
   "qrCode",
-  "uniqueProductIdentifier",
-  "digitalProductPassportId",
   "subjectDid",
   "dppDid",
   "companyDid",
@@ -187,13 +182,7 @@ const reservedSystemFieldKeys = new Set([
 ]);
 
 const nonPersistedPayloadKeys = new Set([
-  "digitalProductPassportId",
-  "uniqueProductIdentifier",
   "internalAliasId",
-  "dppSchemaVersion",
-  "dppStatus",
-  "lastUpdate",
-  "contentSpecificationIds",
   "subjectDid",
   "dppDid",
   "companyDid",
@@ -379,7 +368,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     baselinePayloadRef.current = {
       internalAliasId: normalizePersistedComparisonValue(alignedData?.internalAliasId || ""),
       ...Object.fromEntries(
-        Object.entries(canonicalizeRecordToSchemaKeys(alignedData || {}, sections)).map(([key, value]) => [
+        Object.entries(alignedData || {}).map(([key, value]) => [
           key,
           normalizePersistedComparisonValue(value),
         ])
@@ -734,7 +723,10 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   };
 
   const buildPersistedBody = ({ onlyDirty = false } = {}) => {
-    const canonicalFormData = canonicalizeRecordToSchemaKeys(formDataRef.current, sections); // ← Use ref instead of state
+    // Preserve the exact schema/header keys chosen in Local Tools. A key is
+    // changed only by an explicit header-mapping confirmation, never while the
+    // form is saving a passport.
+    const persistedFormData = formDataRef.current;
     const schemaFieldKeys = new Set(
       flattenSchemaFieldsFromSections(Object.values(sections || {}))
         .map((field) => field?.key)
@@ -743,7 +735,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     const hasSchemaKeys = schemaFieldKeys.size > 0;
     const allowedKeys = new Set([...schemaFieldKeys, ...managedEditableKeys]);
     const cleanData = Object.fromEntries(
-      Object.entries(canonicalFormData)
+      Object.entries(persistedFormData)
         .filter(([key]) => {
           if (nonEditableFormKeys.has(key)) return false;
           if (nonPersistedPayloadKeys.has(key)) return false;

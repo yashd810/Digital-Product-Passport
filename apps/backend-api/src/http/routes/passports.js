@@ -350,6 +350,7 @@ module.exports = function registerPassportRoutes(app, {
     validGranularities,
     getPassportTypeSchema,
     hasCompanyPassportTypeAccess,
+    toStoredPassportValue,
   });
 
   // ─── BULK REVISE ───────────────────────────────────────────────────────────

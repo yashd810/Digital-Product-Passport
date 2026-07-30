@@ -121,12 +121,21 @@ function getTypeFields(passportType, typeDefinitions = []) {
   return dynamicFields;
 }
 
+function isRequiredForCompleteness(field = {}) {
+  return field.required === true || Number(field.minCount) > 0;
+}
+
 export function calcCompleteness(passport, typeDefinitions = []) {
   if (!passport) return null;
 
   const pType = passport.passportType;
   const typeFields = pType ? getTypeFields(pType, typeDefinitions) : [];
-  const authorFields = typeFields.filter((field) => field.type !== "file" && !field.dynamic);
+  // The dashboard percentage is release completeness, not an attempt to
+  // penalise optional passport information. Semantic modules express required
+  // fields through either `required` or `minCount: 1`.
+  const authorFields = typeFields.filter((field) =>
+    field.type !== "file" && !field.dynamic && isRequiredForCompleteness(field)
+  );
   const fieldsToMeasure = [
     ...baseCompletenessFields,
     ...authorFields.filter((field) => !baseCompletenessFields.some((baseField) => baseField.key === field.key)),

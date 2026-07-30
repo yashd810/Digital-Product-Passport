@@ -9,6 +9,7 @@ const publicMetadataKeys = new Set([
   "lineageId",
   "passportType",
   "modelName",
+  "productImage",
   "uniqueProductIdentifier",
   "productIdentifierDid",
   "passportPolicyKey",

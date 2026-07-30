@@ -49,6 +49,7 @@ function parseOptions(args = []) {
   return {
     dryRun: args.includes("--dry-run"),
     skipStorage: args.includes("--skip-storage"),
+    refreshModuleProfile: args.includes("--refresh-module-profile"),
     requestedModule: getArgValue(args, "--module="),
     companyIds,
     grantAllActiveCompanies,
@@ -182,7 +183,50 @@ function sameFieldSet(leftSections = [], rightSections = []) {
   return left.length === right.length && left.every((key, index) => key === right[index]);
 }
 
-async function ensurePassportType(pool, definition) {
+function buildModuleRefreshProfile(existingFieldsJson = {}) {
+  const currentProfile = existingFieldsJson?.profile || {};
+  return {
+    sourceModule: currentProfile.sourceModule || existingFieldsJson.sourceModule,
+    // Keep the selected Local Tools fields and section labels, but deliberately
+    // omit derived field metadata. It is rebuilt from the module so corrections
+    // such as a public lifecycle field take effect for an existing seed.
+    includedFields: (currentProfile.includedFields || [])
+      .map((field) => ({
+        sourceModuleFieldKey: field?.sourceModuleFieldKey,
+        semanticId: field?.semanticId,
+        domainClassKey: field?.domainClassKey,
+        ...(field?.labelI18n ? { labelI18n: field.labelI18n } : {}),
+      }))
+      .filter((field) => field.sourceModuleFieldKey || field.semanticId),
+    ...(Array.isArray(currentProfile.sectionOverrides)
+      ? { sectionOverrides: currentProfile.sectionOverrides }
+      : {}),
+  };
+}
+
+async function refreshPassportTypeProfile(pool, existing, definition) {
+  const existingSchemaVersion = Number.parseInt(existing.fieldsJson?.schemaVersion, 10) || 1;
+  const fieldsJson = compilePassportTypeProfile({
+    moduleDefinition: definition,
+    profile: buildModuleRefreshProfile(existing.fieldsJson),
+    schemaVersion: existingSchemaVersion + 1,
+  });
+  const refreshed = await pool.query(
+    `UPDATE "passportTypes"
+        SET "fieldsJson" = $2::jsonb,
+            "updatedAt" = NOW()
+      WHERE id = $1
+      RETURNING id,
+                "typeName" AS "typeName",
+                "displayName" AS "displayName",
+                "isActive" AS "isActive",
+                "fieldsJson" AS "fieldsJson"`,
+    [existing.id, JSON.stringify(fieldsJson)]
+  );
+  return { ...(refreshed.rows?.[0] || existing), seedAction: "refreshedProfile" };
+}
+
+async function ensurePassportType(pool, definition, { refreshModuleProfile = false } = {}) {
   await pool.query(
     "INSERT INTO \"productCategories\" (name, icon) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING",
     [definition.productCategory, definition.productIcon || "📋"]
@@ -202,6 +246,9 @@ async function ensurePassportType(pool, definition) {
   const existing = existingResult.rows?.[0] || null;
   if (existing) {
     if (existing.fieldsJson?.profile) {
+      if (refreshModuleProfile) {
+        return refreshPassportTypeProfile(pool, existing, definition);
+      }
       return { ...existing, seedAction: "preservedProfile" };
     }
 
@@ -343,7 +390,9 @@ async function runSeed({ pool, options }) {
   const seededPassportTypes = [];
 
   for (const definition of modules) {
-    const row = await ensurePassportType(pool, definition);
+    const row = await ensurePassportType(pool, definition, {
+      refreshModuleProfile: options.refreshModuleProfile,
+    });
     let storage = "skipped";
     if (storageService) {
       await storageService.createPassportTable(definition.typeName, {
@@ -405,6 +454,7 @@ if (require.main === module) {
 
 module.exports = {
   ensurePassportType,
+  buildModuleRefreshProfile,
   getSelectedModules,
   grantCompanyAccess,
   parseOptions,

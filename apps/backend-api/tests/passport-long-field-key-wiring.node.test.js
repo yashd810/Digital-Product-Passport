@@ -327,6 +327,7 @@ test("single revise copies a long field through its deterministic physical colum
     versionNumber: 1,
     createdBy: 8,
     deletedAt: null,
+    batteryChemistry: [{ batteryChemistry: "NCA" }],
     [physicalFieldKey]: "copied value",
   };
   registerLifecycleRoutes(app, {
@@ -370,6 +371,7 @@ test("single revise copies a long field through its deterministic physical colum
   assert.ok(insertCall);
   assert.match(insertCall.sql, new RegExp(`"${physicalFieldKey}"`));
   assert.equal(insertCall.params.includes("copied value"), true);
+  assert.equal(insertCall.params.includes(JSON.stringify(rawSource.batteryChemistry)), true);
 });
 
 test("bulk revise applies a change addressed by a long logical key", async () => {
@@ -385,6 +387,7 @@ test("bulk revise applies a change addressed by a long logical key", async () =>
     versionNumber: 1,
     createdBy: 8,
     deletedAt: null,
+    batteryChemistry: [{ batteryChemistry: "NCA" }],
     [physicalFieldKey]: "old bulk value",
   };
   registerBulkLifecycleRoutes(app, {
@@ -444,6 +447,7 @@ test("bulk revise applies a change addressed by a long logical key", async () =>
   assert.ok(passportInsert);
   assert.match(passportInsert.sql, new RegExp(`"${physicalFieldKey}"`));
   assert.equal(passportInsert.params.includes("new bulk value"), true);
+  assert.equal(passportInsert.params.includes(JSON.stringify(rawSource.batteryChemistry)), true);
 });
 
 test("company passport reads expose long logical keys instead of physical column names", async () => {

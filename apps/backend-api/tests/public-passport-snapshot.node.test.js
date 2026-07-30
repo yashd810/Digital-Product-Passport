@@ -14,6 +14,7 @@ test("public snapshots allowlist metadata and explicitly public schema fields", 
       companyId: 7,
       internalAliasId: "private-alias",
       modelName: "Public model",
+      productImage: "https://assets.example/product.png",
       publicField: "public-value",
       restrictedField: "restricted-value",
       unknownColumn: "unknown-value",
@@ -42,6 +43,7 @@ test("public snapshots allowlist metadata and explicitly public schema fields", 
   assert.equal(snapshot.dppId, "dpp-1");
   assert.equal(snapshot.guid, undefined);
   assert.equal(snapshot.modelName, "Public model");
+  assert.equal(snapshot.productImage, "https://assets.example/product.png");
   assert.equal(snapshot.publicField, "public-value");
   assert.equal(snapshot.restrictedField, undefined);
   assert.equal(snapshot.unknownColumn, undefined);

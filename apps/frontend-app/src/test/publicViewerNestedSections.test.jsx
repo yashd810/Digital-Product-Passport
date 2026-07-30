@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 
 import PublicPassportPortal, {
+  DataFieldRows,
   DataNestedSection,
 } from "../passport-viewer/components/PublicPassportPortal";
 
@@ -28,7 +29,7 @@ const nestedSections = [{
 }];
 
 describe("public viewer nested data sections", () => {
-  test("shows Data as the only viewer tab and does not render a separate header tab", () => {
+  test("shows overview, data, trust, and documents without a separate header tab", () => {
     const markup = renderToStaticMarkup(
       <PublicPassportPortal
         passport={{ passportType: "examplePassport", rootField: "Root value" }}
@@ -38,10 +39,51 @@ describe("public viewer nested data sections", () => {
       />
     );
 
-    expect(markup.match(/role="tab"/g)).toHaveLength(1);
+    expect(markup.match(/role="tab"/g)).toHaveLength(4);
+    expect(markup).toContain(">Overview<");
     expect(markup).toContain(">Data<");
+    expect(markup).toContain(">Trust<");
+    expect(markup).toContain(">Documents<");
     expect(markup).not.toContain(">Header<");
     expect(markup).not.toContain("Passport Header");
+  });
+
+  test("keeps symbol fields out of the textual data rows", () => {
+    const markup = renderToStaticMarkup(
+      <DataFieldRows
+        fields={[
+          { key: "symbol", label: "Collection symbol", type: "symbol", confidentiality: "public" },
+          { key: "text", label: "Battery category", type: "text", confidentiality: "public" },
+        ]}
+        passport={{ symbol: "/repository-files/collection.svg", text: "Industrial" }}
+        lang="en"
+      />
+    );
+
+    expect(markup).not.toContain("Collection symbol");
+    expect(markup).toContain("Battery category");
+  });
+
+  test("renders PDF document actions for preview and full opening", () => {
+    const markup = renderToStaticMarkup(
+      <PublicPassportPortal
+        passport={{ passportType: "examplePassport", declaration: "/repository-files/declaration.pdf" }}
+        companyData={{ companyName: "Example Company" }}
+        typeDef={{
+          fieldsJson: {
+            sections: [{
+              key: "documents",
+              label: "Documents",
+              fields: [{ key: "declaration", label: "Declaration", type: "file", confidentiality: "public" }],
+            }],
+          },
+        }}
+        lang="en"
+      />
+    );
+
+    expect(markup).toContain("Preview PDF");
+    expect(markup).toContain("Open full PDF");
   });
 
   test("renders a composition chart for every configured field", () => {

@@ -50,6 +50,11 @@ module.exports = function registerLifecycleRoutes(app, deps) {
     validGranularities,
     getPassportTypeSchema,
     hasCompanyPassportTypeAccess,
+    toStoredPassportValue = (value) => (
+      Array.isArray(value) || Object.prototype.toString.call(value) === "[object Object]"
+        ? JSON.stringify(value)
+        : value
+    ),
   } = deps;
 
   const companyDppParamsSchema = {
@@ -280,7 +285,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         if (key === "releaseStatus") return inRevisionStatus;
         if (key === "createdBy") return userId;
         if (key === "deletedAt") return null;
-        return src[key];
+        return toStoredPassportValue(src[key]);
       });
 
       const allCols = ["dppId", "lineageId", ...cols];

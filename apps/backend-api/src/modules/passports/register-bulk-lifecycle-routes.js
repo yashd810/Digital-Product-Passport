@@ -219,7 +219,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
               if (key === "createdBy") return userId;
               if (key === "deletedAt") return null;
               if (Object.prototype.hasOwnProperty.call(mappedChanges, key)) return toStoredPassportValue(mappedChanges[key]);
-              return source[key];
+              return toStoredPassportValue(source[key]);
             });
 
             const allColumns = ["dppId", "lineageId", ...columns];
