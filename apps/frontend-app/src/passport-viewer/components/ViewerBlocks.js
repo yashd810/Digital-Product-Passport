@@ -75,7 +75,7 @@ export function LiveBadge({ updatedAt }) {
   );
 }
 
-export function FileCell({ url, label, onRefreshUrl = null, autoPreview = false }) {
+export function FileCell({ url, label, onRefreshUrl = null }) {
   const [open, setOpen] = useState(false);
   const [blobUrl, setBlobUrl] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -123,13 +123,6 @@ export function FileCell({ url, label, onRefreshUrl = null, autoPreview = false 
     }
   }, [blobUrl, onRefreshUrl, safeInitialUrl, url]);
 
-  const autoPreviewedUrlRef = useRef("");
-  useEffect(() => {
-    if (!autoPreview || !safeInitialUrl || autoPreviewedUrlRef.current === safeInitialUrl) return;
-    autoPreviewedUrlRef.current = safeInitialUrl;
-    void loadPreview();
-  }, [autoPreview, loadPreview, safeInitialUrl]);
-
   const handleToggle = async () => {
     if (open) {
       setOpen(false);
@@ -156,7 +149,7 @@ export function FileCell({ url, label, onRefreshUrl = null, autoPreview = false 
           aria-expanded={open}
           aria-controls={previewId}
         >
-          {loading ? "Loading…" : open ? "Hide preview" : "Preview PDF"}
+          {loading ? "Loading…" : open ? "Hide preview" : "Show preview"}
         </button>
       </div>
     </div>

@@ -82,7 +82,7 @@ describe("public viewer nested data sections", () => {
       />
     );
 
-    expect(markup).toContain("Preview PDF");
+    expect(markup).toContain("Show preview");
     expect(markup).toContain("Open full PDF");
   });
 
@@ -108,7 +108,7 @@ describe("public viewer nested data sections", () => {
     expect(markup).toContain('class="pdf-preview-btn"');
   });
 
-  test("loads document PDFs automatically when the Documents tab is selected", async () => {
+  test("keeps PDF previews collapsed until the viewer chooses to show them", async () => {
     const source = await import("node:fs/promises").then(({ readFile }) => readFile(
       new URL("../passport-viewer/components/PublicPassportPortal.js", import.meta.url),
       "utf8"
@@ -118,10 +118,39 @@ describe("public viewer nested data sections", () => {
       "utf8"
     ));
 
-    expect(source).toContain('autoPreview={activePage === "documents"}');
-    expect(source).toContain("autoPreview={autoPreview}");
-    expect(fileCellSource).toContain("autoPreview = false");
-    expect(fileCellSource).toContain("void loadPreview()");
+    expect(source).not.toContain("autoPreview");
+    expect(fileCellSource).not.toContain("autoPreview");
+    expect(fileCellSource).toContain('open ? "Hide preview" : "Show preview"');
+  });
+
+  test("shows only symbol UI fields in the overview labels and symbols card", () => {
+    const markup = renderToStaticMarkup(
+      <PublicPassportPortal
+        passport={{
+          passportType: "examplePassport",
+          collectionSymbol: "https://api.example.test/repository-files/access/collection-symbol",
+          meaningOfLabels: "https://api.example.test/repository-files/access/labels-document",
+        }}
+        companyData={{ companyName: "Example Company" }}
+        typeDef={{
+          fieldsJson: {
+            sections: [{
+              key: "labels",
+              label: "Labels & Conformity",
+              fields: [
+                { key: "collectionSymbol", label: "Collection symbol", type: "symbol", confidentiality: "public" },
+                { key: "meaningOfLabels", label: "Meaning of labels and symbols", type: "file", confidentiality: "public" },
+              ],
+            }],
+          },
+        }}
+        lang="en"
+      />
+    );
+    const overviewMarkup = markup.slice(markup.indexOf('id="overview"'), markup.indexOf('id="data"'));
+
+    expect(overviewMarkup).toContain("Collection symbol");
+    expect(overviewMarkup).not.toContain("Meaning of labels and symbols");
   });
 
   test("renders a composition chart for every configured field", () => {

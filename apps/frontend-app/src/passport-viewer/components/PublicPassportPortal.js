@@ -326,7 +326,6 @@ function DataArtifactPreview({
   label,
   onPreviewImage,
   onRefreshFieldUrl = null,
-  autoPreview = false,
 }) {
   if (!isFilled(raw)) return null;
   if (field.type === "file" || isPdfLikeUrl(raw)) {
@@ -335,7 +334,6 @@ function DataArtifactPreview({
         url={raw}
         label={label}
         onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(field.key, raw) : null}
-        autoPreview={autoPreview}
       />
     );
   }
@@ -389,7 +387,6 @@ function DataFieldValue({
   lang,
   onPreviewImage,
   onRefreshFieldUrl = null,
-  autoPreviewFiles = false,
 }) {
   const [expandedHistory, setExpandedHistory] = useState(false);
   const [chartType, setChartType] = useState("line");
@@ -443,7 +440,6 @@ function DataFieldValue({
         label={formatFieldLabelWithUnit(translateSchemaLabel(lang, field), field)}
         onPreviewImage={onPreviewImage}
         onRefreshFieldUrl={onRefreshFieldUrl}
-        autoPreview={autoPreviewFiles}
       />
     );
   } else if (semanticProperty && semanticGraph) {
@@ -554,7 +550,6 @@ function DataFieldRow({
   lang,
   onPreviewImage,
   onRefreshFieldUrl,
-  autoPreviewFiles,
 }) {
   return (
     <li className="field-row">
@@ -571,7 +566,6 @@ function DataFieldRow({
           lang={lang}
           onPreviewImage={onPreviewImage}
           onRefreshFieldUrl={onRefreshFieldUrl}
-          autoPreviewFiles={autoPreviewFiles}
         />
       </div>
     </li>
@@ -666,7 +660,6 @@ function DocumentCard({
   securityGroupApiKey = "",
   lang,
   onRefreshFieldUrl = null,
-  autoPreview = false,
 }) {
   const { field, fieldLabel, isLocked } = item;
   const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
@@ -693,7 +686,6 @@ function DocumentCard({
             url={documentValue}
             label={fieldLabel}
             onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(field.key, documentValue) : null}
-            autoPreview={autoPreview}
           />
         ) : documentValue && (field.type === "symbol" || isImageLikeUrl(documentValue)) ? (
           <div className="doc-asset-shell">
@@ -846,8 +838,7 @@ export default function PublicPassportPortal({
     .map((field) => ({ field, ...resolveFieldValue(field, passport, unlockedPassport, dynamicValues) }))
     .filter((entry) => {
       if (entry.isLocked || !isFilled(entry.raw)) return false;
-      const text = `${normalizeText(entry.field.key)} ${normalizeText(entry.field.label)}`;
-      return entry.field.type === "symbol" || text.includes("symbol") || text.includes("label");
+      return entry.field.type === "symbol";
     })
     .slice(0, 3);
 
@@ -890,7 +881,6 @@ export default function PublicPassportPortal({
       if (safeSrc) setPreviewImage({ src: safeSrc, label });
     },
     onRefreshFieldUrl,
-    autoPreviewFiles: activePage === "data",
   };
 
   return (
@@ -1248,7 +1238,6 @@ export default function PublicPassportPortal({
                 securityGroupApiKey={securityGroupApiKey}
                 lang={lang}
                 onRefreshFieldUrl={onRefreshFieldUrl}
-                autoPreview={activePage === "documents"}
               />
             ))}
           </div>
