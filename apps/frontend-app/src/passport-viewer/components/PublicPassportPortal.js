@@ -640,6 +640,7 @@ function DocumentCard({
   securityGroupApiKey = "",
   lang,
   onRefreshFieldUrl = null,
+  autoPreview = false,
 }) {
   const { field, fieldLabel, isLocked } = item;
   const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
@@ -666,6 +667,7 @@ function DocumentCard({
             url={documentValue}
             label={fieldLabel}
             onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(field.key, documentValue) : null}
+            autoPreview={autoPreview}
           />
         ) : documentValue && (field.type === "symbol" || isImageLikeUrl(documentValue)) ? (
           <div className="doc-asset-shell">
@@ -1219,6 +1221,7 @@ export default function PublicPassportPortal({
                 securityGroupApiKey={securityGroupApiKey}
                 lang={lang}
                 onRefreshFieldUrl={onRefreshFieldUrl}
+                autoPreview={activePage === "documents"}
               />
             ))}
           </div>

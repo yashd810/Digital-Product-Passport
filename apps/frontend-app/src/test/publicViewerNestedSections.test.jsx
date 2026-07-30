@@ -86,6 +86,22 @@ describe("public viewer nested data sections", () => {
     expect(markup).toContain("Open full PDF");
   });
 
+  test("loads document PDFs automatically when the Documents tab is selected", async () => {
+    const source = await import("node:fs/promises").then(({ readFile }) => readFile(
+      new URL("../passport-viewer/components/PublicPassportPortal.js", import.meta.url),
+      "utf8"
+    ));
+    const fileCellSource = await import("node:fs/promises").then(({ readFile }) => readFile(
+      new URL("../passport-viewer/components/ViewerBlocks.js", import.meta.url),
+      "utf8"
+    ));
+
+    expect(source).toContain('autoPreview={activePage === "documents"}');
+    expect(source).toContain("autoPreview={autoPreview}");
+    expect(fileCellSource).toContain("autoPreview = false");
+    expect(fileCellSource).toContain("void loadPreview()");
+  });
+
   test("renders a composition chart for every configured field", () => {
     const compositionFields = [
       {

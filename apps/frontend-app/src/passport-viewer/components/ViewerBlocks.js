@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { normalizePublicViewerOrigin } from "../../passports/utils/publicViewerUrl";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
@@ -75,7 +75,7 @@ export function LiveBadge({ updatedAt }) {
   );
 }
 
-export function FileCell({ url, label, onRefreshUrl = null }) {
+export function FileCell({ url, label, onRefreshUrl = null, autoPreview = false }) {
   const [open, setOpen] = useState(false);
   const [blobUrl, setBlobUrl] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -93,11 +93,7 @@ export function FileCell({ url, label, onRefreshUrl = null }) {
     return toSafeResourceHref(nextUrl || url);
   };
 
-  const handleToggle = async () => {
-    if (open) {
-      setOpen(false);
-      return;
-    }
+  const loadPreview = useCallback(async () => {
     if (blobUrl) {
       setOpen(true);
       return;
@@ -125,6 +121,21 @@ export function FileCell({ url, label, onRefreshUrl = null }) {
     } finally {
       setLoading(false);
     }
+  }, [blobUrl, onRefreshUrl, safeInitialUrl, url]);
+
+  const autoPreviewedUrlRef = useRef("");
+  useEffect(() => {
+    if (!autoPreview || !safeInitialUrl || autoPreviewedUrlRef.current === safeInitialUrl) return;
+    autoPreviewedUrlRef.current = safeInitialUrl;
+    void loadPreview();
+  }, [autoPreview, loadPreview, safeInitialUrl]);
+
+  const handleToggle = async () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    await loadPreview();
   };
 
   return (
