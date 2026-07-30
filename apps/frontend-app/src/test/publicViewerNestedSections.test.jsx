@@ -86,6 +86,28 @@ describe("public viewer nested data sections", () => {
     expect(markup).toContain("Open full PDF");
   });
 
+  test("renders file fields as PDFs before semantic URI values", () => {
+    const markup = renderToStaticMarkup(
+      <DataFieldRows
+        fields={[{
+          key: "declaration",
+          label: "Declaration",
+          type: "file",
+          dataType: "uri",
+          rangeKind: "scalar",
+          confidentiality: "public",
+        }]}
+        passport={{ declaration: "https://api.example.test/repository-files/access/signed-document" }}
+        semanticGraph={{}}
+        lang="en"
+      />
+    );
+
+    expect(markup).toContain("Open full PDF");
+    expect(markup).toContain('class="pdf-open-link"');
+    expect(markup).toContain('class="pdf-preview-btn"');
+  });
+
   test("loads document PDFs automatically when the Documents tab is selected", async () => {
     const source = await import("node:fs/promises").then(({ readFile }) => readFile(
       new URL("../passport-viewer/components/PublicPassportPortal.js", import.meta.url),

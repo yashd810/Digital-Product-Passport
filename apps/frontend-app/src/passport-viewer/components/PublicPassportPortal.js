@@ -320,10 +320,24 @@ function buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, l
     .filter(Boolean);
 }
 
-function DataArtifactPreview({ field, raw, label, onPreviewImage, onRefreshFieldUrl = null }) {
+function DataArtifactPreview({
+  field,
+  raw,
+  label,
+  onPreviewImage,
+  onRefreshFieldUrl = null,
+  autoPreview = false,
+}) {
   if (!isFilled(raw)) return null;
   if (field.type === "file" || isPdfLikeUrl(raw)) {
-    return <FileCell url={raw} label={label} onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(field.key, raw) : null} />;
+    return (
+      <FileCell
+        url={raw}
+        label={label}
+        onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(field.key, raw) : null}
+        autoPreview={autoPreview}
+      />
+    );
   }
   if (field.type === "symbol" || isImageLikeUrl(raw)) {
     return (
@@ -375,6 +389,7 @@ function DataFieldValue({
   lang,
   onPreviewImage,
   onRefreshFieldUrl = null,
+  autoPreviewFiles = false,
 }) {
   const [expandedHistory, setExpandedHistory] = useState(false);
   const [chartType, setChartType] = useState("line");
@@ -420,6 +435,17 @@ function DataFieldValue({
         <LockedFieldCell field={field} />
       </div>
     );
+  } else if (field.type === "symbol" || field.type === "file" || field.type === "url" || isImageLikeUrl(raw) || isPdfLikeUrl(raw) || isUrlLike(raw)) {
+    content = (
+      <DataArtifactPreview
+        field={field}
+        raw={raw}
+        label={formatFieldLabelWithUnit(translateSchemaLabel(lang, field), field)}
+        onPreviewImage={onPreviewImage}
+        onRefreshFieldUrl={onRefreshFieldUrl}
+        autoPreview={autoPreviewFiles}
+      />
+    );
   } else if (semanticProperty && semanticGraph) {
     content = (
       <SemanticGraphValue
@@ -460,8 +486,6 @@ function DataFieldValue({
     ) : (
       <span className="field-value-empty">—</span>
     );
-  } else if (field.type === "symbol" || field.type === "file" || field.type === "url" || isImageLikeUrl(raw) || isPdfLikeUrl(raw) || isUrlLike(raw)) {
-    content = <DataArtifactPreview field={field} raw={raw} label={formatFieldLabelWithUnit(translateSchemaLabel(lang, field), field)} onPreviewImage={onPreviewImage} onRefreshFieldUrl={onRefreshFieldUrl} />;
   } else if (typeof raw === "string" && raw.includes("\n")) {
     content = renderTextBlock(raw, "field-value-text");
   } else if (isFilled(raw)) {
@@ -530,6 +554,7 @@ function DataFieldRow({
   lang,
   onPreviewImage,
   onRefreshFieldUrl,
+  autoPreviewFiles,
 }) {
   return (
     <li className="field-row">
@@ -546,6 +571,7 @@ function DataFieldRow({
           lang={lang}
           onPreviewImage={onPreviewImage}
           onRefreshFieldUrl={onRefreshFieldUrl}
+          autoPreviewFiles={autoPreviewFiles}
         />
       </div>
     </li>
@@ -864,6 +890,7 @@ export default function PublicPassportPortal({
       if (safeSrc) setPreviewImage({ src: safeSrc, label });
     },
     onRefreshFieldUrl,
+    autoPreviewFiles: activePage === "data",
   };
 
   return (
