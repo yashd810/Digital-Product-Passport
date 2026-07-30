@@ -1096,7 +1096,9 @@
 
 .passport-portal .field-row {
   display: grid;
-  grid-template-columns: minmax(180px, 0.75fr) minmax(0, 1.25fr);
+  /* Field labels are concise; reserve three quarters of each row for the
+     author-entered content, including multi-column tables. */
+  grid-template-columns: minmax(150px, 0.5fr) minmax(0, 1.5fr);
   gap: 18px;
   padding: 13px 0;
   border-bottom: 1px solid rgba(23, 48, 74, 0.09);
