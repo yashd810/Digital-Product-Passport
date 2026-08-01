@@ -55,7 +55,7 @@ export function PassportListTable({
             <th><SortableHeader columnKey="releaseStatus" label="Status" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
             <th><SortableHeader columnKey="completeness" label="Complete" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
             {!filterByUser && <th><SortableHeader columnKey="createdBy" label="Created By" sortConfig={sortConfig} toggleSort={toggleSort} /></th>}
-            <th scope="col">Viewer</th>
+            <th className="passport-view-col" scope="col">Viewer</th>
             <th>Options</th>
           </tr>
           {showFilters && (

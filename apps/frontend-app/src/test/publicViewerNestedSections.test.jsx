@@ -96,6 +96,30 @@ describe("public viewer nested data sections", () => {
     expect(markup).toContain("Battery category");
   });
 
+  test("renders URI data with a text UI type as the entered text", () => {
+    const website = "https://example.test/battery-information";
+    const markup = renderToStaticMarkup(
+      <DataFieldRows
+        fields={[{
+          key: "website",
+          label: "Website",
+          type: "text",
+          uiType: "text",
+          dataType: "URI",
+          rangeKind: "scalar",
+          confidentiality: "public",
+        }]}
+        passport={{ website }}
+        semanticGraph={{}}
+        lang="en"
+      />
+    );
+
+    expect(markup).toContain('class="field-value-uri-text"');
+    expect(markup).toContain(website);
+    expect(markup).not.toContain(`href="${website}"`);
+  });
+
   test("renders PDF document actions for preview and full opening", () => {
     const markup = renderToStaticMarkup(
       <PublicPassportPortal

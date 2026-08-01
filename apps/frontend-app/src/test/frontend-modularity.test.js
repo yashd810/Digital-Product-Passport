@@ -254,7 +254,7 @@ describe("frontend modularity helpers", () => {
     expect(appSource).toContain('path="/csv-import/:passportType/create-json"');
   });
 
-  test("passport table exposes an explicit viewer action in addition to row navigation", () => {
+  test("passport table opens the viewer only from its explicit action", () => {
     const rowSource = readFileSync(
       new URL("../user/dashboard/passports/components/PassportListRow.js", import.meta.url),
       "utf8",
@@ -272,7 +272,11 @@ describe("frontend modularity helpers", () => {
     expect(rowSource).toContain("View passport");
     expect(rowSource).toContain("Preview passport");
     expect(rowSource).toContain('target="_blank"');
-    expect(tableSource).toContain('scope="col">Viewer</th>');
+    expect(rowSource).toContain("onClick={selectionMode ? () =>");
+    expect(rowSource).toContain('className="passport-model-cell"');
+    expect(rowSource).toContain('className="passport-serial-cell"');
+    expect(rowSource).not.toContain('className="model-link-btn"');
+    expect(tableSource).toContain('className="passport-view-col" scope="col">Viewer</th>');
     expect(listStateSource).toContain("navigate(destination.path)");
     expect(listStateSource).toContain("window.location.assign(destination.url)");
   });

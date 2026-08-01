@@ -362,6 +362,29 @@
 
 .form-group textarea { resize: vertical; min-height: 100px; }
 
+.form-group-system {
+  opacity: 0.62;
+}
+
+.form-group-system input:disabled,
+.form-group-system textarea:disabled,
+.form-group-system button:disabled,
+.form-group-system .app-select__trigger:disabled {
+  background: rgba(122, 146, 166, 0.14);
+  border-color: rgba(122, 146, 166, 0.3);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+[data-theme="light"] .form-group-system input:disabled,
+[data-theme="light"] .form-group-system textarea:disabled,
+[data-theme="light"] .form-group-system button:disabled,
+[data-theme="light"] .form-group-system .app-select__trigger:disabled {
+  background: #edf2f5;
+  border-color: rgba(90, 112, 128, 0.26);
+  color: #5f7282;
+}
+
 /* Form actions */
 .form-actions {
   display: flex;

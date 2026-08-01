@@ -11,6 +11,9 @@ describe("passport form system field handling", () => {
     expect(source).toContain("const isSystemPrefilledField");
     expect(source).toContain("systemHeader?.fieldMappings");
     expect(source).toContain("managedSlotKeys");
+    expect(source).toContain("platformGeneratedHeaderSlots");
+    expect(source).toContain("applicationPrefilledFieldKeys");
+    expect(source).toContain("form-group-system");
     expect(source).toContain('System value');
     expect(source).toContain("renderProductImagePicker()");
     expect(source).toMatch(/renderProductImagePicker[\s\S]*?setSymbolPicker\("productImage"\)/);

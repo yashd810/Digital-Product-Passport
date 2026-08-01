@@ -64,20 +64,16 @@ export function PassportListRow({
       key={`${menuId}${isHistorical ? "-history" : ""}`}
       className={[
         isPinned ? "passport-row-pinned" : "",
-        "passport-row-clickable",
+        selectionMode ? "passport-row-clickable" : "",
         isHistorical ? "passport-row-history" : "",
       ].filter(Boolean).join(" ")}
-      onClick={() => {
+      onClick={selectionMode ? () => {
         if (openMenuId) {
           setOpenMenuId(null);
           return;
         }
-        if (selectionMode) {
-          toggleSelectPassport(passport.dppId, passport.versionNumber);
-        } else {
-          openPassportViewer(passport);
-        }
-      }}
+        toggleSelectPassport(passport.dppId, passport.versionNumber);
+      } : undefined}
     >
       {user?.role !== "viewer" && selectionMode && (
         <td>
@@ -113,12 +109,8 @@ export function PassportListRow({
           <span className="version-badge">v{passport.versionNumber}</span>
         </div>
       </td>
-      <td>{serialNumber ? <span className="product-id-badge">{serialNumber}</span> : <span className="no-product-id">—</span>}</td>
-      <td>
-        <button className="model-link-btn" onClick={e => { e.stopPropagation(); openPassportViewer(passport); }}>
-          {passport.modelName}
-        </button>
-      </td>
+      <td>{serialNumber ? <span className="passport-serial-cell">{serialNumber}</span> : <span className="no-product-id">—</span>}</td>
+      <td><span className="passport-model-cell">{passport.modelName}</span></td>
       {filterByUser && (
         <td><span className="type-badge passport-type-badge">{pType}</span></td>
       )}

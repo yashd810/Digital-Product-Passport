@@ -64,6 +64,12 @@ function isPdfLikeUrl(value) {
   return Boolean(toSafeResourceHref(value)) && /\.pdf(\?.*)?$/i.test(String(value));
 }
 
+function isUriTextField(field = {}) {
+  const uiType = String(field?.uiType || field?.type || "").trim().toLowerCase();
+  const dataType = String(field?.dataType || field?.valueDataType || "").trim().toLowerCase();
+  return uiType === "text" && (dataType === "uri" || dataType === "anyuri");
+}
+
 function formatValue(value) {
   if (!isFilled(value)) return "";
   if (Array.isArray(value)) return value.filter(isFilled).join(", ");
@@ -401,6 +407,7 @@ function DataFieldValue({
 
   const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
   const { raw, isLocked, isDynamic, isPublic, dynEntry } = resolved;
+  const uriTextField = isUriTextField(field);
   const semanticProperty = field.rangeKind && field.type !== "table" ? field : null;
   const pieItems = getCompositionItems(field, raw);
 
@@ -439,7 +446,7 @@ function DataFieldValue({
         <LockedFieldCell field={field} />
       </div>
     );
-  } else if (field.type === "symbol" || field.type === "file" || field.type === "url" || isImageLikeUrl(raw) || isPdfLikeUrl(raw) || isUrlLike(raw)) {
+  } else if (!uriTextField && (field.type === "symbol" || field.type === "file" || field.type === "url" || isImageLikeUrl(raw) || isPdfLikeUrl(raw) || isUrlLike(raw))) {
     content = (
       <DataArtifactPreview
         field={field}
@@ -449,7 +456,7 @@ function DataFieldValue({
         onRefreshFieldUrl={onRefreshFieldUrl}
       />
     );
-  } else if (semanticProperty && semanticGraph) {
+  } else if (!uriTextField && semanticProperty && semanticGraph) {
     content = (
       <SemanticGraphValue
         graph={semanticGraph}
@@ -492,6 +499,8 @@ function DataFieldValue({
     );
   } else if (typeof raw === "string" && raw.includes("\n")) {
     content = renderTextBlock(raw, "field-value-text");
+  } else if (uriTextField && isFilled(raw)) {
+    content = <span className="field-value-uri-text">{formatDisplayValue(field, raw)}</span>;
   } else if (isFilled(raw)) {
     content = <strong className="field-value-strong">{formatDisplayValue(field, raw)}</strong>;
   }

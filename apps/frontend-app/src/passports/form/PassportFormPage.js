@@ -38,6 +38,20 @@ const api = import.meta.env.VITE_API_URL || "";
 const editSessionTimeoutMs = 12 * 60 * 60 * 1000;
 const editHeartbeatMs = 60 * 1000;
 const currentYear = new Date().getFullYear();
+const platformGeneratedHeaderSlots = new Set([
+  "digitalProductPassportId",
+  "uniqueProductIdentifier",
+  "internalAliasId",
+  "granularity",
+  "dppSchemaVersion",
+  "dppStatus",
+  "lastUpdate",
+  "contentSpecificationIds",
+  "subjectDid",
+  "dppDid",
+  "companyDid",
+]);
+const applicationPrefilledFieldKeys = new Set(["economicOperatorIdentifierScheme"]);
 function getFieldInputPrompt(field) {
   const baseLabel = String(field?.label || field?.key || "value").toLowerCase();
   const unitLabel = getFieldUnitLabel(field);
@@ -607,6 +621,9 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
   const isSystemPrefilledField = (fieldKey) => {
     const mappings = Array.isArray(systemHeader?.fieldMappings) ? systemHeader.fieldMappings : [];
+    if (applicationPrefilledFieldKeys.has(fieldKey)) {
+      return Boolean(complianceContext.company?.economicOperatorIdentifierScheme);
+    }
     const managedSlotKeys = new Set(
       mappings
         .filter((mapping) => mapping?.sourceType === "managed")
@@ -614,12 +631,11 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     );
     if (managedSlotKeys.has(fieldKey)) return true;
 
-    const mappedFieldKeys = new Set(
-      mappings
-        .filter((mapping) => mapping?.sourceType === "field")
-        .map((mapping) => mapping.fieldKey)
+    const fieldMapping = mappings.find(
+      (mapping) => mapping?.sourceType === "field" && mapping.fieldKey === fieldKey
     );
-    if (!mappedFieldKeys.has(fieldKey)) return false;
+    if (!fieldMapping) return false;
+    if (platformGeneratedHeaderSlots.has(fieldMapping.slotKey)) return true;
     if (fieldKey === "economicOperatorId") {
       return Boolean(complianceContext.company?.economicOperatorIdentifier);
     }
@@ -1358,15 +1374,16 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       <div className="form-grid">
         {visibleFields.map((field) => {
           const isLocked = mode === "create" && modelDataKeys.has(field.key);
-          const needsInput = isTemplateCreateMode && !isLocked && isFieldUnfilled(field);
+          const isSystemPrefilled = isSystemPrefilledField(field.key);
+          const needsInput = isTemplateCreateMode && !isLocked && !isSystemPrefilled && isFieldUnfilled(field);
           return (
             <div key={field.key}
-              className={`form-group${field.type === "textarea" || field.type === "file" || field.rangeKind === "class" ? " full-width" : ""}${isLocked ? " form-group-locked" : ""}${needsInput ? " form-group-needs-input" : ""}`}>
+              className={`form-group${field.type === "textarea" || field.type === "file" || field.rangeKind === "class" ? " full-width" : ""}${isLocked ? " form-group-locked" : ""}${isSystemPrefilled ? " form-group-system" : ""}${needsInput ? " form-group-needs-input" : ""}`}>
               {field.type !== "boolean" && (
                 <label htmlFor={field.type === "file" ? `f-${field.key}` : field.key}>
                   {formatFieldLabelWithUnit(field.label, field)}
                   {isLocked && <span className="pf-model-badge">📌 Model data</span>}
-                  {isSystemPrefilledField(field.key) && <span className="pf-model-badge">System value</span>}
+                  {isSystemPrefilled && <span className="pf-model-badge">System value</span>}
                   {needsInput && <span className="pf-required-badge">Needs input</span>}
                 </label>
               )}

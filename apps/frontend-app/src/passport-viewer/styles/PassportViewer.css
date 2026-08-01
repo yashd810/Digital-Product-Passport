@@ -1215,6 +1215,14 @@
   line-height: 1.45;
 }
 
+.passport-portal .field-value-uri-text {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #244058;
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
 .passport-portal .field-value-empty {
   color: #7a92a6;
   font-weight: 700;
