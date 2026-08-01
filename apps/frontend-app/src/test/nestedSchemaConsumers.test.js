@@ -68,4 +68,17 @@ describe("nested schema consumers", () => {
     expect(source).toContain("const renderTemplateSection");
     expect(source).toContain("childSections.map((child, childIndex)");
   });
+
+  test("template forms use the document scroll instead of a constrained editor panel", () => {
+    const styles = readFileSync(
+      new URL("../shared/styles/Dashboard.css", import.meta.url),
+      "utf8",
+    );
+    const editorStyles = styles.match(/\.tmpl-editor \{[\s\S]*?\n\}/)?.[0] || "";
+    const bodyStyles = styles.match(/\.tmpl-editor-body \{[\s\S]*?\n\}/)?.[0] || "";
+
+    expect(editorStyles).toContain("overflow: visible;");
+    expect(editorStyles).not.toContain("max-height:");
+    expect(bodyStyles).not.toContain("overflow-y:");
+  });
 });
