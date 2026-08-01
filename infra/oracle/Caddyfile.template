@@ -30,6 +30,12 @@ __MARKETING_HOST__ {
 	reverse_proxy @dictionaryArtifacts https://__API_HOST__ {
 		header_up Host __API_HOST__
 	}
+	@dictionaryApi {
+		path_regexp ^/api/dictionary/[^/]+/[^/]+(?:/.*)?$
+	}
+	reverse_proxy @dictionaryApi https://__API_HOST__ {
+		header_up Host __API_HOST__
+	}
 	reverse_proxy 127.0.0.1:8080
 }
 

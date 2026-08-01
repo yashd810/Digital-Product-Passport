@@ -53,6 +53,20 @@ check_api_security_headers() {
   fi
 }
 
+check_dictionary_api_proxy() {
+  file="$1"
+
+  if ! grep -Fq 'path_regexp ^/api/dictionary/[^/]+/[^/]+(?:/.*)?$' "$file"; then
+    echo "FAIL: $file does not proxy the published dictionary API route"
+    exit 1
+  fi
+
+  if ! grep -Fq 'reverse_proxy @dictionaryApi https://__API_HOST__' "$file"; then
+    echo "FAIL: $file does not send the published dictionary API route to the API host"
+    exit 1
+  fi
+}
+
 printf '%s\n' \
   'SERVER_URL=https://api.example.test' \
   'APP_URL=https://app.example.test' \
@@ -65,6 +79,8 @@ check_caddyfile_template "$ROOT_DIR/infra/oracle/Caddyfile.frontend.template"
 check_caddyfile_template "$ROOT_DIR/infra/oracle/Caddyfile.backend.template"
 check_api_security_headers "$ROOT_DIR/infra/oracle/Caddyfile.template"
 check_api_security_headers "$ROOT_DIR/infra/oracle/Caddyfile.backend.template"
+check_dictionary_api_proxy "$ROOT_DIR/infra/oracle/Caddyfile.template"
+check_dictionary_api_proxy "$ROOT_DIR/infra/oracle/Caddyfile.frontend.template"
 
 for target in all frontend backend; do
   case "$target" in

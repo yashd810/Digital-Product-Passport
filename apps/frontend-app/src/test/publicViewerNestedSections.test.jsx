@@ -453,6 +453,29 @@ describe("public viewer nested data sections", () => {
     expect(markup).toContain("Level four");
   });
 
+  test("provides a native data-section selector for compact viewer layouts", async () => {
+    const markup = renderToStaticMarkup(
+      <PublicPassportPortal
+        passport={{ passportType: "examplePassport", rootField: "Root value" }}
+        companyData={{ companyName: "Example Company" }}
+        typeDef={{ fieldsJson: { sections: nestedSections } }}
+        lang="en"
+      />
+    );
+    const css = await import("node:fs/promises").then(({ readFile }) => readFile(
+      new URL("../passport-viewer/styles/PassportViewer.css", import.meta.url),
+      "utf8"
+    ));
+
+    expect(markup).toContain('class="data-section-picker"');
+    expect(markup).toContain("Choose a passport data section");
+    expect(markup).toContain('<select id=');
+    expect(markup).toMatch(/<option value="root"(?: selected="")?>Root section<\/option>/);
+    expect(css).toMatch(/@media \(max-width: 1024px\)[\s\S]*?\.passport-portal \.data-section-nav\s*\{\s*display: none;/);
+    expect(css).toContain(".passport-portal .data-section-picker {");
+    expect(css).toContain("@media (max-width: 640px)");
+  });
+
   test("connects each native dropdown summary to its content and exposes its state", () => {
     const markup = renderToStaticMarkup(
       <PublicPassportPortal

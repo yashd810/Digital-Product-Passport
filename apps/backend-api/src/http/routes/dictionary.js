@@ -248,6 +248,13 @@ module.exports = function registerDictionaryRoutes(app, {
     });
   }
 
+  app.get([
+    "/api/dictionary/:family/:version",
+    "/api/dictionary/:family/:version/",
+  ], publicReadRateLimit, (req, res) => {
+    sendArtifact(req, res, getModelByPath(req, res), "manifest");
+  });
+
   app.get(["/api/dictionary/:family/:version/terms/:slug", "/dictionary/:family/:version/terms/:slug"], publicReadRateLimit, (req, res) => {
     sendTerm(req, res, getModelByPath(req, res));
   });

@@ -11,6 +11,15 @@ export function hasUserPopulatedTemplateValue(value) {
   return String(value).trim().length > 0;
 }
 
+// Repository access URLs intentionally end in opaque signed tokens. The UI must
+// therefore keep the picker-supplied name instead of deriving a misleading name
+// from the URL path.
+export function getTemplateFileDisplayName(fileName, linkedUrl) {
+  const selectedName = String(fileName || "").trim();
+  if (selectedName) return selectedName;
+  return linkedUrl ? "Linked document" : null;
+}
+
 export function buildUserTemplateFields(sections, fieldValues, modelDataKeys) {
   const values = fieldValues && typeof fieldValues === "object" ? fieldValues : {};
   const modelKeys = modelDataKeys instanceof Set ? modelDataKeys : new Set(modelDataKeys || []);

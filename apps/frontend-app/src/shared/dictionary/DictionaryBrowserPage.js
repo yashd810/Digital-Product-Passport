@@ -93,6 +93,17 @@ export function getSemanticReferenceDisplay(reference, fallbackLabel = "") {
   };
 }
 
+export function getDictionaryValueConstraint(term = {}) {
+  switch (term.rangeKind) {
+    case "class":
+      return { label: "Value class", reference: term.range };
+    case "enum":
+      return { label: "Allowed values", reference: term.range };
+    default:
+      return { label: "Value datatype", reference: term.range };
+  }
+}
+
 function SemanticReference({ reference, fallbackLabel = "" }) {
   const display = getSemanticReferenceDisplay(reference, fallbackLabel);
   return (
@@ -110,6 +121,7 @@ function TermCard({ term, unitsByKey, termHref }) {
   const unitDisplay = term.unitDisplay || unitObj?.display || (term.unit === "none" ? "n.a." : term.unit || "n.a.");
   const dataTypeDisplay = formatDataType(term);
   const termLabel = getLocalSemanticLabel(term.label) || term.label;
+  const valueConstraint = getDictionaryValueConstraint(term);
 
   return (
     <article className="dictionary-term-card">
@@ -133,8 +145,8 @@ function TermCard({ term, unitsByKey, termHref }) {
               <SemanticReference reference={term.domain} />
             </div>
             <div className="dictionary-term-meta-block">
-              <span className="dictionary-term-meta-label">Range</span>
-              <SemanticReference reference={term.range} fallbackLabel={dataTypeDisplay} />
+              <span className="dictionary-term-meta-label">{valueConstraint.label}</span>
+              <SemanticReference reference={valueConstraint.reference} fallbackLabel={dataTypeDisplay} />
             </div>
           </div>
           <div className="dictionary-term-meta-line">
@@ -207,6 +219,7 @@ function DictionaryDetail({ term, unitsByKey, manifest, basePath, apiPath }) {
   const unitDisplay = term.unitDisplay || unitsByKey.get(term.unit)?.display || (term.unit === "none" ? "n.a." : term.unit || "n.a.");
   const dataTypeDisplay = formatDataType(term);
   const termLabel = getLocalSemanticLabel(term.label) || term.label;
+  const valueConstraint = getDictionaryValueConstraint(term);
 
   return (
     <>
@@ -240,8 +253,8 @@ function DictionaryDetail({ term, unitsByKey, manifest, basePath, apiPath }) {
             <DetailRow label="XSD datatype" value={term.dataType?.xsdType} mono />
             <DetailRow label="Domain" value={<SemanticReference reference={term.domain} />} />
             <DetailRow
-              label="Range"
-              value={<SemanticReference reference={term.range} fallbackLabel={dataTypeDisplay} />}
+              label={valueConstraint.label}
+              value={<SemanticReference reference={valueConstraint.reference} fallbackLabel={dataTypeDisplay} />}
             />
             <DetailRow label="Unit" value={unitDisplay} />
             <DetailRow label="Internal key" value={term.internalKey} mono />
@@ -302,7 +315,6 @@ export default function DictionaryBrowserPage() {
   const [classes, setClasses] = useState([]);
   const [units, setUnits] = useState([]);
   const [manifest, setManifest] = useState(null);
-  const [activeClass, setActiveClass] = useState(null);
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [loading, setLoading] = useState(true);
@@ -387,35 +399,17 @@ export default function DictionaryBrowserPage() {
     [units]
   );
 
-  const classCounts = useMemo(() => {
-    const counts = new Map();
-    for (const nextTerm of terms) {
-      const classKey = nextTerm.domain?.key
-        || classes.find((classDef) => classDef.iri === nextTerm.domain?.iri)?.key;
-      if (classKey) counts.set(classKey, (counts.get(classKey) || 0) + 1);
-    }
-    return counts;
-  }, [classes, terms]);
-
-  const activeClassLabel = useMemo(
-    () => getLocalSemanticLabel(classes.find((classDef) => classDef.key === activeClass)?.label) || null,
-    [classes, activeClass]
-  );
-
   const filteredTerms = useMemo(() => {
     const query = deferredSearch.trim().toLowerCase();
     return terms.filter((nextTerm) => {
-      const termClassKey = nextTerm.domain?.key
-        || classes.find((classDef) => classDef.iri === nextTerm.domain?.iri)?.key;
-      const matchesClass = !activeClass || termClassKey === activeClass;
       const matchesSearch = !query
         || nextTerm.label.toLowerCase().includes(query)
         || nextTerm.definition.toLowerCase().includes(query)
         || nextTerm.slug.includes(query)
         || String(nextTerm.iri || "").toLowerCase().includes(query);
-      return matchesClass && matchesSearch;
+      return matchesSearch;
     });
-  }, [terms, activeClass, classes, deferredSearch]);
+  }, [terms, deferredSearch]);
 
   if (loading || (isDetailView && !term)) {
     return (
@@ -551,33 +545,11 @@ export default function DictionaryBrowserPage() {
               />
             </div>
 
-            <div className="dictionary-class-row">
-              <button
-                type="button"
-                onClick={() => setActiveClass(null)}
-                className={`dictionary-class-pill${!activeClass ? " is-active" : ""}`}
-              >
-                All
-                <span>{terms.length}</span>
-              </button>
-              {classes.map((classDef) => (
-                <button
-                  key={classDef.key}
-                  type="button"
-                  onClick={() => setActiveClass(activeClass === classDef.key ? null : classDef.key)}
-                  className={`dictionary-class-pill${activeClass === classDef.key ? " is-active" : ""}`}
-                >
-                  {getLocalSemanticLabel(classDef.label) || classDef.label}
-                  <span>{classCounts.get(classDef.key) || 0}</span>
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="dictionary-results-bar">
             <p className="dictionary-results-copy">
               {filteredTerms.length} term{filteredTerms.length !== 1 ? "s" : ""}
-              {activeClassLabel ? ` in ${activeClassLabel}` : ""}
               {deferredSearch.trim() ? ` matching "${deferredSearch.trim()}"` : ""}
             </p>
 

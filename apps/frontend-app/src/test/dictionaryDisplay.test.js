@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getDictionaryValueConstraint,
   getLocalSemanticLabel,
   getSemanticReferenceDisplay,
 } from "../shared/dictionary/DictionaryBrowserPage";
@@ -47,5 +48,25 @@ describe("dictionary semantic reference display", () => {
       secondary: "",
     });
     expect(getSemanticReferenceDisplay({}, "decimal").primary).toBe("Decimal");
+  });
+
+  it("names RDF and SHACL value constraints by their semantic kind", () => {
+    expect(getDictionaryValueConstraint({ rangeKind: "scalar", range: { label: "String" } }).label)
+      .toBe("Value datatype");
+    expect(getDictionaryValueConstraint({ rangeKind: "class", range: { label: "Postal address" } }).label)
+      .toBe("Value class");
+    expect(getDictionaryValueConstraint({ rangeKind: "enum", range: { label: "Battery status" } }).label)
+      .toBe("Allowed values");
+  });
+
+  it("uses search without class-filter tags in the dictionary toolbar", async () => {
+    const source = await import("node:fs/promises").then(({ readFile }) => readFile(
+      new URL("../shared/dictionary/DictionaryBrowserPage.js", import.meta.url),
+      "utf8"
+    ));
+
+    expect(source).toContain('placeholder="Search terms, field keys, definitions..."');
+    expect(source).not.toContain("dictionary-class-row");
+    expect(source).not.toContain("setActiveClass");
   });
 });

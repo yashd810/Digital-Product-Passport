@@ -13,7 +13,7 @@ import {
 } from "../../../shared/passports/passportSchemaUtils";
 import { filterPassportDataEntrySections } from "../../../shared/passports/passportSchemaVisibility";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
-import { buildUserTemplateFields } from "./templatePayload";
+import { buildUserTemplateFields, getTemplateFileDisplayName } from "./templatePayload";
 import RepositoryPicker from "../../../passports/form/components/RepositoryPicker";
 import SymbolRepositoryPicker from "../../../passports/form/components/SymbolRepositoryPicker";
 import AppSelect from "../../../shared/components/AppSelect";
@@ -26,6 +26,7 @@ const api = import.meta.env.VITE_API_URL || "";
 function TemplateField({
   field,
   value,
+  fileDisplayName,
   isModelData,
   disabled = false,
   symbols = [],
@@ -67,13 +68,13 @@ function TemplateField({
     }
     if (field.type === "file") {
       const linkedUrl = toSafeResourceHref(value);
-      const fileName = linkedUrl ? linkedUrl.split("/").pop() : null;
+      const fileName = getTemplateFileDisplayName(fileDisplayName, linkedUrl);
       return (
         <div className="file-upload-widget">
           {linkedUrl ? (
             <div className="file-existing">
               <a href={linkedUrl} target="_blank" rel="noopener noreferrer" className="file-existing-link">
-                📄 {decodeURIComponent(fileName || "Document")}
+                📄 {fileName || "Document"}
               </a>
               <button type="button" className="file-clear-btn" disabled={disabled} onClick={() => onValueChange("")}>✕ Remove</button>
             </div>
@@ -249,6 +250,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
   const [description,   setDescription]  = useState(editingTemplate?.description || cloneTemplate?.description || "");
   const [sections,      setSections]      = useState(null);
   const [fieldValues,   setFieldValues]   = useState({});   // fieldKey → value
+  const [fileDisplayNames, setFileDisplayNames] = useState({}); // fieldKey → repository file name
   const [modelDataKeys, setModelDataKeys] = useState(new Set()); // Set of field keys marked as model data
   const [symbols,       setSymbols]       = useState([]);
   const [repoPicker,    setRepoPicker]    = useState(null);
@@ -307,10 +309,15 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
       setDescription(cloneTemplate.description || "");
     }
     setFieldValues(vals);
+    setFileDisplayNames({});
     setModelDataKeys(model);
   }, [editingTemplate, cloneTemplate]);
 
   const setFieldValue   = (key, val) => setFieldValues(p => ({ ...p, [key]: val }));
+  const setFileDisplayName = (key, name) => setFileDisplayNames((current) => ({
+    ...current,
+    [key]: String(name || "").trim(),
+  }));
   const toggleModelData = (key, on) => setModelDataKeys(p => {
     const next = new Set(p);
     on ? next.add(key) : next.delete(key);
@@ -363,10 +370,14 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
                 key={field.key}
                 field={field}
                 value={fieldValues[field.key] ?? ""}
+                fileDisplayName={fileDisplayNames[field.key]}
                 isModelData={modelDataKeys.has(field.key)}
                 disabled={saving}
                 symbols={symbols}
-                onValueChange={(value) => setFieldValue(field.key, value)}
+                onValueChange={(value) => {
+                  setFieldValue(field.key, value);
+                  if (field.type === "file" && !value) setFileDisplayName(field.key, "");
+                }}
                 onModelDataToggle={(isModelData) => toggleModelData(field.key, isModelData)}
                 onOpenRepositoryPicker={() => setRepoPicker(field.key)}
                 onOpenSymbolPicker={() => setSymbolPicker(field.key)}
@@ -457,7 +468,14 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
       {repoPicker && (
         <RepositoryPicker
           companyId={companyId}
-          onSelect={(url) => { const safeUrl = toSafeResourceHref(url); if (safeUrl) setFieldValue(repoPicker, safeUrl); setRepoPicker(null); }}
+          onSelect={(url, fileName) => {
+            const safeUrl = toSafeResourceHref(url);
+            if (safeUrl) {
+              setFieldValue(repoPicker, safeUrl);
+              setFileDisplayName(repoPicker, fileName);
+            }
+            setRepoPicker(null);
+          }}
           onClose={() => setRepoPicker(null)}
         />
       )}

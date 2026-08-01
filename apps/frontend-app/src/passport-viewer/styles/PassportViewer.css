@@ -718,6 +718,41 @@
   letter-spacing: -0.055em;
 }
 
+.passport-portal .data-section-picker {
+  display: none;
+  gap: 7px;
+  margin: 0 0 14px;
+}
+
+.passport-portal .data-section-picker label {
+  color: #526e85;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.passport-portal .data-section-picker select {
+  width: 100%;
+  min-height: 48px;
+  appearance: auto;
+  border: 1px solid rgba(23, 48, 74, 0.18);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--navy);
+  padding: 0 14px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.25;
+  box-shadow: var(--shadow-soft);
+}
+
+.passport-portal .data-section-picker select:focus-visible {
+  outline: 3px solid rgba(13, 181, 176, 0.34);
+  outline-offset: 2px;
+}
+
 .passport-portal .data-browser {
   display: grid;
   grid-template-columns: minmax(210px, 280px) minmax(0, 1fr);
@@ -1360,28 +1395,38 @@
   margin-top: 8px;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1024px) {
+  .passport-portal .nav-inner {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 20px;
+  }
+
+  .passport-portal .nav-links {
+    order: 3;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .passport-portal .nav-links button {
+    min-width: 0;
+    text-align: center;
+  }
+
   .passport-portal .hero-main,
   .passport-portal .grid2,
   .passport-portal .data-browser {
     grid-template-columns: 1fr;
   }
 
+  .passport-portal .data-section-picker {
+    display: grid;
+  }
+
   .passport-portal .data-section-nav {
-    position: static;
-    display: flex;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .passport-portal .data-section-nav::-webkit-scrollbar {
     display: none;
-  }
-
-  .passport-portal .data-section-nav button {
-    width: auto;
-    min-width: 170px;
-    flex: 0 0 auto;
   }
 
   .passport-portal .hero {
@@ -1402,24 +1447,84 @@
   }
 }
 
-@media (max-width: 720px) {
+@media (min-width: 641px) and (max-width: 1024px) {
+  .passport-portal .hero-main {
+    gap: 22px;
+  }
+
+  .passport-portal .side-panel {
+    grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.15fr);
+    align-items: center;
+  }
+
+  .passport-portal .product-photo {
+    min-height: 184px;
+  }
+
+  .passport-portal .qr {
+    width: 116px;
+    height: 116px;
+  }
+
+  .passport-portal main {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .passport-portal .nav {
+    position: static;
+  }
+
   .passport-portal .nav-inner {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  .passport-portal .brand {
+    min-width: 0;
+    gap: 9px;
+  }
+
+  .passport-portal .logo {
+    width: 48px;
+    height: 40px;
+    border-radius: 12px;
+    padding: 6px 9px;
+  }
+
+  .passport-portal .brand strong {
+    font-size: 0.88rem;
+    overflow-wrap: anywhere;
   }
 
   .passport-portal .nav-links {
+    grid-column: 1 / -1;
     width: 100%;
+    gap: 6px;
+  }
+
+  .passport-portal .nav button {
+    min-height: 40px;
+    padding: 8px 5px;
+    font-size: 0.76rem;
+    line-height: 1.1;
+    white-space: normal;
   }
 
   .passport-portal .nav-actions {
-    width: 100%;
+    justify-self: end;
+    width: auto;
   }
 
   .passport-portal .nav-actions .restricted-access-btn {
-    width: 100%;
-    justify-content: center;
+    min-height: 40px;
+    padding: 8px 11px;
+    font-size: 0.76rem;
   }
 
   .passport-portal .brand span {
@@ -1427,14 +1532,14 @@
   }
 
   .passport-portal .hero {
-    padding: 24px 16px 58px;
+    padding: 22px 14px 42px;
   }
 
   .passport-portal h1 {
-    font-size: clamp(2.15rem, 12vw, 4.1rem);
+    font-size: clamp(2.15rem, 13vw, 3.35rem);
+    letter-spacing: -0.065em;
   }
 
-  .passport-portal .hero-cards,
   .passport-portal .overview-meta,
   .passport-portal .header-grid,
   .passport-portal .trust-grid,
@@ -1442,28 +1547,54 @@
     grid-template-columns: 1fr;
   }
 
+  .passport-portal .hero-cards {
+    gap: 9px;
+    margin-top: 18px;
+  }
+
+  .passport-portal .hero-card {
+    min-width: 0;
+    border-radius: 15px;
+    padding: 12px;
+  }
+
+  .passport-portal .hero-card span {
+    font-size: 0.66rem;
+  }
+
+  .passport-portal .hero-card strong {
+    font-size: 0.86rem;
+  }
+
   .passport-portal .side-panel {
-    border-radius: 24px;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 20px;
   }
 
   .passport-portal .product-photo,
   .passport-portal .energy-art {
-    min-height: 190px;
+    min-height: 172px;
+    border-radius: 18px;
   }
 
   .passport-portal .qr-row {
-    grid-template-columns: 1fr;
-    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
   }
 
   .passport-portal .qr {
-    width: 124px;
-    height: 124px;
+    width: 96px;
+    height: 96px;
+    padding: 8px;
+    border-radius: 16px;
   }
 
   .passport-portal main {
-    border-radius: 28px 28px 0 0;
-    padding: 22px 16px 58px;
+    margin-top: -20px;
+    border-radius: 24px 24px 0 0;
+    padding: 18px 14px 48px;
   }
 
   .passport-portal .page-head {
@@ -1472,7 +1603,38 @@
   }
 
   .passport-portal .card {
-    padding: 18px;
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .passport-portal .card h2 {
+    font-size: 1.62rem;
+  }
+
+  .passport-portal .data-title {
+    font-size: 1.85rem;
+  }
+
+  .passport-portal .data-section-picker {
+    margin-bottom: 12px;
+  }
+
+  .passport-portal .data-section-picker select {
+    min-height: 50px;
+    font-size: 16px;
+  }
+
+  .passport-portal .data-section-panel {
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .passport-portal .data-section-panel-head {
+    margin-bottom: 12px;
+  }
+
+  .passport-portal .data-section-panel-head h3 {
+    font-size: 1.25rem;
   }
 
   .passport-portal .event {
@@ -1487,20 +1649,17 @@
     padding: 16px;
   }
 
-  .passport-portal .data-section-panel {
-    padding: 16px;
-  }
-
   .passport-portal .data-nested-section-content {
-    padding: 0 16px 16px;
+    padding: 0 14px 14px;
   }
 
   .passport-portal .data-nested-section-children {
-    padding-left: 8px;
+    padding-left: 7px;
+    border-left-width: 1px;
   }
 
   .passport-portal .field-list {
-    padding: 0 16px 16px;
+    padding: 0 14px 14px;
   }
 
   .passport-portal .data-direct-field-card .field-list {
@@ -1521,6 +1680,16 @@
     font-size: 0.98rem;
   }
 
+  .passport-portal .inline-table-wrap {
+    margin-right: -2px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .passport-portal .inline-table th,
+  .passport-portal .inline-table td {
+    padding: 9px 10px;
+  }
+
   .passport-portal .doc-card {
     grid-template-columns: 40px 1fr;
   }
@@ -1531,6 +1700,16 @@
 
   .passport-portal .doc-card a {
     grid-column: 2;
+  }
+
+  .passport-portal .doc-asset-visual,
+  .passport-portal .doc-asset-actions {
+    justify-content: flex-start;
+  }
+
+  .passport-portal .footer {
+    padding: 24px 14px 32px;
+    font-size: 0.86rem;
   }
 }
 

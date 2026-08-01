@@ -761,6 +761,7 @@ export default function PublicPassportPortal({
   const [activePage, setActivePage] = useState("overview");
   const [activeDataSectionKey, setActiveDataSectionKey] = useState("");
   const [previewImage, setPreviewImage] = useState(null);
+  const dataSectionPickerId = useId();
   const [publicHistoryState, setPublicHistoryState] = useState(() => (
     publicHistoryPayload
       ? { loading: false, loaded: true, data: publicHistoryPayload.history || [], failed: false }
@@ -778,6 +779,9 @@ export default function PublicPassportPortal({
   const selectedDataSection = dataSections.find((section) => (section.key || translateSchemaLabel(lang, section)) === activeDataSectionKey)
     || dataSections[0]
     || null;
+  const selectedDataSectionValue = selectedDataSection
+    ? (selectedDataSection.key || translateSchemaLabel(lang, selectedDataSection))
+    : "";
 
   useEffect(() => {
     if (!dataSections.length) {
@@ -1112,6 +1116,24 @@ export default function PublicPassportPortal({
 
         <section className={`page${activePage === "data" ? " active" : ""}`} id="data" role="tabpanel" hidden={activePage !== "data"}>
           <h2 className="data-title">Passport data</h2>
+          <div className="data-section-picker">
+            <label htmlFor={dataSectionPickerId}>Choose a passport data section</label>
+            <select
+              id={dataSectionPickerId}
+              value={selectedDataSectionValue}
+              onChange={(event) => setActiveDataSectionKey(event.target.value)}
+              disabled={dataSections.length === 0}
+            >
+              {dataSections.map((section, sectionIndex) => {
+                const sectionValue = section.key || translateSchemaLabel(lang, section);
+                return (
+                  <option key={section.key || sectionIndex} value={sectionValue}>
+                    {translateSchemaLabel(lang, section)}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
           <div className="data-browser">
             <aside className="data-section-nav" aria-label="Passport data sections">
               {dataSections.map((section, sectionIndex) => {

@@ -442,6 +442,20 @@ test("dictionary routes serve registered models and canonical artifacts", async 
     assert.equal(manifest.statusCode, 200);
     assert.equal(parseJsonResponse(manifest).semanticModelKey, "exampleProductDictionaryV1");
 
+    const apiManifest = await invokeRoute(app, {
+      path: "/api/dictionary/:family/:version",
+      params: { family: "example-product", version: "v1" },
+    });
+    assert.equal(apiManifest.statusCode, 200);
+    assert.equal(parseJsonResponse(apiManifest).semanticModelKey, "exampleProductDictionaryV1");
+
+    const apiManifestWithTrailingSlash = await invokeRoute(app, {
+      path: "/api/dictionary/:family/:version/",
+      params: { family: "example-product", version: "v1" },
+    });
+    assert.equal(apiManifestWithTrailingSlash.statusCode, 200);
+    assert.equal(parseJsonResponse(apiManifestWithTrailingSlash).semanticModelKey, "exampleProductDictionaryV1");
+
     const terms = await invokeRoute(app, {
       path: "/api/dictionary/:family/:version/terms",
       params: { family: "alternate-product", version: "v2" },
