@@ -120,6 +120,24 @@ describe("public viewer nested data sections", () => {
     expect(markup).not.toContain(`href="${website}"`);
   });
 
+  test("shows the restricted marker without an access-explanation sentence", () => {
+    const markup = renderToStaticMarkup(
+      <DataFieldRows
+        fields={[{
+          key: "restrictedValue",
+          label: "Restricted value",
+          type: "text",
+          confidentiality: "restricted",
+        }]}
+        passport={{ restrictedValue: "Not public" }}
+        lang="en"
+      />
+    );
+
+    expect(markup).toContain(">Restricted<");
+    expect(markup).not.toContain("This value is available to authorised parties only.");
+  });
+
   test("renders PDF document actions for preview and full opening", () => {
     const markup = renderToStaticMarkup(
       <PublicPassportPortal

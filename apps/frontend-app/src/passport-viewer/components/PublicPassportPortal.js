@@ -440,7 +440,6 @@ function DataFieldValue({
   if (isLocked) {
     content = (
       <div className="field-value-locked">
-        <p>This value is available to authorised parties only.</p>
         <LockedFieldCell field={field} />
       </div>
     );
