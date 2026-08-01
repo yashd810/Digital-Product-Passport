@@ -15,6 +15,8 @@ const {
 } = require("../src/services/passport-module-registry");
 const { flattenSchemaFieldsFromSections } = require("../src/shared/passports/passport-helpers");
 const { runtimeFieldFromSemanticProperty } = require("../src/shared/passports/passport-semantic-graph");
+const createDidService = require("../src/services/did-service");
+const createProductIdentifierService = require("../src/services/product-identifier-service");
 
 function createSystemHeader() {
   return {
@@ -37,6 +39,41 @@ function createSystemHeader() {
     fieldKeys: [],
   };
 }
+
+test("battery identifiers derive from the entered serial number and retain the viewer product identifier slot", () => {
+  const batteryModule = require("../passport-modules/battery-v1/module");
+  const uniqueProductIdentifierMapping = batteryModule.systemHeader.fieldMappings
+    .find((mapping) => mapping.slotKey === "uniqueProductIdentifier");
+
+  assert.equal(batteryModule.identity.businessIdentifierField, "batterySerialNumber");
+  assert.deepEqual(uniqueProductIdentifierMapping, {
+    slotKey: "uniqueProductIdentifier",
+    label: "Unique Product Identifier",
+    sourceType: "field",
+    fieldKey: "uniqueProductIdentifier",
+  });
+
+  const productIdentifierService = createProductIdentifierService({
+    didService: createDidService({
+      apiOrigin: "https://api.example.test",
+      publicOrigin: "https://dpp.example.test",
+      didDomain: "example.test",
+    }),
+  });
+  const source = productIdentifierService.extractBusinessProductIdentifier(
+    { batterySerialNumber: "BAT-SN-001" },
+    batteryModule
+  );
+  const identifier = productIdentifierService.buildCanonicalProductDid({
+    companyName: "Example Manufacturer",
+    passportType: batteryModule.typeName,
+    rawProductId: source,
+    granularity: "item",
+  });
+
+  assert.equal(source, "BAT-SN-001");
+  assert.equal(identifier, "did:web:example.test:did:example-manufacturer:item:BAT-SN-001");
+});
 
 test("semantic class collections preserve an explicit table UI type", () => {
   const field = runtimeFieldFromSemanticProperty({

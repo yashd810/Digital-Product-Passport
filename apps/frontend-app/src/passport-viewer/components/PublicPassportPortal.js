@@ -76,6 +76,13 @@ function formatDisplayValue(field, value) {
 }
 
 function getBusinessIdentifierValue(passport, typeDef) {
+  // The platform writes the canonical product identifier from the module's
+  // chosen business identifier. Prefer that resolved value for the product
+  // card, while retaining the source-field fallback for records loaded before
+  // the identifier has been persisted.
+  if (isFilled(passport?.uniqueProductIdentifier)) {
+    return formatValue(passport.uniqueProductIdentifier);
+  }
   const fieldKey = typeDef?.fieldsJson?.identity?.businessIdentifierField || "";
   if (!fieldKey) return "";
   const value = passport?.[fieldKey];
@@ -449,6 +456,7 @@ function DataFieldValue({
         property={semanticProperty}
         value={raw}
         labelFormatter={(entry) => translateSchemaLabel(lang, entry)}
+        plainEnum={field.key === "dppStatus"}
       />
     );
   } else if (field.type === "boolean") {

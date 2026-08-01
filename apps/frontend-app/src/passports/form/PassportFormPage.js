@@ -606,8 +606,16 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   };
 
   const isSystemPrefilledField = (fieldKey) => {
+    const mappings = Array.isArray(systemHeader?.fieldMappings) ? systemHeader.fieldMappings : [];
+    const managedSlotKeys = new Set(
+      mappings
+        .filter((mapping) => mapping?.sourceType === "managed")
+        .map((mapping) => mapping.slotKey)
+    );
+    if (managedSlotKeys.has(fieldKey)) return true;
+
     const mappedFieldKeys = new Set(
-      (Array.isArray(systemHeader?.fieldMappings) ? systemHeader.fieldMappings : [])
+      mappings
         .filter((mapping) => mapping?.sourceType === "field")
         .map((mapping) => mapping.fieldKey)
     );

@@ -48,6 +48,38 @@ describe("public viewer nested data sections", () => {
     expect(markup).not.toContain("Passport Header");
   });
 
+  test("shows the resolved product identifier and falls back to the configured serial number", () => {
+    const typeDef = {
+      fieldsJson: {
+        identity: { businessIdentifierField: "batterySerialNumber" },
+        sections: nestedSections,
+      },
+    };
+    const resolvedMarkup = renderToStaticMarkup(
+      <PublicPassportPortal
+        passport={{
+          passportType: "examplePassport",
+          batterySerialNumber: "BAT-SN-001",
+          uniqueProductIdentifier: "did:web:example:products:bat-sn-001",
+        }}
+        companyData={{ companyName: "Example Company" }}
+        typeDef={typeDef}
+        lang="en"
+      />
+    );
+    const fallbackMarkup = renderToStaticMarkup(
+      <PublicPassportPortal
+        passport={{ passportType: "examplePassport", batterySerialNumber: "BAT-SN-001" }}
+        companyData={{ companyName: "Example Company" }}
+        typeDef={typeDef}
+        lang="en"
+      />
+    );
+
+    expect(resolvedMarkup).toContain("did:web:example:products:bat-sn-001");
+    expect(fallbackMarkup).toContain("BAT-SN-001");
+  });
+
   test("keeps symbol fields out of the textual data rows", () => {
     const markup = renderToStaticMarkup(
       <DataFieldRows
@@ -106,6 +138,33 @@ describe("public viewer nested data sections", () => {
     expect(markup).toContain("Open full PDF");
     expect(markup).toContain('class="pdf-open-link"');
     expect(markup).toContain('class="pdf-preview-btn"');
+  });
+
+  test("renders DPP status as ordinary field text instead of an enum pill", () => {
+    const markup = renderToStaticMarkup(
+      <DataFieldRows
+        fields={[{
+          key: "dppStatus",
+          label: "DPP Status",
+          type: "text",
+          rangeKind: "enum",
+          rangeEnumKey: "dppStatus",
+          confidentiality: "public",
+        }]}
+        passport={{ dppStatus: "active" }}
+        semanticGraph={{
+          enums: [{
+            key: "dppStatus",
+            values: [{ key: "active", label: "Active" }],
+          }],
+        }}
+        lang="en"
+      />
+    );
+
+    expect(markup).toContain('class="field-value-strong semantic-enum-value-plain"');
+    expect(markup).not.toContain('class="semantic-enum-value"');
+    expect(markup).toContain(">Active<");
   });
 
   test("keeps PDF previews collapsed until the viewer chooses to show them", async () => {

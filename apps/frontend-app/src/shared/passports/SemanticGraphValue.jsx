@@ -19,13 +19,16 @@ function ScalarValue({ property, value }) {
   return <span>{String(value ?? "—")}</span>;
 }
 
-function OneSemanticValue({ graph, property, value, labelFormatter, depth }) {
+function OneSemanticValue({ graph, property, value, labelFormatter, depth, plainEnum = false }) {
   if (property.rangeKind === "scalar") return <ScalarValue property={property} value={value} />;
   if (property.rangeKind === "enum") {
     const enumValue = getSemanticGraphEnum(graph, property.rangeEnumKey)
       ?.values?.find((candidate) => candidate.key === value);
     return (
-      <span className="semantic-enum-value" title={enumValue?.semanticId || value}>
+      <span
+        className={plainEnum ? "field-value-strong semantic-enum-value-plain" : "semantic-enum-value"}
+        title={enumValue?.semanticId || value}
+      >
         {enumValue?.label || String(value ?? "—")}
       </span>
     );
@@ -63,6 +66,7 @@ function OneSemanticValue({ graph, property, value, labelFormatter, depth }) {
                   value={value[childProperty.key]}
                   labelFormatter={labelFormatter}
                   depth={depth + 1}
+                  plainEnum={plainEnum}
                 />
               </dd>
             </div>
@@ -78,6 +82,7 @@ export default function SemanticGraphValue({
   value,
   labelFormatter = (entry) => entry?.label || entry?.key || "",
   depth = 0,
+  plainEnum = false,
 }) {
   const many = isManySemanticProperty(property);
   const parsed = parseSemanticGraphValue(value, many ? [] : value);
@@ -87,13 +92,13 @@ export default function SemanticGraphValue({
   const entries = many ? (Array.isArray(parsed) ? parsed : []) : [parsed];
   if (!entries.length) return <span className="field-value-empty">—</span>;
   if (!many) {
-    return <OneSemanticValue graph={graph} property={property} value={entries[0]} labelFormatter={labelFormatter} depth={depth} />;
+    return <OneSemanticValue graph={graph} property={property} value={entries[0]} labelFormatter={labelFormatter} depth={depth} plainEnum={plainEnum} />;
   }
   return (
     <div className="semantic-value-list">
       {entries.map((entry, index) => (
         <div className="semantic-value-list-entry" key={`${property.key}-${index}`}>
-          <OneSemanticValue graph={graph} property={property} value={entry} labelFormatter={labelFormatter} depth={depth} />
+          <OneSemanticValue graph={graph} property={property} value={entry} labelFormatter={labelFormatter} depth={depth} plainEnum={plainEnum} />
         </div>
       ))}
     </div>

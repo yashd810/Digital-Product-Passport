@@ -126,7 +126,7 @@ module.exports = {
     fieldKeys: ["digitalProductPassportId","uniqueProductIdentifier","granularity","dppSchemaVersion","dppStatus","lastUpdate","economicOperatorId","facilityId"],
   },
   identity: {
-    businessIdentifierField: "uniqueProductIdentifier",
+    businessIdentifierField: "batterySerialNumber",
     modelNameField: "modelName",
   },
   passportPolicy: {

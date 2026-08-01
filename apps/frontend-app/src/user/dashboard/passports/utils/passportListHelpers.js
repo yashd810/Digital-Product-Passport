@@ -121,20 +121,28 @@ function getTypeFields(passportType, typeDefinitions = []) {
   return dynamicFields;
 }
 
-function isRequiredForCompleteness(field = {}) {
-  return field.required === true || Number(field.minCount) > 0;
+function getSystemManagedFieldKeys(typeDefinition = {}) {
+  const mappings = typeDefinition?.fieldsJson?.systemHeader?.fieldMappings;
+  if (!Array.isArray(mappings)) return new Set();
+  return new Set(
+    mappings
+      .filter((mapping) => mapping?.sourceType === "managed" && mapping?.slotKey)
+      .map((mapping) => mapping.slotKey)
+  );
 }
 
 export function calcCompleteness(passport, typeDefinitions = []) {
   if (!passport) return null;
 
   const pType = passport.passportType;
-  const typeFields = pType ? getTypeFields(pType, typeDefinitions) : [];
-  // The dashboard percentage is release completeness, not an attempt to
-  // penalise optional passport information. Semantic modules express required
-  // fields through either `required` or `minCount: 1`.
+  const typeDefinition = typeDefinitions.find((type) => type.typeName === pType);
+  const typeFields = typeDefinition ? getTypeFields(pType, typeDefinitions) : [];
+  const systemManagedFieldKeys = getSystemManagedFieldKeys(typeDefinition);
+  // The dashboard reflects how much of this passport's configured information
+  // is actually filled in. Platform-generated fields and live telemetry are
+  // excluded because the passport author cannot supply them in the form.
   const authorFields = typeFields.filter((field) =>
-    field.type !== "file" && !field.dynamic && isRequiredForCompleteness(field)
+    !field.dynamic && !systemManagedFieldKeys.has(field.key)
   );
   const fieldsToMeasure = [
     ...baseCompletenessFields,
