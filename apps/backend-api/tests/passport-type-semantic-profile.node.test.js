@@ -6,7 +6,7 @@ const test = require("node:test");
 const {
   buildPassportTypeSemanticProfile,
   projectSemanticGraphToSections,
-} = require("../src/services/passport-type-semantic-profile");
+} = require("../src/modules/passports/services/passport-type-semantic-profile");
 
 const base = "https://example.test/dictionary/product/v1";
 const classIri = (key) => `${base}/classes/${key}`;

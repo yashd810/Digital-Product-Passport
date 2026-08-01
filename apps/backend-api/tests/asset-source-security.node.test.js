@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const createAssetService = require("../src/services/asset-management");
+const createAssetService = require("../src/modules/assets/asset-management-service");
 
 test("asset source integrations fail closed without an allowlist", async () => {
   const service = createAssetService({ assetSourceAllowedHosts: new Set() });

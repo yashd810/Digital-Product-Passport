@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
 
-const createSigningService = require("../src/services/signing-service");
+const createSigningService = require("../src/platform/security/signing-service");
 
 function createSigningKeyPair() {
   return crypto.generateKeyPairSync("ec", {

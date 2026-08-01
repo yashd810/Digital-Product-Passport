@@ -1,9 +1,9 @@
 "use strict";
 
 const path = require("path");
-const logger = require("../../services/logger");
-const { getPassportTypeModules } = require("../../services/passport-module-registry");
-const { compilePassportTypeProfile } = require("../../services/passport-type-profile");
+const logger = require("../../platform/observability/logger");
+const { getPassportTypeModules } = require("../passports/services/passport-module-registry");
+const { compilePassportTypeProfile } = require("../passports/services/passport-type-profile");
 const {
   flattenSchemaFieldsFromSections,
   isSafePassportTypeName,

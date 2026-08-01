@@ -12,12 +12,12 @@ const { walkSchemaSections } = require("../../shared/passports/passport-helpers"
 const {
   normalizeSystemPassportHeader,
   validateSystemPassportHeader,
-} = require("../../services/passport-header-fields");
+} = require("../../modules/passports/services/passport-header-fields");
 const {
   buildCompanyDppPolicyUpdateQuery,
   companyPolicyDefaults,
   validateCompanyDppPolicyInput,
-} = require("../../services/company-dpp-policy");
+} = require("../../modules/passports/services/company-dpp-policy");
 
 const companyTrustLevels = new Set(["basic", "verifiedBusiness", "enterprise"]);
 

@@ -15,6 +15,8 @@ const {
 const generatedPackagePath = "apps/backend-api/passport-modules/example-product-v1";
 const generatedModulePath = `${generatedPackagePath}/module.js`;
 const generatorDir = path.resolve(__dirname, "../../../local-tools/passport-module-generator");
+const generatorApplicationPath = path.join(generatorDir, "server/application.js");
+const generatorWorkspacePath = path.join(generatorDir, "client/workspace.js");
 
 function createGeneratorInput() {
   return {
@@ -178,7 +180,7 @@ test("passport module generator derives the module key from its output folder id
   assert.equal(executeCommonJs(moduleArtifact.content).moduleKey, "example-product:v1");
   const pageSource = fs.readFileSync(path.join(generatorDir, "index.html"), "utf8");
   assert.match(pageSource, /<input id="moduleKey"[^>]*\breadonly\b/);
-  const appSource = fs.readFileSync(path.join(generatorDir, "app.js"), "utf8");
+  const appSource = fs.readFileSync(generatorWorkspacePath, "utf8");
   assert.match(appSource, /moduleKeyInput\.value = normalizedFamily/);
   assert.match(appSource, /delete moduleKeyInput\.dataset\.manual/);
 });
@@ -366,7 +368,7 @@ test("passport module generator CSV preflight rejects incomplete and ambiguous s
 });
 
 test("passport module generator exposes the CSV preflight POST endpoint", () => {
-  const serverSource = fs.readFileSync(path.join(generatorDir, "server.js"), "utf8");
+  const serverSource = fs.readFileSync(generatorApplicationPath, "utf8");
   assert.match(serverSource, /req\.method === "POST" && pathname === "\/api\/validate-csv-import"/);
   assert.match(serverSource, /sendJson\(res, 200, validateCsvImport\(input\)\)/);
 });
@@ -527,8 +529,8 @@ test("passport module generator downloads every artifact with its repository pat
 });
 
 test("passport module generator is export-only and has no repository write wiring", () => {
-  const serverSource = fs.readFileSync(path.join(generatorDir, "server.js"), "utf8");
-  const appSource = fs.readFileSync(path.join(generatorDir, "app.js"), "utf8");
+  const serverSource = fs.readFileSync(generatorApplicationPath, "utf8");
+  const appSource = fs.readFileSync(generatorWorkspacePath, "utf8");
   const pageSource = fs.readFileSync(path.join(generatorDir, "index.html"), "utf8");
 
   assert.doesNotMatch(serverSource, /\/api\/write|writeArtifacts|fs\.writeFile(?:Sync)?/);

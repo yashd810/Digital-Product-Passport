@@ -1,0 +1,88 @@
+/* Form actions */
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  margin-top: 18px;
+}
+
+.cancel-btn,
+.submit-btn {
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-family: var(--font);
+  min-height: 42px;
+}
+
+.cancel-btn {
+  background: rgba(255,255,255,0.04);
+  color: var(--text-primary);
+  border: 1.5px solid var(--border);
+}
+.cancel-btn:hover:not(:disabled) {
+  background: rgba(13,181,176,0.10);
+  border-color: rgba(13,181,176,0.30);
+  transform: translateY(-1px);
+}
+
+.submit-btn {
+  border: none;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color: #0b1826;
+  box-shadow: 0 14px 28px rgba(13,181,176,0.18);
+}
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px rgba(13,181,176,0.26);
+}
+
+.cancel-btn:disabled,
+.submit-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+[data-theme="light"] .cancel-btn {
+  background: #ffffff;
+  border-color: rgba(23,48,74,0.14);
+  color: #143244;
+}
+
+[data-theme="light"] .cancel-btn:hover:not(:disabled) {
+  background: #edf7fa;
+  border-color: rgba(13,181,176,0.28);
+  color: #123346;
+}
+
+[data-theme="light"] .submit-btn:hover:not(:disabled) {
+  box-shadow: 0 18px 34px rgba(13,181,176,0.22);
+  filter: saturate(0.98) brightness(1.01);
+}
+
+/* Footer */
+.createpass-footer {
+  background: #000F08;
+  color: var(--mint);
+  text-align: center;
+  padding: 18px;
+  margin-top: auto;
+  font-size: 13px;
+}
+.createpass-footer p { margin: 0; }
+
+/* Type badge */
+.type-badge {
+  display: inline-block;
+  background: rgba(28,55,56,0.15);
+  color: var(--text-primary);
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 12px;
+  font-family: var(--font);
+}
+
+[data-theme="light"] .type-badge { background: #d4e8e4; color: var(--jet); }

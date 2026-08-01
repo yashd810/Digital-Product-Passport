@@ -14,8 +14,8 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
-const createPasswordService = require("../src/services/password-service");
-const { validatePasswordPolicy } = require("../src/services/security-service");
+const createPasswordService = require("../src/platform/security/password-service");
+const { validatePasswordPolicy } = require("../src/platform/security/security-service");
 
 function stripQuotes(value) {
   const trimmed = String(value || "").trim();

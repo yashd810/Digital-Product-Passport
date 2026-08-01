@@ -1,6 +1,6 @@
 "use strict";
 
-const logger = require("../../services/logger");
+const logger = require("../../platform/observability/logger");
 const { buildCanonicalIdentityBundle } = require("../../shared/identifiers/canonical-identity-bundle");
 const { isPublicVersionVisible } = require("../../modules/public-passports/visibility");
 const { rewriteRepositoryLinksForSignedAccessDeep } = require("../../shared/repository/repository-file-links");

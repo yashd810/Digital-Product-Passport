@@ -6,8 +6,8 @@ require("dotenv").config({
   quiet: true,
 });
 
-const { getPassportTypeModules } = require("../src/services/passport-module-registry");
-const { compilePassportTypeProfile } = require("../src/services/passport-type-profile");
+const { getPassportTypeModules } = require("../src/modules/passports/services/passport-module-registry");
+const { compilePassportTypeProfile } = require("../src/modules/passports/services/passport-type-profile");
 const {
   flattenSchemaFieldsFromSections,
   isSafePassportTypeName,
@@ -68,7 +68,7 @@ function createPool() {
 }
 
 function createStorageService(pool) {
-  const createPassportService = require("../src/services/passport-service");
+  const createPassportService = require("../src/modules/passports/services/passport-service");
   const {
     inRevisionStatus,
     systemPassportFields,

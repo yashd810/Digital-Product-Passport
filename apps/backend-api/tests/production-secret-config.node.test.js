@@ -13,7 +13,7 @@ const templatePath = path.join(repoRoot, "infra/oracle/oci.env.example");
 const generatorPath = path.join(repoRoot, "infra/oracle/generate-env-secrets.sh");
 const deployScriptPath = path.join(repoRoot, "infra/oracle/deploy-prod.sh");
 const bootstrapScriptPath = path.join(repoRoot, "infra/oracle/bootstrap.sh");
-const serverPath = path.join(repoRoot, "apps/backend-api/src/server.js");
+const startupPath = path.join(repoRoot, "apps/backend-api/src/bootstrap/start-server.js");
 const bootstrapSuperAdminPath = path.join(repoRoot, "apps/backend-api/scripts/bootstrap-super-admin.js");
 const productionComposePaths = [
   path.join(repoRoot, "docker/docker-compose.prod.backend.yml"),
@@ -155,7 +155,7 @@ test("production bootstrap requires an explicit topology and database-volume ini
 });
 
 test("production startup consumes the structured passport-storage validation result", () => {
-  const server = fs.readFileSync(serverPath, "utf8");
+  const server = fs.readFileSync(startupPath, "utf8");
 
   assert.match(server, /storageValidation\.results\.filter/);
   assert.doesNotMatch(server, /storageChecks\.filter/);

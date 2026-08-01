@@ -1,0 +1,320 @@
+/* Dashboard team-management route styles. Imported in the original cascade order. */
+/* ============================================
+   MANAGE TEAM
+   ============================================ */
+
+.team-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 28px 22px 60px;
+  font-family: var(--font);
+}
+
+.team-header {
+  margin-bottom: 22px;
+}
+.team-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--heading-display);
+  margin: 0 0 4px;
+}
+.team-header p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.team-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 22px 24px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 8px rgba(0, 15, 8, 0.08);
+}
+.team-card h4 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Role legend */
+.role-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.legend-desc {
+  color: var(--text-secondary);
+}
+
+/* Role badges */
+.team-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.role-admin {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.role-editor {
+  background: #d1fae5;
+  color: #065f46;
+}
+.role-viewer {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* Invite form */
+.invite-card-team {
+  border-top: 3px solid var(--jet);
+}
+.invite-note {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: -8px 0 12px;
+}
+.invite-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.invite-email-input {
+  flex: 1;
+  min-width: 220px;
+  padding: 10px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: var(--font);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+.invite-email-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(13, 181, 176, 0.15);
+}
+.invite-role-select {
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: var(--font);
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.invite-send-btn {
+  padding: 10px 20px;
+  background: linear-gradient(
+    135deg,
+    var(--accent) 0%,
+    var(--accent-strong) 100%
+  );
+  color: #0b1826;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: var(--font);
+  white-space: nowrap;
+  transition: all 0.2s;
+  box-shadow: 0 14px 28px rgba(13, 181, 176, 0.18);
+}
+.invite-send-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 34px rgba(13, 181, 176, 0.26);
+}
+.invite-send-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Table */
+.team-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.team-table thead {
+  background: rgba(255, 255, 255, 0.04);
+}
+.team-table th {
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--border);
+}
+.team-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+.team-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+[data-theme="light"] .team-table thead {
+  background: rgba(13, 181, 176, 0.08);
+  border-bottom: 2px solid rgba(13, 181, 176, 0.18);
+}
+[data-theme="light"] .team-table th {
+  color: #155e63;
+  border-bottom-color: rgba(13, 181, 176, 0.18);
+}
+[data-theme="light"] .team-table td {
+  color: var(--onyx);
+  border-bottom-color: rgba(28, 55, 56, 0.08);
+}
+[data-theme="light"] .team-table tbody tr:hover {
+  background: #f0faf8;
+}
+.self-row {
+  background: rgba(13, 181, 176, 0.08) !important;
+}
+
+/* Member cell */
+.member-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.member-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--jet);
+  color: var(--mint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.member-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.member-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+.member-email {
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+.member-title {
+  font-size: 13px;
+  color: var(--steel);
+}
+.you-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: var(--jet);
+  color: var(--mint);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Role edit inline */
+.role-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.role-select-inline {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: var(--font);
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+.btn-save-role,
+.btn-cancel-role,
+.btn-edit-role {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.15s;
+  color: var(--text-primary);
+}
+.btn-save-role:hover {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.btn-cancel-role:hover {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.btn-edit-role {
+  border: none;
+  font-size: 14px;
+  padding: 2px 4px;
+}
+
+.btn-deactivate {
+  padding: 6px 10px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ffb7b7;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.15s;
+}
+.btn-deactivate:hover {
+  background: rgba(239, 68, 68, 0.22);
+  color: var(--white);
+}
+
+@media (max-width: 768px) {
+  .team-page {
+    padding: 14px;
+  }
+  .invite-row {
+    flex-direction: column;
+  }
+  .invite-email-input {
+    min-width: 100%;
+  }
+}

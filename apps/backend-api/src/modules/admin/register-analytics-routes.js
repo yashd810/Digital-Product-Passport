@@ -1,6 +1,6 @@
 "use strict";
 
-const logger = require("../../services/logger");
+const logger = require("../../platform/observability/logger");
 
 module.exports = function registerAnalyticsRoutes(app, deps) {
   const {

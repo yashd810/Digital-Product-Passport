@@ -8,7 +8,7 @@ import {
   getAuditActionOptions,
   getAuditChangedFieldLabels,
   isCompanyDashboardAuditEvent,
-} from "../shared/audit/auditDisplay";
+} from "../audit/auditDisplay";
 
 describe("audit display helpers", () => {
   it("turns stored camel, snake, and kebab identifiers into readable labels", () => {

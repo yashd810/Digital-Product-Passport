@@ -1,3 +1,7 @@
+/**
+ * Repository-backed symbol picker. It owns folder navigation and loading only;
+ * the Passport Form owns what a selected symbol means for a particular field.
+ */
 import React, { useCallback, useEffect, useState } from "react";
 import { fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../shared/styles/CreatePass.css";

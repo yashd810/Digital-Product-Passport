@@ -7,7 +7,7 @@ require("dotenv").config({
 });
 
 const { Pool } = require("pg");
-const createPassportService = require("../src/services/passport-service");
+const createPassportService = require("../src/modules/passports/services/passport-service");
 const {
   inRevisionStatus,
   systemPassportFields,
@@ -30,7 +30,7 @@ const {
   formatHistoryFieldValue,
   comparableHistoryFieldValue,
 } = require("../src/shared/passports/passport-helpers");
-const logger = require("../src/services/logger");
+const logger = require("../src/platform/observability/logger");
 
 const pool = new Pool({
   user: process.env.DB_USER,

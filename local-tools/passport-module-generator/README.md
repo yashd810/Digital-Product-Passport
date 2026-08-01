@@ -11,6 +11,27 @@ Run it from the repo root:
 node local-tools/passport-module-generator/server.js
 ```
 
+## Source Layout
+
+- `client/` contains the browser workspace controller and its styles; focused
+  interaction controllers, including expandable-detail animation and the
+  accessible searchable-select adapter, live in `client/ui/`. The neutral
+  starter module specification lives separately in `client/workspace/` so it
+  does not inflate the controller.
+- `shared/` holds browser/server-neutral schema and CSV rules.
+- `server.js` is the stable command-line entrypoint; `server/application.js`
+  owns the local HTTP API and artifact download boundary.
+- `server/archive/zip.js` writes the deterministic export archive without a
+  runtime dependency.
+- `server/http/transport.js` owns loopback request parsing, static asset
+  containment, and response headers; it does not contain module rules.
+- `tests/` contains Node tests; run them with
+  `node --test local-tools/passport-module-generator/tests/*.node.test.js`.
+
+The output package structure below is intentionally independent from this
+source structure: every generated Passport Module remains a single portable
+folder.
+
 Then open:
 
 ```text

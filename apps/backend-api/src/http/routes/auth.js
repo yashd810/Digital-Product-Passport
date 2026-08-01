@@ -1,12 +1,12 @@
 "use strict";
 const crypto = require("crypto");
-const logger = require("../../services/logger");
+const logger = require("../../platform/observability/logger");
 const {
   getEmailFromAddress,
   isEmailConfigured,
   renderPasswordResetBody,
   renderCompanyInvitationBody,
-} = require("../../services/email");
+} = require("../../platform/communications/email-service");
 const { getAppOrigin } = require("../../shared/security/configured-origin");
 const { normalizeSafeImageReference } = require("../../shared/passports/passport-uri");
 

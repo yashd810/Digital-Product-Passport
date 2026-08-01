@@ -5,7 +5,7 @@ const test = require("node:test");
 const {
   buildCompanyDppPolicyUpdateQuery,
   validateCompanyDppPolicyInput,
-} = require("../src/services/company-dpp-policy");
+} = require("../src/modules/passports/services/company-dpp-policy");
 
 test("company DPP policy updates quote and allowlist every schema column", () => {
   const updates = validateCompanyDppPolicyInput({

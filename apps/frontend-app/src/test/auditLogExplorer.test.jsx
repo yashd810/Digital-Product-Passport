@@ -2,7 +2,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import AuditLogExplorer from "../shared/audit/AuditLogExplorer";
+import AuditLogExplorer from "../audit/AuditLogExplorer";
 import { getAdminAuditEntries, mergeAuditEntries } from "../admin/pages/AdminAuditLogs";
 
 describe("shared audit log explorer", () => {
@@ -41,7 +41,7 @@ describe("shared audit log explorer", () => {
   });
 
   it("wires the dedicated audit page into the super-admin route and navigation", () => {
-    const appSource = readFileSync(new URL("../app/containers/App.js", import.meta.url), "utf8");
+    const appSource = readFileSync(new URL("../app/routes/AppRoutes.jsx", import.meta.url), "utf8");
     const layoutSource = readFileSync(new URL("../admin/layout/AdminLayout.js", import.meta.url), "utf8");
 
     expect(appSource).toContain('path="audit-logs"                   element={<AdminAuditLogs />}');

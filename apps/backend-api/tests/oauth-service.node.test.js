@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const { EventEmitter } = require("node:events");
 const test = require("node:test");
-const createOauthService = require("../src/services/oauth-service");
+const createOauthService = require("../src/platform/identity/oauth-service");
 const { fetchPinnedOauth, validateOauthUrl } = createOauthService;
 
 function restoreEnv(name, value) {

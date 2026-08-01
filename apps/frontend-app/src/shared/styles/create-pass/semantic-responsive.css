@@ -1,0 +1,6 @@
+/* Narrow-screen adjustments for the semantic property editor. */
+@media (max-width: 620px) {
+  .semantic-property-heading {
+    align-items: flex-start;
+  }
+}

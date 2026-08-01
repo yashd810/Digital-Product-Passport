@@ -25,7 +25,7 @@ test("email service loads its backend-owned stylesheet outside Docker", () => {
   assert.equal(fs.existsSync(stylesheetPath), true);
   assert.match(fs.readFileSync(stylesheetPath, "utf8"), /EMAIL TEMPLATE STYLES/);
 
-  const { brandedEmail } = require("../src/services/email");
+  const { brandedEmail } = require("../src/platform/communications/email-service");
   const html = brandedEmail({
     preheader: "Verification <unsafe>",
     bodyHtml: "<p>Ready</p>",
@@ -43,7 +43,7 @@ test("email body renderers escape request-derived text and reject unsafe links",
     renderContactSubmissionBody,
     renderPasswordResetBody,
     renderCompanyInvitationBody,
-  } = require("../src/services/email");
+  } = require("../src/platform/communications/email-service");
   const unsafe = "<img src=x onerror=alert(1)>";
 
   for (const html of [
@@ -69,7 +69,7 @@ test("mail delivery has no provider or sender fallbacks", () => {
     getEmailConfiguration,
     getEmailFromAddress,
     isEmailConfigured,
-  } = require("../src/services/email");
+  } = require("../src/platform/communications/email-service");
 
   withEmailEnv({}, () => {
     assert.equal(isEmailConfigured(), false);
@@ -102,7 +102,7 @@ test("mail delivery has no provider or sender fallbacks", () => {
 });
 
 test("mail delivery requires explicit transport settings and strict TLS", () => {
-  const { createTransporter, getEmailConfiguration, isEmailConfigured } = require("../src/services/email");
+  const { createTransporter, getEmailConfiguration, isEmailConfigured } = require("../src/platform/communications/email-service");
   const validConfiguration = {
     EMAIL_HOST: "smtp.example.test",
     EMAIL_PORT: "587",

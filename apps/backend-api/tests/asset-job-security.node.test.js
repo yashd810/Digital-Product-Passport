@@ -8,7 +8,7 @@ const {
   parseAssetSourceCredentials,
   toPublicAssetSourceConfig,
 } = require("../src/shared/assets/asset-source-config");
-const createAssetService = require("../src/services/asset-management");
+const createAssetService = require("../src/modules/assets/asset-management-service");
 const { normalizeAssetHeaders } = require("../src/shared/passports/passport-helpers");
 
 function createResponse() {

@@ -5,7 +5,7 @@ const test = require("node:test");
 const registerCompanyRoutes = require("../src/modules/admin/register-company-routes");
 const {
   validateCompanyDppPolicyInput,
-} = require("../src/services/company-dpp-policy");
+} = require("../src/modules/passports/services/company-dpp-policy");
 
 const noop = () => {};
 

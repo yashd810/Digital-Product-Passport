@@ -1,7 +1,7 @@
 "use strict";
 
-const logger = require("../../services/logger");
-const { generateDppRecordId } = require("../../services/dpp-record-id");
+const logger = require("../../platform/observability/logger");
+const { generateDppRecordId } = require("../../modules/passports/services/dpp-record-id");
 const {
   flattenSchemaFieldsFromSections,
   mapCompanyRow,

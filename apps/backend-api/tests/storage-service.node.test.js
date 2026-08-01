@@ -6,7 +6,7 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 
-const createStorageService = require("../src/services/storage-service");
+const createStorageService = require("../src/platform/storage/storage-service");
 const { createBackupProviderStorageService } = createStorageService;
 
 const pdfBuffer = Buffer.from("%PDF-1.7\nvalidated document\n", "utf8");

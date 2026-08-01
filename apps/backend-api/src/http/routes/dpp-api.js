@@ -1,5 +1,5 @@
 "use strict";
-const logger = require("../../services/logger");
+const logger = require("../../platform/observability/logger");
 const {
   extractCarrierAuthenticityMutation,
   applyCarrierAuthenticityMutation,
@@ -7,7 +7,7 @@ const {
 const {
   generateDppRecordId,
   isDppRecordId
-} = require("../../services/dpp-record-id");
+} = require("../../modules/passports/services/dpp-record-id");
 const { createRequestResponseHelpers } = require("../../modules/dpp-api/request-response-helpers");
 const { createResolutionHelpers } = require("../../modules/dpp-api/resolution-helpers");
 const registerMutationRoutes = require("../../modules/dpp-api/register-mutation-routes");

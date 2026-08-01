@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
-const createPasswordService = require("../src/services/password-service");
+const createPasswordService = require("../src/platform/security/password-service");
 
 test("password service accepts only Argon2id hashes", async () => {
   const service = createPasswordService({

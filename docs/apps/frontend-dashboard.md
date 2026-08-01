@@ -18,7 +18,8 @@ It includes:
 ## Entry Points
 
 - `apps/frontend-app/src/app/bootstrap/index.js:1`
-- `apps/frontend-app/src/app/containers/App.js:77`
+- `apps/frontend-app/src/app/containers/App.js:1` (application shell)
+- `apps/frontend-app/src/app/routes/AppRoutes.jsx:1` (route composition)
 
 ## Main Frontend Areas
 
@@ -31,11 +32,13 @@ It includes:
 | `src/passports/` | create/edit/history flows |
 | `src/passport-viewer/` | viewer pages and shared viewer components |
 | `src/manual/` | in-app manual content |
-| `src/shared/` | shared utilities, dictionary browser, styles, table helpers |
+| `src/dictionary/` | dictionary browser feature |
+| `src/audit/` | reusable audit-log display feature |
+| `src/shared/` | shared utilities, styles, table helpers, and cross-feature components |
 
 ## Route Shape
 
-The route map is centralized in `apps/frontend-app/src/app/containers/App.js:102`.
+The route map is centralized in `apps/frontend-app/src/app/routes/AppRoutes.jsx`.
 
 Important route families:
 

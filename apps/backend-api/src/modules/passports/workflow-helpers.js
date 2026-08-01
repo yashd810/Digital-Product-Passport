@@ -2,7 +2,7 @@
 
 const { buildDashboardPath } = require("../../shared/navigation/dashboard-paths");
 const { getAppOrigin } = require("../../shared/security/configured-origin");
-const { escapeHtml, getEmailFromAddress } = require("../../services/email");
+const { escapeHtml, getEmailFromAddress } = require("../../platform/communications/email-service");
 
 function createWorkflowHelpers({
   pool,

@@ -1,5 +1,9 @@
 "use strict";
 
+/**
+ * Architecture guard: prevent feature modules from reaching upward into route
+ * or bootstrap composition. Keep new backend dependencies flowing inward.
+ */
 const fs = require("fs");
 const path = require("path");
 
@@ -36,9 +40,9 @@ function classifyFile(filePath) {
   const rel = relativeProjectPath(filePath);
   if (rel.startsWith("src/bootstrap/")) return "bootstrap";
   if (rel.startsWith("src/modules/")) return "module";
+  if (rel.startsWith("src/platform/")) return "platform";
   if (rel.startsWith("src/http/routes/")) return "route";
   if (rel === "src/server.js") return "server";
-  if (rel.startsWith("src/services/")) return "service";
   return "other";
 }
 

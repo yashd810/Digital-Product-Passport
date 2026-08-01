@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import AuditLogExplorer from "../../shared/audit/AuditLogExplorer";
+import AuditLogExplorer from "../../audit/AuditLogExplorer";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
 

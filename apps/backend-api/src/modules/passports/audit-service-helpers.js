@@ -1,7 +1,7 @@
 "use strict";
 
 const nodeCrypto = require("crypto");
-const canonicalizeJson = require("../../services/json-canonicalization");
+const canonicalizeJson = require("../../platform/serialization/canonicalize-json");
 
 // PostgreSQL advisory-lock namespace for the per-company audit and anchor
 // chains. A transaction-scoped lock protects the empty-chain case as well as

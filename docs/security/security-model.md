@@ -23,7 +23,7 @@ Security in this app is not one feature. It is layered through authentication, c
 - `apps/backend-api/src/http/middleware/auth.js:1`
 - `apps/backend-api/src/http/routes/passports.js:34`
 - `apps/backend-api/src/http/routes/passport-public.js:12`
-- `apps/backend-api/src/services/signing-service.js:1`
+- `apps/backend-api/src/platform/security/signing-service.js:1`
 - `apps/backend-api/src/modules/passports/api-key-helpers.js:1`
 
 ## Practical Reading Order

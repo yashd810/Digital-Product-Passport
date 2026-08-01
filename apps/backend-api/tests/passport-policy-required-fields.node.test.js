@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const createRequiredFieldsService = require("../src/services/required-fields-service");
+const createRequiredFieldsService = require("../src/modules/passports/services/required-fields-service");
 
 function createMockPool(typeDef) {
   return {

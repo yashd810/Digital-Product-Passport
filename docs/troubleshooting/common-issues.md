@@ -20,6 +20,7 @@ service that did not become healthy.
 Start with:
 
 - `apps/backend-api/src/server.js:1`
+- `apps/backend-api/src/bootstrap/start-server.js:1`
 - `apps/backend-api/src/bootstrap/register-routes.js:1`
 
 Then check the relevant route group in `apps/backend-api/src/http/routes/`.
@@ -28,7 +29,7 @@ Then check the relevant route group in `apps/backend-api/src/http/routes/`.
 
 Check:
 
-- the route in `apps/frontend-app/src/app/containers/App.js:102`
+- the route in `apps/frontend-app/src/app/routes/AppRoutes.jsx:1`
 - the feature folder that owns that page
 - shared styles in `apps/frontend-app/src/shared/styles/`
 

@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const registerBackupRoutes = require("../src/modules/passports/register-backup-routes");
-const createBackupProviderService = require("../src/services/backup-provider-service");
+const createBackupProviderService = require("../src/platform/backups/backup-provider-service");
 
 function createRouteApp() {
   const routes = [];

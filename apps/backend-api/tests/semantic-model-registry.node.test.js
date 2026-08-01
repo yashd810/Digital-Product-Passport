@@ -6,7 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 const express = require("express");
-const createSemanticModelRegistry = require("../src/services/semantic-model-registry");
+const createSemanticModelRegistry = require("../src/modules/passports/services/semantic-model-registry");
 const registerDictionaryRoutes = require("../src/http/routes/dictionary");
 
 function writeJson(filePath, payload) {

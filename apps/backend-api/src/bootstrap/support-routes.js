@@ -6,7 +6,7 @@ const {
 const {
   getEmailFromAddress,
   renderContactSubmissionBody,
-} = require("../services/email");
+} = require("../platform/communications/email-service");
 const { resolveExistingContainedPath } = require("../shared/storage/path-containment");
 const {
   discardContactHoneypot,

@@ -190,15 +190,15 @@ describe("frontend modularity helpers", () => {
       new URL("../admin/passport-types/AdminPassportTypeFields.js", import.meta.url),
       "utf8",
     );
-    const adminStyles = readFileSync(
-      new URL("../admin/styles/AdminDashboard.css", import.meta.url),
+    const adminRouteStyles = readFileSync(
+      new URL("../admin/styles/admin/company-analytics.css", import.meta.url),
       "utf8",
     );
 
     expect(createPageSource).toContain('className="back-link apt-passport-type-back"');
     expect(fieldsPageSource).toContain('className="back-link apt-passport-type-back"');
-    expect(adminStyles).toMatch(/\.back-link\s*\{[^}]*white-space:\s*nowrap;/s);
-    expect(adminStyles).toMatch(/\.back-link\s*\{[^}]*flex:\s*0 0 auto;/s);
+    expect(adminRouteStyles).toMatch(/\.back-link\s*\{[^}]*white-space:\s*nowrap;/s);
+    expect(adminRouteStyles).toMatch(/\.back-link\s*\{[^}]*flex:\s*0 0 auto;/s);
   });
 
   test("passport type editing keeps the compact field profile and removes the redundant bottom semantic review", () => {
@@ -256,7 +256,7 @@ describe("frontend modularity helpers", () => {
 
   test("dashboard retains only canonical CSV and public-viewer routes", () => {
     const appSource = readFileSync(
-      new URL("../app/containers/App.js", import.meta.url),
+      new URL("../app/routes/AppRoutes.jsx", import.meta.url),
       "utf8",
     );
 
@@ -711,7 +711,7 @@ describe("frontend modularity helpers", () => {
       "utf8",
     );
     const auditStyles = readFileSync(
-      new URL("../shared/audit/AuditLogExplorer.css", import.meta.url),
+      new URL("../audit/AuditLogExplorer.css", import.meta.url),
       "utf8",
     );
     const passportDataStyles = readFileSync(
@@ -746,6 +746,69 @@ describe("frontend modularity helpers", () => {
     expect(pageSelectStyles).not.toMatch(/background-image:\s*var\(--select-arrow-icon\)/);
     expect(adminStyles).not.toMatch(/\.admin-select-(?:trigger|menu)/);
     expect(adminStyles).not.toMatch(/\.acpt-select-menu\s*\{\s*min-width:\s*100%/);
+  });
+
+  test("dashboard, admin, and passport-form style roots remain small composition entrypoints", () => {
+    const dashboardRoot = readFileSync(
+      new URL("../shared/styles/Dashboard.css", import.meta.url),
+      "utf8",
+    );
+    const adminRoot = readFileSync(
+      new URL("../admin/styles/AdminDashboard.css", import.meta.url),
+      "utf8",
+    );
+    const profileAndListRoot = readFileSync(
+      new URL("../shared/styles/dashboard/profile-and-list.css", import.meta.url),
+      "utf8",
+    );
+    const companyAccessRoot = readFileSync(
+      new URL("../admin/styles/admin/company-access.css", import.meta.url),
+      "utf8",
+    );
+    const createPassRoot = readFileSync(
+      new URL("../shared/styles/CreatePass.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(dashboardRoot.split("\n").length).toBeLessThanOrEqual(20);
+    expect(dashboardRoot).toContain('@import "./dashboard/layout.css";');
+    expect(dashboardRoot).toContain('@import "./dashboard/templates-and-form.css";');
+    expect(adminRoot.split("\n").length).toBeLessThanOrEqual(20);
+    expect(adminRoot).toContain('@import "./admin/passport-types.css";');
+    expect(adminRoot).toContain('@import "./admin/company-access.css";');
+    expect(profileAndListRoot.split("\n").length).toBeLessThanOrEqual(12);
+    expect(profileAndListRoot).toContain('@import "./profile/passport-list.css";');
+    expect(profileAndListRoot).toContain('@import "./profile/overview-charts.css";');
+    expect(companyAccessRoot.split("\n").length).toBeLessThanOrEqual(8);
+    expect(companyAccessRoot).toContain('@import "./company-access/company-access-page.css";');
+    expect(companyAccessRoot).toContain('@import "./company-access/passport-type-and-module-support.css";');
+    expect(createPassRoot.split("\n").length).toBeLessThanOrEqual(16);
+    expect(createPassRoot).toContain('@import "./create-pass/layout-and-session.css";');
+    expect(createPassRoot).toContain('@import "./create-pass/semantic-editor.css";');
+  });
+
+  test("reorganized frontend modules keep visible ownership notes", () => {
+    const ownershipNotes = [
+      ["../app/containers/App.js", "Application shell"],
+      ["../app/routes/AppRoutes.jsx", "Route composition"],
+      ["../audit/AuditLogExplorer.js", "Shared audit-log view"],
+      ["../dictionary/DictionaryBrowserPage.js", "Dictionary feature"],
+      ["../passports/form/PassportFormPage.js", "Form coordinator"],
+      ["../passports/form/passportFormDrafts.js", "Pure Passport Form draft transforms"],
+      ["../passports/form/passportFormFieldPolicy.js", "Form ownership policy"],
+      ["../passports/form/components/PassportFieldInput.jsx", "Field renderer"],
+      ["../passports/form/components/PassportProductImagePicker.jsx", "Product-image control"],
+      ["../passports/form/components/SymbolRepositoryPicker.js", "Repository-backed symbol picker"],
+      ["../shared/styles/Dashboard.css", "Dashboard stylesheet composition root"],
+      ["../admin/styles/AdminDashboard.css", "Admin stylesheet composition root"],
+      ["../shared/styles/CreatePass.css", "Passport create/edit stylesheet composition root"],
+    ];
+
+    for (const [relativePath, responsibility] of ownershipNotes) {
+      const source = readFileSync(new URL(relativePath, import.meta.url), "utf8");
+      expect(source.startsWith("//") || source.startsWith("/*")).toBe(true);
+      expect(source.split("\n").slice(0, 6).join("\n")).toContain(responsibility);
+    }
   });
 
   test("app-owned dropdown helpers retain option values and skip disabled choices", () => {

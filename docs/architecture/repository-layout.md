@@ -1,5 +1,8 @@
 # Repository Layout
 
+For placement rules, file-header conventions, and the Passport Module
+portability invariant, see [Code Organization](./code-organization.md).
+
 ## In Plain English
 
 The repository is now organized by app first, then by responsibility inside each app.

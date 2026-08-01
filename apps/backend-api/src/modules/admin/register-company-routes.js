@@ -2,8 +2,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const logger = require("../../services/logger");
-const { companyPolicyDefaults } = require("../../services/company-dpp-policy");
+const logger = require("../../platform/observability/logger");
+const { companyPolicyDefaults } = require("../passports/services/company-dpp-policy");
 
 const maxCountryLength = 80;
 

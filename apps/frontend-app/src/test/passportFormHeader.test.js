@@ -7,6 +7,18 @@ describe("passport form system field handling", () => {
       new URL("../passports/form/PassportFormPage.js", import.meta.url),
       "utf8"
     );
+    const fieldPolicySource = readFileSync(
+      new URL("../passports/form/passportFormFieldPolicy.js", import.meta.url),
+      "utf8"
+    );
+    const productImageSource = readFileSync(
+      new URL("../passports/form/components/PassportProductImagePicker.jsx", import.meta.url),
+      "utf8"
+    );
+    const fieldInputSource = readFileSync(
+      new URL("../passports/form/components/PassportFieldInput.jsx", import.meta.url),
+      "utf8"
+    );
 
     expect(source).toContain("const isSystemPrefilledField");
     expect(source).toContain("systemHeader?.fieldMappings");
@@ -15,21 +27,21 @@ describe("passport form system field handling", () => {
     expect(source).toContain("applicationPrefilledFieldKeys");
     expect(source).toContain("form-group-system");
     expect(source).toContain('System value');
-    expect(source).toContain("renderProductImagePicker()");
-    expect(source).toMatch(/renderProductImagePicker[\s\S]*?setSymbolPicker\("productImage"\)/);
-    expect(source).not.toMatch(/renderProductImagePicker[\s\S]*?setRepoPicker\("productImage"\)/);
-    expect(source).toContain('Link PDF from Repository');
+    expect(source).toContain("<PassportProductImagePicker");
+    expect(source).toContain('onOpenPicker={() => setSymbolPicker("productImage")}');
+    expect(productImageSource).not.toContain("onOpenRepositoryPicker");
+    expect(fieldInputSource).toContain('Link PDF from Repository');
     expect(source).toContain("fileDisplayNames");
     expect(source).toContain("onSelect={(url, fileName)");
-    expect(source).toContain('linkedUrl ? "Linked document" : null');
-    expect(source).not.toContain('linkedUrl ? linkedUrl.split("/").pop() : null');
+    expect(fieldInputSource).toContain('linkedUrl ? "Linked document" : null');
+    expect(fieldInputSource).not.toContain('linkedUrl ? linkedUrl.split("/").pop() : null');
     expect(source).not.toContain("renderPassportHeaderSection");
     expect(source).not.toContain("renderManagedComplianceSection");
     expect(source).not.toMatch(/\bsetModelName\b/);
     expect(source).not.toContain("buildPassportFormHeaderContext");
     expect(source).not.toContain("canonicalizeRecordToSchemaKeys");
     expect(source).toMatch(/const persistedFormData = formDataRef\.current/);
-    const nonPersistedBlock = source.match(/const nonPersistedPayloadKeys = new Set\(\[([\s\S]*?)\]\);/);
+    const nonPersistedBlock = fieldPolicySource.match(/export const nonPersistedPayloadKeys = new Set\(\[([\s\S]*?)\]\);/);
     expect(nonPersistedBlock?.[1]).not.toContain("uniqueProductIdentifier");
   });
 });

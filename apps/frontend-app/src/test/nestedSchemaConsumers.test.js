@@ -46,12 +46,16 @@ describe("nested schema consumers", () => {
       new URL("../passports/form/PassportFormPage.js", import.meta.url),
       "utf8",
     );
+    const fieldInputSource = readFileSync(
+      new URL("../passports/form/components/PassportFieldInput.jsx", import.meta.url),
+      "utf8",
+    );
 
     expect(source).toContain("const renderSchemaSectionTree");
     expect(source).toContain("const renderSchemaFields");
     expect(source).toContain("childSections.map((child, childIndex)");
     expect(source).toContain("const fields = flattenSchemaFieldsFromSections(Object.values(sections || {}))");
-    expect(source).toContain('["file", "symbol", "table"].includes(field.type)');
+    expect(fieldInputSource).toContain('["file", "symbol", "table"].includes(field.type)');
     expect(source).not.toContain("getRootSemanticProperty");
     expect(source).not.toContain("flattenSchemaFieldsFromSections([section])");
   });
@@ -71,7 +75,7 @@ describe("nested schema consumers", () => {
 
   test("template forms use the document scroll instead of a constrained editor panel", () => {
     const styles = readFileSync(
-      new URL("../shared/styles/Dashboard.css", import.meta.url),
+      new URL("../shared/styles/dashboard/templates-and-form.css", import.meta.url),
       "utf8",
     );
     const editorStyles = styles.match(/\.tmpl-editor \{[\s\S]*?\n\}/)?.[0] || "";

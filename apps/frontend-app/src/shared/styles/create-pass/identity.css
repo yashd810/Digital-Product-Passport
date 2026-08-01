@@ -1,0 +1,52 @@
+/* Identity row */
+.passport-identity-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: rgba(28,55,56,0.06);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  align-items: end;
+}
+
+[data-theme="light"] .passport-identity-row {
+  background: #f0faf6;
+  border-color: rgba(28,55,56,0.12);
+}
+
+.passport-field-group { display: flex; flex-direction: column; }
+
+.passport-field-group label {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-family: var(--font);
+}
+
+.passport-model-input {
+  padding: 11px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-size: 14px;
+  font-family: var(--font);
+  transition: all 0.25s ease;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .passport-model-input {
+  background: #ffffff;
+  color: var(--onyx);
+  border-color: rgba(28,55,56,0.2);
+}
+
+.passport-model-input:focus {
+  outline: none;
+  border-color: var(--jet);
+  box-shadow: 0 0 0 3px rgba(28,55,56,0.15);
+}

@@ -1,6 +1,6 @@
 "use strict";
 
-const { buildPassportModuleDigest } = require("../src/services/passport-type-profile");
+const { buildPassportModuleDigest } = require("../src/modules/passports/services/passport-type-profile");
 
 const baseIri = "https://example.test/dictionary/example-product/v1/terms/";
 

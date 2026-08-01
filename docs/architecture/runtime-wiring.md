@@ -28,9 +28,10 @@ Important behavior there:
   cookies only to trusted API origins and omits them in the standalone public
   viewer
 
-The main route map lives in `apps/frontend-app/src/app/containers/App.js:1`.
+The application shell lives in `apps/frontend-app/src/app/containers/App.js:1`.
+The main route map lives in `apps/frontend-app/src/app/routes/AppRoutes.jsx:1`.
 
-That file wires:
+The route module wires:
 
 - public auth pages
 - dashboard pages
@@ -40,9 +41,11 @@ That file wires:
 
 ## Backend Wiring
 
-The backend starts in `apps/backend-api/src/server.js:1`.
+The backend starts in the small process entrypoint
+`apps/backend-api/src/server.js:1`, which delegates composition to
+`apps/backend-api/src/bootstrap/start-server.js:1`.
 
-That file does four big jobs:
+The composition root does four big jobs:
 
 1. loads environment and runtime paths
 2. creates Express, PostgreSQL, storage, auth, semantics, signing, and related services

@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const createDidService = require("../src/services/did-service");
+const createDidService = require("../src/platform/identity/did-service");
 
 function createService() {
   return createDidService({

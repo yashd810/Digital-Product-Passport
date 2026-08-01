@@ -1,0 +1,107 @@
+/* ============================================
+   DASHBOARD HELPERS
+   Shared helpers for layout, buttons, modals, and inline-style cleanup
+   ============================================ */
+
+.dashboard-main-shell {
+  padding-bottom: 0;
+}
+
+.dashboard-user-avatar-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.sidebar-section-label-spaced {
+  margin-top: 14px;
+}
+
+.dashboard-loading-panel {
+  padding: 40px;
+}
+
+.dashboard-loading-screen {
+  padding: 60px;
+}
+
+.dashboard-alert-spaced {
+  margin-bottom: 20px;
+}
+
+.dashboard-alert-inline {
+  margin-bottom: 12px;
+}
+
+.wf-error-title {
+  font-weight: 700;
+}
+
+.dashboard-alert-inline.wf-compliance-alert {
+  max-height: min(42vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.wf-error-section {
+  margin-top: 10px;
+}
+
+.wf-error-heading {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+  margin-bottom: 6px;
+}
+
+.wf-error-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.wf-error-list li + li {
+  margin-top: 4px;
+}
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 12px;
+    align-items: flex-start;
+  }
+
+  .modal-box {
+    max-height: calc(100vh - 24px);
+    margin: 0 auto;
+  }
+
+  .modal-body {
+    padding: 16px 18px;
+  }
+
+  .modal-footer {
+    padding: 14px 18px 18px;
+    flex-wrap: wrap;
+  }
+
+  .btn-cancel-wf,
+  .btn-release-wf,
+  .btn-approve-wf,
+  .btn-reject-wf {
+    flex: 1 1 160px;
+  }
+
+  .wf-checker-header {
+    flex-direction: column;
+  }
+
+  .wf-checker-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.dashboard-hidden-input {
+  display: none;
+}

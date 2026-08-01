@@ -44,6 +44,7 @@ access at port `3001` is for local diagnostics. Detailed setup lives in
 ├── docker/                       # Local and production compose files
 ├── docs/                         # Centralized developer and product documentation
 ├── infra/                        # Nginx, Caddy, OCI, semantic resources, templates
+├── local-tools/                  # Local-only developer tools, not deployed with the app
 └── scripts/                      # Deployment, generation, migration, and utility scripts
 ```
 

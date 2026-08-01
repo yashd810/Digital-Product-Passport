@@ -16,13 +16,13 @@ A safe mental model is:
 
 | Task | Start here |
 | --- | --- |
-| Add a dashboard page | `apps/frontend-app/src/app/containers/App.js` and the relevant feature folder |
+| Add a dashboard page | `apps/frontend-app/src/app/routes/AppRoutes.jsx` and the relevant feature folder |
 | Change a company-side screen | `apps/frontend-app/src/user/...` |
 | Change an admin screen | `apps/frontend-app/src/admin/...` |
 | Change passport viewer behavior | `apps/frontend-app/src/passport-viewer/...` |
 | Change public viewer shell | `apps/public-passport-viewer/src/...` |
 | Add backend route behavior | `apps/backend-api/src/http/routes/...` or `apps/backend-api/src/modules/...` |
-| Add reusable backend logic | `apps/backend-api/src/services/...` or `src/shared/...` |
+| Add reusable backend logic | the owning `src/modules/<feature>/...`, `src/platform/...`, or `src/shared/...` |
 | Change startup or app wiring | `apps/backend-api/src/server.js` or `src/bootstrap/...` |
 | Change schema | `apps/backend-api/src/db/init.js` |
 | Add a passport module and semantic resources | `apps/backend-api/passport-modules/<family>-<version>/` |
@@ -33,10 +33,12 @@ The current backend pattern is:
 
 - top-level route group in `src/http/routes/`
 - feature-specific route registration helpers in `src/modules/`
-- shared or reusable service logic in `src/services/`
+- feature-owned services in `src/modules/<feature>/services/`, cross-cutting
+  capabilities in `src/platform/`, and pure shared helpers in `src/shared/`
 - shared helpers in `src/shared/`
 
-Do not add new code to old top-level folders like `routes/`, `services/`, `middleware/`, or `Server/`. Those are no longer the active backend layout.
+Do not add new code to old top-level folders like `routes/`, `services/`,
+`middleware/`, or `Server/`. Those are no longer the active backend layout.
 
 ## Frontend Change Pattern
 

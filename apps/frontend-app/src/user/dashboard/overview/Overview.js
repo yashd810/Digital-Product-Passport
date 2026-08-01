@@ -9,7 +9,7 @@ import {
   formatAuditEntity,
   getAuditActionKind,
   isCompanyDashboardAuditEvent,
-} from "../../../shared/audit/auditDisplay";
+} from "../../../audit/auditDisplay";
 
 const api = import.meta.env.VITE_API_URL || "";
 const overviewBarColors = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e"];

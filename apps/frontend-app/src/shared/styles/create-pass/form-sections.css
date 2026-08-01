@@ -1,0 +1,182 @@
+/* Form sections */
+.createpass-form { display: flex; flex-direction: column; gap: 0; }
+
+.form-section {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.form-section:last-of-type { margin-bottom: 28px; }
+
+.section-header {
+  background: rgba(28,55,56,0.06);
+  padding: 15px 18px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.25s ease;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  text-align: left;
+  font: inherit;
+}
+
+[data-theme="light"] .section-header { background: #f0faf6; }
+
+[data-theme="light"] .section-header:hover {
+  background: #e3f5f1;
+  color: #123346;
+  border-bottom-color: rgba(13,181,176,0.26);
+}
+
+.section-header:hover {
+  background: var(--jet);
+  color: var(--mint);
+  border-bottom-color: var(--jet);
+}
+
+.section-header:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: -2px;
+}
+
+.section-title { font-weight: 700; font-size: 14px; letter-spacing: 0.3px; }
+
+.toggle-icon {
+  display: inline-block;
+  transition: transform 0.25s ease;
+  font-size: 12px;
+}
+.toggle-icon.expanded { transform: rotate(180deg); }
+
+.section-content {
+  padding: 20px;
+  background: var(--bg-card);
+  animation: slideDown 0.25s ease;
+}
+
+[data-theme="light"] .section-content { background: #ffffff; }
+
+/* Nested schema sections retain their hierarchy in passport forms. */
+.pf-schema-section-node {
+  min-width: 0;
+}
+
+.pf-schema-section-heading {
+  margin: 20px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 7px;
+  background: rgba(13, 181, 176, 0.06);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pf-schema-section-children {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+.pf-schema-section-depth-2 .pf-schema-section-heading,
+.pf-schema-section-depth-3 .pf-schema-section-heading {
+  background: rgba(13, 181, 176, 0.035);
+  font-size: 12px;
+}
+
+[data-theme="light"] .pf-schema-section-heading {
+  background: #f0faf6;
+  border-color: rgba(28, 55, 56, 0.18);
+  border-left-color: var(--accent);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 14px;
+}
+
+.form-group { display: flex; flex-direction: column; }
+.form-group.full-width { grid-column: 1 / -1; }
+
+.form-group label {
+  margin-bottom: 7px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+
+.form-group input,
+.form-group textarea,
+.form-group .app-select__trigger {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: var(--font);
+  transition: all 0.25s ease;
+  background-color: rgba(255,255,255,0.04);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .form-group input,
+[data-theme="light"] .form-group textarea,
+[data-theme="light"] .form-group .app-select__trigger {
+  background-color: #fafffe;
+  color: var(--onyx);
+  border-color: rgba(28,55,56,0.2);
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group .app-select__trigger:focus {
+  outline: none;
+  border-color: var(--jet);
+  background-color: rgba(255,255,255,0.06);
+  box-shadow: 0 0 0 3px rgba(28,55,56,0.15);
+}
+
+[data-theme="light"] .form-group input:focus,
+[data-theme="light"] .form-group textarea:focus,
+[data-theme="light"] .form-group .app-select__trigger:focus {
+  background-color: #ffffff;
+}
+
+.form-group textarea { resize: vertical; min-height: 100px; }
+
+.form-group-system {
+  opacity: 0.62;
+}
+
+.form-group-system input:disabled,
+.form-group-system textarea:disabled,
+.form-group-system button:disabled,
+.form-group-system .app-select__trigger:disabled {
+  background: rgba(122, 146, 166, 0.14);
+  border-color: rgba(122, 146, 166, 0.3);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+[data-theme="light"] .form-group-system input:disabled,
+[data-theme="light"] .form-group-system textarea:disabled,
+[data-theme="light"] .form-group-system button:disabled,
+[data-theme="light"] .form-group-system .app-select__trigger:disabled {
+  background: #edf2f5;
+  border-color: rgba(90, 112, 128, 0.26);
+  color: #5f7282;
+}

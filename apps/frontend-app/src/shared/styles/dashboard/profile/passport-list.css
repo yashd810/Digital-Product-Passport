@@ -1,0 +1,531 @@
+/* ============================================
+   DASHBOARD HELPERS: Passport list
+   ============================================ */
+
+.passport-list-page {
+  padding-bottom: 60px;
+}
+
+.passport-list-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.passport-list-header {
+  margin-bottom: 28px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.passport-list-title {
+  margin: 0 0 8px 0;
+  color: var(--heading-display);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.passport-list-description {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0;
+}
+
+.passport-list-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.passport-list-actions .csv-btn,
+.passport-list-actions .create-passport-btn {
+  min-height: 42px;
+}
+
+.passport-list-actions .passport-select-toggle {
+  min-width: 140px;
+}
+
+.passport-list-actions .csv-btn.export-btn {
+  min-width: 146px;
+}
+
+.passport-list-actions .csv-btn.template-btn:not(.passport-select-toggle) {
+  min-width: 204px;
+}
+
+.passport-select-toggle.active {
+  background: rgba(13, 181, 176, 0.16);
+  border-color: rgba(13, 181, 176, 0.4);
+  color: var(--accent);
+}
+
+/* ── Bulk Actions Bar ───────────────────────────────────────────── */
+.bulk-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--sidebar-active-bg, rgba(13, 181, 176, 0.08));
+  border: 1px solid rgba(13, 181, 176, 0.25);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex-wrap: wrap;
+}
+.bulk-actions-count {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--accent);
+  white-space: nowrap;
+  min-width: 80px;
+}
+.bulk-actions-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.bulk-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--card-bg, #16293d);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    opacity 0.15s;
+  white-space: nowrap;
+}
+.bulk-action-btn:hover:not(:disabled) {
+  background: var(--sidebar-active-bg, rgba(13, 181, 176, 0.12));
+  border-color: rgba(13, 181, 176, 0.4);
+}
+.bulk-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.bulk-action-btn.bulk-action-release {
+  border-color: rgba(13, 181, 176, 0.4);
+  color: var(--accent);
+}
+.bulk-action-btn.bulk-action-delete {
+  border-color: rgba(220, 60, 60, 0.35);
+  color: #ef5350;
+}
+.bulk-action-btn.bulk-action-delete:hover:not(:disabled) {
+  background: rgba(220, 60, 60, 0.1);
+  border-color: rgba(220, 60, 60, 0.5);
+}
+.bulk-actions-loading {
+  font-size: 12px;
+  color: var(--text-secondary);
+  animation: pulse-opacity 1.2s ease-in-out infinite;
+}
+
+[data-theme="light"] .bulk-actions-bar {
+  background: rgba(13, 181, 176, 0.06);
+  border-color: rgba(13, 181, 176, 0.2);
+}
+
+[data-theme="light"] .bulk-action-btn {
+  background: #ffffff;
+  border-color: rgba(28, 55, 56, 0.18);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .bulk-action-btn:hover:not(:disabled) {
+  background: rgba(13, 181, 176, 0.07);
+  border-color: rgba(13, 181, 176, 0.35);
+}
+
+[data-theme="light"] .bulk-action-btn.bulk-action-delete {
+  border-color: rgba(220, 60, 60, 0.35);
+  color: #e53935;
+}
+
+@keyframes pulse-opacity {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.bulk-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bulk-create-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.bulk-revise-modal-card {
+  max-width: 920px;
+  padding: 28px;
+}
+
+.bulk-revise-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bulk-revise-scope-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  padding: 14px;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bulk-revise-scope-card strong {
+  font-size: 14px;
+}
+
+.bulk-revise-scope-card span,
+.bulk-revise-scope-card small {
+  color: var(--text-secondary);
+}
+
+.bulk-revise-scope-card.active {
+  border-color: rgba(13, 181, 176, 0.4);
+  background: rgba(13, 181, 176, 0.12);
+}
+
+.bulk-revise-change-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bulk-revise-change-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(280px, 1.3fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bulk-revise-field-select,
+.bulk-revise-field-value {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bulk-revise-field-select label,
+.bulk-revise-field-value label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.bulk-revise-remove-btn {
+  min-height: 42px;
+}
+
+.bulk-revise-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.bulk-revise-checkbox input {
+  accent-color: var(--accent);
+}
+
+.bulk-revise-textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: var(--font);
+  resize: vertical;
+}
+
+.bulk-revise-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+
+.bulk-revise-result-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bulk-revise-result-item.submitted {
+  border-color: rgba(13, 181, 176, 0.35);
+}
+
+.bulk-revise-result-item.failed {
+  border-color: rgba(239, 68, 68, 0.28);
+}
+
+.bulk-revise-result-item.skipped {
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.bulk-revise-result-topline {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.bulk-revise-result-copy {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.bulk-revise-result-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(184, 204, 217, 0.14);
+  color: var(--text-secondary);
+}
+
+.bulk-revise-result-status.revised,
+.bulk-revise-result-status.submitted {
+  background: rgba(13, 181, 176, 0.16);
+  color: var(--accent);
+}
+
+.bulk-revise-result-status.skipped {
+  background: rgba(245, 158, 11, 0.18);
+  color: #d97706;
+}
+
+.bulk-revise-result-status.failed {
+  background: rgba(239, 68, 68, 0.16);
+  color: #dc2626;
+}
+
+.passport-table-select-col {
+  width: 40px;
+}
+
+.passport-table-pin-col {
+  width: 28px;
+}
+
+.passport-row-pinned {
+  background: #fffbeb;
+}
+
+.passport-pin-cell {
+  padding: 0 4px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.passport-pagination-size {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.passport-pagination-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.passport-page-size-select {
+  min-width: 90px;
+}
+
+.passport-pagination {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.passport-pagination-summary {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.passport-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.passport-page-btn {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.passport-page-btn:hover:not(:disabled) {
+  border-color: rgba(13, 181, 176, 0.24);
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.passport-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.passport-page-indicator {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .passport-page-btn {
+  background: #ffffff;
+  border-color: rgba(28, 55, 56, 0.16);
+  color: var(--onyx);
+}
+
+[data-theme="light"] .passport-page-btn:hover:not(:disabled) {
+  background: #f4fbff;
+  color: #0b8e97;
+}
+
+@media (max-width: 768px) {
+  .passport-pagination-size {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .passport-pagination {
+    align-items: stretch;
+  }
+
+  .passport-pagination-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+.passport-type-badge {
+  text-transform: capitalize;
+}
+
+.completeness-empty {
+  font-size: 11px;
+  color: var(--steel);
+}
+
+.completeness-bar {
+  min-width: 68px;
+}
+
+.completeness-track {
+  height: 4px;
+  margin-bottom: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: #e0ecea;
+}
+
+.completeness-fill {
+  height: 100%;
+}
+
+.completeness-fill-high {
+  background: #065f46;
+}
+
+.completeness-fill-medium {
+  background: #7a5c00;
+}
+
+.completeness-fill-low {
+  background: #7a1c1c;
+}
+
+.completeness-pill {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.completeness-pill-high {
+  color: #065f46;
+  background: #d1fae5;
+}
+
+.completeness-pill-medium {
+  color: #7a5c00;
+  background: #fef3c7;
+}
+
+.completeness-pill-low {
+  color: #7a1c1c;
+  background: #fde8e8;
+}

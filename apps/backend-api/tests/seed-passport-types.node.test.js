@@ -13,8 +13,8 @@ const {
   resolveCompaniesForAccess,
   runSeed,
 } = require("../scripts/seed-passport-types");
-const { getPassportTypeModule } = require("../src/services/passport-module-registry");
-const { compilePassportTypeProfile } = require("../src/services/passport-type-profile");
+const { getPassportTypeModule } = require("../src/modules/passports/services/passport-module-registry");
+const { compilePassportTypeProfile } = require("../src/modules/passports/services/passport-type-profile");
 
 function findFieldByKey(sections, fieldKey) {
   for (const section of sections || []) {

@@ -1,5 +1,5 @@
-const logger = require("../../services/logger");
-const { recordSignedDppRelease } = require("../../services/dpp-release-record-service");
+const logger = require("../../platform/observability/logger");
+const { recordSignedDppRelease } = require("../../modules/passports/services/dpp-release-record-service");
 const { buildDashboardPath } = require("../../shared/navigation/dashboard-paths");
 const { releasePassportAtomically } = require("../../modules/passports/release-passport-transaction");
 

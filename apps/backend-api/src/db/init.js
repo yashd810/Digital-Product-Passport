@@ -1,6 +1,6 @@
 "use strict";
 
-const logger = require("../services/logger");
+const logger = require("../platform/observability/logger");
 
 function isSafeSqlIdentifier(value) {
   return /^[A-Za-z][A-Za-z0-9]*$/.test(String(value || ""));

@@ -4,7 +4,7 @@ import {
   getDictionaryValueConstraint,
   getLocalSemanticLabel,
   getSemanticReferenceDisplay,
-} from "../shared/dictionary/DictionaryBrowserPage";
+} from "../dictionary/DictionaryBrowserPage";
 
 describe("dictionary semantic reference display", () => {
   it("uses the local human label instead of a section breadcrumb", () => {
@@ -61,7 +61,7 @@ describe("dictionary semantic reference display", () => {
 
   it("uses search without class-filter tags in the dictionary toolbar", async () => {
     const source = await import("node:fs/promises").then(({ readFile }) => readFile(
-      new URL("../shared/dictionary/DictionaryBrowserPage.js", import.meta.url),
+      new URL("../dictionary/DictionaryBrowserPage.js", import.meta.url),
       "utf8"
     ));
 

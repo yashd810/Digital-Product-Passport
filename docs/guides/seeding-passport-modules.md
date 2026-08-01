@@ -74,7 +74,7 @@ That folder contains:
 
 The loader is:
 
-- `apps/backend-api/src/services/passport-module-registry.js:1`
+- `apps/backend-api/src/modules/passports/services/passport-module-registry.js:1`
 
 Folder naming is deterministic: replace the colon in `moduleKey` with a
 hyphen. For example, `example-product:v1` must use `example-product-v1`.

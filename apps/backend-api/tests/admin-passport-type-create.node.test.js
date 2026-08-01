@@ -5,7 +5,7 @@ const test = require("node:test");
 const express = require("express");
 const multer = require("multer");
 const registerCatalogRoutes = require("../src/modules/admin/register-catalog-routes");
-const { compilePassportTypeProfile } = require("../src/services/passport-type-profile");
+const { compilePassportTypeProfile } = require("../src/modules/passports/services/passport-type-profile");
 const { flattenSchemaFieldsFromSections } = require("../src/shared/passports/passport-helpers");
 const { createPassportModuleFixture } = require("./passport-module-fixture");
 

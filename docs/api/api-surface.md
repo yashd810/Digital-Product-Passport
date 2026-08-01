@@ -43,7 +43,7 @@ The passport area is split on purpose.
 
 - `src/http/routes/passports.js` wires the big passport surface together.
 - `src/modules/passports/*.js` holds feature-specific route helpers.
-- `src/services/passport-service.js` holds reusable persistence and domain logic.
+- `src/modules/passports/services/passport-service.js` holds reusable persistence and domain logic.
 
 That split is the current design, not leftover clutter.
 

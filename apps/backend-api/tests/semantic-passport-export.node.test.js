@@ -5,8 +5,8 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const createSemanticModelRegistry = require("../src/services/semantic-model-registry");
-const createSemanticPassportExportService = require("../src/services/semantic-passport-export");
+const createSemanticModelRegistry = require("../src/modules/passports/services/semantic-model-registry");
+const createSemanticPassportExportService = require("../src/modules/passports/services/semantic-passport-export");
 const {
   toPassportStorageColumnKey,
 } = require("../src/shared/passports/passport-helpers");

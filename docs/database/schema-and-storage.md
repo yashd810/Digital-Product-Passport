@@ -58,7 +58,7 @@ Important directories:
 
 Current storage implementation entrypoint:
 
-- `apps/backend-api/src/services/storage-service.js:1`
+- `apps/backend-api/src/platform/storage/storage-service.js:1`
 
 ## Health Checks
 

@@ -3,7 +3,7 @@
 const { isSafePassportTypeName } = require("../../shared/passports/passport-helpers");
 const {
   buildPassportTypeSemanticProfile,
-} = require("../../services/passport-type-semantic-profile");
+} = require("../../modules/passports/services/passport-type-semantic-profile");
 
 function defaultMiddleware(_req, _res, next) {
   next();

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import AuditLogExplorer from "../../../shared/audit/AuditLogExplorer";
-import { isCompanyDashboardAuditEvent } from "../../../shared/audit/auditDisplay";
+import AuditLogExplorer from "../../../audit/AuditLogExplorer";
+import { isCompanyDashboardAuditEvent } from "../../../audit/auditDisplay";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 
 function AuditLogs({ companyId }) {

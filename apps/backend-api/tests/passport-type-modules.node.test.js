@@ -12,11 +12,11 @@ const {
   getPassportTypeModules,
   loadPassportTypeModuleDefinitions,
   normalizeModuleDefinition,
-} = require("../src/services/passport-module-registry");
+} = require("../src/modules/passports/services/passport-module-registry");
 const { flattenSchemaFieldsFromSections } = require("../src/shared/passports/passport-helpers");
 const { runtimeFieldFromSemanticProperty } = require("../src/shared/passports/passport-semantic-graph");
-const createDidService = require("../src/services/did-service");
-const createProductIdentifierService = require("../src/services/product-identifier-service");
+const createDidService = require("../src/platform/identity/did-service");
+const createProductIdentifierService = require("../src/modules/passports/services/product-identifier-service");
 
 function createSystemHeader() {
   return {

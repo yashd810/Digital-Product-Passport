@@ -1,3 +1,4 @@
+// Form coordinator: route/API/draft state; pure helpers and field controls live in sibling modules.
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
@@ -7,222 +8,55 @@ import {
   extractFieldValuesFromElements,
 } from "../../shared/passports/schemaKeyUtils";
 import {
-  createEmptyTableRow,
-  normalizeTableColumns,
-  parseTableRows,
-} from "../../shared/passports/tableSchemaUtils";
-import {
   flattenSchemaFieldsFromSections,
   normalizeSchemaSections,
 } from "../../shared/passports/passportSchemaUtils";
 import {
   filterPassportDataEntrySections,
   getPassportDataEntryFieldKeys,
-  selectPassportDataEntryValues,
 } from "../../shared/passports/passportSchemaVisibility";
 import {
   normalizeSystemPassportHeader,
 } from "../../admin/passport-types/builderHelpers";
-import SemanticGraphFieldEditor from "../../shared/passports/SemanticGraphFieldEditor";
 import {
   coerceSemanticGraphPropertyValue,
 } from "../../shared/passports/semanticGraphUtils";
-import { toSafeImageSrc, toSafeResourceHref } from "../../shared/security/urlSafety";
-import { formatFieldLabelWithUnit, getFieldUnitLabel } from "../../passport-viewer/utils/viewerHelpers";
+import { toSafeResourceHref } from "../../shared/security/urlSafety";
+import { formatFieldLabelWithUnit } from "../../passport-viewer/utils/viewerHelpers";
 import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
 import RepositoryPicker from "./components/RepositoryPicker";
 import SymbolRepositoryPicker from "./components/SymbolRepositoryPicker";
+import PassportFieldInput from "./components/PassportFieldInput";
+import PassportProductImagePicker from "./components/PassportProductImagePicker";
+import {
+  buildClonePrefill,
+  buildDraftStorageKey,
+  generateDraftLocalPassportId,
+  mergePassportRepresentations,
+  normalizePersistedComparisonValue,
+} from "./passportFormDrafts";
+import {
+  applicationPrefilledFieldKeys,
+  managedEditableKeys,
+  nonEditableFormKeys,
+  nonPersistedPayloadKeys,
+  platformGeneratedHeaderSlots,
+  reservedSystemFieldKeys,
+  sanitizePassportFormData,
+} from "./passportFormFieldPolicy";
 import "../../shared/styles/CreatePass.css";
 
+/**
+ * Passport create/edit page composition.
+ *
+ * This component coordinates route context, authenticated API calls, form
+ * state, browser drafts, and feature subcomponents. Pure draft transforms live
+ * in `passportFormDrafts.js`; individual input controls live in `components/`.
+ */
 const api = import.meta.env.VITE_API_URL || "";
 const editSessionTimeoutMs = 12 * 60 * 60 * 1000;
 const editHeartbeatMs = 60 * 1000;
 const currentYear = new Date().getFullYear();
-const platformGeneratedHeaderSlots = new Set([
-  "digitalProductPassportId",
-  "uniqueProductIdentifier",
-  "internalAliasId",
-  "granularity",
-  "dppSchemaVersion",
-  "dppStatus",
-  "lastUpdate",
-  "contentSpecificationIds",
-  "subjectDid",
-  "dppDid",
-  "companyDid",
-]);
-const applicationPrefilledFieldKeys = new Set(["economicOperatorIdentifierScheme"]);
-function getFieldInputPrompt(field) {
-  const baseLabel = String(field?.label || field?.key || "value").toLowerCase();
-  const unitLabel = getFieldUnitLabel(field);
-  return unitLabel ? `Enter ${baseLabel} in ${unitLabel}` : `Enter ${baseLabel}`;
-}
-
-function buildDraftStorageKey({ mode, companyId, passportType, dppId }) {
-  return [
-    "passport-form-draft",
-    mode || "create",
-    companyId || "no-company",
-    passportType || "no-type",
-    dppId || "new",
-  ].join(":");
-}
-
-function normalizePersistedComparisonValue(value) {
-  if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return String(value);
-    }
-  }
-  if (typeof value === "string") return value.trim();
-  return value ?? null;
-}
-
-function mergePassportRepresentations(rawRecord = {}, fullRecord = {}) {
-  const rawFields = rawRecord?.fields && typeof rawRecord.fields === "object" ? rawRecord.fields : {};
-  const fullFields = fullRecord?.fields && typeof fullRecord.fields === "object" ? fullRecord.fields : {};
-  return {
-    ...fullRecord,
-    ...rawRecord,
-    fields: {
-      ...fullFields,
-      ...rawFields,
-    },
-    elements: fullRecord?.elements || rawRecord?.elements,
-  };
-}
-
-function buildClonePrefill(record, sections) {
-  if (!record || typeof record !== "object") {
-    return { internalAliasId: "", formData: {} };
-  }
-
-  const keyMap = buildSchemaFieldKeyMap(sections);
-  const mergedRecord = {
-    ...record,
-    ...(record.fields && typeof record.fields === "object" ? record.fields : {}),
-    ...extractFieldValuesFromElements(record.elements, keyMap),
-  };
-  const aligned = alignRecordToSchemaKeys(mergedRecord, sections);
-  const excludedKeys = new Set([
-    "id",
-    "dppId",
-    "companyId",
-    "lineageId",
-    "createdAt",
-    "updatedAt",
-    "releaseStatus",
-    "versionNumber",
-    "archivedAt",
-    "releasedAt",
-    "deletedAt",
-    "elements",
-    "fields",
-    "linkedData",
-    "companyProfile",
-    "subjectDid",
-    "dppDid",
-    "companyDid",
-  ]);
-
-  const formData = Object.fromEntries(
-    Object.entries(selectPassportDataEntryValues(aligned, sections))
-      .filter(([key, value]) => !excludedKeys.has(key) && value !== undefined)
-  );
-
-  return {
-    internalAliasId: "",
-    formData,
-  };
-}
-
-function generateDraftLocalPassportId() {
-  if (typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID) {
-    return `dppId${globalThis.crypto.randomUUID()}`;
-  }
-  const randomPart = Math.random().toString(36).slice(2, 10);
-  const timestampPart = Date.now().toString(36);
-  return `dppId${timestampPart}${randomPart}`;
-}
-
-const nonEditableFormKeys = new Set([
-  "id",
-  "dppId",
-  "companyId",
-  "lineageId",
-  "createdBy",
-  "createdByEmail",
-  "createdAt",
-  "updatedBy",
-  "updatedAt",
-  "releaseStatus",
-  "versionNumber",
-  "archived",
-  "archivedAt",
-  "releasedAt",
-  "deletedAt",
-  "passportType",
-  "qrCode",
-  "subjectDid",
-  "dppDid",
-  "companyDid",
-  "internalAliasId",
-  "elements",
-  "fields",
-  "linkedData",
-  "companyProfile",
-  "firstName",
-  "lastName",
-]);
-
-const reservedSystemFieldKeys = new Set([
-  "carrierAuthenticity",
-  "carrierSecurityStatus",
-  "carrierAuthenticationMethod",
-  "carrierVerificationInstructions",
-  "signedCarrierPayload",
-  "issuerCertificateId",
-  "carrierCompatibilityProfiles",
-  "physicalCarrierSecurityFeatures",
-  "trustedViewerOrigin",
-  "trustedViewerHost",
-  "counterfeitRiskLevel",
-  "antiCounterfeitInstructions",
-  "safetyWarnings",
-  "qrPrintSpecification",
-  "signCarrierPayload",
-]);
-
-const nonPersistedPayloadKeys = new Set([
-  "internalAliasId",
-  "subjectDid",
-  "dppDid",
-  "companyDid",
-  "schemaVersion",
-]);
-
-const managedEditableKeys = new Set([
-  "productImage",
-]);
-
-const passportFormContextKeys = new Set([
-  ...nonEditableFormKeys,
-  ...nonPersistedPayloadKeys,
-  ...reservedSystemFieldKeys,
-  ...managedEditableKeys,
-  "semanticModelKey",
-]);
-
-function sanitizePassportFormData(record, sections) {
-  const dataEntryKeys = getPassportDataEntryFieldKeys(sections);
-  return Object.fromEntries(
-    Object.entries(record && typeof record === "object" ? record : {})
-      .filter(([key]) => dataEntryKeys.has(key) || passportFormContextKeys.has(key))
-  );
-}
-
 function PassportForm({ user, companyId, mode = "create", passportType: typeProp }) {
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -804,87 +638,8 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     return deltaBody;
   };
 
-  const renderProductImagePicker = () => {
-    const linkedUrl = toSafeImageSrc(formData.productImage);
-    const disabled = isSaving || (mode === "edit" && isLoading);
-
-    return (
-      <div className="passport-field-group passport-product-image-group">
-        <label>Product Image</label>
-        <div className="file-upload-widget">
-          {linkedUrl ? (
-            <div className="file-existing image-existing">
-              <img src={linkedUrl} alt="Product" className="pf-product-image-thumb" />
-              <span className="file-existing-link">Repository image linked</span>
-              <button
-                type="button"
-                className="file-clear-btn"
-                disabled={disabled}
-                onClick={() => handleField("productImage", "")}
-              >
-                ✕ Remove
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="file-upload-label"
-              disabled={disabled}
-              onClick={() => setSymbolPicker("productImage")}
-            >
-              <span className="file-placeholder">🖼 Link Product Image from Symbols</span>
-            </button>
-          )}
-          {linkedUrl && (
-            <button
-              type="button"
-              className="file-upload-label file-replace-label"
-              disabled={disabled}
-              onClick={() => setSymbolPicker("productImage")}
-            >
-              <span className="file-placeholder">↺ Change</span>
-            </button>
-          )}
-          <div className="file-link-paste">
-            <input
-              type="text"
-              className="file-link-input"
-              placeholder="Or paste a repository image link here…"
-              disabled={disabled}
-              data-field-key="productImage"
-              onPaste={(e) => {
-                const text = e.clipboardData.getData("text").trim();
-                const safeUrl = toSafeResourceHref(text);
-                if (safeUrl) {
-                  e.preventDefault();
-                  handleField("productImage", safeUrl);
-                }
-              }}
-              onBlur={(e) => {
-                const text = e.target.value.trim();
-                const safeUrl = toSafeResourceHref(text);
-                if (safeUrl) {
-                  handleField("productImage", safeUrl);
-                  e.target.value = "";
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  const text = e.target.value.trim();
-                  const safeUrl = toSafeResourceHref(text);
-                  if (safeUrl) {
-                    handleField("productImage", safeUrl);
-                    e.target.value = "";
-                  }
-                }
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  };
-
+  // Edit presence is a collaboration signal, not a lock: inactivity releases
+  // the server session without discarding the browser's unsaved draft.
   const refreshEditPresence = async (method = "GET") => {
     if (mode !== "edit" || !dppId || !activePassportType || !effectiveCompanyId) return;
     const init = method === "POST"
@@ -920,6 +675,8 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     sessionActiveRef.current = false;
   };
 
+  // Both automatic and explicit saves use this guarded delta path so unchanged
+  // values are never sent back and concurrent clicks cannot create two writes.
   const saveEditChanges = async ({ showSuccessMessage = false } = {}) => {
     if (mode !== "edit" || !dppId || !activePassportType || saveInFlightRef.current) return false;
     const missingRequiredFields = getRequiredMissingFields();
@@ -1002,6 +759,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     }
   };
 
+  // Keep the edit-presence record fresh only while the user remains active.
   useEffect(() => {
     if (mode !== "edit" || !dppId || !activePassportType || !effectiveCompanyId || isLoading) return;
 
@@ -1046,6 +804,8 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     };
   }, [mode, dppId, activePassportType, effectiveCompanyId, isLoading, sessionExpired]);
 
+  // Create the passport record before uploading its files; uploads need the
+  // canonical DPP identifier returned by the server.
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(""); setSuccess(""); setIsSaving(true);
@@ -1111,244 +871,30 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     } finally { setIsSaving(false); }
   };
 
+  // Page-level policy remains here; type-specific input controls stay in the
+  // dedicated field component so their behavior is reusable and testable.
   const renderField = (field) => {
-    const val      = formData[field.key] ?? "";
     const isLocked = mode === "create" && modelDataKeys.has(field.key);
     const isSystemPrefilled = isSystemPrefilledField(field.key);
-    const disabled = isSaving || (mode==="edit" && isLoading) || isLocked || isSystemPrefilled;
-    const fieldLabel = formatFieldLabelWithUnit(field.label, field);
+    const disabled = isSaving || (mode === "edit" && isLoading) || isLocked || isSystemPrefilled;
     const highlightMissing = isTemplateCreateMode && !isLocked && isFieldUnfilled(field);
-    const fieldClassName = highlightMissing ? "pf-needs-input" : "";
-    const semanticProperty = field.rangeKind ? field : null;
 
-    if (semanticProperty && semanticGraph && !["file", "symbol", "table"].includes(field.type)) {
-      return (
-        <SemanticGraphFieldEditor
-          graph={semanticGraph}
-          property={semanticProperty}
-          value={val}
-          disabled={disabled}
-          hideRootLabel
-          onChange={(nextValue) => handleField(field.key, nextValue)}
-        />
-      );
-    }
-
-    if (field.type === "boolean") {
-      return (
-        <label className={fieldClassName} style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
-          <input type="checkbox" checked={!!val}
-            onChange={e => handleField(field.key, e.target.checked)} disabled={disabled} />
-          <span style={{ fontSize:14, color:"var(--text-primary)", fontFamily:"var(--font)" }}>{fieldLabel}</span>
-        </label>
-      );
-    }
-
-    if (field.type === "file") {
-      const linkedUrl  = toSafeResourceHref(val);
-      const selectedFile = fileSelections[field.key];
-      const fileName = selectedFile?.name || fileDisplayNames[field.key] || (linkedUrl ? "Linked document" : null);
-      return (
-        <div className="file-upload-widget">
-          {linkedUrl || selectedFile ? (
-            <div className="file-existing">
-              {linkedUrl ? (
-                <a href={linkedUrl} target="_blank" rel="noopener noreferrer" className="file-existing-link">
-                  📄 {fileName || "Document"}
-                </a>
-              ) : (
-                <span className="file-existing-link">📄 {fileName || "Document"}</span>
-              )}
-              <button type="button" className="file-clear-btn" disabled={disabled}
-                onClick={() => { clearFileSelection(field.key); handleField(field.key, ""); }}>✕ Remove</button>
-            </div>
-          ) : (
-            <button type="button" className="file-upload-label" disabled={disabled}
-              onClick={() => setRepoPicker(field.key)}>
-              <span className="file-placeholder">📁 Link PDF from Repository</span>
-            </button>
-          )}
-          {linkedUrl && (
-            <button type="button" className="file-upload-label file-replace-label" disabled={disabled}
-              onClick={() => setRepoPicker(field.key)}>
-              <span className="file-placeholder">↺ Change</span>
-            </button>
-          )}
-          <div className="file-link-paste">
-            <input
-              type="text"
-              className={`file-link-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
-              placeholder="Or paste a repository link here…"
-              disabled={disabled}
-              value={linkedUrl && document.activeElement?.dataset?.fieldKey !== field.key ? "" : undefined}
-              data-field-key={field.key}
-              onPaste={(e) => {
-                const text = e.clipboardData.getData("text").trim();
-                const safeUrl = toSafeResourceHref(text);
-                if (safeUrl) { e.preventDefault(); clearFileSelection(field.key); handleField(field.key, safeUrl); }
-              }}
-              onBlur={(e) => {
-                const text = e.target.value.trim();
-                const safeUrl = toSafeResourceHref(text);
-                if (safeUrl) { clearFileSelection(field.key); handleField(field.key, safeUrl); e.target.value = ""; }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  const text = e.target.value.trim();
-                  const safeUrl = toSafeResourceHref(text);
-                  if (safeUrl) { clearFileSelection(field.key); handleField(field.key, safeUrl); e.target.value = ""; }
-                }
-              }}
-            />
-          </div>
-        </div>
-      );
-    }
-
-    if (field.type === "symbol") {
-      const linkedUrl = toSafeResourceHref(val);
-      const picked    = linkedUrl ? symbols.find(s => s.fileUrl === linkedUrl) : null;
-      return (
-        <div className="file-upload-widget">
-          {linkedUrl ? (
-            <div className="file-existing">
-              {toSafeImageSrc(linkedUrl) && <img src={toSafeImageSrc(linkedUrl)} alt={picked?.name || "symbol"} className="pf-symbol-thumb" />}
-              <span className="file-existing-link">{picked?.name || "Symbol"}</span>
-              <button type="button" className="file-clear-btn" disabled={disabled}
-                onClick={() => handleField(field.key, "")}>✕ Remove</button>
-            </div>
-          ) : (
-            <button type="button" className="file-upload-label" disabled={disabled}
-              onClick={() => setSymbolPicker(field.key)}>
-              <span className="file-placeholder">🔣 Link Symbol from Repository</span>
-            </button>
-          )}
-          {linkedUrl && (
-            <button type="button" className="file-upload-label file-replace-label" disabled={disabled}
-              onClick={() => setSymbolPicker(field.key)}>
-              <span className="file-placeholder">↺ Change</span>
-            </button>
-          )}
-          <div className="file-link-paste">
-            <input
-              type="text"
-              className={`file-link-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
-              placeholder="Or paste a repository link here…"
-              disabled={disabled}
-              data-field-key={field.key}
-              onPaste={(e) => {
-                const text = e.clipboardData.getData("text").trim();
-                const safeUrl = toSafeResourceHref(text);
-                if (safeUrl) { e.preventDefault(); handleField(field.key, safeUrl); }
-              }}
-              onBlur={(e) => {
-                const text = e.target.value.trim();
-                const safeUrl = toSafeResourceHref(text);
-                if (safeUrl) { handleField(field.key, safeUrl); e.target.value = ""; }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  const text = e.target.value.trim();
-                  const safeUrl = toSafeResourceHref(text);
-                  if (safeUrl) { handleField(field.key, safeUrl); e.target.value = ""; }
-                }
-              }}
-            />
-          </div>
-        </div>
-      );
-    }
-
-    if (field.type === "table") {
-      const tableColumns = normalizeTableColumns(field);
-      const rows = parseTableRows(val, field);
-      const commitTable = (nextRows) => handleField(field.key, nextRows);
-
-      const updateCell = (ri, ci, v) => {
-        const column = tableColumns[ci];
-        if (!column) return;
-        const next = rows.map(r => ({ ...r }));
-        next[ri][column.key] = v;
-        commitTable(next);
-      };
-      const addRow = () => commitTable([...rows, createEmptyTableRow(tableColumns)]);
-      const removeRow = (ri) => {
-        const next = rows.filter((_, i) => i !== ri);
-        commitTable(next.length ? next : [createEmptyTableRow(tableColumns)]);
-      };
-
-      return (
-        <div className="pf-table-wrap">
-          <table className="pf-table">
-            <thead>
-              <tr>
-                {tableColumns.map((column) => (
-                  <th key={column.key}>{formatFieldLabelWithUnit(column.label || column.key, column)}</th>
-                ))}
-                <th className="pf-table-action-col" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, ri) => (
-                <tr key={ri}>
-                  {tableColumns.map((column, ci) => (
-                    <td key={column.key}>
-                      <input
-                        type="text"
-                        value={row[column.key] ?? ""}
-                        disabled={disabled}
-                        placeholder="—"
-                        onChange={e => updateCell(ri, ci, e.target.value)}
-                        className={`pf-table-cell-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
-                      />
-                    </td>
-                  ))}
-                  <td className="pf-table-action-col">
-                    <button type="button" className="pf-table-remove-row" onClick={() => removeRow(ri)} disabled={disabled} title="Remove row">✕</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button type="button" className="pf-table-add-row" onClick={addRow} disabled={disabled}>+ Add Row</button>
-        </div>
-      );
-    }
-
-    if (field.type === "textarea") {
-      return <textarea value={val} disabled={disabled}
-        className={fieldClassName}
-        placeholder={getFieldInputPrompt(field)}
-        onChange={e => handleField(field.key,e.target.value)} />;
-    }
-
-    if (field.type === "date") {
-      // Store as YYYY-MM-DD (native date format); convert DD/MM/YYYY on load
-      const toInput = (v) => {
-        if (!v) return "";
-        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-        const [d, m, y] = v.split("/");
-        return d && m && y ? `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}` : "";
-      };
-      const fromInput = (v) => v; // keep YYYY-MM-DD internally
-      return (
-        <div className="pf-date-wrap">
-          <input
-            type="date"
-            value={toInput(val)}
-            disabled={disabled}
-            onChange={e => handleField(field.key, fromInput(e.target.value))}
-            className={`pf-date-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
-          />
-          <span className="pf-date-hint">DD/MM/YYYY</span>
-        </div>
-      );
-    }
-
-    return <input type="text" value={val} disabled={disabled}
-      className={fieldClassName}
-      placeholder={getFieldInputPrompt(field)}
-      onChange={e => handleField(field.key,e.target.value)} />;
+    return (
+      <PassportFieldInput
+        field={field}
+        value={formData[field.key] ?? ""}
+        disabled={disabled}
+        fieldClassName={highlightMissing ? "pf-needs-input" : ""}
+        semanticGraph={semanticGraph}
+        onChange={(nextValue) => handleField(field.key, nextValue)}
+        fileSelections={fileSelections}
+        fileDisplayNames={fileDisplayNames}
+        symbols={symbols}
+        onClearFileSelection={clearFileSelection}
+        onOpenRepositoryPicker={setRepoPicker}
+        onOpenSymbolPicker={setSymbolPicker}
+      />
+    );
   };
 
   const isVisibleSchemaField = (field) => (
@@ -1395,6 +941,8 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     );
   };
 
+  // Render the server-owned nested schema recursively without flattening its
+  // semantic section hierarchy into a visually ambiguous form.
   const renderSchemaSectionTree = (section, depth = 0, path = []) => {
     if (!section || !hasVisibleSchemaSectionContent(section)) return null;
 
@@ -1485,7 +1033,12 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
             </div>
           )}
 
-          {renderProductImagePicker()}
+          <PassportProductImagePicker
+            value={formData.productImage}
+            disabled={isSaving || (mode === "edit" && isLoading)}
+            onChange={(value) => handleField("productImage", value)}
+            onOpenPicker={() => setSymbolPicker("productImage")}
+          />
 
           {templateName && (
             <div className="pf-template-banner">

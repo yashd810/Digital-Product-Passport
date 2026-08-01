@@ -1,7 +1,7 @@
 "use strict";
 
-const logger = require("../../services/logger");
-const { escapeHtml, getEmailFromAddress, isEmailConfigured } = require("../../services/email");
+const logger = require("../../platform/observability/logger");
+const { escapeHtml, getEmailFromAddress, isEmailConfigured } = require("../../platform/communications/email-service");
 const { getAppOrigin } = require("../../shared/security/configured-origin");
 
 module.exports = function registerSuperAdminRoutes(app, deps) {

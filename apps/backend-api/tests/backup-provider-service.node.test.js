@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
-const createBackupProviderService = require("../src/services/backup-provider-service");
+const createBackupProviderService = require("../src/platform/backups/backup-provider-service");
 
 function restoreEnv(name, value) {
   if (value === undefined) delete process.env[name];

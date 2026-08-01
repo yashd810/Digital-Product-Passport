@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const registerCompanyRoutes = require("../src/modules/admin/register-company-routes");
 const registerUserAccessRoutes = require("../src/modules/admin/register-user-access-routes");
 const registerPassportSupportRoutes = require("../src/modules/passports/register-support-routes");
-const createPassportService = require("../src/services/passport-service");
+const createPassportService = require("../src/modules/passports/services/passport-service");
 
 function createRouteApp() {
   const routes = [];

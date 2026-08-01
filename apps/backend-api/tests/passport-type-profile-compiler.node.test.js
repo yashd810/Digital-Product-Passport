@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   compilePassportTypeProfile,
-} = require("../src/services/passport-type-profile");
+} = require("../src/modules/passports/services/passport-type-profile");
 const {
   flattenSchemaFieldsFromSections,
 } = require("../src/shared/passports/passport-helpers");

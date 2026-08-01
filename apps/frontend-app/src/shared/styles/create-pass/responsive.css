@@ -1,0 +1,16 @@
+/* Responsive */
+@media (max-width: 768px) {
+  .createpass-header h1    { font-size: 22px; }
+  .createpass-main         { padding: 18px 10px; }
+  .createpass-container    { padding: 18px; }
+  .edit-session-banner     { flex-direction: column; }
+  .edit-session-meta       { min-width: 0; text-align: left; }
+  .edit-session-status     { align-self: flex-start; }
+  .passport-identity-row   { grid-template-columns: 1fr; }
+  .form-grid               { grid-template-columns: 1fr; gap: 10px; }
+  .pf-schema-section-children { padding-left: 10px; }
+  .form-actions            { flex-direction: column; }
+  .cancel-btn, .submit-btn { width: 100%; }
+  .back-btn                { position: static; transform: none; margin-bottom: 10px; display: block; width: fit-content; }
+  .createpass-header       { padding-top: 16px; }
+}

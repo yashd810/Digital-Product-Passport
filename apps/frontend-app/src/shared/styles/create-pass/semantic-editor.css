@@ -1,0 +1,125 @@
+/* Nested data-entry controls are generated from the compiled field structure. */
+.semantic-property-editor {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.semantic-root-property {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.semantic-property-heading,
+.semantic-many-entry-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.semantic-property-heading > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.semantic-property-heading strong,
+.semantic-class-heading strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.semantic-required {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.semantic-class-editor {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  border-left: 3px solid color-mix(in srgb, var(--accent) 58%, var(--border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--bg-surface, #1a2e3b) 88%, transparent);
+}
+
+.semantic-class-properties,
+.semantic-many-list {
+  display: grid;
+  gap: 12px;
+}
+
+.semantic-class-properties > .semantic-property-editor {
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.semantic-class-properties > .semantic-property-editor:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.semantic-many-entry {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.semantic-many-entry-heading {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.semantic-add-button,
+.semantic-remove-button {
+  justify-self: start;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--border));
+  border-radius: 7px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.semantic-remove-button {
+  color: var(--text-secondary);
+  border-color: var(--border);
+  padding: 5px 8px;
+}
+
+.semantic-add-button:disabled,
+.semantic-remove-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.semantic-boolean-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.semantic-editor-error {
+  margin: 0;
+  color: #ef4444;
+  font-size: 12px;
+}

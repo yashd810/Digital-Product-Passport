@@ -46,7 +46,7 @@ The platform is generic at the product-passport level. Product-specific behavior
 
 Current product module packages live in:
 
-- `apps/backend-api/src/services/passport-module-registry.js:1`
+- `apps/backend-api/src/modules/passports/services/passport-module-registry.js:1`
 - `apps/backend-api/passport-modules/<family>-<version>/`
 
 Each package keeps its `module.js` and semantic resources together. Add only

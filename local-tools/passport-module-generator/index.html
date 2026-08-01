@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Passport Module Generator</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/client/styles.css">
   </head>
   <body>
     <main class="shell">
@@ -685,13 +685,18 @@
       </div>
     </template>
 
-    <script src="/schema-limits.js"></script>
-    <script src="/section-csv-paths.js"></script>
-    <script src="/csv-core.js"></script>
-    <script src="/derived-field-metadata.js"></script>
-    <script src="/fields-csv.js"></script>
-    <script src="/semantic-graph-csv.js"></script>
-    <script src="/csv-import-reconciliation.js"></script>
-    <script src="/app.js"></script>
+    <!-- Shared rules load before the UI controller so browser and server stay aligned. -->
+    <script src="/shared/schema-limits.js"></script>
+    <script src="/shared/section-csv-paths.js"></script>
+    <script src="/shared/csv-core.js"></script>
+    <script src="/shared/derived-field-metadata.js"></script>
+    <script src="/shared/fields-csv.js"></script>
+    <script src="/shared/semantic-graph-csv.js"></script>
+    <script src="/shared/csv-import-reconciliation.js"></script>
+    <script src="/client/ui/searchable-selects.js"></script>
+    <script src="/client/ui/smooth-details.js"></script>
+    <script src="/client/workspace/header-mapping.js"></script>
+    <script src="/client/workspace/starter-spec.js"></script>
+    <script src="/client/workspace.js"></script>
   </body>
 </html>

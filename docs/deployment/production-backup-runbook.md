@@ -6,7 +6,7 @@ Backups in this system are not a side note. They are part of how released passpo
 
 ## Main Repo Files
 
-- `apps/backend-api/src/services/backup-provider-service.js`
+- `apps/backend-api/src/platform/backups/backup-provider-service.js`
 - `apps/backend-api/scripts/db-backup-object-storage.js`
 - `infra/oracle/db-backup.sh`
 - `infra/oracle/install-db-backup-jobs.sh`

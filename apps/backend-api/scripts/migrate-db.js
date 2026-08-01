@@ -8,11 +8,11 @@ require("dotenv").config({
 
 const { Pool } = require("pg");
 const { initDb } = require("../src/db/init");
-const createDidService = require("../src/services/did-service");
-const createPassportService = require("../src/services/passport-service");
-const createProductIdentifierService = require("../src/services/product-identifier-service");
+const createDidService = require("../src/platform/identity/did-service");
+const createPassportService = require("../src/modules/passports/services/passport-service");
+const createProductIdentifierService = require("../src/modules/passports/services/product-identifier-service");
 const { getApiOrigin, getPublicViewerOrigin } = require("../src/shared/security/configured-origin");
-const logger = require("../src/services/logger");
+const logger = require("../src/platform/observability/logger");
 const {
   inRevisionStatus,
   systemPassportFields,

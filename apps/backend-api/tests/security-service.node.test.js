@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
-const { hashOtpCode } = require("../src/services/security-service");
+const { hashOtpCode } = require("../src/platform/security/security-service");
 
 test("OTP hashes are keyed and domain separated", () => {
   const previousSecret = process.env.OTP_HMAC_SECRET;

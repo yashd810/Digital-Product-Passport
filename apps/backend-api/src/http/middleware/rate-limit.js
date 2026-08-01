@@ -1,7 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
-const logger = require("../../services/logger");
+const logger = require("../../platform/observability/logger");
 
 const envInt = (name, fallback) => {
   const environmentName = String(name || "")

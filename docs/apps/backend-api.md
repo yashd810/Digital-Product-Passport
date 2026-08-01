@@ -17,7 +17,10 @@ If the frontend is the face of the product, the backend is the engine room.
 
 ## Entry Point
 
-- `apps/backend-api/src/server.js:1`
+- `apps/backend-api/src/server.js:1` is the small process entrypoint.
+- `apps/backend-api/src/bootstrap/start-server.js:1` is the API composition
+  root; it wires configuration, services, route families, startup checks, and
+  lifecycle handling.
 
 ## Main Backend Areas
 
@@ -27,9 +30,9 @@ If the frontend is the face of the product, the backend is the engine room.
 | `src/db/` | schema creation and startup migrations |
 | `src/http/routes/` | top-level route groups |
 | `src/http/middleware/` | auth and rate limiting middleware |
-| `src/modules/` | feature-specific route helpers and domain logic |
-| `src/infrastructure/` | wrappers and construction points for storage, email, signing, OAuth, semantics, backup, logging |
-| `src/services/` | core implementations |
+| `src/modules/` | feature-specific route helpers and domain logic; passport services live in `modules/passports/services/` |
+| `src/platform/` | cross-cutting implementations for storage, security, identity, caching, communications, backups, and observability |
+| `src/infrastructure/` | low-level adapters and construction points, such as PostgreSQL |
 | `src/shared/` | shared helpers used across backend layers |
 | `passport-modules/` | self-contained product module packages: runtime definition and semantic artifacts |
 
@@ -57,7 +60,7 @@ Most complex passport behavior is coordinated through:
 
 - `apps/backend-api/src/http/routes/passports.js:34`
 - `apps/backend-api/src/modules/passports/*.js`
-- `apps/backend-api/src/services/passport-service.js:1`
+- `apps/backend-api/src/modules/passports/services/passport-service.js:1`
 
 That area handles:
 
@@ -78,7 +81,7 @@ default production fixtures.
 
 Shared module and semantic-package loader:
 
-- `apps/backend-api/src/services/passport-module-registry.js:1`
+- `apps/backend-api/src/modules/passports/services/passport-module-registry.js:1`
 
 Add each generated package under
 `apps/backend-api/passport-modules/<family>-<version>/` and seed only the
@@ -87,7 +90,7 @@ and all semantic artifacts.
 
 Current semantic model registry:
 
-- `apps/backend-api/src/services/semantic-model-registry.js:1`
+- `apps/backend-api/src/modules/passports/services/semantic-model-registry.js:1`
 
 Both registries discover the same package folders, so runtime definitions and
 semantic resources cannot be selected from different directory trees.
