@@ -233,6 +233,7 @@ function updateEditablePassportUseCase(deps) {
     const complianceManagedFields = await buildComplianceManagedFields({
       companyId,
       passportType: typeSchema.typeName,
+      typeDef: typeSchema,
       granularity: effectiveGranularity,
       requestedFields: {
         ...currentRow,

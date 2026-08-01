@@ -133,6 +133,7 @@ function createDraftPassportUseCase(deps) {
     const complianceManagedFields = await buildComplianceManagedFields({
       companyId,
       passportType: resolvedPassportType,
+      typeDef: typeSchema,
       granularity: effectiveGranularity,
       requestedFields: {
         ...fields,

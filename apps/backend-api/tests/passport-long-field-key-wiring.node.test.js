@@ -59,6 +59,7 @@ const noopMiddleware = (_req, _res, next) => next?.();
 test("draft create stores a long logical key physically and returns and archives the logical key", async () => {
   let insertQuery = null;
   let archivedPassport = null;
+  let complianceTypeDefinition = null;
   const rawInserted = {
     id: 41,
     dppId: "dpp-long-create",
@@ -90,14 +91,17 @@ test("draft create stores a long logical key physically and returns and archives
       internalAliasId,
       uniqueProductIdentifier: `did:example:${internalAliasId}`,
     }),
-    buildComplianceManagedFields: async () => ({
-      passportPolicyKey: "policy",
-      contentSpecificationIds: "[]",
-      carrierPolicyKey: null,
-      economicOperatorId: null,
-      economicOperatorIdentifierScheme: null,
-      facilityId: null,
-    }),
+    buildComplianceManagedFields: async ({ typeDef }) => {
+      complianceTypeDefinition = typeDef;
+      return {
+        passportPolicyKey: "policy",
+        contentSpecificationIds: "[]",
+        carrierPolicyKey: null,
+        economicOperatorId: null,
+        economicOperatorIdentifierScheme: null,
+        facilityId: null,
+      };
+    },
     getWritablePassportColumns,
     joinQuotedSqlIdentifiers,
     toStoredPassportValue,
@@ -137,6 +141,7 @@ test("draft create stores a long logical key physically and returns and archives
   assert.equal(Object.hasOwn(result.passport, physicalFieldKey), false);
   assert.equal(archivedPassport[longFieldKey], "created value");
   assert.equal(Object.hasOwn(archivedPassport, physicalFieldKey), false);
+  assert.equal(complianceTypeDefinition, typeSchema);
 });
 
 test("draft create stores the selected model and mapped operator fields once in their platform columns", async () => {
