@@ -145,7 +145,7 @@ export function PassportListRow({
             rel="noopener noreferrer"
             aria-label={`${viewerActionLabel}: ${passport.modelName || passport.dppId} (opens in a new tab)`}
           >
-            {viewerActionLabel}
+            View
           </a>
         ) : (
           <button
@@ -155,7 +155,7 @@ export function PassportListRow({
             disabled={!viewerDestination}
             aria-label={`${viewerActionLabel}: ${passport.modelName || passport.dppId}`}
           >
-            {viewerActionLabel}
+            View
           </button>
         )}
       </td>
