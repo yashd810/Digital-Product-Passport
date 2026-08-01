@@ -529,7 +529,21 @@ module.exports = function registerCatalogRoutes(app, deps) {
       const sectionValidationError = validatePassportTypeSections(fieldsJson.sections);
       if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
 
-      const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(fieldsJson.sections);
+      // The profile compiler intentionally retains canonical module fields used
+      // by its system header (for example modelName and economicOperatorId).
+      // They are safe because they originate from the trusted registered module,
+      // not from browser-authored schema. Keep rejecting every other reserved
+      // field while allowing only those canonical header mappings.
+      const canonicalHeaderFieldKeys = Array.isArray(moduleDefinition.fieldsJson?.systemHeader?.fieldMappings)
+        ? moduleDefinition.fieldsJson.systemHeader.fieldMappings
+          .filter((mapping) => mapping?.sourceType === "field" && mapping.fieldKey === mapping.slotKey)
+          .map((mapping) => mapping.fieldKey)
+        : [];
+      const allowedCanonicalFieldKeys = new Set(["modelName", ...canonicalHeaderFieldKeys]);
+      const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(
+        fieldsJson.sections,
+        allowedCanonicalFieldKeys
+      );
       if (reservedFieldConflicts.length) {
         return res.status(400).json({
           error: "One or more fields duplicate reserved passport registry/header fields and do not need to be created again.",

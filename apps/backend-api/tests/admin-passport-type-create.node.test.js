@@ -7,6 +7,7 @@ const multer = require("multer");
 const registerCatalogRoutes = require("../src/modules/admin/register-catalog-routes");
 const { compilePassportTypeProfile } = require("../src/modules/passports/services/passport-type-profile");
 const { flattenSchemaFieldsFromSections } = require("../src/shared/passports/passport-helpers");
+const { findReservedPassportHeaderFieldConflicts } = require("../src/shared/passports/passport-reserved-fields");
 const { createPassportModuleFixture } = require("./passport-module-fixture");
 
 function createMockResponse() {
@@ -238,6 +239,7 @@ function createCatalogApp({
   moduleDefinitions = [],
   hasStoredRecords = false,
   catalogDependencies = {},
+  findReservedFieldConflicts = () => [],
 }) {
   const app = express();
   registerCatalogRoutes(app, {
@@ -263,7 +265,7 @@ function createCatalogApp({
       sections,
     }),
     getTypeSchemaVersion: (fieldsJson = {}) => Number.parseInt(fieldsJson.schemaVersion, 10) || 1,
-    findReservedPassportHeaderFieldConflicts: () => [],
+    findReservedPassportHeaderFieldConflicts: findReservedFieldConflicts,
     validatePassportTypeSections: () => null,
     buildPassportTypeGovernanceCheck: () => ({ issueCount: 0, issues: [] }),
     getPassportTypeModules: () => moduleDefinitions,
@@ -386,6 +388,42 @@ test("admin compiles a selected nested module profile on the server", async () =
   assert.ok(fieldsJson.moduleDigest);
   assert.ok(fieldsJson.profileDigest);
   assert.equal(fieldsJson.profile.selectionMode, "explicit");
+});
+
+test("admin accepts registered module profiles that retain canonical system-header fields", async () => {
+  const calls = [];
+  const createdTables = [];
+  const audits = [];
+  const moduleDefinition = createPassportModuleFixture();
+  const app = createCatalogApp({
+    calls,
+    createdTables,
+    audits,
+    moduleDefinitions: [moduleDefinition],
+    findReservedFieldConflicts: findReservedPassportHeaderFieldConflicts,
+  });
+
+  const response = await invokeRoute(app, {
+    path: "/api/admin/passport-types",
+    body: {
+      typeName: moduleDefinition.typeName,
+      displayName: moduleDefinition.displayName,
+      productCategory: moduleDefinition.productCategory,
+      productIcon: moduleDefinition.productIcon,
+      semanticModelKey: moduleDefinition.semanticModelKey,
+      sourceModule: moduleDefinition.moduleKey,
+      profile: {
+        moduleDigest: moduleDefinition.moduleDigest,
+        includedFields: [{ sourceModuleFieldKey: "economicOperatorAddressCountry" }],
+      },
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  const insert = calls.find((call) => call.sql.includes('INSERT INTO "passportTypes"'));
+  const compiledFields = flattenSchemaFieldsFromSections(JSON.parse(insert.params[5]).sections);
+  assert.equal(compiledFields.some((field) => field.key === "modelName"), true);
+  assert.equal(compiledFields.some((field) => field.key === "economicOperatorId"), true);
 });
 
 test("admin rejects browser-authored topology and semantic graph payloads", async () => {
