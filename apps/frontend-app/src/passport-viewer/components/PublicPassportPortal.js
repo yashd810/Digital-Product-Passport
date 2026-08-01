@@ -70,6 +70,11 @@ function isUriTextField(field = {}) {
   return uiType === "text" && (dataType === "uri" || dataType === "anyuri");
 }
 
+function isStatusField(field = {}) {
+  return [field?.key, field?.label]
+    .some((value) => String(value || "").toLowerCase().includes("status"));
+}
+
 function formatValue(value) {
   if (!isFilled(value)) return "";
   if (Array.isArray(value)) return value.filter(isFilled).join(", ");
@@ -463,7 +468,7 @@ function DataFieldValue({
         property={semanticProperty}
         value={raw}
         labelFormatter={(entry) => translateSchemaLabel(lang, entry)}
-        plainEnum={field.key === "dppStatus"}
+        plainEnum={isStatusField(field)}
       />
     );
   } else if (field.type === "boolean") {

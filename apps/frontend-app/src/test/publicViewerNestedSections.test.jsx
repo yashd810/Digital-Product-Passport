@@ -164,23 +164,33 @@ describe("public viewer nested data sections", () => {
     expect(markup).toContain('class="pdf-preview-btn"');
   });
 
-  test("renders DPP status as ordinary field text instead of an enum pill", () => {
+  test("renders DPP and battery statuses as ordinary field text instead of enum pills", () => {
     const markup = renderToStaticMarkup(
       <DataFieldRows
-        fields={[{
-          key: "dppStatus",
-          label: "DPP Status",
-          type: "text",
-          rangeKind: "enum",
-          rangeEnumKey: "dppStatus",
-          confidentiality: "public",
-        }]}
-        passport={{ dppStatus: "active" }}
-        semanticGraph={{
-          enums: [{
+        fields={[
+          {
             key: "dppStatus",
-            values: [{ key: "active", label: "Active" }],
-          }],
+            label: "DPP Status",
+            type: "text",
+            rangeKind: "enum",
+            rangeEnumKey: "dppStatus",
+            confidentiality: "public",
+          },
+          {
+            key: "batteryStatus",
+            label: "Battery Status",
+            type: "text",
+            rangeKind: "enum",
+            rangeEnumKey: "batteryStatus",
+            confidentiality: "public",
+          },
+        ]}
+        passport={{ dppStatus: "active", batteryStatus: "inUse" }}
+        semanticGraph={{
+          enums: [
+            { key: "dppStatus", values: [{ key: "active", label: "Active" }] },
+            { key: "batteryStatus", values: [{ key: "inUse", label: "In use" }] },
+          ],
         }}
         lang="en"
       />
@@ -189,6 +199,7 @@ describe("public viewer nested data sections", () => {
     expect(markup).toContain('class="field-value-strong semantic-enum-value-plain"');
     expect(markup).not.toContain('class="semantic-enum-value"');
     expect(markup).toContain(">Active<");
+    expect(markup).toContain(">In use<");
   });
 
   test("keeps PDF previews collapsed until the viewer chooses to show them", async () => {
