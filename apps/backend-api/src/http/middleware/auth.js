@@ -118,6 +118,7 @@ module.exports = function createAuthMiddleware({ jwt, pool, jwtSecret, sessionCo
         email: currentUser.email,
         companyId: currentUser.companyId,
         role: currentUser.role,
+        sessionVersion: currentUser.sessionVersion ?? 1,
         mfaEnabled: !!currentUser.twoFactorEnabled,
         mfaVerifiedAt: payload.mfaVerifiedAt || null,
         authenticationMethods: Array.isArray(payload.amr) ? payload.amr : ["pwd"],

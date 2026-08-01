@@ -102,3 +102,40 @@ test("an invalid bearer token cannot fall back to a valid session cookie", async
   assert.equal(res.statusCode, 403);
   assert.deepEqual(verifiedTokens, ["invalid-bearer-token"]);
 });
+
+test("authenticated users retain their current session version for fresh bearer tokens", async () => {
+  const { authenticateToken } = createAuthMiddleware({
+    jwt: {
+      verify() {
+        return { userId: 7, sessionVersion: 4, amr: ["pwd"] };
+      },
+    },
+    pool: {
+      async query() {
+        return {
+          rows: [{
+            id: 7,
+            email: "admin@example.test",
+            companyId: null,
+            role: "superAdmin",
+            isActive: true,
+            sessionVersion: 4,
+            twoFactorEnabled: false,
+          }],
+        };
+      },
+    },
+    jwtSecret: "test-secret",
+    sessionCookieName: "session",
+  });
+  const req = { headers: { authorization: "Bearer valid-token" } };
+  const res = createResponse();
+  let advanced = false;
+
+  await authenticateToken(req, res, () => {
+    advanced = true;
+  });
+
+  assert.equal(advanced, true);
+  assert.equal(req.user.sessionVersion, 4);
+});
