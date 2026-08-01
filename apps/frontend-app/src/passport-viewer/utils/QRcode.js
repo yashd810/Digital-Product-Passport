@@ -199,35 +199,13 @@ export const generateQRCodeBundle = async ({
     errorCorrectionLevel: defaultErrorCorrectionLevel,
   });
 
-  const safetyWarnings = [
-    `Only trust this code when it opens on ${qrPrintSpecification?.trustedViewerHost || "the verified public viewer host"}.`,
-    "Public DPP pages should not ask for passwords, payment details, or software downloads.",
-    "If the domain or page design looks suspicious, stop and report the carrier.",
-  ];
-
   return {
     qrCodeDataUrl: canvas.toDataURL("image/png", 0.95),
     publicUrl: passportLink,
     carrierAuthenticity: {
-      carrierSecurityStatus: "trustedPublicEntry",
-      carrierAuthenticationMethod: "verifiedHttpsViewer",
       trustedViewerOrigin: qrPrintSpecification?.trustedViewerOrigin || null,
       trustedViewerHost: qrPrintSpecification?.trustedViewerHost || null,
-      counterfeitRiskLevel: String(granularity || "item").toLowerCase() === "item" ? "high" : "medium",
-      antiCounterfeitInstructions: [
-        "Compare the viewer domain with the trusted host printed on the label.",
-        "Use the DPP signature or certificate details when the carrier says protected verification is available.",
-        "Report the label if the QR code redirects away from the trusted viewer.",
-      ],
-      safetyWarnings,
       qrPrintSpecification,
-      dataCarrierPlacementRules: {
-        carrierPlacement: String(granularity || "item").toLowerCase() === "model" ? "packagingOrDocumentation" : "productOrPrimaryPackaging",
-        hriPlacement: "belowQr",
-        quietZonePolicy: "Keep the clear area around the QR code at or above 4 modules on all sides.",
-        durabilityPolicy: "Verify the printed carrier against the expected product lifecycle environment before release.",
-        scannerTestPolicy: "Test with representative phone and industrial scanners under expected lighting, distance, and angle conditions.",
-      },
     },
   };
 }

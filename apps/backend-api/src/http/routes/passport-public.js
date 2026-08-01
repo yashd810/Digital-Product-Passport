@@ -703,6 +703,8 @@ module.exports = function registerPassportPublicRoutes(app, {
       dppHash: verifyResult?.dataHash || signatureRow?.dataHash || null,
       signature: signatureRow?.signature || null,
       algorithm: verifyResult?.algorithm || signatureRow?.algorithm || "ES256",
+      signedAt: verifyResult?.signedAt || signatureRow?.signedAt || null,
+      signingKeyId: verifyResult?.keyId || signatureRow?.signingKeyId || null,
       signedBy: platformDid,
       publicKeyUrl: didDocumentUrl,
       didDocumentUrl,

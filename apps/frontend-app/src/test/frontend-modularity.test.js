@@ -234,6 +234,26 @@ describe("frontend modularity helpers", () => {
     }))).toEqual([{ slotKey: "serial", fieldKey: "serialNumber", required: true }]);
   });
 
+  test("hides redundant and internal header entries", () => {
+    const entries = resolveSystemHeaderEntries(
+      [{
+        key: "administration",
+        label: "Administration",
+        fields: [{ key: "digitalProductPassportId", label: "Digital Product Passport ID", type: "text" }],
+      }],
+      {
+        fieldMappings: [
+          { slotKey: "digitalProductPassportId", sourceType: "field", fieldKey: "digitalProductPassportId" },
+          { slotKey: "internalAliasId", sourceType: "managed", managedKey: "internalManagedInternalAliasId" },
+          { slotKey: "subjectDid", sourceType: "managed", managedKey: "internalManagedSubjectDid" },
+          { slotKey: "dppDid", sourceType: "managed", managedKey: "internalManagedDppDid" },
+        ],
+      },
+    );
+
+    expect(entries.map((entry) => entry.slotKey)).toEqual(["dppDid"]);
+  });
+
   test("dashboard retains only canonical CSV and public-viewer routes", () => {
     const appSource = readFileSync(
       new URL("../app/containers/App.js", import.meta.url),

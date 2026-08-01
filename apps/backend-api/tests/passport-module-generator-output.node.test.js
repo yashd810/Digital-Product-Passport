@@ -537,9 +537,10 @@ test("passport module generator is export-only and has no repository write wirin
   assert.match(pageSource, /This tool never writes into the repository/);
 });
 
-test("passport module generator always keeps DID header slots system managed", () => {
+test("passport module generator exposes only DPP and company DIDs as managed headers", () => {
   const input = createGeneratorInput();
   input.module.systemHeaderFieldAssignments = {
+    digitalProductPassportId: "modelIdentifier",
     subjectDid: "modelIdentifier",
     dppDid: "modelIdentifier",
     companyDid: "modelIdentifier",
@@ -548,16 +549,16 @@ test("passport module generator always keeps DID header slots system managed", (
   const moduleArtifact = artifacts.find((artifact) => artifact.path === generatedModulePath);
   const generatedModule = executeCommonJs(moduleArtifact.content);
   const didMappings = generatedModule.systemHeader.fieldMappings.filter((mapping) =>
-    ["subjectDid", "dppDid", "companyDid"].includes(mapping.slotKey)
+    ["dppDid", "companyDid"].includes(mapping.slotKey)
   );
 
-  assert.equal(spec.module.systemHeaderFieldAssignments.subjectDid, "__managed__:internalManagedSubjectDid");
+  assert.equal(spec.module.systemHeaderFieldAssignments.digitalProductPassportId, undefined);
+  assert.equal(spec.module.systemHeaderFieldAssignments.subjectDid, undefined);
   assert.equal(spec.module.systemHeaderFieldAssignments.dppDid, "__managed__:internalManagedDppDid");
   assert.equal(spec.module.systemHeaderFieldAssignments.companyDid, "__managed__:internalManagedCompanyDid");
   assert.deepEqual(
     didMappings.map((mapping) => [mapping.slotKey, mapping.sourceType, mapping.managedKey]),
     [
-      ["subjectDid", "managed", "internalManagedSubjectDid"],
       ["dppDid", "managed", "internalManagedDppDid"],
       ["companyDid", "managed", "internalManagedCompanyDid"],
     ]

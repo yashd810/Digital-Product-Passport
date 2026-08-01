@@ -142,6 +142,83 @@ describe("public viewer nested data sections", () => {
     expect(markup).toContain("Open full PDF");
   });
 
+  test("documents tab includes only fields declared with the file UI type", () => {
+    const markup = renderToStaticMarkup(
+      <PublicPassportPortal
+        passport={{
+          passportType: "examplePassport",
+          declaration: "/repository-files/declaration.pdf",
+          linkedPdf: "https://example.test/linked.pdf",
+          restrictedNote: "Internal note",
+        }}
+        companyData={{ companyName: "Example Company" }}
+        typeDef={{
+          fieldsJson: {
+            sections: [{
+              key: "documents",
+              label: "Documents",
+              fields: [
+                { key: "declaration", label: "Declaration", type: "text", uiType: "file", confidentiality: "public" },
+                { key: "linkedPdf", label: "Linked PDF", type: "text", uiType: "text", dataType: "uri", confidentiality: "public" },
+                { key: "restrictedNote", label: "Restricted note", type: "text", confidentiality: "restricted" },
+              ],
+            }],
+          },
+        }}
+        lang="en"
+      />
+    );
+    const documentsMarkup = markup.slice(markup.indexOf('id="documents"'));
+
+    expect(documentsMarkup).toContain("Declaration");
+    expect(documentsMarkup).toContain("Show preview");
+    expect(documentsMarkup).not.toContain("Linked PDF");
+    expect(documentsMarkup).not.toContain("Restricted note");
+  });
+
+  test("keeps verification evidence only in the Trust tab", () => {
+    const markup = renderToStaticMarkup(
+      <PublicPassportPortal
+        passport={{ passportType: "examplePassport" }}
+        companyData={{ companyName: "Example Company" }}
+        typeDef={{ fieldsJson: { sections: [] } }}
+        verificationBundle={{
+          verificationProofStatus: "valid",
+          issuer: "did:web:issuer.example.test",
+          signedAt: "2026-08-01T10:00:00.000Z",
+          signingKeyId: "key-123",
+          proofType: "JsonWebSignature2020",
+          algorithm: "ES256",
+          trustLevel: "basic",
+          dppDataUnchanged: true,
+          externalCompanyCertificate: "Not provided",
+          canonicalDppJsonUrl: "https://api.example.test/api/public/passports/DPP-1",
+        }}
+        carrierAuthenticity={{
+          counterfeitRiskLevel: "high",
+          carrierSecurityStatus: "trustedPublicEntry",
+          trustedViewerHost: "viewer.example.test",
+        }}
+        lang="en"
+      />
+    );
+    const trustMarkup = markup.slice(markup.indexOf('id="trustPage"'), markup.indexOf('id="documents"'));
+
+    expect(markup).not.toContain('class="verification-panel"');
+    expect(trustMarkup).toContain("Verification result");
+    expect(trustMarkup).toContain("Valid");
+    expect(trustMarkup).toContain("Issuer");
+    expect(trustMarkup).toContain("did:web:issuer.example.test");
+    expect(trustMarkup).toContain("Signed at");
+    expect(trustMarkup).toContain("Verification method");
+    expect(trustMarkup).toContain("Signing key");
+    expect(trustMarkup).not.toContain("Counterfeit risk level");
+    expect(trustMarkup).not.toContain("Carrier security status");
+    expect(trustMarkup).not.toContain("Company trust level");
+    expect(trustMarkup).not.toContain("DPP data unchanged");
+    expect(trustMarkup).not.toContain("External company certificate");
+  });
+
   test("renders file fields as PDFs before semantic URI values", () => {
     const markup = renderToStaticMarkup(
       <DataFieldRows

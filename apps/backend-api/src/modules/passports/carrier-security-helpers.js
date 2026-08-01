@@ -130,12 +130,6 @@ function createCarrierSecurityHelpers({
       ...metadata,
       trustedViewerOrigin: metadata.trustedViewerOrigin || getTrustedViewerOrigin(),
       trustedViewerHost: metadata.trustedViewerHost || getTrustedViewerHost(),
-      counterfeitRiskLevel: metadata.counterfeitRiskLevel || (String(passport?.granularity || "item").toLowerCase() === "item" ? "high" : "medium"),
-      antiCounterfeitInstructions: metadata.antiCounterfeitInstructions || [
-        "Only trust the QR code when it opens on the verified DPP viewer domain.",
-        "Do not enter passwords or payment details on a public DPP page.",
-        "Use the signature or certificate details to verify protected carriers when available.",
-      ],
     };
     if (!forceSign && enrichedMetadata.signedCarrierPayload) return enrichedMetadata;
     if (typeof signPortableDataConstruct !== "function") return enrichedMetadata;

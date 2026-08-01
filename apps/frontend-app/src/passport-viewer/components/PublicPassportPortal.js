@@ -64,6 +64,10 @@ function isPdfLikeUrl(value) {
   return Boolean(toSafeResourceHref(value)) && /\.pdf(\?.*)?$/i.test(String(value));
 }
 
+function isFileUiField(field = {}) {
+  return String(field.uiType || field.type || "").trim().toLowerCase() === "file";
+}
+
 function isUriTextField(field = {}) {
   const uiType = String(field?.uiType || field?.type || "").trim().toLowerCase();
   const dataType = String(field?.dataType || field?.valueDataType || "").trim().toLowerCase();
@@ -284,49 +288,38 @@ function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues,
   ];
 }
 
-function buildTrustRows(passport, carrierAuthenticity, sigVerification) {
-  const verificationEvidence = Array.isArray(carrierAuthenticity?.dataCarrierVerificationEvidence)
-    ? carrierAuthenticity.dataCarrierVerificationEvidence
-    : [];
-  const latestVerification = verificationEvidence[0] || null;
-
-  return [
-    ["Signature status", sigVerification?.status || ""],
-    ["Signature timestamp", formatIsoDate(sigVerification?.signedAt)],
-    ["Signing key", sigVerification?.keyId || ""],
-    ["Trusted viewer host", carrierAuthenticity?.trustedViewerHost || ""],
-    ["Trusted viewer origin", carrierAuthenticity?.trustedViewerOrigin || ""],
-    ["Carrier security status", carrierAuthenticity?.carrierSecurityStatus || ""],
-    ["Carrier authentication", carrierAuthenticity?.carrierAuthenticationMethod || ""],
-    ["Counterfeit risk level", carrierAuthenticity?.counterfeitRiskLevel || ""],
-    ["Issuer certificate", carrierAuthenticity?.issuerCertificateId || ""],
-    ["Signed carrier payload", carrierAuthenticity?.signedCarrierPayload ? "Available" : "Not stored"],
-    ["QR print specification", carrierAuthenticity?.qrPrintSpecification ? `${carrierAuthenticity.qrPrintSpecification.symbology} · ECC ${carrierAuthenticity.qrPrintSpecification.errorCorrectionLevel}` : ""],
-    ["Latest verification", formatIsoDate(latestVerification?.verifiedAt) ? `${latestVerification.printGrade || "recorded"} · ${formatIsoDate(latestVerification?.verifiedAt)}` : ""],
-    ["Current viewer host", typeof window !== "undefined" ? window.location.host : ""],
-    ["Public passport URL", passport?.linkedData?.publicUrl || ""],
-  ].filter(([, value]) => isFilled(value));
+function formatVerificationResult(value) {
+  const status = String(value || "").trim().toLowerCase();
+  if (status === "valid" || status === "signedbyplatform") return "Valid";
+  if (status === "tampered") return "Tampered";
+  if (status === "unsigned") return "Unsigned";
+  if (status === "keymissing" || status === "signingkeymissing") return "Signing key unavailable";
+  if (status === "invalid" || status === "verificationfailed") return "Invalid";
+  return "";
 }
 
-function buildVerificationRows(verificationBundle) {
-  if (!verificationBundle) return [];
+function formatVerificationMethod(verificationBundle, sigVerification) {
   return [
-    ["DPP integrity", verificationBundle.integrity || ""],
-    ["Signer", verificationBundle.signedBy || ""],
-    ["Company trust level", verificationBundle.trustLevel || ""],
-    ["DPP data unchanged", verificationBundle.dppDataUnchanged ? "Yes" : "No"],
-    ["External company certificate", verificationBundle.externalCompanyCertificate || "Not provided"],
-    ["Verification status", verificationBundle.verificationStatus || ""],
+    sigVerification?.proofType || verificationBundle?.proofType,
+    sigVerification?.algorithm || verificationBundle?.algorithm,
+  ].filter(isFilled).join(" · ");
+}
+
+function buildTrustRows(verificationBundle, sigVerification) {
+  return [
+    ["Verification result", formatVerificationResult(sigVerification?.status || verificationBundle?.verificationProofStatus || verificationBundle?.verificationStatus)],
+    ["Issuer", sigVerification?.issuer || verificationBundle?.issuer || verificationBundle?.signedBy || ""],
+    ["Signed at", formatIsoDate(sigVerification?.signedAt || verificationBundle?.signedAt)],
+    ["Verification method", formatVerificationMethod(verificationBundle, sigVerification)],
+    ["Signing key", sigVerification?.keyId || verificationBundle?.signingKeyId || ""],
   ].filter(([, value]) => isFilled(value));
 }
 
 function buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, lang) {
   return fields
     .map((field) => {
+      if (!isFileUiField(field)) return null;
       const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
-      const rawText = formatValue(resolved.raw);
-      const isDocumentArtifact = field.type === "file" || isPdfLikeUrl(rawText);
-      if (!resolved.isLocked && !isDocumentArtifact) return null;
       if (!resolved.isLocked && !isFilled(resolved.raw)) return null;
 
       return {
@@ -346,7 +339,7 @@ function DataArtifactPreview({
   onRefreshFieldUrl = null,
 }) {
   if (!isFilled(raw)) return null;
-  if (field.type === "file" || isPdfLikeUrl(raw)) {
+  if (isFileUiField(field)) {
     return (
       <FileCell
         url={raw}
@@ -687,7 +680,7 @@ function DocumentCard({
   const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
   const documentValue = !isLocked && isFilled(resolved.raw) ? resolved.raw : null;
   const safeDocumentHref = toSafeResourceHref(documentValue);
-  const isPdfDocument = Boolean(documentValue) && (field.type === "file" || isPdfLikeUrl(documentValue));
+  const isPdfDocument = Boolean(documentValue) && isFileUiField(field);
   const handleOpenDocument = async (e) => {
     if (typeof onRefreshFieldUrl !== "function") return;
     e.preventDefault();
@@ -701,7 +694,7 @@ function DocumentCard({
       <div>
         <h3>{fieldLabel}</h3>
       </div>
-      <span className="badge neutral">{field.type}</span>
+      <span className="badge neutral">{field.uiType || field.type}</span>
       <div className="doc-preview-area">
         {isPdfDocument ? (
           <FileCell
@@ -758,7 +751,6 @@ export default function PublicPassportPortal({
   lang,
   sigVerification,
   verificationBundle,
-  carrierAuthenticity,
   onRefreshFieldUrl = null,
   isPreviewMode = false,
   isInactiveView = false,
@@ -867,8 +859,7 @@ export default function PublicPassportPortal({
   const lifecycleEvents = buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues, lastUpdateAt);
   const publicHistory = publicHistoryState.data || [];
   const compactPublicHistory = publicHistory.filter((entry) => entry.isCurrent || entry.inactivePath);
-  const trustRows = buildTrustRows(passport, carrierAuthenticity, sigVerification);
-  const verificationRows = buildVerificationRows(verificationBundle);
+  const trustRows = buildTrustRows(verificationBundle, sigVerification);
   const documentItems = buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, lang);
   const verificationLinks = {
     canonicalDppJsonUrl: toSafeExternalHref(verificationBundle?.canonicalDppJsonUrl),
@@ -1057,45 +1048,6 @@ export default function PublicPassportPortal({
                 </div>
               )}
 
-              {verificationBundle && (
-                <section className="verification-panel" aria-label="Verification">
-                  <div className="verification-panel-head">
-                    <span className="badge ok">Verification</span>
-                    <h3>This passport is signed by the platform issuer.</h3>
-                    <p>You can independently verify the data using the links below.</p>
-                  </div>
-                  <div className="verification-grid">
-                    {verificationRows.map(([label, value]) => (
-                      <div key={label} className="verification-card">
-                        <span>{label}</span>
-                        <strong>{value}</strong>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="verification-actions">
-                    {verificationLinks.canonicalDppJsonUrl && (
-                      <a className="pill-button" href={verificationLinks.canonicalDppJsonUrl} target="_blank" rel="noopener noreferrer">
-                        Download DPP JSON
-                      </a>
-                    )}
-                    {verificationLinks.signatureUrl && (
-                      <a className="pill-button" href={verificationLinks.signatureUrl} target="_blank" rel="noopener noreferrer">
-                        Download signature proof
-                      </a>
-                    )}
-                    {verificationLinks.verificationBundleUrl && (
-                      <a className="pill-button" href={verificationLinks.verificationBundleUrl} target="_blank" rel="noopener noreferrer">
-                        Download verification bundle
-                      </a>
-                    )}
-                    {verificationLinks.didDocumentUrl && (
-                      <a className="pill-button" href={verificationLinks.didDocumentUrl} target="_blank" rel="noopener noreferrer">
-                        View DID document / public key
-                      </a>
-                    )}
-                  </div>
-                </section>
-              )}
             </article>
 
             <article className="card">
@@ -1216,26 +1168,48 @@ export default function PublicPassportPortal({
         <section className={`page${activePage === "trustPage" ? " active" : ""}`} id="trustPage" role="tabpanel" hidden={activePage !== "trustPage"}>
           <div className="page-head">
             <div>
-              <span className="badge ok">Verifier credentials</span>
-              <h2>Trust identity</h2>
-              <p>These fields come from platform-generated signature and carrier-authenticity data rather than static passport content.</p>
+              <span className="badge ok">Verification</span>
+              <h2>Passport verification</h2>
+              <p>Cryptographic evidence for this released passport.</p>
             </div>
           </div>
           <section className="trust-panel">
-            {verificationBundle && (
-              <div className="verification-inline-note">
-                <strong>DPP integrity: {verificationBundle.integrity || "Unknown"}</strong>
-                <span>Signer: {verificationBundle.signedBy || "Unknown"}</span>
-              </div>
-            )}
-            <div className="trust-grid">
-              {[...verificationRows, ...trustRows].map(([label, value]) => (
+            {trustRows.length > 0 ? (
+              <div className="trust-grid">
+                {trustRows.map(([label, value]) => (
                 <div key={label} className="trust-card">
                   <span>{label}</span>
                   <strong>{value}</strong>
                 </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="pv-history-state">Verification evidence is available after the passport is released.</p>
+            )}
+            {verificationBundle && (
+              <div className="verification-actions">
+                {verificationLinks.canonicalDppJsonUrl && (
+                  <a className="pill-button" href={verificationLinks.canonicalDppJsonUrl} target="_blank" rel="noopener noreferrer">
+                    Download DPP JSON
+                  </a>
+                )}
+                {verificationLinks.signatureUrl && (
+                  <a className="pill-button" href={verificationLinks.signatureUrl} target="_blank" rel="noopener noreferrer">
+                    Download signature proof
+                  </a>
+                )}
+                {verificationLinks.verificationBundleUrl && (
+                  <a className="pill-button" href={verificationLinks.verificationBundleUrl} target="_blank" rel="noopener noreferrer">
+                    Download verification bundle
+                  </a>
+                )}
+                {verificationLinks.didDocumentUrl && (
+                  <a className="pill-button" href={verificationLinks.didDocumentUrl} target="_blank" rel="noopener noreferrer">
+                    View DID document / public key
+                  </a>
+                )}
+              </div>
+            )}
           </section>
         </section>
 

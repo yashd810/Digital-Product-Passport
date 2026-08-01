@@ -52,9 +52,7 @@ const mime = {
 };
 
 const headerSlotDefinitions = [
-  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
   { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier" },
-  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId", platformManaged: true },
   { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity" },
   { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion" },
   { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus" },
@@ -62,7 +60,6 @@ const headerSlotDefinitions = [
   { slotKey: "economicOperatorId", label: "Economic Operator ID", managedKey: "internalManagedEconomicOperatorId" },
   { slotKey: "facilityId", label: "Facility ID", managedKey: "internalManagedFacilityId" },
   { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds" },
-  { slotKey: "subjectDid", label: "Subject DID", managedKey: "internalManagedSubjectDid", platformManaged: true },
   { slotKey: "dppDid", label: "DPP DID", managedKey: "internalManagedDppDid", platformManaged: true },
   { slotKey: "companyDid", label: "Company DID", managedKey: "internalManagedCompanyDid", platformManaged: true },
 ];
@@ -303,7 +300,11 @@ function normalizeHeaderAssignments(value) {
   const assignments = Object.fromEntries(
     Object.entries(source)
       .map(([slotKey, fieldKey]) => [clean(slotKey), clean(fieldKey)])
-      .filter(([slotKey, fieldKey]) => slotKey && fieldKey)
+      .filter(([slotKey, fieldKey]) => (
+        slotKey
+        && fieldKey
+        && headerSlotDefinitions.some((slot) => slot.slotKey === slotKey)
+      ))
   );
   headerSlotDefinitions.filter((slot) => slot.platformManaged).forEach((slot) => {
     assignments[slot.slotKey] = `__managed__:${slot.managedKey}`;

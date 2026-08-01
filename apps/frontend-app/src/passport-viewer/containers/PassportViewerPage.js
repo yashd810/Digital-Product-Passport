@@ -50,7 +50,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const [typeDef,          setTypeDef]          = useState(null);
   const [publicHistoryPayload, setPublicHistoryPayload] = useState(null);
   const [qrCode,           setQrCode]           = useState(null);
-  const [carrierAuthenticity, setCarrierAuthenticity] = useState(null);
   const [qrLoading,        setQrLoading]        = useState(true);
   const [loading,          setLoading]          = useState(true);
   const [error,            setError]            = useState("");
@@ -222,7 +221,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         });
         if (generatedBundle?.qrCodeDataUrl) {
           setQrCode(generatedBundle.qrCodeDataUrl);
-          setCarrierAuthenticity(generatedBundle.carrierAuthenticity || null);
           if (isPreviewMode && passport.companyId) {
             try {
               await saveQRCodeToDatabase(
@@ -239,7 +237,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         }
       } catch (e) {
         setQrCode(null);
-        setCarrierAuthenticity(null);
       } finally {
         setQrLoading(false);
       }
@@ -449,7 +446,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           lang={lang}
           sigVerification={sigVerification}
           verificationBundle={verificationBundle}
-          carrierAuthenticity={passport?.carrierAuthenticity || carrierAuthenticity}
           onRefreshFieldUrl={refreshFieldUrl}
           isPreviewMode={isPreviewMode}
           isInactiveView={isInactiveView}

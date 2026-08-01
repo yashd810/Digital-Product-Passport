@@ -36,24 +36,10 @@ export const defaultSystemPassportHeaderSection = {
 
 export const systemHeaderManagedDefinitions = [
   {
-    slotKey: "digitalProductPassportId",
-    label: "Digital Product Passport ID",
-    semanticId: "dpp:digitalProductPassportId",
-    managedKey: "internalManagedDigitalProductPassportId",
-    required: true,
-  },
-  {
     slotKey: "uniqueProductIdentifier",
     label: "Unique Product Identifier",
     semanticId: "dpp:uniqueProductIdentifier",
     managedKey: "internalManagedUniqueProductIdentifier",
-    required: true,
-  },
-  {
-    slotKey: "internalAliasId",
-    label: "Internal Alias ID",
-    semanticId: "dpp:internalAliasId",
-    managedKey: "internalManagedInternalAliasId",
     required: true,
   },
   {
@@ -103,13 +89,6 @@ export const systemHeaderManagedDefinitions = [
     label: "Content Specification IDs",
     semanticId: "dpp:contentSpecificationIds",
     managedKey: "internalManagedContentSpecificationIds",
-    required: true,
-  },
-  {
-    slotKey: "subjectDid",
-    label: "Subject DID",
-    semanticId: "dpp:subjectDid",
-    managedKey: "internalManagedSubjectDid",
     required: true,
   },
   {
@@ -187,6 +166,7 @@ export function resolveSystemHeaderEntries(sections = [], systemHeader = {}) {
   );
   if (normalized.fieldMappings.length) {
     return normalized.fieldMappings.map((mapping) => {
+      if (["digitalProductPassportId", "internalAliasId", "subjectDid"].includes(mapping.slotKey)) return null;
       if (mapping.sourceType === "managed") {
         const managedDefinition = getSystemHeaderManagedDefinition(mapping.managedKey);
         if (!managedDefinition) return null;

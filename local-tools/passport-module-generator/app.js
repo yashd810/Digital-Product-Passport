@@ -28,9 +28,7 @@ if (!csvImportReconciliation) {
 }
 
 const headerSlotDefinitions = [
-  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
   { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier" },
-  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId", platformManaged: true },
   { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity" },
   { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion" },
   { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus" },
@@ -38,7 +36,6 @@ const headerSlotDefinitions = [
   { slotKey: "economicOperatorId", label: "Economic Operator ID", managedKey: "internalManagedEconomicOperatorId" },
   { slotKey: "facilityId", label: "Facility ID", managedKey: "internalManagedFacilityId" },
   { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds" },
-  { slotKey: "subjectDid", label: "Subject DID", managedKey: "internalManagedSubjectDid", platformManaged: true },
   { slotKey: "dppDid", label: "DPP DID", managedKey: "internalManagedDppDid", platformManaged: true },
   { slotKey: "companyDid", label: "Company DID", managedKey: "internalManagedCompanyDid", platformManaged: true },
 ];
@@ -47,10 +44,12 @@ function normalizeSystemHeaderAssignments(assignments = {}) {
   const source = assignments && typeof assignments === "object" && !Array.isArray(assignments)
     ? assignments
     : {};
-  const normalized = Object.fromEntries(Object.entries(source).map(([slotKey, value]) => [
-    slotKey,
-    String(value || "").startsWith("__managed__:") ? "" : value,
-  ]));
+  const normalized = Object.fromEntries(Object.entries(source)
+    .filter(([slotKey]) => headerSlotDefinitions.some((slot) => slot.slotKey === slotKey))
+    .map(([slotKey, value]) => [
+      slotKey,
+      String(value || "").startsWith("__managed__:") ? "" : value,
+    ]));
   headerSlotDefinitions
     .filter((slot) => slot.platformManaged)
     .forEach((slot) => {

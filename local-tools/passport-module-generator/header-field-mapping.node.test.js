@@ -113,7 +113,6 @@ test("pending header selections keep their label-derived keys and are not export
 
 test("every user-mappable header slot can be confirmed while app-owned identifiers stay managed", () => {
   const headerSlotKeys = [
-    "digitalProductPassportId",
     "uniqueProductIdentifier",
     "granularity",
     "dppSchemaVersion",
@@ -172,11 +171,9 @@ test("every user-mappable header slot can be confirmed while app-owned identifie
   );
   assert.deepEqual(
     generatedModule.systemHeader.fieldMappings
-      .filter((mapping) => ["internalAliasId", "subjectDid", "dppDid", "companyDid"].includes(mapping.slotKey))
+      .filter((mapping) => ["dppDid", "companyDid"].includes(mapping.slotKey))
       .map((mapping) => [mapping.slotKey, mapping.sourceType, mapping.managedKey]),
     [
-      ["internalAliasId", "managed", "internalManagedInternalAliasId"],
-      ["subjectDid", "managed", "internalManagedSubjectDid"],
       ["dppDid", "managed", "internalManagedDppDid"],
       ["companyDid", "managed", "internalManagedCompanyDid"],
     ]
