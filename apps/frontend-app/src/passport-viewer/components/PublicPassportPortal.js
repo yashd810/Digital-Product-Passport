@@ -614,16 +614,17 @@ export function DataNestedSection({
   const visualDepth = Math.min(depth, 4);
 
   return (
-    <details
-      className={`category data-section-dropdown data-nested-section data-nested-section-depth-${visualDepth}`}
+    <section
+      className={`category data-section-dropdown data-nested-section data-nested-section-depth-${visualDepth}${expanded ? " is-expanded" : ""}`}
       data-section-depth={depth}
-      open={expanded}
-      onToggle={(event) => {
-        const nextExpanded = event.currentTarget.open;
-        if (nextExpanded !== expanded) setExpanded(nextExpanded);
-      }}
     >
-      <summary aria-controls={contentId} aria-expanded={expanded}>
+      <button
+        type="button"
+        className="data-section-trigger"
+        aria-controls={contentId}
+        aria-expanded={expanded}
+        onClick={() => setExpanded((current) => !current)}
+      >
         <span className="cat-title">
           <span
             className="data-nested-section-title"
@@ -636,31 +637,38 @@ export function DataNestedSection({
         <span className="cat-meta">
           <span className="chevron" aria-hidden="true" />
         </span>
-      </summary>
+      </button>
 
-      <div className="data-nested-section-content" id={contentId}>
-        {(section.fields || []).length > 0 && (
-          <div className="data-direct-field-card">
-            <DataFieldRows fields={section.fields || []} lang={lang} {...fieldProps} />
-          </div>
-        )}
+      <div
+        className="data-nested-section-motion"
+        id={contentId}
+        aria-hidden={!expanded}
+        inert={expanded ? undefined : ""}
+      >
+        <div className="data-nested-section-content">
+          {(section.fields || []).length > 0 && (
+            <div className="data-direct-field-card">
+              <DataFieldRows fields={section.fields || []} lang={lang} {...fieldProps} />
+            </div>
+          )}
 
-        {childSections.length > 0 && (
-          <div className="data-nested-section-children">
-            {childSections.map((child, childIndex) => (
-              <DataNestedSection
-                key={child.key || `${section.key || "section"}-${childIndex}`}
-                section={child}
-                sectionIndex={childIndex}
-                depth={depth + 1}
-                lang={lang}
-                {...fieldProps}
-              />
-            ))}
-          </div>
-        )}
+          {childSections.length > 0 && (
+            <div className="data-nested-section-children">
+              {childSections.map((child, childIndex) => (
+                <DataNestedSection
+                  key={child.key || `${section.key || "section"}-${childIndex}`}
+                  section={child}
+                  sectionIndex={childIndex}
+                  depth={depth + 1}
+                  lang={lang}
+                  {...fieldProps}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </details>
+    </section>
   );
 }
 

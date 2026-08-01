@@ -440,7 +440,7 @@ describe("public viewer nested data sections", () => {
     expect(markup).toContain("Post-consumer");
   });
 
-  test("keeps root sections in side navigation and renders every nested level as a dropdown", () => {
+  test("keeps root sections in side navigation and renders every nested level as an accordion", () => {
     const markup = renderToStaticMarkup(
       <PublicPassportPortal
         passport={{
@@ -461,7 +461,8 @@ describe("public viewer nested data sections", () => {
     );
 
     expect(markup.match(/<aside class="data-section-nav"/g)).toHaveLength(1);
-    expect(markup.match(/<details class="category data-section-dropdown data-nested-section/g)).toHaveLength(3);
+    expect(markup.match(/<section class="category data-section-dropdown data-nested-section/g)).toHaveLength(3);
+    expect(markup.match(/class="data-section-trigger"/g)).toHaveLength(3);
     expect(markup).toContain('data-section-depth="1"');
     expect(markup).toContain('data-section-depth="2"');
     expect(markup).toContain('data-section-depth="3"');
@@ -494,7 +495,7 @@ describe("public viewer nested data sections", () => {
     expect(css).toContain("@media (max-width: 640px)");
   });
 
-  test("connects each native dropdown summary to its content and exposes its state", () => {
+  test("connects each accordion trigger to its content and exposes its state", () => {
     const markup = renderToStaticMarkup(
       <PublicPassportPortal
         passport={{ passportType: "examplePassport" }}
@@ -503,14 +504,14 @@ describe("public viewer nested data sections", () => {
         lang="en"
       />
     );
-    const summaries = markup.match(/<summary[^>]*>/g) || [];
-    const controlledContentIds = summaries.map((summary) => (
-      summary.match(/aria-controls="([^"]+)"/)?.[1]
+    const triggers = markup.match(/<button[^>]*class="data-section-trigger"[^>]*>/g) || [];
+    const controlledContentIds = triggers.map((trigger) => (
+      trigger.match(/aria-controls="([^"]+)"/)?.[1]
     ));
 
-    expect(summaries).toHaveLength(3);
-    expect(summaries[0]).toContain('aria-expanded="true"');
-    expect(summaries.slice(1).every((summary) => summary.includes('aria-expanded="false"'))).toBe(true);
+    expect(triggers).toHaveLength(3);
+    expect(triggers[0]).toContain('aria-expanded="true"');
+    expect(triggers.slice(1).every((trigger) => trigger.includes('aria-expanded="false"'))).toBe(true);
     expect(controlledContentIds).toHaveLength(3);
     controlledContentIds.forEach((contentId) => {
       expect(contentId).toBeTruthy();
@@ -527,7 +528,7 @@ describe("public viewer nested data sections", () => {
   test.each([
     [2, nestedSections[0].sections[0].sections[0], "Deep field"],
     [3, nestedSections[0].sections[0].sections[0].sections[0], "Level four field"],
-  ])("renders a depth-%i section's fields inside its expanded control", (depth, section, fieldLabel) => {
+  ])("renders a depth-%i section's fields inside its expanded accordion", (depth, section, fieldLabel) => {
     const markup = renderToStaticMarkup(
       <DataNestedSection
         section={section}
@@ -541,7 +542,7 @@ describe("public viewer nested data sections", () => {
       />
     );
 
-    expect(markup).toMatch(new RegExp(`<details[^>]+data-section-depth="${depth}"[^>]+open=""`));
+    expect(markup).toMatch(new RegExp(`<section[^>]*class="[^"]*is-expanded[^"]*"[^>]*data-section-depth="${depth}"`));
     expect(markup).toContain('aria-expanded="true"');
     expect(markup).toContain(fieldLabel);
   });
