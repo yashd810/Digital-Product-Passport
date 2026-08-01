@@ -8,6 +8,23 @@ const canonicalizeJson = require("../../platform/serialization/canonicalize-json
 // the latest-row lookup, which row locks alone cannot protect.
 const auditChainLockNamespace = 18223;
 
+function normalizeAuditInteger(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : value;
+}
+
+function normalizeAuditRecordId(value) {
+  if (value === null || value === undefined || value === "") return null;
+  return String(value);
+}
+
+function normalizeAuditCreatedAt(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const normalized = new Date(value);
+  return Number.isNaN(normalized.getTime()) ? value : normalized.toISOString();
+}
+
 function buildAuditEventPayload({
   createdAt = null,
   companyId = null,
@@ -54,6 +71,20 @@ function buildHashPayloadVersion({
   actorIdentifier,
   audience,
 }) {
+  if (Number(hashVersion) >= 3) {
+    return buildAuditEventPayload({
+      createdAt: normalizeAuditCreatedAt(createdAt),
+      companyId: normalizeAuditInteger(companyId),
+      userId: normalizeAuditInteger(userId),
+      action,
+      tableName,
+      recordId: normalizeAuditRecordId(recordId),
+      oldData,
+      newData,
+      actorIdentifier,
+      audience,
+    });
+  }
   if (Number(hashVersion) >= 2) {
     return buildAuditEventPayload({
       createdAt,
@@ -79,6 +110,46 @@ function buildHashPayloadVersion({
     actorIdentifier,
     audience,
   });
+}
+
+function buildLegacyV2HashPayloadCandidates(row) {
+  const numericAlternatives = (value) => {
+    if (value === null || value === undefined) return [null];
+    const values = [value];
+    const asString = String(value);
+    if (asString !== value) values.push(asString);
+    const asNumber = Number(value);
+    if (Number.isSafeInteger(asNumber) && asNumber !== value) values.push(asNumber);
+    return values;
+  };
+
+  const candidates = [];
+  const seen = new Set();
+  for (const companyId of numericAlternatives(row.companyId)) {
+    for (const userId of numericAlternatives(row.userId)) {
+      for (const recordId of numericAlternatives(row.recordId)) {
+        const payload = buildHashPayloadVersion({
+          hashVersion: 2,
+          createdAt: row.createdAt || null,
+          companyId,
+          userId,
+          action: row.action,
+          tableName: row.tableName || null,
+          recordId,
+          oldData: row.oldValues || null,
+          newData: row.newValues || null,
+          actorIdentifier: row.actorIdentifier || null,
+          audience: row.audience || null,
+        });
+        const canonicalPayload = canonicalizeJson(payload);
+        if (!seen.has(canonicalPayload)) {
+          seen.add(canonicalPayload);
+          candidates.push(payload);
+        }
+      }
+    }
+  }
+  return candidates;
 }
 
 function createAuditServiceHelpers({ pool, logger }) {
@@ -114,8 +185,11 @@ function createAuditServiceHelpers({ pool, logger }) {
       );
     }
 
-    const createdAt = options.createdAt || new Date().toISOString();
-    const hashVersion = 2;
+    const createdAt = normalizeAuditCreatedAt(options.createdAt || new Date().toISOString());
+    const hashVersion = 3;
+    const normalizedCompanyId = normalizeAuditInteger(companyId);
+    const normalizedUserId = normalizeAuditInteger(userId);
+    const normalizedRecordId = normalizeAuditRecordId(passportDppId);
     const previousHashRes = await client.query(
       `SELECT "eventHash"
        FROM "auditLogs"
@@ -126,7 +200,7 @@ function createAuditServiceHelpers({ pool, logger }) {
        ORDER BY id DESC
        LIMIT 1
        FOR UPDATE`,
-      [companyId ?? null]
+      [normalizedCompanyId]
     );
     const previousEventHash = previousHashRes.rows[0]?.eventHash || null;
     const actorIdentifier =
@@ -140,11 +214,11 @@ function createAuditServiceHelpers({ pool, logger }) {
     const payload = buildHashPayloadVersion({
       hashVersion,
       createdAt,
-      companyId: companyId ?? null,
-      userId: userId ?? null,
+      companyId: normalizedCompanyId,
+      userId: normalizedUserId,
       action,
       tableName: tableName || null,
-      recordId: passportDppId || null,
+      recordId: normalizedRecordId,
       oldData: oldData || null,
       newData: newData || null,
       actorIdentifier,
@@ -159,11 +233,11 @@ function createAuditServiceHelpers({ pool, logger }) {
        )
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
       [
-        companyId ?? null,
-        userId ?? null,
+        normalizedCompanyId,
+        normalizedUserId,
         action,
         tableName,
-        passportDppId || null,
+        normalizedRecordId,
         oldData ? JSON.stringify(oldData) : null,
         newData ? JSON.stringify(newData) : null,
         actorIdentifier,
@@ -240,8 +314,12 @@ function createAuditServiceHelpers({ pool, logger }) {
         audience: row.audience || null,
       });
       const expectedHash = computeHashChainValue(previousHash, payload);
+      const legacyV2Hashes = hashVersion === 2
+        ? buildLegacyV2HashPayloadCandidates(row).map((candidate) => computeHashChainValue(previousHash, candidate))
+        : [];
+      const eventHashMatches = row.eventHash === expectedHash || legacyV2Hashes.includes(row.eventHash);
 
-      if (row.previousEventHash !== previousHash || row.eventHash !== expectedHash) {
+      if (row.previousEventHash !== previousHash || !eventHashMatches) {
         failures.push({
           id: row.id,
           hashVersion,
