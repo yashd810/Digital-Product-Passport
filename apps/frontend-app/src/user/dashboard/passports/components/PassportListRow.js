@@ -174,6 +174,7 @@ export function PassportListRow({
             passport={passport}
             pType={pType}
             isPinned={isPinned}
+            canManagePassport={user?.role !== "viewer"}
             companyName={user?.companyName}
             companyId={companyId}
             navigate={navigate}
