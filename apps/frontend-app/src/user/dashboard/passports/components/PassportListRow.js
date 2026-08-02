@@ -174,7 +174,6 @@ export function PassportListRow({
             passport={passport}
             pType={pType}
             isPinned={isPinned}
-            readOnly={user?.role === "viewer"}
             companyName={user?.companyName}
             companyId={companyId}
             navigate={navigate}
