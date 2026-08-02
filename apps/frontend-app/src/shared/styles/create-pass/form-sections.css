@@ -55,13 +55,36 @@
 }
 .toggle-icon.expanded { transform: rotate(180deg); }
 
+.section-content-motion {
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.28s ease,
+    opacity 0.2s ease;
+}
+
+.section-content-motion.is-expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
 .section-content {
+  min-height: 0;
+  overflow: hidden;
   padding: 20px;
   background: var(--bg-card);
-  animation: slideDown 0.25s ease;
 }
 
 [data-theme="light"] .section-content { background: #ffffff; }
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle-icon,
+  .section-content-motion {
+    transition: none;
+  }
+}
 
 /* Nested schema sections retain their hierarchy in passport forms. */
 .pf-schema-section-node {

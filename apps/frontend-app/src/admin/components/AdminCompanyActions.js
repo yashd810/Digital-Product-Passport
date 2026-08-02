@@ -5,25 +5,29 @@ import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
 import { buildCompanyDppPolicyForm } from "../utils/companyDppPolicy";
 import CompanyDppPolicyFields from "./CompanyDppPolicyFields";
+import { useMotionPresence } from "../../shared/hooks/useMotionPresence";
 
 const api = import.meta.env.VITE_API_URL || "";
 
-function CompanyKebabMenu({ pos, onClose, children }) {
+function CompanyKebabMenu({ pos, open, onClose, children }) {
   const ref = useRef(null);
 
   useEffect(() => {
+    if (!open) return undefined;
     const handler = (event) => {
       if (ref.current && !ref.current.contains(event.target)) onClose();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [onClose, open]);
 
   return createPortal(
     <div
       ref={ref}
-      className="kebab-dropdown-menu"
+      className={`kebab-dropdown-menu${open ? " is-open" : " is-closing"}`}
       style={{ top: pos.top, bottom: pos.bottom, left: pos.left }}
+      aria-hidden={!open}
+      inert={open ? undefined : ""}
     >
       {children}
     </div>,
@@ -44,6 +48,7 @@ function AdminCompanyActions({
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuPresent = useMotionPresence(menuOpen);
   const [kebabPos, setKebabPos] = useState({ top: 0, left: 0 });
 
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -261,8 +266,8 @@ function AdminCompanyActions({
         </button>
       )}
 
-      {menuOpen && (
-        <CompanyKebabMenu pos={kebabPos} onClose={closeMenu}>
+      {menuPresent && (
+        <CompanyKebabMenu pos={kebabPos} open={menuOpen} onClose={closeMenu}>
           {includeAnalytics && (
             <button className="menu-item" onClick={openAnalytics}>
               📊 Analytics

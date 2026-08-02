@@ -14,11 +14,17 @@ export function CompletenessBar({ pct }) {
   );
 }
 
-export function KebabMenu({ anchorRect, onClose, children }) {
+export function KebabMenu({ anchorRect, open, onClose, children }) {
   const ref = useRef(null);
   const [resolvedPos, setResolvedPos] = useState({ top: 0, left: 0 });
+  const [lockedAnchorRect, setLockedAnchorRect] = useState(anchorRect);
 
   useEffect(() => {
+    if (open && anchorRect) setLockedAnchorRect(anchorRect);
+  }, [anchorRect, open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
     const handler = (e) => {
       if (e.target.closest(".kebab-menu-btn")) return;
       if (e.target.closest("tr.passport-row-clickable")) return;
@@ -26,21 +32,21 @@ export function KebabMenu({ anchorRect, onClose, children }) {
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [onClose, open]);
 
   useEffect(() => {
-    if (!ref.current || !anchorRect) return;
+    if (!ref.current || !lockedAnchorRect) return;
 
     const margin = 12;
     const menuRect = ref.current.getBoundingClientRect();
-    let nextTop = anchorRect.bottom + 4;
-    let nextLeft = anchorRect.right - menuRect.width;
+    let nextTop = lockedAnchorRect.bottom + 4;
+    let nextLeft = lockedAnchorRect.right - menuRect.width;
 
     nextLeft = Math.min(nextLeft, window.innerWidth - menuRect.width - margin);
     nextLeft = Math.max(nextLeft, margin);
 
     if (nextTop + menuRect.height > window.innerHeight - margin) {
-      nextTop = Math.max(margin, anchorRect.top - menuRect.height - 4);
+      nextTop = Math.max(margin, lockedAnchorRect.top - menuRect.height - 4);
     }
 
     setResolvedPos((currentPos) => (
@@ -48,10 +54,16 @@ export function KebabMenu({ anchorRect, onClose, children }) {
         ? { top: nextTop, left: nextLeft }
         : currentPos
     ));
-  }, [anchorRect, children]);
+  }, [children, lockedAnchorRect]);
 
   return createPortal(
-    <div ref={ref} className="kebab-dropdown-menu" style={{ top: resolvedPos.top, left: resolvedPos.left }}>
+    <div
+      ref={ref}
+      className={`kebab-dropdown-menu${open ? " is-open" : " is-closing"}`}
+      style={{ top: resolvedPos.top, left: resolvedPos.left }}
+      aria-hidden={!open}
+      inert={open ? undefined : ""}
+    >
       {children}
     </div>,
     document.body

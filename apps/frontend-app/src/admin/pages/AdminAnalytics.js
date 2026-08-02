@@ -19,115 +19,66 @@ const companySeries = [
   { key: "archivedCount",   label: "Archived",    color: statusColors.archived },
 ];
 
-function BarChart({ data, height = 120 }) {
-  if (!data?.length) return null;
-  const max = Math.max(...data.map((item) => item.value), 1);
-  const chartW = 420;
-  const barW = Math.min(64, Math.max(36, chartW / Math.max(data.length * 2.8, 5)));
-  const groupW = chartW / data.length;
-  const topPad = 18;
-  const labelY = topPad + height + 26;
-  const totalH = labelY + 18;
+function CompanyStatusChart({ data, maxCompanies = 10 }) {
+  const totalFor = (company) => companySeries.reduce(
+    (total, series) => total + Number(company[series.key] || 0),
+    0,
+  );
+  const companies = [...(data || [])]
+    .map((company) => ({ ...company, total: totalFor(company) }))
+    .filter((company) => company.total > 0)
+    .sort((left, right) => right.total - left.total);
+  const visibleCompanies = companies.slice(0, maxCompanies);
+  const maxTotal = Math.max(...visibleCompanies.map((company) => company.total), 1);
+  const visibleSeries = companySeries.filter((series) => companies.some(
+    (company) => Number(company[series.key] || 0) > 0,
+  ));
+
+  if (!visibleCompanies.length) return null;
 
   return (
-    <svg className="overview-bar-chart admin-type-bar-chart" width="100%" viewBox={`0 0 ${chartW} ${totalH}`}>
-      {data.map((item, index) => {
-        const barHeight = Math.max(4, (item.value / max) * height);
-        const groupCenter = groupW * index + groupW / 2;
-        const x = groupCenter - barW / 2;
-        const y = topPad + height - barHeight;
-        return (
-          <g key={item.label}>
-            <rect
-              x={x}
-              y={y}
-              width={barW}
-              height={barHeight}
-              rx={4}
-              fill={item.color || adminBarColors[index % adminBarColors.length]}
-              opacity="0.92"
-            />
-            <text x={groupCenter} y={labelY} textAnchor="middle" className="overview-bar-chart-label">
-              {item.label.length > 13 ? `${item.label.substring(0, 11)}...` : item.label}
-            </text>
-            {item.value > 0 && (
-              <text x={groupCenter} y={y - 6} textAnchor="middle" className="overview-bar-chart-value">
-                {item.value}
-              </text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-function ClusteredCompanyChart({ data, height = 180 }) {
-  if (!data?.length) return null;
-
-  const barsPerGroup = companySeries.length;
-  const barGap = 3;
-  const barWidth = 8;
-  const groupWidth = barsPerGroup * barWidth + (barsPerGroup - 1) * barGap;
-  const groupGap = 20;
-  const leftPad = 8;
-  const rightPad = 8;
-  const topPad = 18;
-  const bottomPad = 36;
-  const innerH = height;
-  const h = innerH + topPad + bottomPad;
-  const totalW = Math.max(
-    400,
-    leftPad + rightPad + data.length * groupWidth + Math.max(0, data.length - 1) * groupGap
-  );
-  const maxValue = Math.max(
-    ...data.flatMap((item) => companySeries.map((series) => item[series.key] || 0)),
-    1
-  );
-  const getBarHeight = (value) => Math.max(3, (value / maxValue) * innerH);
-
-  return (
-    <div className="admin-cluster-chart">
-      <svg className="overview-bar-chart" width="100%" viewBox={`0 0 ${totalW} ${h}`}>
-        {data.map((item, groupIndex) => {
-          const groupX = leftPad + groupIndex * (groupWidth + groupGap);
+    <div className="admin-company-status-chart">
+      <div className="admin-company-status-legend" aria-label="Passport statuses">
+        {visibleSeries.map((series) => (
+          <span key={series.key} className="admin-company-status-legend-item">
+            <span className="admin-company-status-legend-swatch" style={{ backgroundColor: series.color }} />
+            {series.label}
+          </span>
+        ))}
+      </div>
+      <p className="admin-company-status-caption">
+        {companies.length > maxCompanies
+          ? `Top ${maxCompanies} of ${companies.length} companies by passport count`
+          : "Company passport totals and status composition"}
+      </p>
+      <div className="admin-company-status-rows" role="list" aria-label="Passport status by company">
+        {visibleCompanies.map((company) => {
+          const breakdown = visibleSeries
+            .filter((series) => Number(company[series.key] || 0) > 0)
+            .map((series) => `${series.label}: ${company[series.key]}`)
+            .join(", ");
           return (
-            <g key={item.label}>
-              {companySeries.map((series, seriesIndex) => {
-                const value = item[series.key] || 0;
-                const bh = getBarHeight(value);
-                const x = groupX + seriesIndex * (barWidth + barGap);
-                const y = topPad + innerH - bh;
-                return (
-                  <g key={series.key}>
-                    <rect x={x} y={y} width={barWidth} height={bh} rx={2} fill={series.color} opacity="0.95" />
-                    {value > 0 && (
-                      <text x={x + barWidth / 2} y={y - 3} textAnchor="middle" className="overview-bar-chart-value">
-                        {value}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-              <text
-                x={groupX + groupWidth / 2}
-                y={h - 8}
-                textAnchor="middle"
-                className="overview-bar-chart-label"
-              >
-                {item.label.length > 14 ? `${item.label.substring(0, 12)}…` : item.label}
-              </text>
-            </g>
+            <div className="admin-company-status-row" key={company.label} role="listitem">
+              <span className="admin-company-status-name" title={company.label}>{company.label}</span>
+              <div className="admin-company-status-track" title={`${company.label} — ${breakdown}`}>
+                {visibleSeries.map((series) => {
+                  const value = Number(company[series.key] || 0);
+                  return value > 0 ? (
+                    <span
+                      key={series.key}
+                      className="admin-company-status-segment"
+                      style={{
+                        width: `${(value / maxTotal) * 100}%`,
+                        backgroundColor: series.color,
+                      }}
+                    />
+                  ) : null;
+                })}
+              </div>
+              <strong className="admin-company-status-total">{company.total}</strong>
+            </div>
           );
         })}
-      </svg>
-      <div className="admin-cluster-legend">
-        {companySeries.map((series) => (
-          <div key={series.key} className="admin-cluster-legend-item">
-            <span className="admin-cluster-legend-swatch" style={{ backgroundColor: series.color }} />
-            <span className="admin-cluster-legend-label">{series.label}</span>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -339,7 +290,7 @@ function AdminAnalytics() {
           <div className="chart-card chart-card-wide admin-overall-chart-card">
             <div className="chart-title">Passport status by company</div>
             {companyChartData.length > 0 ? (
-              <ClusteredCompanyChart data={companyChartData} height={180} />
+              <CompanyStatusChart data={companyChartData} />
             ) : (
               <div className="overview-empty-chart">No company totals yet</div>
             )}
@@ -386,8 +337,10 @@ function AdminAnalytics() {
                   {expanded[productCategory.productCategory] && productCategory.types.map((type) => (
                     <tr key={type.typeName} className="type-subrow">
                       <td className="admin-subrow-label">
-                        └── {type.displayName}
-                        <code className="admin-inline-code admin-inline-code-spaced">{type.typeName}</code>
+                        <span className="admin-analytics-type-name-cell">
+                          <span className="admin-analytics-type-branch" aria-hidden="true">└──</span>
+                          <span className="admin-analytics-type-display-name">{type.displayName || "Unnamed passport type"}</span>
+                        </span>
                       </td>
                       <td>{type.total || 0}</td>
                       <td><span className="mini-badge draft">{type.draft || 0}</span></td>

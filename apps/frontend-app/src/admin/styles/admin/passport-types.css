@@ -155,21 +155,36 @@
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 14px;
-  gap: 8px;
+  gap: 12px;
+  min-width: 0;
+}
+.apt-card-heading {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.apt-card-header-actions {
+  flex: 0 0 auto;
 }
 .apt-card-display-name {
   font-size: 15px;
   font-weight: 700;
   color: #111827;
   margin-bottom: 5px;
+  overflow-wrap: anywhere;
 }
 .apt-card-type-name {
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow: hidden;
   font-size: 11px;
   background: #f1f5f9;
   color: #475569;
   padding: 3px 8px;
   border-radius: 4px;
   font-family: monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .apt-badge {
   font-size: 11px;

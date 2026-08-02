@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import { safeWindowOpen, toSafeInternalPath } from "../../../shared/security/urlSafety";
+import { useMotionPresence } from "../../../shared/hooks/useMotionPresence";
 import "../../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -41,6 +42,7 @@ function NotificationsPanel({ user }) {
   const [loading,  setLoading]  = useState(false);
   const panelRef   = useRef(null);
   const btnRef     = useRef(null);
+  const panelPresent = useMotionPresence(open);
 
   const fetchNotifs = async () => {
     setLoading(true);
@@ -125,8 +127,13 @@ function NotificationsPanel({ user }) {
         )}
       </button>
 
-      {open && (
-        <div ref={panelRef} className="notif-panel">
+      {panelPresent && (
+        <div
+          ref={panelRef}
+          className={`notif-panel${open ? " is-open" : ""}`}
+          aria-hidden={!open}
+          inert={open ? undefined : ""}
+        >
           <div className="notif-panel-header">
             <span className="notif-panel-title">Notifications</span>
             {unread > 0 && (

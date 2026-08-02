@@ -376,7 +376,24 @@
   transform: rotate(180deg);
 }
 
+.audit-explorer-details-motion {
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.28s ease,
+    opacity 0.2s ease;
+}
+
+.audit-explorer-details-motion.is-expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
 .audit-explorer-details {
+  min-height: 0;
+  overflow: hidden;
   padding: 0 22px 22px 80px;
   border-top: 1px solid rgba(13, 181, 176, 0.1);
   background: rgba(255, 255, 255, 0.014);

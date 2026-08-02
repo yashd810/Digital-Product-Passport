@@ -1,4 +1,5 @@
 import React from "react";
+import { useMotionPresence } from "../../../../shared/hooks/useMotionPresence";
 import {
   formatPassportStatus,
   getPassportLinkType,
@@ -45,6 +46,7 @@ export function PassportListRow({
   const pType = passport.passportType || activeType;
   const menuId = `${passport.dppId}-${passport.versionNumber}`;
   const isOpen = openMenuId === menuId;
+  const menuPresent = useMotionPresence(isOpen);
   const pct = calcCompleteness(passport, allPassportTypes);
   const isPinned = pinnedGuids.has(passport.dppId);
   const isExpanded = expandedPassportGroups.has(parentGuid);
@@ -109,23 +111,27 @@ export function PassportListRow({
           <span className="version-badge">v{passport.versionNumber}</span>
         </div>
       </td>
-      <td>{serialNumber ? <span className="passport-serial-cell">{serialNumber}</span> : <span className="no-product-id">—</span>}</td>
-      <td><span className="passport-model-cell">{passport.modelName}</span></td>
+      <td className="passport-serial-col">
+        {serialNumber ? <span className="passport-serial-cell" title={serialNumber}>{serialNumber}</span> : <span className="no-product-id">—</span>}
+      </td>
+      <td className="passport-model-col"><span className="passport-model-cell" title={passport.modelName || undefined}>{passport.modelName}</span></td>
       {filterByUser && (
         <td><span className="type-badge passport-type-badge">{pType}</span></td>
       )}
-      <td>{formatPassportDate(passport)}</td>
-      <td>
+      <td className="passport-date-col">{formatPassportDate(passport)}</td>
+      <td className="passport-status-col">
         <div className="passport-status-cell">
           <span className={`status-badge ${normalizedStatus}`}>
             {formatPassportStatus(passport.releaseStatus)}
           </span>
         </div>
       </td>
-      <td><CompletenessBar pct={pct} /></td>
+      <td className="passport-completeness-col"><CompletenessBar pct={pct} /></td>
       {!filterByUser && (
-        <td className="small-text">
+        <td className="small-text passport-creator-col">
+          <span className="passport-creator-cell" title={passport.createdByName || undefined}>
           {passport.createdByName || "—"}
+          </span>
         </td>
       )}
       <td className="passport-view-cell" onClick={e => e.stopPropagation()}>
@@ -151,18 +157,25 @@ export function PassportListRow({
           </button>
         )}
       </td>
-      <td className="options-cell" onClick={e => e.stopPropagation()}>
-        {user?.role !== "viewer" && (
-          <div className="kebab-menu-container">
-            <button className="kebab-menu-btn" onClick={e => openMenu(e, menuId)}>⋮</button>
-          </div>
-        )}
-        {isOpen && (
+      <td className="options-cell passport-options-col" onClick={e => e.stopPropagation()}>
+        <div className="kebab-menu-container">
+          <button
+            type="button"
+            className="kebab-menu-btn"
+            onClick={e => openMenu(e, menuId)}
+            aria-label={`Passport options for ${passport.modelName || serialNumber || passport.dppId}`}
+          >
+            ⋮
+          </button>
+        </div>
+        {menuPresent && (
           <PassportListRowMenu
             anchorRect={menuAnchorRect}
+            isOpen={isOpen}
             passport={passport}
             pType={pType}
             isPinned={isPinned}
+            readOnly={user?.role === "viewer"}
             companyName={user?.companyName}
             companyId={companyId}
             navigate={navigate}

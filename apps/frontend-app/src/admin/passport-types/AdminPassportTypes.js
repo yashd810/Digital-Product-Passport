@@ -5,17 +5,25 @@ import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildProductCategoryOptions } from "./builderHelpers";
 import { formatSemanticModelLabel } from "./semanticTermCatalog";
 import { countSchemaFields, normalizeSchemaSections } from "../../shared/passports/passportSchemaUtils";
+import { useMotionPresence } from "../../shared/hooks/useMotionPresence";
 import "../styles/AdminDashboard.css";
 
-function TypeKebabMenu({ pos, onClose, children }) {
+function TypeKebabMenu({ pos, open, onClose, children }) {
   const ref = useRef(null);
   useEffect(() => {
+    if (!open) return undefined;
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [onClose, open]);
   return createPortal(
-    <div ref={ref} className="kebab-dropdown-menu" style={{ top: pos.top, left: pos.left }}>
+    <div
+      ref={ref}
+      className={`kebab-dropdown-menu${open ? " is-open" : " is-closing"}`}
+      style={{ top: pos.top, left: pos.left }}
+      aria-hidden={!open}
+      inert={open ? undefined : ""}
+    >
       {children}
     </div>,
     document.body
@@ -52,13 +60,21 @@ function AdminPassportTypes() {
 
   // Kebab menu
   const [openKebabId, setOpenKebabId] = useState(null);
+  const [renderedKebabId, setRenderedKebabId] = useState(null);
   const [kebabPos,    setKebabPos]    = useState({ top: 0, left: 0 });
+  const kebabPresent = useMotionPresence(Boolean(openKebabId));
+
+  useEffect(() => {
+    if (openKebabId) setRenderedKebabId(openKebabId);
+    else if (!kebabPresent) setRenderedKebabId(null);
+  }, [kebabPresent, openKebabId]);
 
   const openKebab = (e, id) => {
     e.stopPropagation();
     if (openKebabId === id) { setOpenKebabId(null); return; }
     const rect = e.currentTarget.getBoundingClientRect();
     setKebabPos({ top: rect.bottom + 4, left: rect.right - 160 });
+    setRenderedKebabId(id);
     setOpenKebabId(id);
   };
 
@@ -502,19 +518,19 @@ function AdminPassportTypes() {
                 {umbTypes.map(t => (
                   <div key={t.id} className={`apt-card ${t.isActive ? "" : "apt-card-inactive"}`}>
                     <div className="apt-card-header">
-                      <div>
-                        <div className="apt-card-display-name">{t.displayName}</div>
-                        <code className="apt-card-type-name">{t.typeName}</code>
+                      <div className="apt-card-heading">
+                        <div className="apt-card-display-name" title={t.displayName}>{t.displayName}</div>
+                        <code className="apt-card-type-name" title={t.typeName}>{t.typeName}</code>
                       </div>
-                      <div className="admin-inline-stack">
+                      <div className="admin-inline-stack apt-card-header-actions">
                         <span className={`apt-badge ${t.isActive ? "apt-badge-active" : "apt-badge-inactive"}`}>
                           {t.isActive ? "Active" : "Inactive"}
                         </span>
                         <button className="kebab-menu-btn admin-no-shrink" onClick={e => openKebab(e, t.id)}>⋮</button>
                       </div>
                     </div>
-                    {openKebabId === t.id && (
-                      <TypeKebabMenu pos={kebabPos} onClose={() => setOpenKebabId(null)}>
+                    {renderedKebabId === t.id && (
+                      <TypeKebabMenu pos={kebabPos} open={openKebabId === t.id} onClose={() => setOpenKebabId(null)}>
                         <button className="menu-item" onClick={() => handleEditMetadata(t)}>
                           ✏️ Edit Metadata
                         </button>

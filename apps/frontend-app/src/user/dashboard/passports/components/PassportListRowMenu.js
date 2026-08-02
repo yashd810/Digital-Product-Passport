@@ -10,9 +10,11 @@ import { KebabMenu } from "./PassportListComponents";
 
 export function PassportListRowMenu({
   anchorRect,
+  isOpen,
   passport,
   pType,
   isPinned,
+  readOnly = false,
   navigate,
   setOpenMenuId,
   setMenuAnchorRect,
@@ -35,31 +37,33 @@ export function PassportListRowMenu({
   });
 
   return (
-    <KebabMenu anchorRect={anchorRect} onClose={() => { setOpenMenuId(null); setMenuAnchorRect(null); }}>
-      <button className="menu-item" onClick={() => togglePin(passport.dppId)}>
-        {isPinned ? "📌 Unpin" : "📌 Pin to top"}
-      </button>
-      <button className={`menu-item edit-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.releaseStatus)} onClick={() => { navigate(`/edit/${passport.dppId}?passportType=${effectivePassportType}`); setOpenMenuId(null); }}>
-        ✏️ Edit
-      </button>
-      <button className={`menu-item release-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.releaseStatus)} onClick={() => { setReleaseModal({ ...passport, passportType: effectivePassportType }); setOpenMenuId(null); }}>
-        🎯 Release
-      </button>
-      <button className="menu-item" onClick={() => { setReleaseModal({ ...passport, passportType: effectivePassportType, checkerOnly: true }); setOpenMenuId(null); }}>
-        🧪 Verification check
-      </button>
-      <button className={`menu-item revise-item${!isReleasedPassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isReleasedPassportStatus(passport.releaseStatus)} onClick={() => { handleRevise(passport.dppId, passport.versionNumber, effectivePassportType); setOpenMenuId(null); }}>
-        🔄 Revise
-      </button>
-      <button className="menu-item" onClick={() => handleClone(passport, effectivePassportType)}>
-        🔁 Clone
-      </button>
-      <button className="menu-item" onClick={() => { navigate(compareVersionsPath); setOpenMenuId(null); }}>
-        🕘 Update history
-      </button>
-      <button className="menu-item" onClick={() => { setDeviceModal({ passport, pType: effectivePassportType }); setOpenMenuId(null); }}>
-        📡 Device Integration
-      </button>
+    <KebabMenu anchorRect={anchorRect} open={isOpen} onClose={() => { setOpenMenuId(null); setMenuAnchorRect(null); }}>
+      {!readOnly && <>
+        <button className="menu-item" onClick={() => togglePin(passport.dppId)}>
+          {isPinned ? "📌 Unpin" : "📌 Pin to top"}
+        </button>
+        <button className={`menu-item edit-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.releaseStatus)} onClick={() => { navigate(`/edit/${passport.dppId}?passportType=${effectivePassportType}`); setOpenMenuId(null); }}>
+          ✏️ Edit
+        </button>
+        <button className={`menu-item release-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.releaseStatus)} onClick={() => { setReleaseModal({ ...passport, passportType: effectivePassportType }); setOpenMenuId(null); }}>
+          🎯 Release
+        </button>
+        <button className="menu-item" onClick={() => { setReleaseModal({ ...passport, passportType: effectivePassportType, checkerOnly: true }); setOpenMenuId(null); }}>
+          🧪 Verification check
+        </button>
+        <button className={`menu-item revise-item${!isReleasedPassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isReleasedPassportStatus(passport.releaseStatus)} onClick={() => { handleRevise(passport.dppId, passport.versionNumber, effectivePassportType); setOpenMenuId(null); }}>
+          🔄 Revise
+        </button>
+        <button className="menu-item" onClick={() => handleClone(passport, effectivePassportType)}>
+          🔁 Clone
+        </button>
+        <button className="menu-item" onClick={() => { navigate(compareVersionsPath); setOpenMenuId(null); }}>
+          🕘 Update history
+        </button>
+        <button className="menu-item" onClick={() => { setDeviceModal({ passport, pType: effectivePassportType }); setOpenMenuId(null); }}>
+          📡 Device Integration
+        </button>
+      </>}
       <button
         className="menu-item"
         onClick={() => {

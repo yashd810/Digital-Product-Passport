@@ -307,6 +307,24 @@
   min-width: 180px;
   width: 180px;
   overflow: hidden;
+  transform-origin: top right;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+  transition:
+    opacity 0.16s ease,
+    transform 0.18s cubic-bezier(0.2, 0.75, 0.3, 1);
+}
+.kebab-dropdown-menu.is-closing {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  pointer-events: none;
+}
+@starting-style {
+  .kebab-dropdown-menu.is-open {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
 }
 [data-theme="light"] .kebab-dropdown-menu {
   background: #ffffff;
@@ -332,6 +350,11 @@
 }
 .menu-item:hover {
   background: rgba(28, 55, 56, 0.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  .kebab-dropdown-menu {
+    transition: none;
+  }
 }
 .menu-item-danger:hover {
   background: #fde8e8;

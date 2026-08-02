@@ -292,7 +292,11 @@ function AuditLogExplorer({
                     <span className={`audit-explorer-chevron${isExpanded ? " is-expanded" : ""}`} aria-hidden="true">⌄</span>
                   </button>
 
-                  {isExpanded && (
+                  <div
+                    className={`audit-explorer-details-motion${isExpanded ? " is-expanded" : ""}`}
+                    aria-hidden={!isExpanded}
+                    inert={isExpanded ? undefined : ""}
+                  >
                     <div id={detailId} className="audit-explorer-details">
                       <h4>Action details</h4>
                       <dl className="audit-explorer-detail-grid">
@@ -337,7 +341,7 @@ function AuditLogExplorer({
                         </div>
                       )}
                     </div>
-                  )}
+                  </div>
                 </article>
               );
             })}

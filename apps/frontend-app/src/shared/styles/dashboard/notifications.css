@@ -72,6 +72,26 @@
   box-shadow: 0 8px 30px rgba(0, 15, 8, 0.18);
   z-index: 9999;
   overflow: hidden;
+  transform-origin: top right;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.2s cubic-bezier(0.2, 0.75, 0.3, 1);
+}
+
+.notif-panel.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+@starting-style {
+  .notif-panel.is-open {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
 }
 
 [data-theme="light"] .notif-panel {
@@ -112,6 +132,12 @@
   text-decoration: underline;
   font-family: var(--font);
   transition: all 0.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notif-panel {
+    transition: none;
+  }
 }
 
 [data-theme="light"] .notif-mark-all {

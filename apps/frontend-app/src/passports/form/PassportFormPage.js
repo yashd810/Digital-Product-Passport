@@ -1090,7 +1090,11 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
                     <span className="section-title">{section.label}</span>
                     <span className={`toggle-icon${expanded[sk]?" expanded":""}`}>▼</span>
                   </button>
-                  {expanded[sk] && (
+                  <div
+                    className={`section-content-motion${expanded[sk] ? " is-expanded" : ""}`}
+                    aria-hidden={!expanded[sk]}
+                    inert={expanded[sk] ? undefined : ""}
+                  >
                     <div id={sectionContentId} className="section-content">
                       {sk==="compliance" && (
                         <p className="section-hint">
@@ -1105,7 +1109,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
                         </div>
                       )}
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })}

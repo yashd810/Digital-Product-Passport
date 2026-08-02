@@ -30,7 +30,7 @@ export function PassportListTable({
 }) {
   return (
     <div className="table-scroll-wrapper">
-      <table className="passports-table">
+      <table className="passports-table passport-list-table">
         <thead>
           <tr>
             {user?.role !== "viewer" && selectionMode && (
@@ -48,30 +48,30 @@ export function PassportListTable({
             )}
             <th className="passport-table-pin-col"></th>
             <th className="passport-version-col"><SortableHeader columnKey="versionNumber" label="Ver." sortConfig={sortConfig} toggleSort={toggleSort} /></th>
-            <th><SortableHeader columnKey="serialNumber" label="Serial Number" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
-            <th><SortableHeader columnKey="modelName" label="Model" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
+            <th className="passport-serial-col"><SortableHeader columnKey="serialNumber" label="Serial Number" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
+            <th className="passport-model-col"><SortableHeader columnKey="modelName" label="Model" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
             {filterByUser && <th><SortableHeader columnKey="passportType" label="Type" sortConfig={sortConfig} toggleSort={toggleSort} /></th>}
-            <th><SortableHeader columnKey="createdAt" label="Date" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
-            <th><SortableHeader columnKey="releaseStatus" label="Status" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
-            <th><SortableHeader columnKey="completeness" label="Complete" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
-            {!filterByUser && <th><SortableHeader columnKey="createdBy" label="Created By" sortConfig={sortConfig} toggleSort={toggleSort} /></th>}
+            <th className="passport-date-col"><SortableHeader columnKey="createdAt" label="Date" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
+            <th className="passport-status-col"><SortableHeader columnKey="releaseStatus" label="Status" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
+            <th className="passport-completeness-col"><SortableHeader columnKey="completeness" label="Complete" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
+            {!filterByUser && <th className="passport-creator-col"><SortableHeader columnKey="createdBy" label="Created By" sortConfig={sortConfig} toggleSort={toggleSort} /></th>}
             <th className="passport-view-col" scope="col">Viewer</th>
-            <th>Options</th>
+            <th className="passport-options-col">Options</th>
           </tr>
           {showFilters && (
             <tr className="table-filter-row">
               {user?.role !== "viewer" && selectionMode && <th></th>}
               <th></th>
               <th><input className="table-filter-input" value={columnFilters.versionNumber || ""} onChange={(e) => updateColumnFilter("versionNumber", e.target.value)} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.serialNumber || ""} onChange={(e) => updateColumnFilter("serialNumber", e.target.value)} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.modelName || ""} onChange={(e) => updateColumnFilter("modelName", e.target.value)} placeholder="Filter" /></th>
+              <th className="passport-serial-col"><input className="table-filter-input" value={columnFilters.serialNumber || ""} onChange={(e) => updateColumnFilter("serialNumber", e.target.value)} placeholder="Filter" /></th>
+              <th className="passport-model-col"><input className="table-filter-input" value={columnFilters.modelName || ""} onChange={(e) => updateColumnFilter("modelName", e.target.value)} placeholder="Filter" /></th>
               {filterByUser && <th><input className="table-filter-input" value={columnFilters.passportType || ""} onChange={(e) => updateColumnFilter("passportType", e.target.value)} placeholder="Filter" /></th>}
-              <th><input className="table-filter-input" value={columnFilters.createdAt || ""} onChange={(e) => updateColumnFilter("createdAt", e.target.value)} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.releaseStatus || ""} onChange={(e) => updateColumnFilter("releaseStatus", e.target.value)} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.completeness || ""} onChange={(e) => updateColumnFilter("completeness", e.target.value)} placeholder="Filter" /></th>
-              {!filterByUser && <th><input className="table-filter-input" value={columnFilters.createdBy || ""} onChange={(e) => updateColumnFilter("createdBy", e.target.value)} placeholder="Filter" /></th>}
+              <th className="passport-date-col"><input className="table-filter-input" value={columnFilters.createdAt || ""} onChange={(e) => updateColumnFilter("createdAt", e.target.value)} placeholder="Filter" /></th>
+              <th className="passport-status-col"><input className="table-filter-input" value={columnFilters.releaseStatus || ""} onChange={(e) => updateColumnFilter("releaseStatus", e.target.value)} placeholder="Filter" /></th>
+              <th className="passport-completeness-col"><input className="table-filter-input" value={columnFilters.completeness || ""} onChange={(e) => updateColumnFilter("completeness", e.target.value)} placeholder="Filter" /></th>
+              {!filterByUser && <th className="passport-creator-col"><input className="table-filter-input" value={columnFilters.createdBy || ""} onChange={(e) => updateColumnFilter("createdBy", e.target.value)} placeholder="Filter" /></th>}
               <th></th>
-              <th></th>
+              <th className="passport-options-col"></th>
             </tr>
           )}
         </thead>

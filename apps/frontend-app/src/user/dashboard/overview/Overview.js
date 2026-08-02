@@ -63,41 +63,47 @@ function normalizeTrendToCurrentYear(trend, currentYear, currentMonthIndex) {
   return { labels: visibleLabels, series };
 }
 
-function BarChart({ data, height = 120 }) {
-  if (!data || !data.length) return null;
-  const max = Math.max(...data.map(d => d.value), 1);
-  const barW = 36; const gap = 16;
-  const totalW = data.length * (barW + gap) + gap;
+function formatPassportTypeLabel(label) {
+  return String(label || "Unknown type")
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([A-Za-z])(\d+)/g, "$1 $2")
+    .replace(/\bV\s+(\d+)/g, "V$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function PassportTypeChart({ data }) {
+  const items = [...(data || [])]
+    .filter((item) => Number(item.value) > 0)
+    .sort((left, right) => Number(right.value) - Number(left.value));
+
+  if (!items.length) return null;
+
+  const max = Math.max(...items.map((item) => Number(item.value)), 1);
+
   return (
-    <svg className="overview-bar-chart" width="100%" viewBox={`0 0 ${Math.max(totalW,200)} ${height+30}`}>
-      {data.map((d,i) => {
-        const bh = Math.max(4,(d.value/max)*height);
-        const x  = gap + i*(barW+gap); const y = height-bh+10;
+    <div className="overview-type-chart" role="list" aria-label="Passports by type">
+      {items.map((item) => {
+        const label = formatPassportTypeLabel(item.label);
+        const value = Number(item.value);
         return (
-          <g key={i}>
-            <rect x={x} y={y} width={barW} height={bh} rx={4} fill={d.color || overviewBarColors[i % overviewBarColors.length]} opacity="0.9"/>
-            <text
-              x={x+barW/2}
-              y={height+18}
-              textAnchor="middle"
-              className="overview-bar-chart-label"
-            >
-              {d.label.length>10?d.label.substring(0,8)+"…":d.label}
-            </text>
-            {d.value>0&&(
-              <text
-                x={x+barW/2}
-                y={y-5}
-                textAnchor="middle"
-                className="overview-bar-chart-value"
-              >
-                {d.value}
-              </text>
-            )}
-          </g>
+          <div className="overview-type-chart-row" key={item.label} role="listitem">
+            <span className="overview-type-chart-label" title={label}>{label}</span>
+            <div className="overview-type-chart-track" title={`${label}: ${value} passports`}>
+              <span
+                className="overview-type-chart-fill"
+                style={{
+                  width: `${(value / max) * 100}%`,
+                  backgroundColor: item.color || overviewBarColors[0],
+                }}
+              />
+            </div>
+            <strong className="overview-type-chart-value">{value}</strong>
+          </div>
         );
       })}
-    </svg>
+    </div>
   );
 }
 
@@ -516,9 +522,9 @@ function Overview({ companyId }) {
               </div>
               {typeChartData.length > 2 && (
                 <div className="overview-chart-row overview-chart-row-center">
-                  <div className="chart-card chart-card-compact">
+                  <div className="chart-card overview-type-chart-card">
                     <div className="chart-title">Passports by type</div>
-                    <BarChart data={typeChartData} height={70}/>
+                    <PassportTypeChart data={typeChartData} />
                   </div>
                 </div>
               )}
