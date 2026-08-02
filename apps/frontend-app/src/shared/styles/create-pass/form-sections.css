@@ -17,7 +17,7 @@
   justify-content: space-between;
   align-items: center;
   transition: all 0.25s ease;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0;
   color: var(--text-primary);
   width: 100%;
   border-left: 0;
@@ -25,6 +25,10 @@
   border-top: 0;
   text-align: left;
   font: inherit;
+}
+
+.form-section.is-expanded .section-header {
+  border-bottom: 1px solid var(--border);
 }
 
 [data-theme="light"] .section-header { background: #f0faf6; }
@@ -73,15 +77,21 @@
 .section-content {
   min-height: 0;
   overflow: hidden;
-  padding: 20px;
+  padding: 0 20px;
   background: var(--bg-card);
+  transition: padding 0.28s ease;
+}
+
+.section-content-motion.is-expanded .section-content {
+  padding: 20px;
 }
 
 [data-theme="light"] .section-content { background: #ffffff; }
 
 @media (prefers-reduced-motion: reduce) {
   .toggle-icon,
-  .section-content-motion {
+  .section-content-motion,
+  .section-content {
     transition: none;
   }
 }

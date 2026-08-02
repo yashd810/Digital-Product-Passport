@@ -164,6 +164,53 @@
   flex-wrap: wrap;
 }
 
+.passport-product-image-group {
+  gap: 9px;
+  margin: 0 0 18px;
+  padding: 0 0 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.passport-product-image-group > label {
+  margin: 0;
+}
+
+.passport-product-image-group .file-upload-widget {
+  display: grid;
+  grid-template-columns: minmax(15rem, max-content) minmax(15rem, 1fr);
+  gap: 10px 12px;
+  width: 100%;
+}
+
+.passport-product-image-group .file-upload-label {
+  justify-content: center;
+  min-height: 44px;
+}
+
+.passport-product-image-group .file-link-paste {
+  min-width: 0;
+  margin: 0;
+}
+
+.passport-product-image-group .file-link-input {
+  box-sizing: border-box;
+  min-height: 44px;
+}
+
+.passport-product-image-group .file-existing {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .passport-product-image-group .file-upload-widget {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .passport-product-image-group .file-upload-label {
+    width: 100%;
+  }
+}
+
 .file-upload-label {
   display: inline-flex;
   align-items: center;

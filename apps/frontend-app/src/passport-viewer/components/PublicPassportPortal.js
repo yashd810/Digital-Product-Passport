@@ -776,6 +776,7 @@ export default function PublicPassportPortal({
   ));
   const passportDisplayName = typeDef?.displayName ||
     String(passport?.passportType || "Digital product passport").replace(/_/g, " ");
+  const productCategory = typeDef?.productCategory || passport?.productCategory || "Product category";
   const sections = useMemo(
     () => filterViewerSections(typeDef?.fieldsJson?.sections || typeDef?.sections || []),
     [typeDef]
@@ -914,8 +915,8 @@ export default function PublicPassportPortal({
           <a className="brand" href="#portal-top" aria-label="Back to passport top">
             <div className="logo">{passportIcon}</div>
             <div>
-              <strong>{passportDisplayName}</strong>
-              <span>Public digital product passport</span>
+              <strong>Digital Product Passport</strong>
+              <span>{productCategory}</span>
             </div>
           </a>
           <div className="nav-links" role="tablist" aria-label="Viewer pages">
@@ -949,7 +950,7 @@ export default function PublicPassportPortal({
       <header className="hero" id="portal-top">
         <div className="hero-main">
           <div>
-            <div className="kicker">{passportDisplayName}</div>
+            <div className="kicker">{productCategory}</div>
             <h1>{displayModelName}</h1>
             {(isPreviewMode || isInactiveView || isObsolete || unlockedPassport) && (
               <div className="hero-badge-row">

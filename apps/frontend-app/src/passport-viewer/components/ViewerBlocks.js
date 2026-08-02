@@ -30,7 +30,7 @@ function getDomainIndicatorState() {
     expectedHost,
     trusted,
     label: trusted
-      ? (isLocal ? `Local preview · ${currentHost}` : `Verified domain · ${currentHost}`)
+      ? (isLocal ? "Local preview" : "Verified domain")
       : `Check domain · expected ${expectedHost || "trusted viewer host"}`,
   };
 }

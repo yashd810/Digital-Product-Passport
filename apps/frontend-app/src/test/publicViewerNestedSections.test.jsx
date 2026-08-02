@@ -29,6 +29,21 @@ const nestedSections = [{
 }];
 
 describe("public viewer nested data sections", () => {
+  test("uses a fixed passport title and the product category in the linked viewer header", () => {
+    const markup = renderToStaticMarkup(
+      <PublicPassportPortal
+        passport={{ passportType: "batteryPassportV1", rootField: "Root value" }}
+        companyData={{ companyName: "Example Company" }}
+        typeDef={{ productCategory: "Battery", fieldsJson: { sections: nestedSections } }}
+        lang="en"
+      />
+    );
+
+    expect(markup).toMatch(/<a class="brand" href="#portal-top"[^>]*>[\s\S]*?<strong>Digital Product Passport<\/strong>[\s\S]*?<span>Battery<\/span>[\s\S]*?<\/a>/);
+    expect(markup).toContain('<div class="kicker">Battery</div>');
+    expect(markup).not.toContain("Public digital product passport");
+  });
+
   test("shows overview, data, trust, and documents without a separate header tab", () => {
     const markup = renderToStaticMarkup(
       <PublicPassportPortal

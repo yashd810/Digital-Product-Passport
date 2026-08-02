@@ -311,6 +311,11 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
+.passport-portal .product-photo {
+  height: 230px;
+  min-height: 230px;
+}
+
 .passport-portal .product-photo::before,
 .passport-portal .energy-art::before {
   content: "";
@@ -345,6 +350,7 @@
 .passport-portal .overview-product-image {
   width: 100%;
   height: 100%;
+  box-sizing: border-box;
   object-fit: contain;
   padding: 20px;
   position: relative;
@@ -1484,6 +1490,7 @@
   }
 
   .passport-portal .product-photo {
+    height: 184px;
     min-height: 184px;
   }
 
@@ -1602,6 +1609,10 @@
   .passport-portal .energy-art {
     min-height: 172px;
     border-radius: 18px;
+  }
+
+  .passport-portal .product-photo {
+    height: 172px;
   }
 
   .passport-portal .qr-row {

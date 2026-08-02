@@ -1079,7 +1079,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
               const sectionContentId = `passport-section-${sk}`;
               const hasVisibleContent = hasVisibleSchemaSectionContent(section);
               return (
-                <div key={sk} className="form-section">
+                <div key={sk} className={`form-section${expanded[sk] ? " is-expanded" : ""}`}>
                   <button
                     type="button"
                     className="section-header"
