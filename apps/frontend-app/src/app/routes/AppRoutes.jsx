@@ -1,9 +1,10 @@
 // Route composition: URL-to-feature mapping and authorization guard placement.
 import React, { lazy } from "react";
-import { Routes, Route, Navigate, useParams } from "react-router";
+import { Routes, Route, Navigate, Link, useParams } from "react-router";
 import { AdminRoute, ProtectedRoute } from "./RouteGuards";
-import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
+import { buildDashboardPath, buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 import { lazyWithRecovery } from "../../shared/utils/lazyWithRecovery";
+import { canManagePassports, passportAuthoringAccessMessage } from "../../shared/auth/passportAuthoringAccess";
 
 /**
  * Dashboard route composition.
@@ -58,15 +59,31 @@ const AdminPassportTypeFields = lazy(() => import("../../admin/passport-types/Ad
 const AdminSecurity = lazy(() => import("../../admin/pages/AdminSecurity"));
 const AdminAuditLogs = lazy(() => import("../../admin/pages/AdminAuditLogs"));
 
+function PassportAuthoringAccessDenied({ user, companyId }) {
+  const passportListPath = buildDashboardPath({
+    companyName: user?.companyName,
+    companyId,
+    subpath: "passports",
+  });
+
+  return (
+    <main className="empty-state" role="alert">
+      <h1>Editor access required</h1>
+      <p>{passportAuthoringAccessMessage}</p>
+      <Link className="passport-view-btn" to={passportListPath}>Return to passports</Link>
+    </main>
+  );
+}
+
 function CreatePassportRoute({ user, companyId }) {
   const { passportType } = useParams();
-  if (user?.role === "viewer") return <Navigate to={buildUserDashboardHomePath({ user, companyId })} replace />;
+  if (!canManagePassports(user)) return <PassportAuthoringAccessDenied user={user} companyId={companyId} />;
   return <PassportForm mode="create" passportType={passportType}
            user={user} companyId={companyId} />;
 }
 
 function EditPassportRoute({ user, companyId }) {
-  if (user?.role === "viewer") return <Navigate to={buildUserDashboardHomePath({ user, companyId })} replace />;
+  if (!canManagePassports(user)) return <PassportAuthoringAccessDenied user={user} companyId={companyId} />;
   return <PassportForm mode="edit" user={user} companyId={companyId} />;
 }
 

@@ -620,7 +620,10 @@
   box-shadow: 0 8px 24px rgba(0, 15, 8, 0.35);
   z-index: 9999;
   min-width: 160px;
-  overflow: hidden;
+  max-height: min(34rem, calc(100vh - 24px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   transform-origin: top right;
   opacity: 1;
   transform: translateY(0) scale(1);

@@ -37,6 +37,10 @@ import {
   getAppSelectOptions,
   getNextEnabledOptionIndex,
 } from "../shared/components/AppSelect";
+import {
+  canManagePassports,
+  passportAuthoringAccessMessage,
+} from "../shared/auth/passportAuthoringAccess";
 
 describe("frontend modularity helpers", () => {
   test("admin serialization keeps generated semantic composition mappings", () => {
@@ -299,6 +303,44 @@ describe("frontend modularity helpers", () => {
     expect(tableSource).toContain('className="passport-view-col" scope="col">Viewer</th>');
     expect(listStateSource).toContain("navigate(destination.path)");
     expect(listStateSource).toContain("window.location.assign(destination.url)");
+  });
+
+  test("passport kebab always exposes the complete command set and does not silently redirect viewers", () => {
+    const menuSource = readFileSync(
+      new URL("../user/dashboard/passports/components/PassportListRowMenu.js", import.meta.url),
+      "utf8",
+    );
+    const rowSource = readFileSync(
+      new URL("../user/dashboard/passports/components/PassportListRow.js", import.meta.url),
+      "utf8",
+    );
+    const routeSource = readFileSync(
+      new URL("../app/routes/AppRoutes.jsx", import.meta.url),
+      "utf8",
+    );
+    const dashboardStyles = readFileSync(
+      new URL("../shared/styles/dashboard/layout.css", import.meta.url),
+      "utf8",
+    );
+
+    ["Edit", "Release", "Verification check", "Revise", "Clone", "Update history", "Device Integration"].forEach((action) => {
+      expect(menuSource).toContain(action);
+    });
+    expect(menuSource).not.toContain("{canManagePassport &&");
+    expect(menuSource).toContain("runManagedAction");
+    expect(rowSource).toContain("canManagePassport={canManagePassports(user)}");
+    expect(routeSource).toContain("PassportAuthoringAccessDenied");
+    expect(routeSource).not.toContain('if (user?.role === "viewer") return <Navigate');
+    expect(dashboardStyles).toMatch(/\.kebab-dropdown-menu\s*\{[^}]*max-height:\s*min\(34rem, calc\(100vh - 24px\)\);[^}]*overflow-y:\s*auto;/s);
+  });
+
+  test("passport authoring access follows the backend's viewer boundary", () => {
+    expect(canManagePassports({ role: "viewer" })).toBe(false);
+    expect(canManagePassports({ role: "editor" })).toBe(true);
+    expect(canManagePassports({ role: "companyAdmin" })).toBe(true);
+    expect(canManagePassports({ role: "superAdmin" })).toBe(true);
+    expect(canManagePassports(null)).toBe(false);
+    expect(passportAuthoringAccessMessage).toContain("Editor or company-admin");
   });
 
   test("standalone public viewer retains only canonical public passport routes", () => {

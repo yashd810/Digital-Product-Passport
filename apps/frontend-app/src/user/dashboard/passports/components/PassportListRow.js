@@ -8,6 +8,7 @@ import {
 import { CompletenessBar } from "./PassportListComponents";
 import { PassportListRowMenu } from "./PassportListRowMenu";
 import { formatPassportDate, getPassportSerialNumberForType } from "../utils/passportListHelpers";
+import { canManagePassports } from "../../../../shared/auth/passportAuthoringAccess";
 
 export function PassportListRow({
   passport,
@@ -174,7 +175,7 @@ export function PassportListRow({
             passport={passport}
             pType={pType}
             isPinned={isPinned}
-            canManagePassport={user?.role !== "viewer"}
+            canManagePassport={canManagePassports(user)}
             companyName={user?.companyName}
             companyId={companyId}
             navigate={navigate}

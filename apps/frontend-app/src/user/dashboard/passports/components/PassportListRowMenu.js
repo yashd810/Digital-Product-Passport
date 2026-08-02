@@ -7,6 +7,7 @@ import {
 import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
 import { buildDashboardPath } from "../../utils/dashboardRoutes";
 import { KebabMenu } from "./PassportListComponents";
+import { passportAuthoringAccessMessage } from "../../../../shared/auth/passportAuthoringAccess";
 
 export function PassportListRowMenu({
   anchorRect,
@@ -35,35 +36,68 @@ export function PassportListRowMenu({
     companyId,
     subpath: `passports/${passport.dppId}/history?passportType=${encodeURIComponent(effectivePassportType)}`,
   });
+  const closeMenu = () => {
+    setOpenMenuId(null);
+    setMenuAnchorRect(null);
+  };
+  const runManagedAction = (action) => {
+    if (!canManagePassport) {
+      showError(passportAuthoringAccessMessage);
+      closeMenu();
+      return;
+    }
+    action();
+  };
 
   return (
-    <KebabMenu anchorRect={anchorRect} open={isOpen} onClose={() => { setOpenMenuId(null); setMenuAnchorRect(null); }}>
+    <KebabMenu anchorRect={anchorRect} open={isOpen} onClose={closeMenu}>
       <button className="menu-item" onClick={() => togglePin(passport.dppId)}>
         {isPinned ? "📌 Unpin" : "📌 Pin to top"}
+      </button>
+      <button
+        className={`menu-item edit-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`}
+        disabled={!isEditablePassportStatus(passport.releaseStatus)}
+        title={canManagePassport ? undefined : passportAuthoringAccessMessage}
+        onClick={() => runManagedAction(() => { navigate(`/edit/${passport.dppId}?passportType=${effectivePassportType}`); closeMenu(); })}
+      >
+        ✏️ Edit
+      </button>
+      <button
+        className={`menu-item release-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`}
+        disabled={!isEditablePassportStatus(passport.releaseStatus)}
+        title={canManagePassport ? undefined : passportAuthoringAccessMessage}
+        onClick={() => runManagedAction(() => { setReleaseModal({ ...passport, passportType: effectivePassportType }); closeMenu(); })}
+      >
+        🎯 Release
       </button>
       <button className="menu-item" onClick={() => { setReleaseModal({ ...passport, passportType: effectivePassportType, checkerOnly: true }); setOpenMenuId(null); }}>
         🧪 Verification check
       </button>
+      <button
+        className={`menu-item revise-item${!isReleasedPassportStatus(passport.releaseStatus) ? " disabled" : ""}`}
+        disabled={!isReleasedPassportStatus(passport.releaseStatus)}
+        title={canManagePassport ? undefined : passportAuthoringAccessMessage}
+        onClick={() => runManagedAction(() => { handleRevise(passport.dppId, passport.versionNumber, effectivePassportType); closeMenu(); })}
+      >
+        🔄 Revise
+      </button>
+      <button
+        className="menu-item"
+        title={canManagePassport ? undefined : passportAuthoringAccessMessage}
+        onClick={() => runManagedAction(() => handleClone(passport, effectivePassportType))}
+      >
+        🔁 Clone
+      </button>
       <button className="menu-item" onClick={() => { navigate(compareVersionsPath); setOpenMenuId(null); }}>
         🕘 Update history
       </button>
-      {canManagePassport && <>
-        <button className={`menu-item edit-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.releaseStatus)} onClick={() => { navigate(`/edit/${passport.dppId}?passportType=${effectivePassportType}`); setOpenMenuId(null); }}>
-          ✏️ Edit
-        </button>
-        <button className={`menu-item release-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.releaseStatus)} onClick={() => { setReleaseModal({ ...passport, passportType: effectivePassportType }); setOpenMenuId(null); }}>
-          🎯 Release
-        </button>
-        <button className={`menu-item revise-item${!isReleasedPassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isReleasedPassportStatus(passport.releaseStatus)} onClick={() => { handleRevise(passport.dppId, passport.versionNumber, effectivePassportType); setOpenMenuId(null); }}>
-          🔄 Revise
-        </button>
-        <button className="menu-item" onClick={() => handleClone(passport, effectivePassportType)}>
-          🔁 Clone
-        </button>
-        <button className="menu-item" onClick={() => { setDeviceModal({ passport, pType: effectivePassportType }); setOpenMenuId(null); }}>
-          📡 Device Integration
-        </button>
-      </>}
+      <button
+        className="menu-item"
+        title={canManagePassport ? undefined : passportAuthoringAccessMessage}
+        onClick={() => runManagedAction(() => { setDeviceModal({ passport, pType: effectivePassportType }); closeMenu(); })}
+      >
+        📡 Device Integration
+      </button>
       <button
         className="menu-item"
         onClick={() => {
