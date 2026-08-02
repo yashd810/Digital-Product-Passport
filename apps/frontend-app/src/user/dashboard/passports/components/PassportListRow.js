@@ -13,6 +13,7 @@ export function PassportListRow({
   parentGuid = passport.dppId,
   isHistorical = false,
   hasOlderVersions = false,
+  latestVersionNumber = passport.versionNumber,
   user,
   activeType,
   allPassportTypes,
@@ -50,6 +51,9 @@ export function PassportListRow({
   const isExpanded = expandedPassportGroups.has(parentGuid);
   const normalizedStatus = normalizePassportStatus(passport.releaseStatus);
   const showOlderVersionsToggle = hasOlderVersions && !isHistorical;
+  const historicalVersionDepth = isHistorical
+    ? Math.max(0, Number(latestVersionNumber || 0) - Number(passport.versionNumber || 0))
+    : 0;
   const serialNumber = getPassportSerialNumberForType(passport, allPassportTypes);
   const passportLinkType = getPassportLinkType(passport.releaseStatus);
   const viewerActionLabel = passportLinkType === "passport"
@@ -89,7 +93,10 @@ export function PassportListRow({
         {!isHistorical && isPinned ? "📌" : ""}
       </td>
       <td className="passport-version-col">
-        <div className={`passport-version-cell${isHistorical ? " historical" : ""}`}>
+        <div
+          className={`passport-version-cell${isHistorical ? " historical" : ""}`}
+          style={isHistorical ? { "--passport-version-indent": `${historicalVersionDepth * 8}px` } : undefined}
+        >
           <span className="passport-version-toggle-slot" aria-hidden={!showOlderVersionsToggle}>
             {showOlderVersionsToggle && (
               <button

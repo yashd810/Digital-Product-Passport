@@ -400,7 +400,7 @@
 }
 
 .passport-version-cell.historical {
-  padding-left: 0;
+  padding-left: var(--passport-version-indent, 0);
 }
 
 .passport-version-col {
