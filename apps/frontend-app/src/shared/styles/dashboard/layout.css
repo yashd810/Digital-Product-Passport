@@ -425,10 +425,15 @@
 }
 
 .passport-version-cell {
-  display: flex;
+  display: grid;
+  grid-template-columns: 18px max-content;
+  column-gap: 10px;
   align-items: center;
-  gap: 6px;
   min-width: 0;
+}
+
+.passport-version-cell .version-badge {
+  grid-column: 2;
 }
 
 .passport-version-col {
@@ -441,16 +446,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 22px;
-  width: 22px;
-  height: 22px;
+  grid-column: 1;
+  justify-self: start;
+  width: 16px;
+  height: 16px;
   padding: 0;
   border-radius: 7px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 800;
   line-height: 1;
   transition:
