@@ -431,19 +431,6 @@
   min-width: 0;
 }
 
-.passport-version-toggle-slot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 22px;
-  width: 22px;
-  height: 22px;
-}
-
-.passport-version-cell.historical {
-  padding-left: 8px;
-}
-
 .passport-version-col {
   width: 88px;
   min-width: 88px;
@@ -454,8 +441,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border-radius: 7px;
   border: 1px solid var(--border);

@@ -93,22 +93,20 @@ export function PassportListRow({
       </td>
       <td className="passport-version-col">
         <div className={`passport-version-cell${isHistorical ? " historical" : ""}`}>
-          <span className="passport-version-toggle-slot" aria-hidden={!showOlderVersionsToggle}>
-            {showOlderVersionsToggle && (
-              <button
-                type="button"
-                className="passport-version-toggle"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  togglePassportGroup(parentGuid);
-                }}
-                aria-expanded={isExpanded}
-                aria-label={isExpanded ? "Hide older versions" : "Show older versions"}
-              >
-                {isExpanded ? "▾" : "▸"}
-              </button>
-            )}
-          </span>
+          {showOlderVersionsToggle && (
+            <button
+              type="button"
+              className="passport-version-toggle"
+              onClick={(e) => {
+                e.stopPropagation();
+                togglePassportGroup(parentGuid);
+              }}
+              aria-expanded={isExpanded}
+              aria-label={isExpanded ? "Hide older versions" : "Show older versions"}
+            >
+              {isExpanded ? "▾" : "▸"}
+            </button>
+          )}
           <span className="version-badge">v{passport.versionNumber}</span>
         </div>
       </td>
