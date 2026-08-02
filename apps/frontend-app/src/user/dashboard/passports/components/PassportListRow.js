@@ -126,7 +126,6 @@ export function PassportListRow({
           </span>
         </div>
       </td>
-      <td className="passport-completeness-col"><CompletenessBar pct={pct} /></td>
       {!filterByUser && (
         <td className="small-text passport-creator-col">
           <span className="passport-creator-cell" title={passport.createdByName || undefined}>
@@ -192,6 +191,7 @@ export function PassportListRow({
           />
         )}
       </td>
+      <td className="passport-completeness-col"><CompletenessBar pct={pct} /></td>
     </tr>
   );
 }
