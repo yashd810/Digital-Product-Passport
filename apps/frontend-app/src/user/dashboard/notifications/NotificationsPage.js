@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import { useI18n } from "../../../app/providers/i18n";
 import "../../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -60,6 +61,7 @@ function StatusPill({ status }) {
 }
 
 export default function NotificationsPage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [notifs,   setNotifs]   = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -116,8 +118,8 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <h2 className="nwf-title">Updates</h2>
-      <p className="nwf-subtitle">Notifications and workflow activity in one place.</p>
+      <h2 className="nwf-title">{t("updates")}</h2>
+      <p className="nwf-subtitle">{t("notificationsSubtitle")}</p>
 
       <div className="nwf-filters">
         {["all", "unread", "workflow"].map(f => (
@@ -172,7 +174,7 @@ export default function NotificationsPage() {
 
                 {isOpen && wf && (
                   <div className="nwf-detail">
-                    <div className="nwf-detail-title">Workflow Details</div>
+                    <div className="nwf-detail-title">{t("workflowDetails")}</div>
                     <div className="nwf-detail-grid">
 
                       {n.workflowSubmittedAt && (

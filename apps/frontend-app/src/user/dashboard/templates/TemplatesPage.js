@@ -17,6 +17,7 @@ import { buildUserTemplateFields, getTemplateFileDisplayName } from "./templateP
 import RepositoryPicker from "../../../passports/form/components/RepositoryPicker";
 import SymbolRepositoryPicker from "../../../passports/form/components/SymbolRepositoryPicker";
 import AppSelect from "../../../shared/components/AppSelect";
+import { useI18n } from "../../../app/providers/i18n";
 import "../../../shared/styles/Dashboard.css";
 import "../../../shared/styles/CreatePass.css";
 
@@ -493,6 +494,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
 
 // ── Bulk create modal ──
 function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
+  const { t } = useI18n();
   const [count,       setCount]       = useState("10");
   const [submitting,  setSubmitting]  = useState(false);
   const [error,       setError]       = useState("");
@@ -537,22 +539,22 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
       <div className="dashboard-modal-card dashboard-modal-card-compact">
         {results ? (
           <>
-            <h3 className="dashboard-modal-title">Passports Created</h3>
+            <h3 className="dashboard-modal-title">{t("passportsCreated")}</h3>
             <div className="tmpl-bulk-summary">
               <div className="tmpl-bulk-stat tmpl-bulk-created">
                 <span className="tmpl-bulk-num">{results.created ?? 0}</span>
-                <span>created</span>
+                <span>{t("created")}</span>
               </div>
               {results.skipped > 0 && (
                 <div className="tmpl-bulk-stat tmpl-bulk-skipped">
                   <span className="tmpl-bulk-num">{results.skipped}</span>
-                  <span>skipped</span>
+                  <span>{t("skipped")}</span>
                 </div>
               )}
               {results.failed > 0 && (
                 <div className="tmpl-bulk-stat tmpl-bulk-failed">
                   <span className="tmpl-bulk-num">{results.failed}</span>
-                  <span>failed</span>
+                  <span>{t("failed")}</span>
                 </div>
               )}
             </div>
@@ -562,13 +564,13 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
             </p>
             <div className="dashboard-modal-actions dashboard-modal-actions-end">
               <button className="dashboard-btn dashboard-btn-primary" onClick={() => onDone()}>
-                Done
+                {t("done")}
               </button>
             </div>
           </>
         ) : (
           <>
-            <h3 className="dashboard-modal-title">Bulk Create from Template</h3>
+            <h3 className="dashboard-modal-title">{t("bulkCreateFromTemplate")}</h3>
             <p className="dashboard-modal-subtitle">
               Create multiple draft passports pre-filled with data from <strong>{template.name}</strong>.
               Each passport will have the template's model data applied automatically.
@@ -589,7 +591,7 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
                 Cancel
               </button>
               <button className="dashboard-btn dashboard-btn-primary" onClick={handleCreate} disabled={submitting}>
-                {submitting ? "Creating…" : "Create Passports"}
+              {submitting ? t("creating") : t("createPassports")}
               </button>
             </div>
           </>
@@ -602,6 +604,7 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
 
 // ── Main templates page ──
 export default function TemplatesPage({ user, companyId, view = "list", editTemplateId = null }) {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const { companySlug } = useParams();
@@ -748,27 +751,27 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
       {/* Header */}
       <div className="tmpl-page-header">
         <div>
-          <h2 className="tmpl-page-title">Passport Templates</h2>
+          <h2 className="tmpl-page-title">{t("passportTemplates")}</h2>
           <p className="tmpl-page-subtitle">
-            Create model-specific templates to speed up passport creation.
-            Mark fields as <strong>model data</strong> to pre-fill and lock them on every new passport.
+            {t("templatesSubtitle")}
+            {" "}{t("templateModelDataHint")}
           </p>
         </div>
         <button className="tmpl-new-btn" onClick={() => navigate(newTemplatePath)}>
-          + New Template
+          + {t("newTemplate")}
         </button>
       </div>
 
       {/* Filters */}
       <div className="tmpl-filters">
         <input className="tmpl-search" type="text"
-          placeholder="Search templates…"
+          placeholder={t("searchTemplates")}
           value={search} onChange={e => setSearch(e.target.value)} />
         <div className="tmpl-type-filters">
           <button
             className={`tmpl-type-btn${filterType === "all" ? " active" : ""}`}
             onClick={() => setFilterType("all")}>
-            All
+            {t("all")}
           </button>
           {allTypes.map(t => (
             <button key={t}
@@ -782,14 +785,14 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
 
       {/* List */}
       {loading ? (
-        <div className="tmpl-empty">Loading templates…</div>
+        <div className="tmpl-empty">{t("loadingTemplates")}</div>
       ) : filtered.length === 0 ? (
         <div className="tmpl-empty-state">
           <div style={{ fontSize: 44, marginBottom: 10 }}>📋</div>
-          <h3>No templates yet</h3>
-          <p>Create your first template to start pre-filling passport fields for a specific model.</p>
+          <h3>{t("noTemplatesYet")}</h3>
+          <p>{t("templateIntro")}</p>
           <button className="tmpl-new-btn" style={{ marginTop: 8 }} onClick={() => navigate(newTemplatePath)}>
-            + Create your first template
+            + {t("createFirstTemplate")}
           </button>
         </div>
       ) : (
@@ -799,52 +802,52 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
             <div key={pType} className="tmpl-group">
               <div className="tmpl-group-header">
                 <span className="tmpl-group-type">{typeLabel}</span>
-                <span className="tmpl-group-count">{tmpls.length} template{tmpls.length !== 1 ? "s" : ""}</span>
+                <span className="tmpl-group-count">{t("templatesCount", { count: tmpls.length, suffix: tmpls.length !== 1 ? "s" : "" })}</span>
               </div>
               <div className="tmpl-cards">
-                {tmpls.map(t => (
-                  <div key={t.id} className="tmpl-card">
+                {tmpls.map((template) => (
+                  <div key={template.id} className="tmpl-card">
                     <div className="tmpl-card-top">
                       <div className="tmpl-card-icon">📋</div>
                       <div className="tmpl-card-info">
-                        <div className="tmpl-card-name">{t.name}</div>
-                        {t.description && <div className="tmpl-card-desc">{t.description}</div>}
+                        <div className="tmpl-card-name">{template.name}</div>
+                        {template.description && <div className="tmpl-card-desc">{template.description}</div>}
                       </div>
                     </div>
 
-                    {parseInt(t.modelFieldCount) > 0 && (
+                    {parseInt(template.modelFieldCount) > 0 && (
                       <div className="tmpl-card-model-count">
-                        📌 {t.modelFieldCount} model data field{Number(t.modelFieldCount) !== 1 ? "s" : ""}
+                        📌 {t("modelDataFields", { count: template.modelFieldCount, suffix: Number(template.modelFieldCount) !== 1 ? "s" : "" })}
                       </div>
                     )}
 
                     <div className="tmpl-card-actions">
                       <button
                         className="tmpl-action-btn tmpl-action-primary"
-                        onClick={() => navigate(`/create/${pType}?templateId=${t.id}`)}
-                        title="Create a single passport pre-filled from this template"
+                        onClick={() => navigate(`/create/${pType}?templateId=${template.id}`)}
+                        title={t("createSinglePassport")}
                       >
-                        + Create passport
+                        + {t("createPassport")}
                       </button>
                       <button
                         className="tmpl-action-btn tmpl-action-bulk"
-                        onClick={() => openBulk(t)}
-                        title="Create multiple passports at once from this template"
+                        onClick={() => openBulk(template)}
+                        title={t("bulkCreateFromTemplate")}
                       >
-                        ⚡ Bulk create
+                        ⚡ {t("bulkCreatePassports")}
                       </button>
                     </div>
                     <div className="tmpl-card-actions tmpl-card-actions-row2">
-                      <button className="tmpl-action-btn" onClick={() => openEdit(t)} title="Edit template">
-                        ✏️ Edit
+                      <button className="tmpl-action-btn" onClick={() => openEdit(template)} title={t("edit")}>
+                        ✏️ {t("edit")}
                       </button>
-                      <button className="tmpl-action-btn" onClick={() => openClone(t)} title="Clone template">
-                        ⧉ Clone
+                      <button className="tmpl-action-btn" onClick={() => openClone(template)} title={t("clone")}>
+                        ⧉ {t("clone")}
                       </button>
                       <button
                         className="tmpl-action-btn tmpl-action-delete"
-                        onClick={() => handleDelete(t.id)}
-                        disabled={deleting === t.id}
+                        onClick={() => handleDelete(template.id)}
+                        disabled={deleting === template.id}
                       >
                         🗑️
                       </button>

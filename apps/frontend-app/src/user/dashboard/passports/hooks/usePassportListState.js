@@ -5,6 +5,7 @@ import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { isObsoletePassportStatus, normalizePassportStatus } from "../../../../passports/utils/passportStatus";
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
+import { useI18n } from "../../../../app/providers/i18n";
 import {
   calcCompleteness,
   formatPassportTypeLabel,
@@ -18,6 +19,7 @@ import {
 const api = import.meta.env.VITE_API_URL || "";
 
 export function usePassportListState({ user, companyId, filterByUser }) {
+  const { t } = useI18n();
   const { passportType, productKey, productCategoryKey } = useParams();
   const navigate = useNavigate();
 
@@ -263,7 +265,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   }, [openMenuId]);
 
   const pageTitle = filterByUser
-    ? "My Passports"
+    ? t("myPassports")
     : activeProductCategory
       ? activeProductCategory
       : activeType

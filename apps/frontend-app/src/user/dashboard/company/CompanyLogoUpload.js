@@ -1,9 +1,11 @@
 import React, { useRef } from "react";
 import { toSafeImageSrc } from "../../../shared/security/urlSafety";
+import { useI18n } from "../../../app/providers/i18n";
 
 const allowedImageTypes = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 function CompanyLogoUpload({ logoPreview, onLogoChange }) {
+  const { t } = useI18n();
   const fileInputRef = useRef(null);
 
   const handleFileChange = (event) => {
@@ -35,11 +37,11 @@ function CompanyLogoUpload({ logoPreview, onLogoChange }) {
 
   return (
     <div className="company-logo-upload-card">
-      <h3 className="company-logo-upload-title">Company Logo</h3>
+      <h3 className="company-logo-upload-title">{t("companyLogo")}</h3>
 
       <div className="company-logo-upload-grid">
         <div className="company-logo-upload-col">
-          <p className="company-logo-upload-label">Company Logo</p>
+          <p className="company-logo-upload-label">{t("companyLogo")}</p>
           <div className="company-logo-upload-box">
             {toSafeImageSrc(logoPreview) ? (
               <img

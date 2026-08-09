@@ -5,6 +5,7 @@ import { flattenSchemaFieldsFromSections } from "../../../../shared/passports/pa
 import { isEditablePassportStatus } from "../../../../passports/utils/passportStatus";
 import { parseCsvText } from "../utils/passportListHelpers";
 import AppSelect from "../../../../shared/components/AppSelect";
+import { useI18n } from "../../../../app/providers/i18n";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -46,6 +47,7 @@ export function BulkEditModal({
   onClose,
   onApplied,
 }) {
+  const { t } = useI18n();
   const [tab, setTab] = useState("form");
   const [selectedType, setSelectedType] = useState(activeType || "");
   const [changeRows, setChangeRows] = useState([{ id: 1, key: "", value: "" }]);
@@ -285,7 +287,7 @@ export function BulkEditModal({
 
   const modalBody = result ? (
     <>
-      <h3 className="dashboard-modal-title">Bulk Edit Complete</h3>
+      <h3 className="dashboard-modal-title">{t("bulkEditComplete")}</h3>
       <p className="dashboard-modal-subtitle">
         Updated <strong>{result.summary?.updated || 0}</strong> passport{result.summary?.updated === 1 ? "" : "s"} for <strong>{selectedType}</strong>.
       </p>
@@ -309,7 +311,7 @@ export function BulkEditModal({
     </>
   ) : (
     <>
-      <h3 className="dashboard-modal-title">Bulk Edit</h3>
+      <h3 className="dashboard-modal-title">{t("bulkEdit")}</h3>
       <p className="dashboard-modal-subtitle">
         Update the selected editable passports by direct form entry, CSV, or JSON.
       </p>

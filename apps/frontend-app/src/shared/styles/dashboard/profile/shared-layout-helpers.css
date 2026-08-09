@@ -93,13 +93,6 @@
     flex: 1 1 160px;
   }
 
-  .wf-checker-header {
-    flex-direction: column;
-  }
-
-  .wf-checker-metrics {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 
 .dashboard-hidden-input {

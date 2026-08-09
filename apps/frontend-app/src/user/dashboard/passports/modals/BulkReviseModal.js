@@ -4,6 +4,7 @@ import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../../../shared/passports/passportSchemaUtils";
 import { dedupeLatestReleasedPassports } from "../utils/passportListHelpers";
 import AppSelect from "../../../../shared/components/AppSelect";
+import { useI18n } from "../../../../app/providers/i18n";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -19,6 +20,7 @@ export function BulkReviseModal({
   onClose,
   onApplied,
 }) {
+  const { t } = useI18n();
   const [scope, setScope] = useState("selected");
   const [selectedType, setSelectedType] = useState(activeType || "");
   const [changeRows, setChangeRows] = useState([{ id: 1, key: "", value: "" }]);
@@ -310,7 +312,7 @@ export function BulkReviseModal({
 
   const modalBody = result ? (
     <>
-      <h3 className="dashboard-modal-title">Bulk Revise Complete</h3>
+      <h3 className="dashboard-modal-title">{t("bulkReviseComplete")}</h3>
       <p className="dashboard-modal-subtitle">
         Batch <strong>#{result.batch?.id}</strong> processed {result.summary?.targeted || 0} passport{result.summary?.targeted === 1 ? "" : "s"}.
       </p>
@@ -360,7 +362,7 @@ export function BulkReviseModal({
     </>
   ) : (
     <>
-      <h3 className="dashboard-modal-title">Bulk Revise Released Passports</h3>
+      <h3 className="dashboard-modal-title">{t("bulkReviseReleasedPassports")}</h3>
       <p className="dashboard-modal-subtitle">
         Create new <strong>In Revision</strong> versions for many released passports at once. The latest released version for each DPP ID is used automatically.
       </p>

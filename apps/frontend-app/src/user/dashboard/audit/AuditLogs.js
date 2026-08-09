@@ -3,8 +3,10 @@ import { useNavigate } from "react-router";
 import AuditLogExplorer from "../../../audit/AuditLogExplorer";
 import { isCompanyDashboardAuditEvent } from "../../../audit/auditDisplay";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import { useI18n } from "../../../app/providers/i18n";
 
 function AuditLogs({ companyId }) {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const apiBaseUrl = import.meta.env.VITE_API_URL || "";
   const [logs, setLogs] = useState([]);
@@ -48,14 +50,15 @@ function AuditLogs({ companyId }) {
 
   return (
     <AuditLogExplorer
-      title="Audit Logs"
-      subtitle="Review passport changes made by members of your company. Super-admin activity is kept in the separate administration audit log."
+      title={t("auditLogs")}
+      subtitle={t("auditLogsSubtitle")}
       logs={logs}
       isLoading={isLoading}
       error={error}
-      emptyMessage="No company passport activity has been recorded yet."
+      emptyMessage={t("auditNoActivity")}
       exportFilenamePrefix="company-audit-logs"
       className="company-audit-explorer"
+      localize
     />
   );
 }

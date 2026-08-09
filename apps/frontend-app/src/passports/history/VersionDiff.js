@@ -5,6 +5,7 @@ import { flattenSchemaFieldsFromSections } from "../../shared/passports/passport
 import { formatPassportStatus } from "../utils/passportStatus";
 import { toSafeInternalPath, toSafeResourceHref } from "../../shared/security/urlSafety";
 import AppSelect from "../../shared/components/AppSelect";
+import { useI18n } from "../../app/providers/i18n";
 import "../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -21,6 +22,7 @@ function formatHistoryDate(value) {
 }
 
 function VersionDiff({ companyId }) {
+  const { t } = useI18n();
   const { dppId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -142,14 +144,14 @@ function VersionDiff({ companyId }) {
       <div className="diff-header">
         <button className="diff-back-btn" onClick={() => navigate(-1)}>← Back</button>
         <div>
-          <h2 className="diff-title">🕘 Update History</h2>
+          <h2 className="diff-title">🕘 {t("passportHistory")}</h2>
           <p className="diff-subtitle">{vB?.modelName || historyPayload?.displayName || dppId} · {pType}</p>
         </div>
       </div>
 
       <section className="history-page-section">
         <div className="history-page-head">
-          <h3>Version timeline</h3>
+          <h3>{t("versionTimeline")}</h3>
           <p>Review every saved version and open the public snapshot when needed.</p>
         </div>
         <div className="history-page-list">
@@ -159,7 +161,7 @@ function VersionDiff({ companyId }) {
                 <div className="history-page-version-group">
                   <span className="pv-history-version-pill">v{entry.versionNumber}</span>
                   <span className={`pv-history-status ${entry.releaseStatus}`}>{formatPassportStatus(entry.releaseStatus)}</span>
-                  {entry.isCurrent && <span className="pv-history-current">Current</span>}
+                  {entry.isCurrent && <span className="pv-history-current">{t("current")}</span>}
                 </div>
                 <span className="history-page-date">{formatHistoryDate(entry.updatedAt || entry.createdAt)}</span>
               </div>
@@ -204,14 +206,14 @@ function VersionDiff({ companyId }) {
       {versions.length > 1 && (
         <section className="history-page-section">
           <div className="history-page-head">
-            <h3>Compare versions</h3>
+            <h3>{t("compareVersions")}</h3>
             <p>Choose two versions to inspect exact field-level changes.</p>
           </div>
 
           {versions.length > 2 && (
             <div className="diff-selectors">
               <div className="diff-sel-group">
-                <label>Compare from</label>
+                <label>{t("compareFrom")}</label>
                 <AppSelect value={vA?.versionNumber || ""} onChange={(event) => setVA(versions.find((version) => version.versionNumber === parseInt(event.target.value, 10)))} aria-label="Compare from version">
                   {versions.map((version) => (
                     <option key={`${version.dppId}-${version.versionNumber}`} value={version.versionNumber}>
@@ -222,7 +224,7 @@ function VersionDiff({ companyId }) {
               </div>
               <span className="diff-sel-arrow">↔</span>
               <div className="diff-sel-group">
-                <label>Compare to</label>
+                <label>{t("compareTo")}</label>
                 <AppSelect value={vB?.versionNumber || ""} onChange={(event) => setVB(versions.find((version) => version.versionNumber === parseInt(event.target.value, 10)))} aria-label="Compare to version">
                   {versions.map((version) => (
                     <option key={`${version.dppId}-${version.versionNumber}`} value={version.versionNumber}>
@@ -235,8 +237,8 @@ function VersionDiff({ companyId }) {
           )}
 
           <div className="diff-summary">
-            <span className="diff-sum-badge changed">{changed.length} field{changed.length !== 1 ? "s" : ""} changed</span>
-            <span className="diff-sum-badge same">{unchanged.length} unchanged</span>
+            <span className="diff-sum-badge changed">{t("changedFieldsCount", { count: changed.length, suffix: changed.length !== 1 ? "s" : "" })}</span>
+            <span className="diff-sum-badge same">{t("unchangedCount", { count: unchanged.length })}</span>
           </div>
 
           <div className="diff-version-headers">
@@ -244,7 +246,7 @@ function VersionDiff({ companyId }) {
               <span className="diff-vh-version">v{vA?.versionNumber}</span>
               <span className={`diff-status ${vA?.releaseStatus}`}>{formatPassportStatus(vA?.releaseStatus)}</span>
             </div>
-            <div className="diff-field-name-header">Field</div>
+            <div className="diff-field-name-header">{t("field")}</div>
             <div className="diff-vh right">
               <span className="diff-vh-version">v{vB?.versionNumber}</span>
               <span className={`diff-status ${vB?.releaseStatus}`}>{formatPassportStatus(vB?.releaseStatus)}</span>
@@ -253,11 +255,11 @@ function VersionDiff({ companyId }) {
 
           {changed.length === 0 ? (
             <div style={{ background: "var(--white)", border: "1px solid #d0e4e0", borderTop: "none", padding: "28px", textAlign: "center", color: "var(--charcoal)" }}>
-              No differences between these two versions.
+              {t("noVersionDifferences")}
             </div>
           ) : (
             <div className="diff-section">
-              <div className="diff-section-label">Changed ({changed.length})</div>
+              <div className="diff-section-label">{t("changedFieldsCount", { count: changed.length, suffix: "" })}</div>
               {changed.map((field) => (
                 <div key={field.key} className="diff-row changed-row">
                   <div className="diff-cell old">{fmtVal(field.a, field.type)}</div>
@@ -270,7 +272,7 @@ function VersionDiff({ companyId }) {
 
           {unchanged.length > 0 && (
             <details className="diff-section">
-              <summary className="diff-section-label unchanged-toggle">Unchanged ({unchanged.length}) — click to expand</summary>
+              <summary className="diff-section-label unchanged-toggle">{t("unchangedCount", { count: unchanged.length })} — {t("clickToExpand")}</summary>
               {unchanged.map((field) => (
                 <div key={field.key} className="diff-row">
                   <div className="diff-cell">{fmtVal(field.a, field.type)}</div>

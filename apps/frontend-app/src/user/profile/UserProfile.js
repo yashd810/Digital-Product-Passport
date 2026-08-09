@@ -212,7 +212,7 @@ function UserProfile({
       <div className="profile-right">
           {showPersonalInfo && (
             <div className="profile-card">
-              <h4 className="card-section-title">Personal Information</h4>
+              <h4 className="card-section-title">{dashboardT("personalInformation")}</h4>
               <form onSubmit={handleSaveProfile} className="profile-form">
                 <div className="form-row-2">
                   <div className="form-group">
@@ -327,7 +327,7 @@ function UserProfile({
           <div className="profile-card">
             <div className="sec-card-header">
               <div>
-                <h4 className="card-section-title">Two-Factor Authentication</h4>
+                <h4 className="card-section-title">{dashboardT("twoFactorAuthentication")}</h4>
                 <p className="profile-helper-text">
                   When enabled, a 6-digit verification code is sent to your email address each time you log in.
                 </p>
@@ -361,7 +361,7 @@ function UserProfile({
 
           {/* Account Info */}
           <div className="profile-card">
-            <h4 className="card-section-title">ℹ️ Account Info</h4>
+            <h4 className="card-section-title">ℹ️ {dashboardT("accountInformation")}</h4>
             <div className="info-grid">
               <div className="info-row"><span>Email</span><strong>{user?.email}</strong></div>
               <div className="info-row"><span>Role</span>

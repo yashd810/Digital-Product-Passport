@@ -1,6 +1,7 @@
 // Repository file picker: loads folder contents; the form owns selection and save behavior.
 import React, { useState, useEffect, useCallback } from "react";
 import { fetchWithAuth } from "../../../shared/api/authHeaders";
+import { useI18n } from "../../../app/providers/i18n";
 import "../../../shared/styles/CreatePass.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -13,6 +14,7 @@ const api = import.meta.env.VITE_API_URL || "";
  *   onClose()
  */
 function RepositoryPicker({ companyId, onSelect, onClose }) {
+  const { t } = useI18n();
   const [items,         setItems]         = useState([]);
   const [breadcrumbs,   setBreadcrumbs]   = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -69,7 +71,7 @@ function RepositoryPicker({ companyId, onSelect, onClose }) {
     <div className="rp-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="rp-modal">
         <div className="rp-modal-header">
-          <h3>📁 Pick from Repository</h3>
+          <h3>📁 {t("pickFromRepository")}</h3>
           <button className="rp-close-btn" onClick={onClose}>✕</button>
         </div>
 

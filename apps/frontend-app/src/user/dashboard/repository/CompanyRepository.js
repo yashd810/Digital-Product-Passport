@@ -3,6 +3,7 @@ import { NavLink, useParams } from "react-router";
 import { fetchWithAuth } from "../../../shared/api/authHeaders";
 import { isTrustedApiRequestUrl, toSafeImageSrc, toSafeResourceHref } from "../../../shared/security/urlSafety";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
+import { useI18n } from "../../../app/providers/i18n";
 import "./CompanyRepository.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -36,6 +37,7 @@ function copyText(value) {
 
 // ─── Symbols Tab ─────────────────────────────────────────────────────────────
 function SymbolsTab({ companyId }) {
+  const { t } = useI18n();
   const [symbols,       setSymbols]       = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [uploading,     setUploading]     = useState(false);
@@ -249,7 +251,7 @@ function SymbolsTab({ companyId }) {
       {/* Upload card */}
       {canUpload ? (
       <div className="repo-upload-card sym-upload-card">
-        <h3 className="sym-card-title">Upload New Symbol</h3>
+        <h3 className="sym-card-title">{t("uploadNewSymbol")}</h3>
         <form onSubmit={handleUpload} className="sym-upload-form">
           <div className="sym-upload-preview-col">
             <div className="sym-preview-box">
@@ -432,6 +434,7 @@ function UploadFolderRequired({ itemLabel }) {
 
 // ─── Files Tab ────────────────────────────────────────────────────────────────
 function FilesTab({ companyId }) {
+  const { t } = useI18n();
   const [items,         setItems]         = useState([]);
   const [breadcrumbs,   setBreadcrumbs]   = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -657,7 +660,7 @@ function FilesTab({ companyId }) {
 
       {canUpload ? (
         <div className="repo-upload-card">
-          <h3 className="sym-card-title">Upload PDF</h3>
+          <h3 className="sym-card-title">{t("uploadPdf")}</h3>
           <form onSubmit={handleUpload} className="sym-upload-form">
             <div className="sym-upload-preview-col">
               <div className="sym-preview-box" aria-hidden="true">
@@ -762,6 +765,7 @@ function FilesTab({ companyId }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 function CompanyRepository({ companyId, activeTab = "files" }) {
+  const { t } = useI18n();
   const { companySlug } = useParams();
   const filesPath = buildDashboardPath({ companySlug, companyId, subpath: "repository/files" });
   const symbolsPath = buildDashboardPath({ companySlug, companyId, subpath: "repository/symbols" });
@@ -770,9 +774,9 @@ function CompanyRepository({ companyId, activeTab = "files" }) {
     <div className="repo-page">
       <div className="repo-header">
         <div>
-          <h2 className="repo-title">📁 Company Repository</h2>
+          <h2 className="repo-title">📁 {t("companyRepository")}</h2>
           <p className="repo-subtitle">
-            Store and organise your documents and symbols. Link them directly into passports.
+            {t("repositorySubtitle")}
           </p>
         </div>
       </div>
@@ -780,11 +784,11 @@ function CompanyRepository({ companyId, activeTab = "files" }) {
       <div className="repo-tabs">
         <NavLink to={filesPath}
           className={({ isActive }) => `repo-tab${isActive ? " active" : ""}`}>
-          📄 Files
+          📄 {t("files")}
         </NavLink>
         <NavLink to={symbolsPath}
           className={({ isActive }) => `repo-tab${isActive ? " active" : ""}`}>
-          🔣 Symbols
+          🔣 {t("symbols")}
         </NavLink>
       </div>
 

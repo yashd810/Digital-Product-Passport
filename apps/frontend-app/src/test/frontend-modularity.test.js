@@ -323,9 +323,10 @@ describe("frontend modularity helpers", () => {
       "utf8",
     );
 
-    ["Edit", "Release", "Verification check", "Revise", "Clone", "Update history", "Device Integration"].forEach((action) => {
+    ["editPassport", "releasePassport", "revisePassport", "clone", "updateHistory", "deviceIntegration"].forEach((action) => {
       expect(menuSource).toContain(action);
     });
+    expect(menuSource).not.toContain("verification");
     expect(menuSource).not.toContain("{canManagePassport &&");
     expect(menuSource).toContain("runManagedAction");
     expect(rowSource).toContain("canManagePassport={canManagePassports(user)}");

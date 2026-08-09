@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
 import AppSelect from "../../../shared/components/AppSelect";
+import { useI18n } from "../../../app/providers/i18n";
 import "../../../shared/styles/Dashboard.css";
 import "./PassportDataManagement.css";
 
@@ -169,6 +170,7 @@ function valueForSort(row, key) {
 }
 
 function PassportDataManagementPage({ companyId, user }) {
+  const { t } = useI18n();
   const fileInputRef = useRef(null);
   const [passportTypes, setPassportTypes] = useState([]);
   const [selectedType, setSelectedType] = useState("");
@@ -742,8 +744,8 @@ function PassportDataManagementPage({ companyId, user }) {
     <div className="pdm-page">
       <div className="pdm-header">
         <div>
-          <h2 className="pdm-title">Passport Data Management</h2>
-          <p className="pdm-subtitle">Create, update, validate, and sync passport data in a row-based workspace.</p>
+          <h2 className="pdm-title">{t("passportDataManagement")}</h2>
+          <p className="pdm-subtitle">{t("passportDataSubtitle")}</p>
         </div>
         <div className="pdm-header-actions">
           <button
@@ -752,13 +754,13 @@ function PassportDataManagementPage({ companyId, user }) {
             onClick={() => setShowSources((value) => !value)}
             disabled={!canManagePassportData}
           >
-            {showSources ? "Hide Sources" : "Sources & Jobs"}
+            {showSources ? t("hideSources") : t("sourcesAndJobs")}
           </button>
           <button type="button" className="dashboard-btn dashboard-btn-primary" onClick={validateRows} disabled={!canManagePassportData || busy || !rows.length}>
-            {busy ? "Working..." : "Validate"}
+            {busy ? t("working") : t("validate")}
           </button>
           <button type="button" className="dashboard-btn dashboard-btn-primary" onClick={applyChanges} disabled={!canManagePassportData || busy || !readyCount || failedCount > 0}>
-            Apply Changes
+            {t("applyChanges")}
           </button>
         </div>
       </div>
@@ -972,7 +974,7 @@ function PassportDataManagementPage({ companyId, user }) {
           <aside className="pdm-source-panel" aria-label="Sources and Jobs">
             <div className="pdm-source-header">
               <div>
-                <h3>Sources & Jobs</h3>
+                <h3>{t("sourcesAndJobs")}</h3>
                 <p>Connect ERP/api data, import JSON, and schedule sync jobs.</p>
               </div>
               <button type="button" className="pdm-source-close" onClick={() => setShowSources(false)} aria-label="Close Sources and Jobs">Close</button>
@@ -1031,13 +1033,13 @@ function PassportDataManagementPage({ companyId, user }) {
             </div>
 
             <div className="pdm-source-block">
-              <h4>JSON Import</h4>
+              <h4>{t("jsonImport")}</h4>
               <textarea value={jsonPaste} onChange={(event) => setJsonPaste(event.target.value)} rows={4} placeholder='[{"internalAliasId":"SKU-001"}]' disabled={!canManagePassportData} />
               <button type="button" className="dashboard-btn dashboard-btn-ghost" onClick={applyJsonPaste} disabled={!canManagePassportData}>Apply JSON</button>
             </div>
 
             <div className="pdm-source-block">
-              <h4>Save Job</h4>
+              <h4>{t("saveJob")}</h4>
               <label><span>Name</span><input value={jobForm.name} onChange={(event) => setJobForm((current) => ({ ...current, name: event.target.value }))} disabled={!canManagePassportData} /></label>
               <label><span>Start at</span><input type="datetime-local" value={jobForm.startAt} onChange={(event) => setJobForm((current) => ({ ...current, startAt: event.target.value }))} disabled={!canManagePassportData} /></label>
               <label><span>Interval minutes</span><input type="number" min="1" value={jobForm.intervalMinutes} onChange={(event) => setJobForm((current) => ({ ...current, intervalMinutes: event.target.value }))} disabled={!canManagePassportData} /></label>
@@ -1046,7 +1048,7 @@ function PassportDataManagementPage({ companyId, user }) {
             </div>
 
             <div className="pdm-source-block">
-              <h4>Saved Jobs</h4>
+              <h4>{t("savedJobs")}</h4>
               {!jobs.length && <p className="pdm-muted">No jobs saved.</p>}
               {jobs.slice(0, 5).map((job) => (
                 <div key={job.id} className="pdm-job-row">
@@ -1060,7 +1062,7 @@ function PassportDataManagementPage({ companyId, user }) {
             </div>
 
             <div className="pdm-source-block">
-              <h4>Recent Runs</h4>
+              <h4>{t("recentRuns")}</h4>
               {!runs.length && <p className="pdm-muted">No runs yet.</p>}
               {runs.slice(0, 5).map((run) => (
                 <div key={run.id} className="pdm-run-row">

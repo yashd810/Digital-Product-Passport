@@ -9,6 +9,7 @@ import { extractComplianceError } from "../../../shared/utils/complianceErrors";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import { safeWindowOpen } from "../../../shared/security/urlSafety";
 import AppSelect from "../../../shared/components/AppSelect";
+import { useI18n } from "../../../app/providers/i18n";
 import "../../../admin/styles/AdminDashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -37,6 +38,7 @@ function WorkflowBadge({ status }) {
 }
 
 function ComplianceFailureNotice({ error }) {
+  const { t } = useI18n();
   if (!error?.message) return null;
 
   const missingFields = Array.isArray(error.missingFields) ? error.missingFields : [];
@@ -48,67 +50,10 @@ function ComplianceFailureNotice({ error }) {
 
       {mandatoryMissingFields.length > 0 && (
         <div className="wf-error-section">
-          <div className="wf-error-heading">Missing required fields</div>
+          <div className="wf-error-heading">{t("missingRequiredFields")}</div>
           <ul className="wf-error-list">
             {mandatoryMissingFields.map((field, index) => (
               <li key={`${field.key || field.label || "missing"}-${index}`}>
-                {field.label || field.key}
-                {field.section ? ` (${field.section})` : ""}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function VerificationCheckerNotice({ verification, compliance }) {
-  if (!verification && !compliance) return null;
-
-  const missingMandatoryFields = Array.isArray(compliance?.completeness?.missingMandatoryFields)
-    ? compliance.completeness.missingMandatoryFields
-    : [];
-  const passedChecks = Array.isArray(verification?.passedChecks) ? verification.passedChecks : [];
-
-  return (
-    <div className="wf-checker-panel">
-      <div className="wf-checker-header">
-        <div>
-          <strong>Verification checker</strong>
-          <div className="wf-checker-subtitle">
-            Advisory only. This checks whether all super-admin required fields are filled in.
-          </div>
-        </div>
-        <span className={`wf-checker-status ${verification?.status || "unknown"}`}>
-          {verification?.status === "ready"
-            ? "Ready"
-            : verification?.status === "missingRequiredFields"
-              ? "Missing required fields"
-              : "Not run yet"}
-        </span>
-      </div>
-
-      <div className="wf-checker-metrics">
-        <div><span>Completeness</span><strong>{verification?.completenessPercentage ?? 0}%</strong></div>
-        <div><span>Missing required</span><strong>{verification?.counts?.missingRequiredFields ?? missingMandatoryFields.length}</strong></div>
-      </div>
-
-      {passedChecks.length > 0 && (
-        <div className="wf-error-section">
-          <div className="wf-error-heading">Good</div>
-          <ul className="wf-error-list">
-            {passedChecks.map((item, index) => <li key={`passed-${index}`}>{item}</li>)}
-          </ul>
-        </div>
-      )}
-
-      {missingMandatoryFields.length > 0 && (
-        <div className="wf-error-section">
-          <div className="wf-error-heading">Missing required fields</div>
-          <ul className="wf-error-list">
-            {missingMandatoryFields.map((field, index) => (
-              <li key={`${field.key || field.label || "required"}-${index}`}>
                 {field.label || field.key}
                 {field.section ? ` (${field.section})` : ""}
               </li>
@@ -127,9 +72,6 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
   const [approverId,   setApproverId]   = useState("");
   const [submitting,   setSubmitting]   = useState(false);
   const [error,        setError]        = useState(null);
-  const [verification, setVerification] = useState(null);
-  const [verificationLoading, setVerificationLoading] = useState(false);
-  const checkerOnly = Boolean(passport?.checkerOnly);
 
   useEffect(() => {
     // Load eligible users (editors + admins)
@@ -155,34 +97,6 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
     .catch((error) => console.warn("Ignored async error", error));
   }, [companyId, user?.id]);
 
-  const runVerificationCheck = useCallback(async () => {
-    setVerificationLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ passportType: getWorkflowPassportType(passport) });
-      const response = await fetchWithAuth(
-        `${api}/api/companies/${companyId}/passports/${passport.dppId}/verification-check?${params.toString()}`,
-        { headers: authHeaders() }
-      );
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setError(extractComplianceError(data, "Failed to run verification check"));
-        return;
-      }
-      setVerification(data);
-    } catch (err) {
-      setError({ message: err.message || "Failed to run verification check", blockingIssues: [], missingFields: [] });
-    } finally {
-      setVerificationLoading(false);
-    }
-  }, [companyId, passport.dppId, passport.passportType]);
-
-  useEffect(() => {
-    if (checkerOnly) {
-      runVerificationCheck();
-    }
-  }, [checkerOnly, runVerificationCheck]);
-
   const handleRelease = async () => {
     setSubmitting(true); setError(null);
     const hasWorkflow = reviewerId || approverId;
@@ -207,22 +121,6 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
           setSubmitting(false);
           return;
         }
-        if (d?.compliance) {
-          setVerification({
-            success: true,
-            compliance: d.compliance,
-            verification: {
-              status: d.compliance?.completeness?.missingMandatoryFields?.length
-                  ? "missingRequiredFields"
-                  : "ready",
-              passedChecks: [],
-              completenessPercentage: d.compliance?.completeness?.percentage ?? 0,
-              counts: {
-                missingRequiredFields: d.compliance?.completeness?.missingMandatoryFields?.length ?? 0,
-              },
-            },
-          });
-        }
         onDone("Submitted for review/approval");
       } else {
         // Direct release (no workflow)
@@ -240,13 +138,6 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
           setSubmitting(false);
           return;
         }
-        if (d?.compliance || d?.verification) {
-          setVerification({
-            success: true,
-            compliance: d.compliance || null,
-            verification: d.verification || null,
-          });
-        }
         onDone("Released");
       }
     } catch (err) {
@@ -259,7 +150,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
         <div className="modal-header">
-          <h3>{checkerOnly ? "🧪 Verification Check" : "🎯 Release Passport"}</h3>
+          <h3>🎯 Release Passport</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
@@ -268,27 +159,11 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
             <span className="modal-version"> v{getWorkflowVersionNumber(passport)}</span>
           </p>
           <p className="modal-hint">
-            {checkerOnly
-              ? "Run the checker to see whether any required fields are still missing."
-              : "Optionally assign a reviewer and/or approver. Leave both empty to release immediately. The checker is advisory only and does not block release."}
+            Optionally assign a reviewer and/or approver. Leave both empty to release immediately.
           </p>
 
           <ComplianceFailureNotice error={error} />
-          <VerificationCheckerNotice verification={verification?.verification} compliance={verification?.compliance} />
-
-          <div className="wf-checker-actions">
-            <button
-              className="btn-cancel-wf"
-              type="button"
-              onClick={runVerificationCheck}
-              disabled={verificationLoading || submitting}
-            >
-              {verificationLoading ? "Checking…" : verification ? "Run again" : "Run verification check"}
-            </button>
-          </div>
-
-          {!checkerOnly && (
-            <>
+          <>
               <div className="wf-select-group">
                 <label>🔍 Reviewer <span className="wf-opt">(optional)</span></label>
                 <AppSelect value={reviewerId} onChange={e => setReviewerId(e.target.value)} disabled={submitting} aria-label="Reviewer">
@@ -329,17 +204,14 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
                   <span className="wf-step">🚀 Released</span>
                 </div>
               )}
-            </>
-          )}
+          </>
         </div>
         <div className="modal-footer">
           <button className="btn-cancel-wf" onClick={onClose} disabled={submitting}>Cancel</button>
-          {!checkerOnly && (
-            <button className="btn-release-wf" onClick={handleRelease} disabled={submitting}>
-              {submitting ? "Submitting…" :
-                reviewerId || approverId ? "Submit for Review" : "Release Now"}
-            </button>
-          )}
+          <button className="btn-release-wf" onClick={handleRelease} disabled={submitting}>
+            {submitting ? "Submitting…" :
+              reviewerId || approverId ? "Submit for Review" : "Release Now"}
+          </button>
         </div>
       </div>
     </div>
@@ -411,6 +283,7 @@ function ActionModal({ wf, action, companyId, onClose, onDone }) {
 
 // ── Main WorkflowDashboard ─────────────────────────────────────
 function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
+  const { t } = useI18n();
   const navigate  = useNavigate();
   const { companySlug } = useParams();
   const tab = activeTab;
@@ -483,9 +356,9 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
   };
 
   const tabs = [
-    { id:"inprogress", label:"In Progress",  count: data.inProgress.length },
-    { id:"backlog",    label:"My Backlog",    count: data.backlog.length },
-    { id:"history",    label:"History",       count: data.history.length },
+    { id:"inprogress", label:t("inProgress"),  count: data.inProgress.length },
+    { id:"backlog",    label:t("myBacklog"),    count: data.backlog.length },
+    { id:"history",    label:t("history"),       count: data.history.length },
   ];
   const openPassportViewer = (wf) => {
     const workflowPassportId = getWorkflowPassportId(wf);
@@ -561,18 +434,18 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
                 <>
                   <button className="wf-action-btn approve"
                     onClick={() => setModal({ wf, action:"approve" })}>
-                    ✅ Approve
+                    ✅ {t("approvePassport")}
                   </button>
                   <button className="wf-action-btn reject"
                     onClick={() => setModal({ wf, action:"reject" })}>
-                    ❌ Reject
+                    ❌ {t("rejectPassport")}
                   </button>
                 </>
               )}
               <button className="wf-action-btn remove"
                 onClick={() => setRemoveModal(wf)}
-                title="Remove from workflow">
-                🗑️ Remove
+                title={t("removeFromWorkflow")}>
+                🗑️ {t("remove")}
               </button>
             </div>
           </td>
@@ -613,8 +486,8 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
   return (
     <div className="wf-page">
       <div className="wf-header">
-        <h2>⚙️ Workflow</h2>
-        <p>Track passport review and approval processes</p>
+        <h2>⚙️ {t("workflow")}</h2>
+        <p>{t("workflowSubtitle")}</p>
       </div>
 
       {flash && <div className="alert alert-success">{flash}</div>}
@@ -636,12 +509,12 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
       </div>
 
       {loading ? (
-        <div className="loading">Loading workflow…</div>
+          <div className="loading">{t("loading")} {t("workflow").toLowerCase()}…</div>
       ) : currentData.length === 0 ? (
         <div className="empty-state">
-          <p>{tab === "inprogress" ? "No passports currently in workflow."
-            : tab === "backlog" ? "No passports waiting for your action."
-            : "No workflow history yet."}</p>
+          <p>{tab === "inprogress" ? t("noWorkflowInProgress")
+            : tab === "backlog" ? t("noWorkflowBacklog")
+            : t("noWorkflowHistory")}</p>
         </div>
       ) : (
         <>
@@ -696,10 +569,10 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
       {removeModal && (
         <div className="apt-modal-overlay" onClick={() => setRemoveModal(null)}>
           <div className="apt-modal" onClick={e => e.stopPropagation()}>
-            <h3 className="apt-modal-title">Remove from Workflow?</h3>
+            <h3 className="apt-modal-title">{t("removeFromWorkflow")}</h3>
             <div className="apt-modal-warning">
-              ⚠️ This will permanently remove <strong>{getWorkflowModelName(removeModal)}</strong> from the workflow.
-              This action cannot be undone.
+              ⚠️ {t("removeWorkflowMessage", { passport: getWorkflowModelName(removeModal) })}
+              {" "}{t("cannotBeUndone")}
             </div>
             <div className="apt-modal-actions">
               <button className="cancel-btn" onClick={() => setRemoveModal(null)}>Cancel</button>

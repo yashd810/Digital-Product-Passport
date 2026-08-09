@@ -4,6 +4,7 @@ import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import { safeWindowOpen, toSafeInternalPath } from "../../../shared/security/urlSafety";
 import { useMotionPresence } from "../../../shared/hooks/useMotionPresence";
+import { useI18n } from "../../../app/providers/i18n";
 import "../../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -22,15 +23,16 @@ const notifIcons = {
   default:              "🔔",
 };
 
-function timeAgo(dateStr) {
+function timeAgo(dateStr, t) {
   const secs = Math.floor((Date.now() - new Date(dateStr)) / 1000);
-  if (secs < 60)   return "just now";
-  if (secs < 3600) return `${Math.floor(secs/60)}m ago`;
-  if (secs < 86400)return `${Math.floor(secs/3600)}h ago`;
-  return `${Math.floor(secs/86400)}d ago`;
+  if (secs < 60)   return t("justNow");
+  if (secs < 3600) return t("minutesAgo", { count: Math.floor(secs / 60) });
+  if (secs < 86400)return t("hoursAgo", { count: Math.floor(secs / 3600) });
+  return t("daysAgo", { count: Math.floor(secs / 86400) });
 }
 
 function NotificationsPanel({ user }) {
+  const { t } = useI18n();
   const navigate   = useNavigate();
   const notificationsPath = buildDashboardPath({
     companyName: user?.companyName,
@@ -119,7 +121,7 @@ function NotificationsPanel({ user }) {
         ref={btnRef}
         className={`notif-bell${open ? " open" : ""}`}
         onClick={() => { setOpen(o => !o); if (!open) fetchNotifs(); }}
-        title="Notifications"
+        title={t("notifications")}
       >
         🔔
         {unread > 0 && (
@@ -135,17 +137,17 @@ function NotificationsPanel({ user }) {
           inert={open ? undefined : ""}
         >
           <div className="notif-panel-header">
-            <span className="notif-panel-title">Notifications</span>
+            <span className="notif-panel-title">{t("notifications")}</span>
             {unread > 0 && (
               <button className="notif-mark-all" onClick={markAllRead}>
-                Mark all read
+                {t("markAllRead")}
               </button>
             )}
           </div>
 
           <div className="notif-panel-view-all">
             <button className="notif-view-all-btn" onClick={() => { setOpen(false); navigate(notificationsPath); }}>
-              View all &amp; workflow history →
+              {t("viewAllWorkflowHistory")} →
             </button>
           </div>
           <div className="notif-list">
@@ -154,7 +156,7 @@ function NotificationsPanel({ user }) {
             ) : notifs.length === 0 ? (
               <div className="notif-empty">
                 <div style={{ fontSize:32, marginBottom:8 }}>🔔</div>
-                No new notifications
+                {t("noNotifications")}
               </div>
             ) : (
               notifs.map(n => (
@@ -167,7 +169,7 @@ function NotificationsPanel({ user }) {
                   <div className="notif-content">
                     <div className="notif-title">{n.title}</div>
                     {n.message && <div className="notif-msg">{n.message}</div>}
-                    <div className="notif-time">{timeAgo(n.createdAt)}</div>
+                    <div className="notif-time">{timeAgo(n.createdAt, t)}</div>
                   </div>
                   {!n.read && <div className="notif-dot" />}
                 </div>

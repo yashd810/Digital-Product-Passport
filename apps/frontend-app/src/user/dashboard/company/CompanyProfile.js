@@ -2,14 +2,17 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router";
 import CompanyLogoUpload from "./CompanyLogoUpload";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import { translateText, useI18n } from "../../../app/providers/i18n";
 import "../../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
 
 function CompanyProfile({ companyId, user }) {
+  const { t } = useI18n();
   const { companyId: routeCompanyId } = useParams();
   const resolvedCompanyId = companyId || routeCompanyId;
   const isSuperAdminView = user?.role === "superAdmin" && routeCompanyId;
+  const dashboardT = (key, values) => isSuperAdminView ? translateText("en", key, values) : t(key, values);
 
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -91,7 +94,7 @@ function CompanyProfile({ companyId, user }) {
   return (
     <div className="company-profile-wrapper">
       <div className="profile-header">
-        <h2>🏢 Company Profile</h2>
+        <h2>🏢 {dashboardT("companyProfile")}</h2>
         <p>{isSuperAdminView ? `Manage the public company logo for ${companyName || "this company"}` : "Manage your company logo for passport viewing"}</p>
       </div>
 
@@ -99,7 +102,7 @@ function CompanyProfile({ companyId, user }) {
 
       <div className="profile-content">
         <div className="profile-card">
-          <h3>Company Information</h3>
+          <h3>{dashboardT("companyInformation")}</h3>
           <div className="info-group">
             <label>Company Name</label>
             <input
@@ -113,7 +116,7 @@ function CompanyProfile({ companyId, user }) {
         </div>
 
         <div className="profile-card">
-          <h3>Company Logo</h3>
+          <h3>{dashboardT("companyLogo")}</h3>
           <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 16 }}>
             Upload the company logo that will be displayed in the public and preview passport viewer.
           </p>
@@ -128,7 +131,7 @@ function CompanyProfile({ companyId, user }) {
 
         {isSuperAdminView ? (
           <div className="profile-card">
-            <h3>Backup Continuity</h3>
+            <h3>{dashboardT("backupContinuity")}</h3>
             <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 16 }}>
               This shows whether backup continuity evidence is production-ready, what is already proven, and what still needs manual OCI or restore-drill work.
             </p>

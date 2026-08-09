@@ -62,7 +62,7 @@ export function PassportListRowMenu({
         title={canManagePassport ? undefined : passportAuthoringAccessMessage}
         onClick={() => runManagedAction(() => { navigate(`/edit/${passport.dppId}?passportType=${effectivePassportType}`); closeMenu(); })}
       >
-        ✏️ Edit
+        ✏️ {t("editPassport")}
       </button>
       <button
         className={`menu-item release-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`}
@@ -70,10 +70,7 @@ export function PassportListRowMenu({
         title={canManagePassport ? undefined : passportAuthoringAccessMessage}
         onClick={() => runManagedAction(() => { setReleaseModal({ ...passport, passportType: effectivePassportType }); closeMenu(); })}
       >
-        🎯 Release
-      </button>
-      <button className="menu-item" onClick={() => { setReleaseModal({ ...passport, passportType: effectivePassportType, checkerOnly: true }); setOpenMenuId(null); }}>
-        🧪 {t("verificationCheck")}
+        🎯 {t("releasePassport")}
       </button>
       <button
         className={`menu-item revise-item${!isReleasedPassportStatus(passport.releaseStatus) ? " disabled" : ""}`}
@@ -81,7 +78,7 @@ export function PassportListRowMenu({
         title={canManagePassport ? undefined : passportAuthoringAccessMessage}
         onClick={() => runManagedAction(() => { handleRevise(passport.dppId, passport.versionNumber, effectivePassportType); closeMenu(); })}
       >
-        🔄 Revise
+        🔄 {t("revisePassport")}
       </button>
       <button
         className="menu-item"

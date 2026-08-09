@@ -3,6 +3,7 @@ import { useNavigate, useParams, NavLink } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../../shared/passports/passportSchemaUtils";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
+import { useI18n } from "../../../app/providers/i18n";
 import "../../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -67,6 +68,7 @@ function ResultSummary({ summary, details, onDone }) {
 }
 
 function CSVImportGuide({ user, companyId, activeTab }) {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const { companySlug, passportType } = useParams();
   const passportListPath = buildDashboardPath({
@@ -270,7 +272,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       </button>
 
       <div className="guide-container">
-        <h1>📊 Import Passports — {passportType}</h1>
+        <h1>📊 {t("importPassports")} — {passportType}</h1>
 
         <div className="upsert-info-box">
           <strong>Governance note:</strong> field confidentiality belongs to the passport type schema,
@@ -292,7 +294,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
         {tab === "create-csv" && (
           <>
             <section className="guide-section">
-              <h2>Step 1: Download the Template</h2>
+              <h2>{t("importStepDownload")}</h2>
               <p>Start by downloading a blank CSV template specific to your <strong>{passportType}</strong> passport type.</p>
               <button className="action-btn download-btn" onClick={handleDownloadTemplate}>
                 📥 Download Template CSV
@@ -300,16 +302,16 @@ function CSVImportGuide({ user, companyId, activeTab }) {
             </section>
 
             <section className="guide-section">
-              <h2>Step 2: Fill in Your Passport Data</h2>
+              <h2>{t("importStepFill")}</h2>
               <div className="subsection">
-                <h3>Required Fields</h3>
+                <h3>{t("requiredFields")}</h3>
                 <ul>
                   <li><strong>internalAliasId</strong> — The unique local passport ID used internally by the platform (required)</li>
                   <li><strong>modelName</strong> — Display name or model label for the product (optional)</li>
                 </ul>
               </div>
               <div className="subsection">
-                <h3>Example Format</h3>
+                <h3>{t("exampleFormat")}</h3>
                 <table className="example-table">
                   <thead><tr><th>Field Key</th><th>Passport 1</th><th>Passport 2</th></tr></thead>
                   <tbody>
@@ -322,7 +324,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
             </section>
 
             <section className="guide-section">
-              <h2>Step 3: Upload Your CSV</h2>
+              <h2>{t("importStepUpload")}</h2>
               <div className="upload-section">
                 <label className={`upload-label ${isImporting ? "disabled" : ""}`}>
                   {isImporting ? "⏳ Importing…" : "🗂️ Choose CSV File"}
@@ -335,7 +337,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
             </section>
 
             <section className="guide-section tips-section">
-              <h2>💡 Tips</h2>
+              <h2>💡 {t("tips")}</h2>
               <ul>
                 <li><strong>Internal Alias ID drives uniqueness</strong> — use a stable internal identifier; model names can repeat</li>
                 <li><strong>Boolean fields:</strong> use "true"/"false" or "1"/"0"</li>
@@ -351,7 +353,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
         {tab === "create-json" && (
           <>
             <section className="guide-section">
-              <h2>Create passports via JSON</h2>
+              <h2>{t("createPassportsViaJson")}</h2>
               <p>
                 Upload a JSON array where each object represents one new passport draft for <strong>{passportType}</strong>.
               </p>
@@ -386,7 +388,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
               />
             ) : (
               <section className="guide-section">
-                <h2>Upload JSON file</h2>
+                <h2>{t("uploadJsonFile")}</h2>
                 <div className="upload-section">
                   <label className={`upload-label ${isUpdating ? "disabled" : ""}`}>
                     {isUpdating ? "⏳ Importing…" : "🗂️ Choose JSON File"}

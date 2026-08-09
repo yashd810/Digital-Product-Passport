@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../shared/passports/passportSchemaUtils";
 import AppSelect from "../../shared/components/AppSelect";
+import { useI18n } from "../../app/providers/i18n";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -22,6 +23,7 @@ function flattenRestrictedFields(typeDef) {
 }
 
 function SecurityCenter({ user, companyId }) {
+  const { t } = useI18n();
   const resolvedCompanyId = companyId || user?.companyId || "";
   const canManageCompanyKeys = user?.role === "companyAdmin" || user?.role === "superAdmin";
 
@@ -273,8 +275,8 @@ function SecurityCenter({ user, companyId }) {
   return (
     <div className="profile-page">
       <div className="profile-header">
-        <h2 className="profile-title">Security</h2>
-        <p className="profile-sub">Manage bearer tokens and restricted-field security groups.</p>
+        <h2 className="profile-title">{t("security")}</h2>
+        <p className="profile-sub">{t("securitySubtitle")}</p>
       </div>
 
       {message.text && (
@@ -285,7 +287,7 @@ function SecurityCenter({ user, companyId }) {
 
       <div className="profile-right">
         <div className="profile-card">
-          <h4 className="card-section-title">Bearer Token</h4>
+          <h4 className="card-section-title">{t("bearerToken")}</h4>
           <p className="profile-helper-text">
             Use this token for authenticated company integration calls in the <code>Authorization: Bearer &lt;token&gt;</code> header.
           </p>
@@ -329,13 +331,13 @@ function SecurityCenter({ user, companyId }) {
           </div>
 
           <div className="token-usage-guide">
-            <h5>Usage Example (cURL):</h5>
+            <h5>{t("usageExample")}</h5>
             <code className="code-block">{bearerExample}</code>
           </div>
         </div>
 
         <div className="profile-card">
-          <h4 className="card-section-title">Security Groups</h4>
+          <h4 className="card-section-title">{t("securityGroups")}</h4>
           <p className="profile-helper-text">
             Security groups generate API keys for the public passport viewer. A key grants access only to the restricted fields selected for its passport type or selected unique passports.
           </p>
@@ -532,7 +534,7 @@ function SecurityCenter({ user, companyId }) {
               </form>
 
               <div className="security-group-list-section">
-                <h5>Existing Security Groups</h5>
+                <h5>{t("existingSecurityGroups")}</h5>
                 {loadingGroups ? (
                   <p className="profile-helper-text">Loading security groups...</p>
                 ) : securityGroups.length === 0 ? (

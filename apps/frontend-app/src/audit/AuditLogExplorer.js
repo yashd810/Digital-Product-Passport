@@ -18,6 +18,7 @@ import {
   getAuditActionOptions,
 } from "./auditDisplay";
 import AppSelect from "../shared/components/AppSelect";
+import { translateText, useI18n } from "../app/providers/i18n";
 import "./AuditLogExplorer.css";
 
 const actionIcons = {
@@ -55,7 +56,10 @@ function AuditLogExplorer({
   onLoadMore,
   showChangeValues = false,
   showCompany = false,
+  localize = false,
 }) {
+  const { t } = useI18n();
+  const dashboardT = (key, values) => localize ? t(key, values) : translateText("en", key, values);
   const idPrefix = useId();
   const [filterUser, setFilterUser] = useState("");
   const [filterAction, setFilterAction] = useState("");
@@ -103,9 +107,9 @@ function AuditLogExplorer({
       anchor.click();
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
-      setFlashMessage({ type: "success", text: "Audit log CSV downloaded." });
+      setFlashMessage({ type: "success", text: dashboardT("auditExportDownloaded") });
     } catch (exportError) {
-      setFlashMessage({ type: "error", text: `CSV export failed: ${exportError.message}` });
+      setFlashMessage({ type: "error", text: dashboardT("auditExportFailed", { error: exportError.message }) });
     }
     window.setTimeout(() => setFlashMessage(null), 4000);
   };
@@ -130,11 +134,11 @@ function AuditLogExplorer({
       <section className="audit-explorer-filters" aria-label="Audit log filters">
         <div className="audit-explorer-filter-grid">
           <div className="audit-explorer-filter-group">
-            <label htmlFor={`${idPrefix}-user`}>User</label>
+            <label htmlFor={`${idPrefix}-user`}>{dashboardT("auditUser")}</label>
             <input
               id={`${idPrefix}-user`}
               type="search"
-              placeholder="Search name or email"
+              placeholder={dashboardT("auditSearchNameOrEmail")}
               value={filterUser}
               onChange={(event) => setFilterUser(event.target.value)}
             />
@@ -142,11 +146,11 @@ function AuditLogExplorer({
 
           {showCompany && (
             <div className="audit-explorer-filter-group">
-              <label htmlFor={`${idPrefix}-company`}>Company</label>
+              <label htmlFor={`${idPrefix}-company`}>{dashboardT("auditCompany")}</label>
               <input
                 id={`${idPrefix}-company`}
                 type="search"
-                placeholder="Search company"
+                placeholder={dashboardT("auditSearchCompany")}
                 value={filterCompany}
                 onChange={(event) => setFilterCompany(event.target.value)}
               />
@@ -154,13 +158,13 @@ function AuditLogExplorer({
           )}
 
           <div className="audit-explorer-filter-group">
-            <label htmlFor={`${idPrefix}-action`}>Action</label>
+            <label htmlFor={`${idPrefix}-action`}>{dashboardT("auditAction")}</label>
             <AppSelect
               id={`${idPrefix}-action`}
               value={filterAction}
               onChange={(event) => setFilterAction(event.target.value)}
             >
-              <option value="">All actions</option>
+              <option value="">{dashboardT("auditAllActions")}</option>
               {actionOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -168,7 +172,7 @@ function AuditLogExplorer({
           </div>
 
           <div className="audit-explorer-filter-group">
-            <label htmlFor={`${idPrefix}-from`}>From</label>
+            <label htmlFor={`${idPrefix}-from`}>{dashboardT("auditFrom")}</label>
             <input
               id={`${idPrefix}-from`}
               type="date"
@@ -178,7 +182,7 @@ function AuditLogExplorer({
           </div>
 
           <div className="audit-explorer-filter-group">
-            <label htmlFor={`${idPrefix}-to`}>To</label>
+            <label htmlFor={`${idPrefix}-to`}>{dashboardT("auditTo")}</label>
             <input
               id={`${idPrefix}-to`}
               type="date"
@@ -190,7 +194,7 @@ function AuditLogExplorer({
           <div className="audit-explorer-filter-actions">
             {hasFilters && (
               <button type="button" className="audit-explorer-secondary-btn" onClick={clearFilters}>
-                Clear
+                {dashboardT("auditClear")}
               </button>
             )}
             <button
@@ -200,28 +204,28 @@ function AuditLogExplorer({
               disabled={filteredLogs.length === 0}
             >
               <span aria-hidden="true">↓</span>
-              Export visible CSV
+              {dashboardT("exportVisibleCsv")}
             </button>
           </div>
         </div>
 
         {hasFilters && (
           <p className="audit-explorer-filter-summary" aria-live="polite">
-            Showing <strong>{filteredLogs.length}</strong> of <strong>{safeLogs.length}</strong> loaded entries
+            {dashboardT("auditShowingEntries", { filtered: filteredLogs.length, total: safeLogs.length })}
             {hasMore ? <> ({resolvedTotalCount} total)</> : null}
           </p>
         )}
       </section>
 
-      {isLoading && <div className="audit-explorer-state">Loading audit logs…</div>}
+      {isLoading && <div className="audit-explorer-state">{dashboardT("auditLoading")}</div>}
 
       {!isLoading && !error && filteredLogs.length === 0 && (
         <div className="audit-explorer-state audit-explorer-empty">
           <span aria-hidden="true">📭</span>
-          <p>{safeLogs.length === 0 ? emptyMessage : "No entries match the selected filters."}</p>
+          <p>{safeLogs.length === 0 ? emptyMessage : dashboardT("auditNoFilteredEntries")}</p>
           {hasFilters && safeLogs.length > 0 && (
             <button type="button" className="audit-explorer-secondary-btn" onClick={clearFilters}>
-              Clear filters
+              {dashboardT("clearFilters")}
             </button>
           )}
           {hasMore && onLoadMore && (
@@ -231,7 +235,7 @@ function AuditLogExplorer({
               onClick={onLoadMore}
               disabled={isLoadingMore}
             >
-              {isLoadingMore ? "Loading…" : "Load more entries"}
+              {isLoadingMore ? dashboardT("loading") : dashboardT("loadMoreEntries")}
             </button>
           )}
         </div>
@@ -240,11 +244,11 @@ function AuditLogExplorer({
       {!isLoading && filteredLogs.length > 0 && (
         <section className="audit-explorer-results" aria-label="Audit log entries">
           <div className="audit-explorer-results-header">
-            <h3>Activity history</h3>
+            <h3>{dashboardT("auditActivityHistory")}</h3>
             <span>
               {hasMore
-                ? `${safeLogs.length} loaded of ${resolvedTotalCount}`
-                : `${filteredLogs.length} ${filteredLogs.length === 1 ? "entry" : "entries"}`}
+                ? dashboardT("auditShowingLoaded", { loaded: safeLogs.length, total: resolvedTotalCount })
+                : `${filteredLogs.length} ${dashboardT(filteredLogs.length === 1 ? "auditEntry" : "auditEntries")}`}
             </span>
           </div>
 
@@ -278,7 +282,7 @@ function AuditLogExplorer({
                         )}
                         {log.recordId && (
                           <span className="audit-explorer-record" title={String(log.recordId)}>
-                            Record {shortRecordId(log.recordId)}
+                            {dashboardT("auditRecord")} {shortRecordId(log.recordId)}
                           </span>
                         )}
                       </span>
@@ -298,24 +302,24 @@ function AuditLogExplorer({
                     inert={isExpanded ? undefined : ""}
                   >
                     <div id={detailId} className="audit-explorer-details">
-                      <h4>Action details</h4>
+                      <h4>{dashboardT("auditActionDetails")}</h4>
                       <dl className="audit-explorer-detail-grid">
-                        <div><dt>User</dt><dd>{formatAuditActor(log)}</dd></div>
+                        <div><dt>{dashboardT("auditUser")}</dt><dd>{formatAuditActor(log)}</dd></div>
                         {(log.userEmail || log.actorEmail) && (
-                          <div><dt>Email</dt><dd>{log.userEmail || log.actorEmail}</dd></div>
+                          <div><dt>{dashboardT("auditEmail")}</dt><dd>{log.userEmail || log.actorEmail}</dd></div>
                         )}
                         {showCompany && (
-                          <div><dt>Company</dt><dd>{log.companyName || "Platform-wide"}</dd></div>
+                          <div><dt>{dashboardT("auditCompany")}</dt><dd>{log.companyName || dashboardT("auditPlatformWide")}</dd></div>
                         )}
-                        <div><dt>Action</dt><dd>{formatAuditAction(log.action)}</dd></div>
-                        <div><dt>Entity</dt><dd>{formatAuditEntity(log.tableName)}</dd></div>
-                        <div><dt>Record ID</dt><dd>{log.recordId || "—"}</dd></div>
-                        <div><dt>Timestamp</dt><dd>{formatTimestamp(log.createdAt)}</dd></div>
+                        <div><dt>{dashboardT("auditAction")}</dt><dd>{formatAuditAction(log.action)}</dd></div>
+                        <div><dt>{dashboardT("auditEntity")}</dt><dd>{formatAuditEntity(log.tableName)}</dd></div>
+                        <div><dt>{dashboardT("auditRecordId")}</dt><dd>{log.recordId || "—"}</dd></div>
+                        <div><dt>{dashboardT("auditTimestamp")}</dt><dd>{formatTimestamp(log.createdAt)}</dd></div>
                       </dl>
 
                       {!showChangeValues && changedFieldLabels.length > 0 && (
                         <section className="audit-explorer-changed-fields">
-                          <h4>Changed fields</h4>
+                          <h4>{dashboardT("auditChangedFields")}</h4>
                           <div>
                             {changedFieldLabels.map((fieldLabel) => (
                               <span key={fieldLabel}>{fieldLabel}</span>
@@ -328,13 +332,13 @@ function AuditLogExplorer({
                         <div className="audit-explorer-change-grid">
                           {log.newValues && (
                             <section>
-                              <h4>New values</h4>
+                              <h4>{dashboardT("auditNewValues")}</h4>
                               <pre>{JSON.stringify(log.newValues, null, 2)}</pre>
                             </section>
                           )}
                           {log.oldValues && (
                             <section>
-                              <h4>Previous values</h4>
+                              <h4>{dashboardT("auditPreviousValues")}</h4>
                               <pre>{JSON.stringify(log.oldValues, null, 2)}</pre>
                             </section>
                           )}
@@ -348,14 +352,14 @@ function AuditLogExplorer({
           </div>
           {hasMore && onLoadMore && (
             <div className="audit-explorer-pagination">
-              <p>Showing {safeLogs.length} of {resolvedTotalCount} entries</p>
+              <p>{dashboardT("auditShowingLoaded", { loaded: safeLogs.length, total: resolvedTotalCount })}</p>
               <button
                 type="button"
                 className="audit-explorer-secondary-btn"
                 onClick={onLoadMore}
                 disabled={isLoadingMore}
               >
-                {isLoadingMore ? "Loading…" : "Load more"}
+                {isLoadingMore ? dashboardT("loading") : dashboardT("loadMoreEntries")}
               </button>
             </div>
           )}

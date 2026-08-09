@@ -3,12 +3,14 @@ import { useNavigate, useSearchParams } from "react-router";
 import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
+import { useI18n } from "../../../app/providers/i18n";
 import "../../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
 
 // ── Inline bulk create modal (reused from PassportList / TemplatesPage) ──
 function BulkModal({ passportType, typeLabel, companyId, templateId, templateName, onClose, onDone }) {
+  const { t } = useI18n();
   const [count,      setCount]      = useState("10");
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState("");
@@ -51,40 +53,40 @@ function BulkModal({ passportType, typeLabel, companyId, templateId, templateNam
       <div className="dashboard-modal-card dashboard-modal-card-compact">
         {result ? (
           <>
-            <h3 className="dashboard-modal-title">Passports Created</h3>
+            <h3 className="dashboard-modal-title">{t("passportsCreated")}</h3>
             <div className="tmpl-bulk-summary">
               <div className="tmpl-bulk-stat tmpl-bulk-created">
-                <span className="tmpl-bulk-num">{result.created ?? 0}</span><span>created</span>
+                <span className="tmpl-bulk-num">{result.created ?? 0}</span><span>{t("created")}</span>
               </div>
-              {result.skipped > 0 && <div className="tmpl-bulk-stat tmpl-bulk-skipped"><span className="tmpl-bulk-num">{result.skipped}</span><span>skipped</span></div>}
-              {result.failed  > 0 && <div className="tmpl-bulk-stat tmpl-bulk-failed"><span className="tmpl-bulk-num">{result.failed}</span><span>failed</span></div>}
+              {result.skipped > 0 && <div className="tmpl-bulk-stat tmpl-bulk-skipped"><span className="tmpl-bulk-num">{result.skipped}</span><span>{t("skipped")}</span></div>}
+              {result.failed  > 0 && <div className="tmpl-bulk-stat tmpl-bulk-failed"><span className="tmpl-bulk-num">{result.failed}</span><span>{t("failed")}</span></div>}
             </div>
-            {templateName && <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 16px" }}>Pre-filled from template <strong>{templateName}</strong>.</p>}
+            {templateName && <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 16px" }}>{t("preFilledFromTemplate", { template: templateName })}</p>}
             <div className="dashboard-modal-actions dashboard-modal-actions-end">
               <button className="dashboard-btn dashboard-btn-primary" onClick={() => onDone()}>Done</button>
             </div>
           </>
         ) : (
           <>
-            <h3 className="dashboard-modal-title">Bulk Create {typeLabel} Passports</h3>
+            <h3 className="dashboard-modal-title">{t("bulkCreatePassports")}: {typeLabel}</h3>
             {templateName && (
               <p className="dashboard-modal-subtitle">
-                Pre-filling from template <strong>{templateName}</strong>. Model data fields will be locked on each draft.
+                {t("preFillingFromTemplate", { template: templateName })}
               </p>
             )}
             <p className="dashboard-modal-subtitle">
-              How many draft passports do you want to create? (max 500)
+              {t("draftCountQuestion")}
             </p>
             <label className="device-manual-label">Number of Passports</label>
             <input type="number" min="1" max="500" step="1"
               value={count} onChange={e => setCount(e.target.value)}
               className="device-manual-input" disabled={submitting} autoFocus />
-            <p className="bulk-create-note">Drafts can be renamed and filled in after creation.</p>
+            <p className="bulk-create-note">{t("draftRenameLater")}</p>
             {error && <div className="dashboard-inline-error">{error}</div>}
             <div className="dashboard-modal-actions dashboard-modal-actions-end">
               <button className="dashboard-btn dashboard-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
               <button className="dashboard-btn dashboard-btn-primary" onClick={handleCreate} disabled={submitting}>
-                {submitting ? "Creating…" : "Create Passports"}
+                {submitting ? t("creating") : t("createPassports")}
               </button>
             </div>
           </>
@@ -118,6 +120,7 @@ function MethodCard({ icon, title, description, tag, tagColor, onClick, disabled
 
 // ── Template picker inside the hub ──
 function TemplatePicker({ templates, onSelect, onCancel }) {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const filtered = templates.filter(t =>
     `${t.name} ${t.description || ""}`.toLowerCase().includes(search.toLowerCase())
@@ -125,22 +128,22 @@ function TemplatePicker({ templates, onSelect, onCancel }) {
   return (
     <div className="ch-tmpl-picker">
       <div className="ch-tmpl-picker-header">
-        <h3 className="ch-tmpl-picker-title">Choose a Template</h3>
+        <h3 className="ch-tmpl-picker-title">{t("chooseTemplate")}</h3>
         <button className="tmpl-editor-close" onClick={onCancel}>✕</button>
       </div>
-      <input className="tmpl-search" type="text" placeholder="Search templates…"
+      <input className="tmpl-search" type="text" placeholder={t("searchTemplates")}
         value={search} onChange={e => setSearch(e.target.value)} autoFocus />
       <div className="ch-tmpl-list">
         {filtered.length === 0 ? (
-          <div className="tmpl-empty">No templates found. Create one in the Templates page first.</div>
-        ) : filtered.map(t => (
-          <div key={t.id} className="ch-tmpl-item" onClick={() => onSelect(t)}>
+          <div className="tmpl-empty">{t("noTemplatesFound")}</div>
+        ) : filtered.map((template) => (
+          <div key={template.id} className="ch-tmpl-item" onClick={() => onSelect(template)}>
             <div className="ch-tmpl-item-icon">📋</div>
             <div>
-              <div className="ch-tmpl-item-name">{t.name}</div>
-              {t.description && <div className="ch-tmpl-item-desc">{t.description}</div>}
-              {parseInt(t.modelFieldCount) > 0 && (
-                <div className="ch-tmpl-item-meta">📌 {t.modelFieldCount} model data field{Number(t.modelFieldCount) !== 1 ? "s" : ""}</div>
+              <div className="ch-tmpl-item-name">{template.name}</div>
+              {template.description && <div className="ch-tmpl-item-desc">{template.description}</div>}
+              {parseInt(template.modelFieldCount) > 0 && (
+                <div className="ch-tmpl-item-meta">📌 {t("modelDataFields", { count: template.modelFieldCount, suffix: Number(template.modelFieldCount) !== 1 ? "s" : "" })}</div>
               )}
             </div>
             <span className="ch-method-arrow">→</span>
@@ -152,6 +155,7 @@ function TemplatePicker({ templates, onSelect, onCancel }) {
 }
 
 export default function CreateHub({ user, companyId }) {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const preselectedType = searchParams.get("type");
@@ -216,8 +220,8 @@ export default function CreateHub({ user, companyId }) {
       {/* Page header */}
       <div className="ch-header">
         <div>
-          <h2 className="ch-title">Create Passport</h2>
-          <p className="ch-subtitle">Choose a passport type and how you want to create it.</p>
+          <h2 className="ch-title">{t("createPassport")}</h2>
+          <p className="ch-subtitle">{t("createPassportSubtitle")}</p>
         </div>
       </div>
 
@@ -226,10 +230,10 @@ export default function CreateHub({ user, companyId }) {
         <div className={`ch-step ${step === "method" ? "ch-step-compact" : ""}`}>
           <div className="ch-step-label">
             <span className="ch-step-num">1</span>
-            Passport Type
+            {t("passportType")}
             {step === "method" && selectedType && (
               <button className="ch-change-btn" onClick={() => { setStep("type"); setSubStep(null); }}>
-                Change
+                {t("change")}
               </button>
             )}
           </div>
@@ -249,7 +253,7 @@ export default function CreateHub({ user, companyId }) {
                 </div>
               ))}
               {passportTypes.length === 0 && (
-                <div className="tmpl-empty">No passport types available for your company yet.</div>
+                <div className="tmpl-empty">{t("noPassportTypes")}</div>
               )}
             </div>
           ) : (
@@ -265,7 +269,7 @@ export default function CreateHub({ user, companyId }) {
           <div className="ch-step">
             <div className="ch-step-label">
               <span className="ch-step-num">2</span>
-              Creation Method
+              {t("creationMethod")}
             </div>
 
             {subStep === "template-pick" ? (
@@ -285,25 +289,25 @@ export default function CreateHub({ user, companyId }) {
                     <div className="ch-tmpl-chosen-name">{chosenTemplate.name}</div>
                     {chosenTemplate.description && <div className="ch-tmpl-chosen-desc">{chosenTemplate.description}</div>}
                     {parseInt(chosenTemplate.modelFieldCount) > 0 && (
-                      <div className="ch-tmpl-chosen-meta">📌 {chosenTemplate.modelFieldCount} model data fields will be pre-filled and locked</div>
+                      <div className="ch-tmpl-chosen-meta">📌 {t("modelDataPreFilledLocked", { count: chosenTemplate.modelFieldCount, suffix: Number(chosenTemplate.modelFieldCount) !== 1 ? "s" : "" })}</div>
                     )}
                   </div>
-                  <button className="ch-change-btn" style={{ marginLeft: "auto" }} onClick={() => setSubStep("template-pick")}>Change</button>
+                  <button className="ch-change-btn" style={{ marginLeft: "auto" }} onClick={() => setSubStep("template-pick")}>{t("change")}</button>
                 </div>
                 <div className="ch-template-actions">
                   <MethodCard
                     icon="✏️"
-                    title="Create single passport"
-                    description="Opens the passport form with model data pre-filled from this template. You fill in the unit-specific fields."
-                    tag="One at a time"
+                    title={t("createSinglePassport")}
+                    description={t("createSinglePassportDescription")}
+                    tag={t("oneAtATime")}
                     tagColor="mint"
                     onClick={() => navigate(`/create/${selectedType.typeName}?templateId=${chosenTemplate.id}`)}
                   />
                   <MethodCard
                     icon="⚡"
-                    title="Bulk create from template"
-                    description="Creates multiple draft passports at once, all pre-filled with this template's model data. You edit each draft to add unit-specific fields."
-                    tag="Many at once"
+                    title={t("bulkCreateFromTemplate")}
+                    description={t("bulkCreateFromTemplateDescription")}
+                    tag={t("manyAtOnce")}
                     tagColor="purple"
                     onClick={() => setBulkModal({ templateId: chosenTemplate.id, templateName: chosenTemplate.name })}
                   />
@@ -313,34 +317,34 @@ export default function CreateHub({ user, companyId }) {
               <div className="ch-methods">
                 <MethodCard
                   icon="✏️"
-                  title="Fill the form"
-                  description="Create one passport at a time using the structured form. Best for individual records or when you want full control over each field."
-                  tag="One at a time"
+                  title={t("fillTheForm")}
+                  description={t("fillTheFormDescription")}
+                  tag={t("oneAtATime")}
                   tagColor="mint"
                   onClick={() => navigate(`/create/${selectedType.typeName}`)}
                 />
                 <MethodCard
                   icon="📋"
-                  title="Create from a template"
-                  description={`Use a saved model template so common fields (manufacturer, specs, category) are pre-filled and locked. ${templates.length > 0 ? `${templates.length} template${templates.length !== 1 ? "s" : ""} available for ${typeLabel}.` : "Create templates in the Templates page first."}`}
-                  tag={templates.length > 0 ? `${templates.length} available` : "No templates yet"}
+                  title={t("createFromTemplate")}
+                  description={t("createFromTemplateDescription", { availability: templates.length > 0 ? t("templatesAvailableForType", { count: templates.length, suffix: templates.length !== 1 ? "s" : "", type: typeLabel }) : t("createTemplatesFirst") })}
+                  tag={templates.length > 0 ? t("templatesAvailable", { count: templates.length }) : t("noTemplatesYet")}
                   tagColor={templates.length > 0 ? "mint" : "muted"}
                   onClick={() => setSubStep("template-pick")}
                   disabled={loadingTemplates}
                 />
                 <MethodCard
                   icon="⚡"
-                  title="Bulk create (empty drafts)"
-                  description="Generates multiple empty draft passports in one click. Use this when you know how many units you need but will fill them in later individually or via CSV."
-                  tag="Many at once"
+                  title={t("bulkCreateEmptyDrafts")}
+                  description={t("bulkCreateEmptyDraftsDescription")}
+                  tag={t("manyAtOnce")}
                   tagColor="purple"
                   onClick={() => setBulkModal({})}
                 />
                 <MethodCard
                   icon="📊"
-                  title="Import passport data"
-                  description="Open the import workspace for CSV or JSON creation. Use CSV for spreadsheet-based batches and JSON when your source system already exports structured passport objects."
-                  tag="CSV or JSON"
+                  title={t("importPassportData")}
+                  description={t("importPassportDataDescription")}
+                  tag={t("csvOrJson")}
                   tagColor="blue"
                   onClick={() => navigate(`/csv-import/${selectedType.typeName}/create-csv`)}
                 />
@@ -351,13 +355,13 @@ export default function CreateHub({ user, companyId }) {
             <div className="ch-help-box">
               <span className="ch-help-icon">💡</span>
               <div>
-                <strong>Not sure which to use?</strong>
+                <strong>{t("notSureWhichToUse")}</strong>
                 <ul className="ch-help-list">
-                  <li><strong>One passport</strong> → Fill the form</li>
-                  <li><strong>Repeated model (same specs, different units)</strong> → Create a template first, then use it</li>
-                  <li><strong>Many units at once</strong> → Bulk create, then export CSV to fill in unit-level fields and re-import</li>
-                  <li><strong>Data already in a spreadsheet</strong> → CSV import</li>
-                  <li><strong>Data already in JSON</strong> → JSON import</li>
+                  <li><strong>{t("onePassport")}</strong> → {t("helpOnePassport")}</li>
+                  <li><strong>{t("repeatedModel")}</strong> → {t("helpRepeatedModel")}</li>
+                  <li><strong>{t("manyUnitsAtOnce")}</strong> → {t("helpManyUnits")}</li>
+                  <li><strong>{t("spreadsheetData")}</strong> → {t("helpSpreadsheetData")}</li>
+                  <li><strong>{t("jsonData")}</strong> → {t("helpJsonData")}</li>
                 </ul>
               </div>
             </div>

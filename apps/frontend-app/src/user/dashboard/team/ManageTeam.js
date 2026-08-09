@@ -3,6 +3,7 @@ import { applyTableControls, getNextSortDirection, sortIndicator } from "../../.
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { toSafeImageSrc } from "../../../shared/security/urlSafety";
 import AppSelect from "../../../shared/components/AppSelect";
+import { useI18n } from "../../../app/providers/i18n";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -18,6 +19,7 @@ function RoleBadge({ role }) {
 }
 
 function ManageTeam({ user, companyId }) {
+  const { t } = useI18n();
   const [members,      setMembers]      = useState([]);
   const [pending,      setPending]      = useState([]);
   const [loading,      setLoading]      = useState(true);
@@ -140,7 +142,7 @@ function ManageTeam({ user, companyId }) {
   return (
     <div className="team-page">
       <div className="team-header">
-        <h2>👥 Manage Team</h2>
+        <h2>👥 {t("manageTeam")}</h2>
         <p>{members.length} member{members.length !== 1 ? "s" : ""} in your organisation</p>
       </div>
 
@@ -162,7 +164,7 @@ function ManageTeam({ user, companyId }) {
 
       {/* Invite card */}
       <div className="team-card invite-card-team">
-        <h4>✉️ Invite a team member</h4>
+        <h4>✉️ {t("inviteTeamMember")}</h4>
         {!isAdmin && (
           <p className="invite-note">
             As an editor, you can invite <strong>viewers</strong> to your team.
@@ -193,7 +195,7 @@ function ManageTeam({ user, companyId }) {
 
       {/* Members table */}
       <div className="team-card">
-        <h4>Team Members</h4>
+        <h4>{t("teamMembers")}</h4>
         {loading ? (
           <div className="loading">Loading…</div>
         ) : (

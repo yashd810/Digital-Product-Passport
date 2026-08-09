@@ -8,6 +8,7 @@ import { safeWindowOpen } from "../../../shared/security/urlSafety";
 import { renderPassportQrToCanvas } from "../../../passport-viewer/utils/QRcode";
 import { getPassportSerialNumberForType } from "../passports/utils/passportListHelpers";
 import AppSelect from "../../../shared/components/AppSelect";
+import { useI18n } from "../../../app/providers/i18n";
 import "../../../shared/styles/Dashboard.css";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -32,6 +33,7 @@ function getPassportGroupKey(passport) {
 // Archived Passports Page
 // ─────────────────────────────────────────────────────────────────────────────
 function ArchivedPassports({ user, companyId }) {
+  const { t } = useI18n();
   // UI state
   const [passports, setPassports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -439,7 +441,7 @@ function ArchivedPassports({ user, companyId }) {
         <td className="options-cell" onClick={e => e.stopPropagation()}>
           {!isHistorical && (
             <button className="archive-restore-btn" onClick={() => handleUnarchive(passport.dppId)}>
-              Restore
+              {t("restore")}
             </button>
           )}
         </td>
@@ -451,8 +453,8 @@ function ArchivedPassports({ user, companyId }) {
     <div className="passport-list-page">
       <div className="passport-list-header">
         <div>
-          <h2 className="passport-list-title">📦 Archived Passports</h2>
-          <p className="passport-list-description">View and restore archived passports</p>
+          <h2 className="passport-list-title">📦 {t("archivedPassports")}</h2>
+          <p className="passport-list-description">{t("archivedPassportsSubtitle")}</p>
         </div>
         {user?.role !== "viewer" && (
           <div className="passport-list-actions">
@@ -463,7 +465,7 @@ function ArchivedPassports({ user, companyId }) {
                 else setSelectionMode(true);
               }}
             >
-              {selectionMode ? "Done Selecting" : "Select Passports"}
+              {selectionMode ? t("doneSelecting") : t("selectPassports")}
             </button>
           </div>
         )}
@@ -471,10 +473,10 @@ function ArchivedPassports({ user, companyId }) {
 
       {selectionMode && selectedList.length > 0 && (
         <div className="bulk-actions-bar">
-          <span className="bulk-actions-count">{selectedList.length} selected</span>
+          <span className="bulk-actions-count">{t("selectedCount", { count: selectedList.length })}</span>
           <div className="bulk-actions-buttons">
             <button className="bulk-action-btn bulk-action-release" onClick={bulkUnarchive} disabled={bulkLoading}>
-              📦 Unarchive
+              📦 {t("unarchive")}
             </button>
             <button className="bulk-action-btn bulk-action-export" onClick={bulkExportJson} disabled={bulkLoading}>
               📦 Export JSON-LD
@@ -483,7 +485,7 @@ function ArchivedPassports({ user, companyId }) {
               🖨 Print QR
             </button>
           </div>
-          {bulkLoading && <span className="bulk-actions-loading">Processing...</span>}
+          {bulkLoading && <span className="bulk-actions-loading">{t("processing")}</span>}
         </div>
       )}
 
@@ -607,7 +609,7 @@ function ArchivedPassports({ user, companyId }) {
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget && !qrExporting) setPrintQrModalOpen(false); }}>
           <div className="modal-box">
             <div className="modal-header">
-              <h3>Print QR Codes</h3>
+              <h3>{t("printQrCodes")}</h3>
               <button className="modal-close" onClick={() => !qrExporting && setPrintQrModalOpen(false)}>X</button>
             </div>
             <div className="modal-body">
