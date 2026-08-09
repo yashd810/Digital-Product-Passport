@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { useMotionPresence } from "../../../../shared/hooks/useMotionPresence";
 import {
   formatPassportStatus,
@@ -10,41 +10,50 @@ import { PassportListRowMenu } from "./PassportListRowMenu";
 import { formatPassportDate, getPassportSerialNumberForType } from "../utils/passportListHelpers";
 import { canManagePassports } from "../../../../shared/auth/passportAuthoringAccess";
 
-function PassportIdentifierText({ value, className, label }) {
+function PassportIdentifierText({ value, className, cellId, onIdentifierColumnWidthChange }) {
   const measurementRef = useRef(null);
-  const [requiresHorizontalScroll, setRequiresHorizontalScroll] = useState(false);
+  const naturalMeasurementRef = useRef(null);
+  const wideColumnLockedRef = useRef(false);
 
   useEffect(() => {
     const measurementNode = measurementRef.current;
-    if (!measurementNode) return undefined;
+    const naturalMeasurementNode = naturalMeasurementRef.current;
+    if (!measurementNode || !naturalMeasurementNode) return undefined;
+    wideColumnLockedRef.current = false;
+    onIdentifierColumnWidthChange?.(cellId, 0);
 
-    const updateOverflowState = () => {
+    const updateColumnWidth = () => {
+      if (wideColumnLockedRef.current) return;
       const lineHeight = Number.parseFloat(window.getComputedStyle(measurementNode).lineHeight);
       const maximumTwoLineHeight = Number.isFinite(lineHeight) ? lineHeight * 2 : 40;
-      setRequiresHorizontalScroll(measurementNode.getBoundingClientRect().height > maximumTwoLineHeight + 1);
+      if (measurementNode.getBoundingClientRect().height <= maximumTwoLineHeight + 1) return;
+
+      const naturalWidth = naturalMeasurementNode.getBoundingClientRect().width;
+      const requiredColumnWidth = Math.max(measurementNode.clientWidth, Math.ceil(naturalWidth / 2) + 24);
+      wideColumnLockedRef.current = true;
+      onIdentifierColumnWidthChange?.(cellId, requiredColumnWidth);
     };
 
-    updateOverflowState();
+    updateColumnWidth();
     const resizeObserver = typeof ResizeObserver === "undefined"
       ? null
-      : new ResizeObserver(updateOverflowState);
+      : new ResizeObserver(updateColumnWidth);
     resizeObserver?.observe(measurementNode);
-    return () => resizeObserver?.disconnect();
-  }, [value]);
+    return () => {
+      resizeObserver?.disconnect();
+      onIdentifierColumnWidthChange?.(cellId, 0);
+    };
+  }, [cellId, onIdentifierColumnWidthChange, value]);
 
   return (
     <span className="passport-text-cell-container">
       <span ref={measurementRef} className={`${className} passport-text-cell-measure`} aria-hidden="true">
         {value}
       </span>
-      <span
-        className={`${className}${requiresHorizontalScroll ? " passport-text-cell-scrollable" : ""}`}
-        title={value}
-        tabIndex={requiresHorizontalScroll ? 0 : undefined}
-        aria-label={requiresHorizontalScroll ? `${label}: ${value}. Scroll horizontally to read the full value.` : undefined}
-      >
+      <span ref={naturalMeasurementRef} className={`${className} passport-text-cell-natural-measure`} aria-hidden="true">
         {value}
       </span>
+      <span className={className} title={value}>{value}</span>
     </span>
   );
 }
@@ -82,6 +91,7 @@ export function PassportListRow({
   getViewerDestination,
   calcCompleteness,
   togglePin,
+  onIdentifierColumnWidthChange,
 }) {
   const pType = passport.passportType || activeType;
   const menuId = `${passport.dppId}-${passport.versionNumber}`;
@@ -150,10 +160,10 @@ export function PassportListRow({
         </div>
       </td>
       <td className="passport-serial-col">
-        {serialNumber ? <PassportIdentifierText value={serialNumber} className="passport-serial-cell" label="Serial number" /> : <span className="no-product-id">—</span>}
+        {serialNumber ? <PassportIdentifierText value={serialNumber} className="passport-serial-cell" cellId={`${menuId}-serial`} onIdentifierColumnWidthChange={onIdentifierColumnWidthChange} /> : <span className="no-product-id">—</span>}
       </td>
       <td className="passport-model-col">
-        {passport.modelName ? <PassportIdentifierText value={passport.modelName} className="passport-model-cell" label="Model" /> : <span className="no-product-id">—</span>}
+        {passport.modelName ? <PassportIdentifierText value={passport.modelName} className="passport-model-cell" cellId={`${menuId}-model`} onIdentifierColumnWidthChange={onIdentifierColumnWidthChange} /> : <span className="no-product-id">—</span>}
       </td>
       {filterByUser && (
         <td><span className="type-badge passport-type-badge">{pType}</span></td>

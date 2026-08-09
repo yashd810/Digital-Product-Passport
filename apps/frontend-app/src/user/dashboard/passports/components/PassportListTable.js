@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { sortIndicator } from "../../../../shared/table/tableControls";
 
 function SortableHeader({ columnKey, label, sortConfig, toggleSort }) {
@@ -28,9 +28,31 @@ export function PassportListTable({
   expandedPassportGroups,
   renderPassportRow,
 }) {
+  const [identifierColumnWidths, setIdentifierColumnWidths] = useState({});
+  const widestIdentifierColumn = useMemo(
+    () => Math.max(0, ...Object.values(identifierColumnWidths)),
+    [identifierColumnWidths],
+  );
+  const updateIdentifierColumnWidth = useCallback((cellId, width) => {
+    setIdentifierColumnWidths((currentWidths) => {
+      const nextWidth = Number.isFinite(width) && width > 0 ? Math.ceil(width) : 0;
+      if (nextWidth === 0 && !currentWidths[cellId]) return currentWidths;
+      if (nextWidth === currentWidths[cellId]) return currentWidths;
+
+      const nextWidths = { ...currentWidths };
+      if (nextWidth === 0) delete nextWidths[cellId];
+      else nextWidths[cellId] = nextWidth;
+      return nextWidths;
+    });
+  }, []);
+  const hasWideIdentifiers = widestIdentifierColumn > 0;
+
   return (
-    <div className="table-scroll-wrapper">
-      <table className="passports-table passport-list-table">
+    <div className={`table-scroll-wrapper passport-list-scroll-wrapper${hasWideIdentifiers ? " passport-list-scroll-wrapper--wide-identifiers" : ""}`}>
+      <table
+        className={`passports-table passport-list-table${hasWideIdentifiers ? " passport-list-table--wide-identifiers" : ""}`}
+        style={hasWideIdentifiers ? { "--passport-identifier-wide-column-width": `${widestIdentifierColumn}px` } : undefined}
+      >
         <thead>
           <tr>
             {user?.role !== "viewer" && selectionMode && (
@@ -80,12 +102,14 @@ export function PassportListTable({
                 parentGuid: group.key,
                 hasOlderVersions: group.olderVersions.length > 0,
                 latestVersionNumber: group.latest.versionNumber,
+                onIdentifierColumnWidthChange: updateIdentifierColumnWidth,
               })}
               {expandedPassportGroups.has(group.key) && group.olderVersions.map((version) =>
                 renderPassportRow(version, {
                   parentGuid: group.key,
                   isHistorical: true,
                   latestVersionNumber: group.latest.versionNumber,
+                  onIdentifierColumnWidthChange: updateIdentifierColumnWidth,
                 })
               )}
             </React.Fragment>

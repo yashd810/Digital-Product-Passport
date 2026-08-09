@@ -274,8 +274,21 @@
 
 /* Keep the dashboard list legible when operational identifiers and names are long. */
 .passport-list-table {
-  min-width: 1120px;
-  table-layout: auto;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.passport-list-scroll-wrapper {
+  overflow-x: hidden;
+}
+
+.passport-list-scroll-wrapper--wide-identifiers {
+  overflow-x: auto;
+}
+
+.passport-list-table--wide-identifiers {
+  width: max(100%, calc(44rem + var(--passport-identifier-wide-column-width) + var(--passport-identifier-wide-column-width)));
+  min-width: max(70rem, calc(44rem + var(--passport-identifier-wide-column-width) + var(--passport-identifier-wide-column-width)));
 }
 
 .passports-table thead {
@@ -373,8 +386,14 @@
 
 .passport-list-table .passport-serial-col,
 .passport-list-table .passport-model-col {
-  width: 1%;
-  min-width: 8.5rem;
+  width: clamp(7.5rem, 10vw, 10rem);
+  min-width: 0;
+}
+
+.passport-list-table--wide-identifiers .passport-serial-col,
+.passport-list-table--wide-identifiers .passport-model-col {
+  width: var(--passport-identifier-wide-column-width);
+  min-width: var(--passport-identifier-wide-column-width);
 }
 
 .passport-list-table .passport-date-col {
@@ -1064,18 +1083,16 @@
   -webkit-line-clamp: unset;
 }
 
-.passport-text-cell-scrollable {
-  display: block;
-  overflow-x: auto;
-  overflow-y: hidden;
+.passport-text-cell-natural-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  display: inline-block;
+  width: max-content;
+  max-width: none;
   white-space: nowrap;
+  overflow: visible;
   -webkit-line-clamp: unset;
-  scrollbar-width: thin;
-}
-
-.passport-text-cell-scrollable:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .passport-creator-cell {
