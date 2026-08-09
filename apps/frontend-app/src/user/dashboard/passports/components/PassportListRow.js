@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useMotionPresence } from "../../../../shared/hooks/useMotionPresence";
 import {
   formatPassportStatus,
@@ -9,6 +9,45 @@ import { CompletenessBar } from "./PassportListComponents";
 import { PassportListRowMenu } from "./PassportListRowMenu";
 import { formatPassportDate, getPassportSerialNumberForType } from "../utils/passportListHelpers";
 import { canManagePassports } from "../../../../shared/auth/passportAuthoringAccess";
+
+function PassportIdentifierText({ value, className, label }) {
+  const measurementRef = useRef(null);
+  const [requiresHorizontalScroll, setRequiresHorizontalScroll] = useState(false);
+
+  useEffect(() => {
+    const measurementNode = measurementRef.current;
+    if (!measurementNode) return undefined;
+
+    const updateOverflowState = () => {
+      const lineHeight = Number.parseFloat(window.getComputedStyle(measurementNode).lineHeight);
+      const maximumTwoLineHeight = Number.isFinite(lineHeight) ? lineHeight * 2 : 40;
+      setRequiresHorizontalScroll(measurementNode.getBoundingClientRect().height > maximumTwoLineHeight + 1);
+    };
+
+    updateOverflowState();
+    const resizeObserver = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(updateOverflowState);
+    resizeObserver?.observe(measurementNode);
+    return () => resizeObserver?.disconnect();
+  }, [value]);
+
+  return (
+    <span className="passport-text-cell-container">
+      <span ref={measurementRef} className={`${className} passport-text-cell-measure`} aria-hidden="true">
+        {value}
+      </span>
+      <span
+        className={`${className}${requiresHorizontalScroll ? " passport-text-cell-scrollable" : ""}`}
+        title={value}
+        tabIndex={requiresHorizontalScroll ? 0 : undefined}
+        aria-label={requiresHorizontalScroll ? `${label}: ${value}. Scroll horizontally to read the full value.` : undefined}
+      >
+        {value}
+      </span>
+    </span>
+  );
+}
 
 export function PassportListRow({
   passport,
@@ -111,9 +150,11 @@ export function PassportListRow({
         </div>
       </td>
       <td className="passport-serial-col">
-        {serialNumber ? <span className="passport-serial-cell" title={serialNumber}>{serialNumber}</span> : <span className="no-product-id">—</span>}
+        {serialNumber ? <PassportIdentifierText value={serialNumber} className="passport-serial-cell" label="Serial number" /> : <span className="no-product-id">—</span>}
       </td>
-      <td className="passport-model-col"><span className="passport-model-cell" title={passport.modelName || undefined}>{passport.modelName}</span></td>
+      <td className="passport-model-col">
+        {passport.modelName ? <PassportIdentifierText value={passport.modelName} className="passport-model-cell" label="Model" /> : <span className="no-product-id">—</span>}
+      </td>
       {filterByUser && (
         <td><span className="type-badge passport-type-badge">{pType}</span></td>
       )}

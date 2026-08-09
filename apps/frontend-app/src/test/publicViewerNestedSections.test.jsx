@@ -175,6 +175,39 @@ describe("public viewer nested data sections", () => {
     expect(markup).toContain("Open full PDF");
   });
 
+  test("omits inferred PDF and link tags from public and restricted document cards", () => {
+    const markup = renderToStaticMarkup(
+      <PublicPassportPortal
+        passport={{
+          passportType: "examplePassport",
+          publicDocument: "/repository-files/public-document.pdf",
+        }}
+        companyData={{ companyName: "Example Company" }}
+        typeDef={{
+          fieldsJson: {
+            sections: [{
+              key: "documents",
+              label: "Documents",
+              fields: [
+                { key: "publicDocument", label: "Public document", type: "file", confidentiality: "public" },
+                { key: "restrictedDocument", label: "Restricted document", type: "file", confidentiality: "restricted" },
+              ],
+            }],
+          },
+        }}
+        lang="en"
+      />
+    );
+    const documentsMarkup = markup.slice(markup.indexOf('id="documents"'));
+
+    expect(documentsMarkup).toContain("Public document");
+    expect(documentsMarkup).toContain("Restricted document");
+    expect(documentsMarkup).toContain(">Restricted<");
+    expect(documentsMarkup).not.toContain('class="doc-icon"');
+    expect(documentsMarkup).not.toContain(">PDF<");
+    expect(documentsMarkup).not.toContain(">LINK<");
+  });
+
   test("documents tab includes only fields declared with the file UI type", () => {
     const markup = renderToStaticMarkup(
       <PublicPassportPortal

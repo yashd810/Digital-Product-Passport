@@ -697,7 +697,6 @@ function DocumentCard({
 
   return (
     <article className="doc-card">
-      <div className="doc-icon">{field.type === "symbol" ? "IMG" : isPdfDocument ? "PDF" : "LINK"}</div>
       <div>
         <h3>{fieldLabel}</h3>
       </div>

@@ -1374,21 +1374,9 @@
 .passport-portal .doc-card {
   padding: 16px;
   display: grid;
-  grid-template-columns: 44px 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 14px;
   align-items: start;
-}
-
-.passport-portal .doc-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 15px;
-  display: grid;
-  place-items: center;
-  background: var(--teal-soft);
-  color: var(--teal-dark);
-  font-size: 0.78rem;
-  font-weight: 950;
 }
 
 .passport-portal .doc-card h3 {
@@ -1750,14 +1738,10 @@
   }
 
   .passport-portal .doc-card {
-    grid-template-columns: 40px 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .passport-portal .doc-card .badge {
-    grid-column: 2;
-  }
-
-  .passport-portal .doc-card a {
     grid-column: 2;
   }
 
