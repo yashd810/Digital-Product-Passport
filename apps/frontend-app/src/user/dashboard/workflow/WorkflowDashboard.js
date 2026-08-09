@@ -527,7 +527,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
     return (
       <tr key={wf.id}>
         <td>
-          <button className="model-link-btn"
+          <button className="workflow-passport-link"
             onClick={() => openPassportViewer(wf)}>
             {passportLabel}
           </button>

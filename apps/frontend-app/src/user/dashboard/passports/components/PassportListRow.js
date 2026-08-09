@@ -125,13 +125,6 @@ export function PassportListRow({
           </span>
         </div>
       </td>
-      {!filterByUser && (
-        <td className="small-text passport-creator-col">
-          <span className="passport-creator-cell" title={passport.createdByName || undefined}>
-          {passport.createdByName || "—"}
-          </span>
-        </td>
-      )}
       <td className="passport-view-cell" onClick={e => e.stopPropagation()}>
         {viewerDestination?.isPublicRoute ? (
           <a

@@ -57,6 +57,7 @@ function SymbolsTab({ companyId }) {
   const [preview,  setPreview]  = useState(null);
   const fileRef = useRef(null);
   const canGoBack = breadcrumbs.length > 0;
+  const canUpload = currentFolder !== null;
   const currentFolderName = breadcrumbs[breadcrumbs.length - 1]?.name || "Symbols root";
 
   const flash = (text, isErr = false) => {
@@ -110,6 +111,11 @@ function SymbolsTab({ companyId }) {
   const handleFileChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
+    if (!canUpload) {
+      e.target.value = "";
+      flash("Open a folder before selecting a symbol", true);
+      return;
+    }
     setFile(f);
     if (!name) setName(f.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " "));
     const reader = new FileReader();
@@ -119,6 +125,7 @@ function SymbolsTab({ companyId }) {
 
   const handleUpload = async (e) => {
     e.preventDefault();
+    if (!canUpload) { flash("Open a folder before uploading a symbol", true); return; }
     if (!name.trim()) { flash("Enter a symbol name", true); return; }
     if (!file)        { flash("Choose a file", true); return; }
     setUploading(true);
@@ -240,7 +247,8 @@ function SymbolsTab({ companyId }) {
       </div>
 
       {/* Upload card */}
-      <div className="sym-card sym-upload-card">
+      {canUpload ? (
+      <div className="repo-upload-card sym-upload-card">
         <h3 className="sym-card-title">Upload New Symbol</h3>
         <form onSubmit={handleUpload} className="sym-upload-form">
           <div className="sym-upload-preview-col">
@@ -269,19 +277,22 @@ function SymbolsTab({ companyId }) {
               />
             </div>
             <div className="sym-upload-actions">
-              <button type="submit" className="repo-btn repo-btn-primary" disabled={uploading}>
+              <button type="submit" className="repo-btn repo-btn-primary" disabled={uploading || !name.trim() || !file}>
                 {uploading ? "Uploading…" : "Upload Symbol"}
               </button>
             </div>
           </div>
         </form>
       </div>
+      ) : (
+        <UploadFolderRequired itemLabel="symbols" />
+      )}
 
       {/* Grid */}
       {loading ? (
         <div className="loading" style={{ padding: 40 }}>Loading…</div>
       ) : symbols.length === 0 ? (
-        <div className="repo-empty"><p>{currentFolder ? "This folder is empty." : "No symbols yet — upload one above or create a folder to get started."}</p></div>
+        <div className="repo-empty"><p>{currentFolder ? "This folder is empty." : "No symbols yet — create a folder to get started."}</p></div>
       ) : (
         <div className="repo-card-grid">
           {symbols.map(sym => (
@@ -407,6 +418,18 @@ function ConfirmDialog({ message, onConfirm, onCancel }) {
   );
 }
 
+function UploadFolderRequired({ itemLabel }) {
+  return (
+    <div className="repo-upload-folder-required" role="status">
+      <span className="repo-upload-folder-required-icon">📁</span>
+      <div>
+        <strong>Choose a folder to upload {itemLabel}</strong>
+        <p>Create a folder or open an existing one first. Uploads are not stored in the repository root.</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Files Tab ────────────────────────────────────────────────────────────────
 function FilesTab({ companyId }) {
   const [items,         setItems]         = useState([]);
@@ -426,9 +449,12 @@ function FilesTab({ companyId }) {
   const [previewItem,  setPreviewItem]  = useState(null);
 
   const fileInputRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [displayName, setDisplayName] = useState("");
   const [uploading, setUploading] = useState(false);
 
   const canGoBack = breadcrumbs.length > 0;
+  const canUpload = currentFolder !== null;
   const currentFolderName = breadcrumbs[breadcrumbs.length - 1]?.name || "Repository root";
 
   const flash = (text, isErr = false) => {
@@ -500,17 +526,40 @@ function FilesTab({ companyId }) {
     finally { setFolderSaving(false); }
   };
 
-  const handleUpload = async (e) => {
+  const handleFileChange = (e) => {
     const file = e.target.files[0];
-    e.target.value = "";
     if (!file) return;
-    if (file.type !== "application/pdf") { flash("Only PDF files allowed", true); return; }
+    if (!canUpload) {
+      e.target.value = "";
+      flash("Open a folder before selecting a PDF", true);
+      return;
+    }
+    if (file.type !== "application/pdf") {
+      e.target.value = "";
+      flash("Only PDF files allowed", true);
+      return;
+    }
+    setSelectedFile(file);
+    setDisplayName(file.name);
+  };
+
+  const resetUpload = () => {
+    setSelectedFile(null);
+    setDisplayName("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    if (!canUpload) { flash("Open a folder before uploading a PDF", true); return; }
+    if (!selectedFile) { flash("Choose a PDF file", true); return; }
+    if (!displayName.trim()) { flash("Enter a file name", true); return; }
     setUploading(true);
     try {
       const fd = new FormData();
-      fd.append("file", file);
-      fd.append("displayName", file.name);
-      if (currentFolder != null) fd.append("parentId", currentFolder);
+      fd.append("file", selectedFile);
+      fd.append("displayName", displayName.trim());
+      fd.append("parentId", currentFolder);
       const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository/upload`, {
         method: "POST",
         body: fd,
@@ -518,6 +567,7 @@ function FilesTab({ companyId }) {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Upload failed");
       flash(`"${data.name}" uploaded`);
+      resetUpload();
       fetchItems();
     } catch (e) { flash(e.message, true); }
     finally { setUploading(false); }
@@ -564,10 +614,6 @@ function FilesTab({ companyId }) {
         <button className="repo-btn repo-btn-secondary" onClick={() => { setShowFolderForm(o => !o); setFolderName(""); }}>
           {showFolderForm ? "✕ Cancel" : "+ New Folder"}
         </button>
-        <button className="repo-btn repo-btn-primary" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-          {uploading ? "⏳ Uploading…" : "⬆ Upload PDF"}
-        </button>
-        <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: "none" }} onChange={handleUpload} />
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -609,11 +655,49 @@ function FilesTab({ companyId }) {
         </div>
       </div>
 
+      {canUpload ? (
+        <div className="repo-upload-card">
+          <h3 className="sym-card-title">Upload PDF</h3>
+          <form onSubmit={handleUpload} className="sym-upload-form">
+            <div className="sym-upload-preview-col">
+              <div className="sym-preview-box" aria-hidden="true">
+                <span className="sym-preview-empty">📄</span>
+              </div>
+              <label className="sym-file-btn">
+                {selectedFile ? "Change PDF" : "Choose PDF"}
+                <input ref={fileInputRef} type="file" accept="application/pdf"
+                  style={{ display: "none" }} onChange={handleFileChange} disabled={uploading} />
+              </label>
+              <p className="sym-file-hint">PDF · max 50 MB</p>
+            </div>
+            <div className="sym-upload-fields">
+              <div className="sym-field-group">
+                <label className="sym-label">File name *</label>
+                <input
+                  type="text" value={displayName} maxLength={255}
+                  placeholder="Choose a PDF to set its name"
+                  className="sym-input"
+                  onChange={e => setDisplayName(e.target.value)}
+                  disabled={uploading || !selectedFile}
+                />
+              </div>
+              <div className="sym-upload-actions">
+                <button type="submit" className="repo-btn repo-btn-primary" disabled={uploading || !selectedFile || !displayName.trim()}>
+                  {uploading ? "Uploading…" : "Upload PDF"}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      ) : (
+        <UploadFolderRequired itemLabel="files" />
+      )}
+
       {loading ? (
         <div className="loading" style={{ padding: 40 }}>Loading…</div>
       ) : items.length === 0 ? (
         <div className="repo-empty">
-          <p>{currentFolder ? "This folder is empty." : "No files yet — upload a PDF or create a folder to get started."}</p>
+          <p>{currentFolder ? "This folder is empty." : "No files yet — create a folder to get started."}</p>
         </div>
       ) : (
         <div className="repo-card-grid">

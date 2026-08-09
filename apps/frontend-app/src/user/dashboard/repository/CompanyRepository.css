@@ -599,13 +599,40 @@
 
 .repo-tab-body { padding-top: 4px; }
 
-/* Symbol upload card */
-.sym-card {
+/* Repository upload card */
+.repo-upload-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px 24px;
   margin-bottom: 24px;
+}
+
+.repo-upload-folder-required {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--text-secondary);
+}
+.repo-upload-folder-required-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+.repo-upload-folder-required strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.repo-upload-folder-required p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
 }
 .sym-card-title {
   font-size: 15px;

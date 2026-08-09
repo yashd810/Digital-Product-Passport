@@ -101,3 +101,32 @@ test("expiring repository access links remain the public file surface", () => {
   assert.ok(route);
   assert.equal(route.handlers[0], harness.publicReadRateLimit);
 });
+
+test("repository uploads require a folder in their matching scope", async () => {
+  const harness = registerHarness();
+  const cases = [
+    {
+      path: "/api/companies/:companyId/repository/upload",
+      error: "Choose an existing folder before uploading a file",
+    },
+    {
+      path: "/api/companies/:companyId/repository/symbols/upload",
+      error: "Choose an existing folder before uploading a symbol",
+    },
+  ];
+
+  for (const upload of cases) {
+    const route = harness.routes.find((entry) => entry.method === "post" && entry.path === upload.path);
+    assert.ok(route);
+
+    const res = createResponse();
+    await route.handlers.at(-1)({
+      params: { companyId: "7" },
+      body: {},
+      file: { buffer: Buffer.from("fixture"), size: 7, originalname: "fixture.pdf" },
+    }, res);
+
+    assert.equal(res.statusCode, 400);
+    assert.deepEqual(res.body, { error: upload.error });
+  }
+});

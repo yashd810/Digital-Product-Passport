@@ -51,6 +51,25 @@ module.exports = function registerRepositoryRoutes(app, {
     const contentType = String(value || "").trim().toLowerCase();
     return safeFileContentTypes.has(contentType) ? contentType : "application/octet-stream";
   };
+  const getUploadFolderId = async ({ companyId, parentId, repositoryScope }) => {
+    const candidate = String(parentId ?? "").trim();
+    if (!/^\d+$/.test(candidate)) return null;
+
+    const folderId = Number(candidate);
+    if (!Number.isSafeInteger(folderId) || folderId <= 0) return null;
+
+    const folder = await pool.query(
+      `SELECT id
+       FROM "companyRepository"
+       WHERE id = $1
+         AND "companyId" = $2
+         AND "repositoryScope" = $3
+         AND type = 'folder'
+       LIMIT 1`,
+      [folderId, companyId, repositoryScope]
+    );
+    return folder.rows.length ? folderId : null;
+  };
 
   const repositoryFileUrl = (req, row) => {
     if (row?.id && (getStorageKey(row) || getFilePath(row))) {
@@ -161,6 +180,14 @@ module.exports = function registerRepositoryRoutes(app, {
         if (!req.file) return res.status(400).json({ error: "No file received" });
         const { parentId, displayName } = req.body;
         const { companyId } = req.params;
+        const folderId = await getUploadFolderId({
+          companyId,
+          parentId,
+          repositoryScope: "files",
+        });
+        if (!folderId) {
+          return res.status(400).json({ error: "Choose an existing folder before uploading a file" });
+        }
         const stored = await storageService.saveRepositoryFile({
           companyId,
           buffer: req.file.buffer,
@@ -173,7 +200,7 @@ module.exports = function registerRepositoryRoutes(app, {
            VALUES ($1, $2, $3, 'file', 'files', $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
           [
             companyId,
-            parentId || null,
+            folderId,
             name,
             stored.path,
             stored.storageKey,
@@ -317,7 +344,14 @@ module.exports = function registerRepositoryRoutes(app, {
       try {
         if (!req.file) return res.status(400).json({ error: "No file uploaded" });
         const { companyId } = req.params;
-        const parentId = req.body.parentId ? parseInt(req.body.parentId, 10) : null;
+        const parentId = await getUploadFolderId({
+          companyId,
+          parentId: req.body.parentId,
+          repositoryScope: "symbols",
+        });
+        if (!parentId) {
+          return res.status(400).json({ error: "Choose an existing folder before uploading a symbol" });
+        }
         const displayName = req.body.name?.trim() || req.file.originalname.replace(/\.[^.]+$/, "");
         const stored = await storageService.saveRepositorySymbol({
           companyId,

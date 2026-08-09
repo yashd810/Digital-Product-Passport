@@ -319,12 +319,6 @@ export function usePassportListState({ user, companyId, filterByUser }) {
         type: "string",
         getValue: (group) => group.latest?.passportType || activeType || "",
       });
-    } else {
-      columns.push({
-        key: "createdBy",
-        type: "string",
-        getValue: (group) => group.latest?.createdByName || "",
-      });
     }
 
     return columns;
