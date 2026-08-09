@@ -382,7 +382,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
-  /api/companies/{companySlug}/integrations/v1/passports:
+  /api/companies/{companySlug}/dpp:
     post:
       operationId: createIntegrationPassport
       tags: [Integration write]
@@ -419,7 +419,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
-  /api/companies/{companySlug}/integrations/v1/passports/{dppId}:
+  /api/companies/{companySlug}/dpp/{dppId}:
     patch:
       operationId: updateIntegrationPassport
       tags: [Integration write]
@@ -482,7 +482,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
-  /api/companies/{companySlug}/integrations/v1/passports/{dppId}/archive:
+  /api/companies/{companySlug}/dpp/{dppId}/archive:
     post:
       operationId: archiveIntegrationPassport
       tags: [Integration write]
@@ -505,7 +505,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
-  /api/companies/{companySlug}/integrations/v1/passports/{dppId}/dynamic-values:
+  /api/companies/{companySlug}/dpp/{dppId}/dynamic-values:
     post:
       operationId: appendIntegrationDynamicValues
       tags: [Integration write]

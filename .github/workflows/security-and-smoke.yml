@@ -195,8 +195,10 @@ jobs:
       - name: Check local generator syntax and mappings
         run: |
           node --check local-tools/passport-module-generator/server.js
-          node --check local-tools/passport-module-generator/app.js
-          node --test local-tools/passport-module-generator/*.node.test.js
+          node --check local-tools/passport-module-generator/server/application.js
+          node --check local-tools/passport-module-generator/server/http/transport.js
+          node --check local-tools/passport-module-generator/client/workspace.js
+          node --test local-tools/passport-module-generator/tests/*.node.test.js
       - name: Check deployment shell scripts
         run: |
           bash -n infra/oracle/bootstrap.sh

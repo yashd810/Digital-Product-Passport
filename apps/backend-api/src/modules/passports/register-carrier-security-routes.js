@@ -526,7 +526,7 @@ function registerCarrierSecurityRoutes(app, deps) {
     }
   });
 
-  app.post("/api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values", requireBearerToken, authenticateToken, integrationWriteRateLimit, resolveIntegrationCompanySlug, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companySlug/dpp/:dppId/dynamic-values", requireBearerToken, authenticateToken, integrationWriteRateLimit, resolveIntegrationCompanySlug, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
       const passportContext = await loadPassportContext(dppId);

@@ -162,13 +162,13 @@ test("standards DPP mutation routes hide explicit server-status failures", async
     },
   });
 
-  const createRoute = routes.find((route) => route.method === "post" && route.routePath === "/api/companies/:companySlug/integrations/v1/passports");
+  const createRoute = routes.find((route) => route.method === "post" && route.routePath === "/api/companies/:companySlug/dpp");
   const createRouteResponse = createResponse();
   await createRoute.handlers.at(-1)({ params: { companyId: "1" }, body: {} }, createRouteResponse);
   assert.equal(createRouteResponse.statusCode, 500);
   assert.deepEqual(createRouteResponse.body, { error: "Failed to create DPP" });
 
-  const updateRoute = routes.find((route) => route.method === "patch" && route.routePath === "/api/companies/:companySlug/integrations/v1/passports/:dppId");
+  const updateRoute = routes.find((route) => route.method === "patch" && route.routePath === "/api/companies/:companySlug/dpp/:dppId");
   const updateResponse = createResponse();
   await updateRoute.handlers.at(-1)({ params: { companyId: "1", dppId: "dpp-a" } }, updateResponse);
   assert.equal(updateResponse.statusCode, 500);

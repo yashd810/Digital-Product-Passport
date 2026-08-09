@@ -73,7 +73,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, comp
   };
 
   const companySlug = slugifyCompanyName(companyName || passport.companyName);
-  const endpoint = `${apiBase}/api/companies/${companySlug}/integrations/v1/passports/${passport.dppId}/dynamic-values`;
+  const endpoint = `${apiBase}/api/companies/${companySlug}/dpp/${passport.dppId}/dynamic-values`;
   const exampleBody = dynFields.length
     ? `{\n${dynFields.map((field) => `  "${field.key}": "value"`).join(",\n")}\n}`
     : `{\n  "fieldKey": "value"\n}`;

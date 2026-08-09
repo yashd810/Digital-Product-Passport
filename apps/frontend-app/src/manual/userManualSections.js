@@ -620,7 +620,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         {
           title: "Use Bearer tokens and security group keys correctly",
           items: [
-            "Use the JWT issued from Dashboard > Security or `POST /api/users/me/token` for create, patch, archive, delete, or dynamic-value operations under `/api/companies/:companySlug/integrations/v1/passports`.",
+            "Use the JWT issued from Dashboard > Security or `POST /api/users/me/token` for create, patch, archive, delete, or dynamic-value operations under `/api/companies/:companySlug/dpp`.",
             "Device Integration supplies the endpoint and payload shape only; it does not issue, copy, or rotate a separate per-device API key.",
             "Use the security group API key in the public viewer unlock flow when selected restricted fields must be revealed to an allowed audience.",
             "Use the normal company session or Bearer token for Passport Data Management; its write routes still enforce company and editor permissions.",
@@ -860,7 +860,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         { label: "Read-only external partner path", value: "/api/public/passports/:dppId with a security group X-API-Key" },
         { label: "Public passport path", value: "/api/public/passports/:dppId without login" },
         { label: "Restricted-field path", value: "GET /api/public/passports/:dppId with X-API-Key" },
-        { label: "Live-value write path", value: "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values with the JWT from POST /api/users/me/token as a Bearer token" },
+        { label: "Live-value write path", value: "POST /api/companies/:companySlug/dpp/:dppId/dynamic-values with the JWT from POST /api/users/me/token as a Bearer token" },
       ],
       journeys: [
         {

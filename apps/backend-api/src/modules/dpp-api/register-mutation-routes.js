@@ -69,7 +69,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     type: "object",
     minProperties: 1,
   };
-  const integrationPassportsBase = "/api/companies/:companySlug/integrations/v1/passports";
+  const publicDppBase = "/api/companies/:companySlug/dpp";
   const resolveIntegrationCompanySlug = createIntegrationCompanySlugResolver({ pool, logger });
 
   async function hasActivePassportTypeAccess(req, passport) {
@@ -97,7 +97,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     next();
   }
 
-  app.post(integrationPassportsBase, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, attachIntegrationCompanyContext, createValidationMiddleware({
+  app.post(publicDppBase, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, attachIntegrationCompanyContext, createValidationMiddleware({
     body: dppCreateSchema,
   }), async (req, res) => {
     try {
@@ -115,13 +115,13 @@ module.exports = function registerMutationRoutes(app, deps) {
     }
   });
 
-  app.options(`${integrationPassportsBase}/:dppId`, (req, res) => {
+  app.options(`${publicDppBase}/:dppId`, (req, res) => {
     setDppMergePatchHeaders(res);
     res.setHeader("Allow", "PATCH, DELETE, OPTIONS");
     return res.status(204).send();
   });
 
-  app.patch(`${integrationPassportsBase}/:dppId`, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, createValidationMiddleware({
+  app.patch(`${publicDppBase}/:dppId`, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, createValidationMiddleware({
     params: {
       type: "object",
       required: ["companySlug", "dppId"],
@@ -148,7 +148,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     }
   });
 
-  app.delete(`${integrationPassportsBase}/:dppId`, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, async (req, res) => {
+  app.delete(`${publicDppBase}/:dppId`, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, async (req, res) => {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
       const routeCompanyId = Number.parseInt(req.params.companyId, 10);
@@ -173,7 +173,7 @@ module.exports = function registerMutationRoutes(app, deps) {
           return res.status(409).json({
             error: "releasedDppRequiresArchive",
             message: "Released DPPs must use the archive lifecycle action instead of DELETE.",
-            archiveEndpoint: `/api/companies/${encodeURIComponent(req.params.companySlug)}/integrations/v1/passports/${encodeURIComponent(dppId)}/archive`,
+            archiveEndpoint: `/api/companies/${encodeURIComponent(req.params.companySlug)}/dpp/${encodeURIComponent(dppId)}/archive`,
             ...buildDppIdentifierFields(released.passport)
           });
         }
@@ -278,7 +278,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     }
   });
 
-  app.post(`${integrationPassportsBase}/:dppId/archive`, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, async (req, res) => {
+  app.post(`${publicDppBase}/:dppId/archive`, requireBearerToken, authenticateToken, integrationWriteRateLimit, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, async (req, res) => {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
       const routeCompanyId = Number.parseInt(req.params.companyId, 10);

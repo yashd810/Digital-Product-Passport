@@ -22,7 +22,7 @@ If you are tracing a frontend request, first figure out which group it belongs t
 | Platform administration | `/api/admin/...` | registered module discovery, module-backed passport-type profiles, company creation and DPP policy, company type access, platform analytics, and super-admin audit logs |
 | Public passports | `/api/public/passports/:dppId...`, `/api/public/companies/:companySlug/profile`, `/did/...`, `/resolve`, `/contexts/...` | public-safe reads, optional security-group restricted-field unlocks, semantic outputs, signatures, DID resolution |
 | Semantic models | `/api/semantic-models...`, `/dictionary/:family/:version...` | semantic model metadata and dictionary browsing |
-| Integration write API | `/api/companies/:companySlug/integrations/v1/passports...` | company automation create, patch, delete, archive, and dynamic-value writes with Bearer authentication |
+| Company DPP API | `/api/companies/:companySlug/dpp...` | company automation create, patch, delete, archive, and dynamic-value writes with Bearer authentication |
 | Health | `/health` (public), `/health/storage` (backend-container loopback only) | database health; storage write/read/delete probe |
 
 ## Main Route Files

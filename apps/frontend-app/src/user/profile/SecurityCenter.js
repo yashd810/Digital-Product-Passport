@@ -265,7 +265,7 @@ function SecurityCenter({ user, companyId }) {
     || !selectedPassportType
     || selectedFieldKeys.length === 0
     || (scopeType === "passports" && selectedPassportDppIds.length === 0);
-  const bearerExample = `curl -X POST ${api}/api/companies/your-company-name/integrations/v1/passports \\
+  const bearerExample = `curl -X POST ${api}/api/companies/your-company-slug/dpp \\
   -H "Authorization: Bearer $DPP_BEARER_TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{"passportType":"yourPassportType","productIdentifier":"yourProductIdentifier"}'`;

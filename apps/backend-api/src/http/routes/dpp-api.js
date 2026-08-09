@@ -15,7 +15,7 @@ const {
   createComplianceManagedFieldHelpers,
 } = require("../../modules/passports/compliance-managed-fields");
 
-// ─── COMPANY INTEGRATION DPP MUTATIONS ───────────────────────────────────────
+// ─── PUBLIC COMPANY DPP MUTATIONS ────────────────────────────────────────────
 
 module.exports = function registerDppApiRoutes(app, {
   pool,
@@ -88,7 +88,7 @@ module.exports = function registerDppApiRoutes(app, {
     isDppRecordId,
   });
 
-  app.use("/api/companies/:companySlug/integrations/v1", (req, res, next) => {
+  app.use("/api/companies/:companySlug/dpp", (req, res, next) => {
     const originalJson = res.json.bind(res);
     res.json = (payload) => originalJson(applyStandardsResultEnvelope(req, res, payload));
     next();

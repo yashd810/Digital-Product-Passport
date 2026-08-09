@@ -127,7 +127,7 @@ test("standards DELETE rejects a revoked passport type before deleting a draft",
   });
   const route = routes.find((entry) => (
     entry.method === "delete"
-    && entry.routePath === "/api/companies/:companySlug/integrations/v1/passports/:dppId"
+    && entry.routePath === "/api/companies/:companySlug/dpp/:dppId"
   ));
   const response = createResponse();
 
@@ -149,7 +149,7 @@ test("standards archive rejects a revoked passport type before reading the linea
   });
   const route = routes.find((entry) => (
     entry.method === "post"
-    && entry.routePath === "/api/companies/:companySlug/integrations/v1/passports/:dppId/archive"
+    && entry.routePath === "/api/companies/:companySlug/dpp/:dppId/archive"
   ));
   const response = createResponse();
 

@@ -238,7 +238,7 @@ async function run() {
         audience: "dpp-app",
       }
     );
-    const integrationBase = "/api/companies/codex-verification-company/integrations/v1/passports";
+    const integrationBase = "/api/companies/codex-verification-company/dpp";
     const missingOriginCookieMutation = await fetchJson(integrationBase, {
       method: "POST",
       headers: {

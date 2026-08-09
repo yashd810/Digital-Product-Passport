@@ -336,8 +336,8 @@ export const backendApiFamilies = [
     ],
   },
   {
-    name: "Standards-oriented DPP API",
-    route: "/api/companies/:companySlug/integrations/v1/passports*",
+    name: "Company DPP API",
+    route: "/api/companies/:companySlug/dpp*",
     details: [
       "Creates, patches, archives, and deletes DPPs using standards-oriented payload names such as productIdentifier, uniqueProductIdentifier, granularity, economicOperatorId, and facilityId.",
       "Uses the same backend permission model as dashboard write APIs and requires the authenticated company user's JWT as a Bearer token; the JWT is issued by POST /api/users/me/token.",
@@ -346,7 +346,7 @@ export const backendApiFamilies = [
   },
   {
     name: "Dynamic field ingestion",
-    route: "/api/public/passports/:dppId/dynamic-values*, /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values, and /api/companies/:companyId/passports/:dppId/dynamic-values",
+    route: "/api/public/passports/:dppId/dynamic-values*, /api/companies/:companySlug/dpp/:dppId/dynamic-values, and /api/companies/:companyId/passports/:dppId/dynamic-values",
     details: [
       "Returns public live dynamic values and their history for released or obsolete passports; the same security group key unlocks selected restricted dynamic fields.",
       "Accepts live-value pushes through the company integration namespace using the authenticated user's JWT from POST /api/users/me/token as a Bearer token.",
@@ -556,7 +556,7 @@ export const apiGettingStartedFlows = [
     steps: [
       "A company user opens Device Integration for the passport and copies the Bearer-token integration endpoint and payload example.",
       "While signed in, issue an authenticated-user JWT from Dashboard > Security or by calling POST /api/users/me/token. Device Integration does not create a separate passport-specific key.",
-      "The device sends POST /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values with Authorization: Bearer <token>.",
+      "The device sends POST /api/companies/:companySlug/dpp/:dppId/dynamic-values with Authorization: Bearer <token>.",
       "The body is a simple object such as { temperature: 22.4, mass: 18.1 }.",
       "Public viewers and dashboards can then read the latest values and history from the dynamic-value endpoints.",
     ],
@@ -625,10 +625,10 @@ export const publicAndLiveApiTable = {
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What it returns or does"],
   rows: [
     ["Public passport read", "GET /api/public/passports/:dppId", "None for public fields; optional X-API-Key for selected restricted fields", "Optional query: version", "Returns public passport data and, when the key is valid, only the restricted fields selected for that security group."],
-    ["Integration create passport", "POST /api/companies/:companySlug/integrations/v1/passports", "Authorization: Bearer <JWT issued by POST /api/users/me/token>, editor permission, and an active grant for passportType", "{ passportType, productIdentifier, granularity, camelCaseFieldKey: value, ... }", "Creates a company-scoped DPP draft. Passport values use canonical semantic camelCase field keys directly at the top level."],
-    ["Integration patch passport", "PATCH /api/companies/:companySlug/integrations/v1/passports/:dppId", "Authorization: Bearer <JWT issued by POST /api/users/me/token>, editor permission, and an active grant for the record's passport type", "{ camelCaseFieldKey: value, granularity, economicOperatorId, facilityId }", "Updates an editable company passport by DPP ID using canonical semantic camelCase field keys directly."],
-    ["Integration archive passport", "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/archive", "Authorization: Bearer <JWT issued by POST /api/users/me/token>, editor permission, and an active grant for the record's passport type", "No body", "Archives a released company passport."],
-    ["Integration delete passport", "DELETE /api/companies/:companySlug/integrations/v1/passports/:dppId", "Authorization: Bearer <JWT issued by POST /api/users/me/token>, editor permission, and an active grant for the record's passport type", "No body", "Hard-deletes a draft, soft-deletes another editable status after snapshotting it, or returns the archive endpoint for a released passport."],
+    ["Create a DPP", "POST /api/companies/:companySlug/dpp", "Authorization: Bearer <JWT issued by POST /api/users/me/token>, editor permission, and an active grant for passportType", "{ passportType, productIdentifier, granularity, camelCaseFieldKey: value, ... }", "Creates a company-scoped DPP draft. Passport values use canonical semantic camelCase field keys directly at the top level."],
+    ["Update a DPP", "PATCH /api/companies/:companySlug/dpp/:dppId", "Authorization: Bearer <JWT issued by POST /api/users/me/token>, editor permission, and an active grant for the record's passport type", "{ camelCaseFieldKey: value, granularity, economicOperatorId, facilityId }", "Updates an editable company passport by DPP ID using canonical semantic camelCase field keys directly."],
+    ["Archive a DPP", "POST /api/companies/:companySlug/dpp/:dppId/archive", "Authorization: Bearer <JWT issued by POST /api/users/me/token>, editor permission, and an active grant for the record's passport type", "No body", "Archives a released company passport."],
+    ["Delete a DPP", "DELETE /api/companies/:companySlug/dpp/:dppId", "Authorization: Bearer <JWT issued by POST /api/users/me/token>, editor permission, and an active grant for the record's passport type", "No body", "Hard-deletes a draft, soft-deletes another editable status after snapshotting it, or returns the archive endpoint for a released passport."],
     ["Canonical passport by DPP ID", "GET /api/public/passports/:dppId", "No auth", "Optional version query", "Canonical public-safe passport payload and linked-data references."],
     ["Public passport history", "GET /api/public/passports/:dppId/history", "None for public changes; optional X-API-Key for selected restricted fields", "No body", "Public version history plus changes to restricted fields selected for a valid security group."],
     ["Access restricted fields", "GET /api/public/passports/:dppId", "X-API-Key or X-Security-Group-Key header", "No body", "Returns only the restricted fields selected for that security group when the key applies to the passport."],
@@ -642,7 +642,7 @@ export const publicAndLiveApiTable = {
     ["Save QR code", "POST /api/companies/:companyId/passports/:dppId/qrcode", "Session cookie or bearer token, company access, editor or company admin", "QR payload and optional carrierAuthenticity metadata", "Stores the passport QR code and carrier authenticity metadata."],
     ["Read latest live values", "GET /api/public/passports/:dppId/dynamic-values", "No auth", "No body", "The most recent public live value per dynamic field for a released or obsolete passport."],
     ["Read one live field history", "GET /api/public/passports/:dppId/dynamic-values/:fieldKey/history", "No auth", "Optional query param: limit", "Time-series history for one public dynamic field on a released or obsolete passport."],
-    ["Push live device values", "POST /api/companies/:companySlug/integrations/v1/passports/:dppId/dynamic-values", "Authorization: Bearer <JWT issued by POST /api/users/me/token>", "{ fieldKey: value, anotherField: value }", "Stores a new live reading per field; no passport-specific device API key is issued."],
+    ["Push live device values", "POST /api/companies/:companySlug/dpp/:dppId/dynamic-values", "Authorization: Bearer <JWT issued by POST /api/users/me/token>", "{ fieldKey: value, anotherField: value }", "Stores a new live reading per field; no passport-specific device API key is issued."],
     ["Manual live-value override", "PATCH /api/companies/:companyId/passports/:dppId/dynamic-values", "Session cookie or bearer token, company access, editor or company admin", "{ fieldKey: value }", "Lets a user save manual live values without a physical device push."],
   ],
 };
