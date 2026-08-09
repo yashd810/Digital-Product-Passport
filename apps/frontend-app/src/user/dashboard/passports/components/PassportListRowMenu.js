@@ -8,6 +8,7 @@ import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUr
 import { buildDashboardPath } from "../../utils/dashboardRoutes";
 import { KebabMenu } from "./PassportListComponents";
 import { passportAuthoringAccessMessage } from "../../../../shared/auth/passportAuthoringAccess";
+import { useI18n } from "../../../../app/providers/i18n";
 
 export function PassportListRowMenu({
   anchorRect,
@@ -30,6 +31,7 @@ export function PassportListRowMenu({
   companyName,
   companyId,
 }) {
+  const { t } = useI18n();
   const effectivePassportType = passport.passportType || pType;
   const compareVersionsPath = buildDashboardPath({
     companyName,
@@ -52,7 +54,7 @@ export function PassportListRowMenu({
   return (
     <KebabMenu anchorRect={anchorRect} open={isOpen} onClose={closeMenu}>
       <button className="menu-item" onClick={() => togglePin(passport.dppId)}>
-        {isPinned ? "📌 Unpin" : "📌 Pin to top"}
+        📌 {isPinned ? t("unpin") : t("pinToTop")}
       </button>
       <button
         className={`menu-item edit-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`}
@@ -71,7 +73,7 @@ export function PassportListRowMenu({
         🎯 Release
       </button>
       <button className="menu-item" onClick={() => { setReleaseModal({ ...passport, passportType: effectivePassportType, checkerOnly: true }); setOpenMenuId(null); }}>
-        🧪 Verification check
+        🧪 {t("verificationCheck")}
       </button>
       <button
         className={`menu-item revise-item${!isReleasedPassportStatus(passport.releaseStatus) ? " disabled" : ""}`}
@@ -86,43 +88,43 @@ export function PassportListRowMenu({
         title={canManagePassport ? undefined : passportAuthoringAccessMessage}
         onClick={() => runManagedAction(() => handleClone(passport, effectivePassportType))}
       >
-        🔁 Clone
+        🔁 {t("clone")}
       </button>
       <button className="menu-item" onClick={() => { navigate(compareVersionsPath); setOpenMenuId(null); }}>
-        🕘 Update history
+        🕘 {t("updateHistory")}
       </button>
       <button
         className="menu-item"
         title={canManagePassport ? undefined : passportAuthoringAccessMessage}
         onClick={() => runManagedAction(() => { setDeviceModal({ passport, pType: effectivePassportType }); closeMenu(); })}
       >
-        📡 Device Integration
+        📡 {t("deviceIntegration")}
       </button>
       <button
         className="menu-item"
         onClick={() => {
           const path = getViewerPath(passport);
           if (!path) {
-            showError("No viewer link is available for this passport");
+            showError(t("noViewerLink"));
             setOpenMenuId(null);
             return;
           }
           const isPassportLink = getPassportLinkType(passport.releaseStatus) === "passport";
           const url = isPassportLink ? buildPublicViewerUrl(path) : `${window.location.origin}${path}`;
           if (!url) {
-            showError("No viewer link is available for this passport");
+            showError(t("noViewerLink"));
             setOpenMenuId(null);
             return;
           }
           navigator.clipboard.writeText(url).then(() => {
-            showSuccess(`${isPassportLink ? "Passport" : "Preview"} link copied to clipboard`);
+            showSuccess(t(isPassportLink ? "passportLinkCopied" : "previewLinkCopied"));
           }).catch(() => {
-            showError("Could not copy link");
+            showError(t("linkCopyFailed"));
           });
           setOpenMenuId(null);
         }}
       >
-        🔗 {getPassportLinkType(passport.releaseStatus) === "passport" ? "Copy passport link" : "Copy preview link"}
+        🔗 {t(getPassportLinkType(passport.releaseStatus) === "passport" ? "copyPassportLink" : "copyPreviewLink")}
       </button>
     </KebabMenu>
   );

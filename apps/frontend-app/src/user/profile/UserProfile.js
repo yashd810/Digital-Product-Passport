@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useI18n } from "../../app/providers/i18n";
+import { translateText, useI18n } from "../../app/providers/i18n";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import AppSelect from "../../shared/components/AppSelect";
 import {
@@ -21,8 +21,10 @@ function UserProfile({
   profileSubtitle,
   showPersonalInfo = true,
   showHeader = true,
+  localize = true,
 }) {
   const { t } = useI18n();
+  const dashboardT = (key, values) => localize ? t(key, values) : translateText("en", key, values);
   const flashRef = useRef(null);
 
   const [profile,    setProfile]    = useState(null);
@@ -193,7 +195,7 @@ function UserProfile({
     <div className="profile-page">
       {showHeader && (
         <div className="profile-header">
-          <h2 className="profile-title">{profileTitle || t("myProfile")}</h2>
+          <h2 className="profile-title">{profileTitle || dashboardT("myProfile")}</h2>
           <p className="profile-sub">{profileSubtitle || user?.email}</p>
         </div>
       )}
@@ -214,30 +216,30 @@ function UserProfile({
               <form onSubmit={handleSaveProfile} className="profile-form">
                 <div className="form-row-2">
                   <div className="form-group">
-                    <label>{t("firstName")}</label>
+                    <label>{dashboardT("firstName")}</label>
                     <input type="text" value={firstName} disabled={saving}
                       onChange={e => setFirstName(e.target.value)} />
                   </div>
                   <div className="form-group">
-                    <label>{t("lastName")}</label>
+                    <label>{dashboardT("lastName")}</label>
                     <input type="text" value={lastName} disabled={saving}
                       onChange={e => setLastName(e.target.value)} />
                   </div>
                 </div>
                 <div className="form-row-2">
                   <div className="form-group">
-                    <label>{t("phone")} <span className="opt">(optional)</span></label>
+                    <label>{dashboardT("phone")} <span className="opt">({dashboardT("optional")})</span></label>
                     <input type="tel" value={phone} placeholder="+46 70 000 0000" disabled={saving}
                       onChange={e => setPhone(e.target.value)} />
                   </div>
                   <div className="form-group">
-                    <label>{t("jobTitle")} <span className="opt">(optional)</span></label>
+                    <label>{dashboardT("jobTitle")} <span className="opt">({dashboardT("optional")})</span></label>
                     <input type="text" value={jobTitle} placeholder="e.g. Product Manager" disabled={saving}
                       onChange={e => setJobTitle(e.target.value)} />
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>{t("bio")} <span className="opt">(optional)</span></label>
+                  <label>{dashboardT("bio")} <span className="opt">({dashboardT("optional")})</span></label>
                   <textarea rows={3} value={bio} placeholder="Brief description…" disabled={saving}
                     onChange={e => setBio(e.target.value)} />
                 </div>
@@ -281,7 +283,7 @@ function UserProfile({
 
                 <div className="form-actions">
                   <button type="submit" className="btn-primary dashboard-btn-primary">
-                    {saving ? "Saving…" : t("saveChanges")}
+                    {saving ? "Saving…" : dashboardT("saveChanges")}
                   </button>
                 </div>
               </form>
@@ -290,7 +292,7 @@ function UserProfile({
 
           {/* Change Password */}
           <div className="profile-card">
-            <h4 className="card-section-title">🔒 {t("changePassword")}</h4>
+            <h4 className="card-section-title">🔒 {dashboardT("changePassword")}</h4>
             <form onSubmit={handleChangePw} className="profile-form">
               <div className="form-group">
                 <label>Current Password</label>
@@ -299,7 +301,7 @@ function UserProfile({
               </div>
               <div className="form-row-2">
                 <div className="form-group">
-                  <label>{t("newPassword")}</label>
+                  <label>{dashboardT("newPassword")}</label>
                   <input type="password" value={newPw} placeholder={`Min. ${passwordMinLength} characters`} disabled={savingPw}
                     onChange={e => setNewPw(e.target.value)} required minLength={passwordMinLength} />
                   <span style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
@@ -307,7 +309,7 @@ function UserProfile({
                   </span>
                 </div>
                 <div className="form-group">
-                  <label>{t("confirmPassword")}</label>
+                  <label>{dashboardT("confirmPassword")}</label>
                   <input type="password" value={confPw} placeholder="Repeat" disabled={savingPw}
                     className={confPw && confPw !== newPw ? "profile-input-error" : ""}
                     onChange={e => setConfPw(e.target.value)} required

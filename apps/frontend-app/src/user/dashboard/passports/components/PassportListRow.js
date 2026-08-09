@@ -9,6 +9,7 @@ import { CompletenessBar } from "./PassportListComponents";
 import { PassportListRowMenu } from "./PassportListRowMenu";
 import { formatPassportDate, getPassportSerialNumberForType } from "../utils/passportListHelpers";
 import { canManagePassports } from "../../../../shared/auth/passportAuthoringAccess";
+import { useI18n } from "../../../../app/providers/i18n";
 
 function PassportIdentifierText({ value, className, cellId, onIdentifierColumnWidthChange }) {
   const measurementRef = useRef(null);
@@ -93,6 +94,7 @@ export function PassportListRow({
   togglePin,
   onIdentifierColumnWidthChange,
 }) {
+  const { t } = useI18n();
   const pType = passport.passportType || activeType;
   const menuId = `${passport.dppId}-${passport.versionNumber}`;
   const isOpen = openMenuId === menuId;
@@ -105,10 +107,10 @@ export function PassportListRow({
   const serialNumber = getPassportSerialNumberForType(passport, allPassportTypes);
   const passportLinkType = getPassportLinkType(passport.releaseStatus);
   const viewerActionLabel = passportLinkType === "passport"
-    ? "View passport"
+    ? t("viewPassport")
     : passportLinkType === "inactive"
-      ? "View historical passport"
-      : "Preview passport";
+      ? t("viewHistoricalPassport")
+      : t("previewPassport");
   const viewerDestination = getViewerDestination(passport);
 
   return (
@@ -137,7 +139,7 @@ export function PassportListRow({
           />
         </td>
       )}
-      <td className="passport-pin-cell" title={isPinned ? "Pinned" : ""}>
+      <td className="passport-pin-cell" title={isPinned ? t("pinned") : ""}>
         {!isHistorical && isPinned ? "📌" : ""}
       </td>
       <td className="passport-version-col">
@@ -151,7 +153,7 @@ export function PassportListRow({
                 togglePassportGroup(parentGuid);
               }}
               aria-expanded={isExpanded}
-              aria-label={isExpanded ? "Hide older versions" : "Show older versions"}
+              aria-label={isExpanded ? t("hideOlderVersions") : t("showOlderVersions")}
             >
               {isExpanded ? "▾" : "▸"}
             </button>
@@ -183,9 +185,9 @@ export function PassportListRow({
             href={viewerDestination.url}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={`${viewerActionLabel}: ${passport.modelName || passport.dppId} (opens in a new tab)`}
+            aria-label={`${viewerActionLabel}: ${passport.modelName || passport.dppId} (${t("opensInNewTab")})`}
           >
-            View
+            {t("view")}
           </a>
         ) : (
           <button
@@ -195,7 +197,7 @@ export function PassportListRow({
             disabled={!viewerDestination}
             aria-label={`${viewerActionLabel}: ${passport.modelName || passport.dppId}`}
           >
-            View
+            {t("view")}
           </button>
         )}
       </td>
@@ -205,7 +207,7 @@ export function PassportListRow({
             type="button"
             className="kebab-menu-btn"
             onClick={e => openMenu(e, menuId)}
-            aria-label={`Passport options for ${passport.modelName || serialNumber || passport.dppId}`}
+            aria-label={t("passportOptionsFor", { passport: passport.modelName || serialNumber || passport.dppId })}
           >
             ⋮
           </button>

@@ -1,4 +1,5 @@
 import React from "react";
+import { useI18n } from "../../../../app/providers/i18n";
 
 export function PassportListPagination({
   currentPage,
@@ -7,18 +8,21 @@ export function PassportListPagination({
   filteredAndSortedPassports,
   totalPages,
 }) {
+  const { t } = useI18n();
+  const from = (currentPage - 1) * rowsPerPage + 1;
+  const to = Math.min(currentPage * rowsPerPage, filteredAndSortedPassports.length);
   return (
     <div className="passport-pagination">
       <div className="passport-pagination-summary">
-        Showing {(currentPage - 1) * rowsPerPage + 1}-{Math.min(currentPage * rowsPerPage, filteredAndSortedPassports.length)} of {filteredAndSortedPassports.length}
+        {t("showingPassports", { from, to, total: filteredAndSortedPassports.length })}
       </div>
       <div className="passport-pagination-controls">
         <button type="button" className="passport-page-btn" onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} disabled={currentPage === 1}>
-          Previous
+          {t("previous")}
         </button>
-        <span className="passport-page-indicator">Page {currentPage} of {totalPages}</span>
+        <span className="passport-page-indicator">{t("pageOf", { current: currentPage, total: totalPages })}</span>
         <button type="button" className="passport-page-btn" onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>
-          Next
+          {t("next")}
         </button>
       </div>
     </div>

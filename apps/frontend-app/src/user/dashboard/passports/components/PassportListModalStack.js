@@ -1,4 +1,5 @@
 import React from "react";
+import { useI18n } from "../../../../app/providers/i18n";
 import { ReleaseModal } from "../../workflow/WorkflowDashboard";
 import {
   ArchiveConfirmModal,
@@ -47,6 +48,7 @@ export function PassportListModalStack({
   confirmArchive,
   paginatedPassports,
 }) {
+  const { t } = useI18n();
   return (
     <>
       {releaseModal && (
@@ -75,12 +77,16 @@ export function PassportListModalStack({
       {archiveConfirm && (
         <ArchiveConfirmModal
           title={archiveConfirm.mode === "bulk"
-            ? `Archive ${archiveConfirm.count} passport${archiveConfirm.count !== 1 ? "s" : ""}?`
-            : "Archive this passport?"}
+            ? t("archiveCount", {
+              count: archiveConfirm.count,
+              suffix: archiveConfirm.count !== 1 ? "s" : "",
+              passport: archiveConfirm.count === 1 ? "Pass" : "Pässe",
+            })
+            : t("archiveThisPassport")}
           message={archiveConfirm.mode === "bulk"
-            ? "The selected passports will be moved to the archive and removed from the active list."
-            : "This passport will be moved to the archive and removed from the active list."}
-          confirmLabel={archiveConfirm.mode === "bulk" ? "Archive Selected" : "Archive Passport"}
+            ? t("archiveBulkMessage")
+            : t("archiveSingleMessage")}
+          confirmLabel={archiveConfirm.mode === "bulk" ? t("archiveSelected") : t("archivePassport")}
           isSubmitting={bulkActionLoading}
           onClose={() => { if (!bulkActionLoading) setArchiveConfirm(null); }}
           onConfirm={confirmArchive}

@@ -2,6 +2,7 @@ import React, { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../../../shared/passports/passportSchemaUtils";
+import { useI18n } from "../../../../app/providers/i18n";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -16,6 +17,7 @@ function slugifyCompanyName(value) {
 }
 
 export function DeviceIntegrationModal({ passport, passportType, companyId, companyName = "", onClose }) {
+  const { t } = useI18n();
   const [dynFields, setDynFields] = useState([]);
   const [manualVals, setManualVals] = useState({});
   const [saving, setSaving] = useState(false);
@@ -63,10 +65,10 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, comp
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(manualVals),
       });
-      setSaveMsg(r.ok ? "Saved!" : "Save failed");
+      setSaveMsg(r.ok ? t("saved") : t("saveFailed"));
       setTimeout(() => setSaveMsg(""), 3000);
     } catch {
-      setSaveMsg("Save failed");
+      setSaveMsg(t("saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -89,8 +91,8 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, comp
         aria-describedby={dialogDescriptionId}
       >
         <div className="modal-header">
-          <span id={dialogTitleId} className="modal-title">Device Integration — {passport.modelName}</span>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close device integration modal">✕</button>
+          <span id={dialogTitleId} className="modal-title">{t("deviceIntegrationTitle", { model: passport.modelName })}</span>
+          <button type="button" className="modal-close" onClick={onClose} aria-label={t("closeDeviceIntegrationModal")}>✕</button>
         </div>
 
         <div className="device-modal-body">
@@ -108,22 +110,22 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, comp
               border: 0,
             }}
           >
-            Review the Bearer-token push endpoint and override dynamic field values for this passport.
+            {t("deviceIntegrationDescription")}
           </p>
           <section className="device-section">
-            <h4 className="device-section-title">Push Endpoint</h4>
+            <h4 className="device-section-title">{t("pushEndpoint")}</h4>
             <p className="device-section-desc">
-              Use a company service Bearer token with permission to update this company passport.
+              {t("pushEndpointDescription")}
             </p>
             <div className="device-code-block">
               <div className="device-code-line"><span className="device-code-method">POST</span> <span className="device-code-url">{endpoint}</span></div>
               <div className="device-code-line device-code-line-spaced">
-                <span className="device-code-comment">Headers:</span>
+                <span className="device-code-comment">{t("headers")}</span>
               </div>
               <div className="device-code-line device-code-indent">Authorization: Bearer <em>&lt;company service token&gt;</em></div>
               <div className="device-code-line device-code-indent">Content-Type: application/json</div>
               <div className="device-code-line device-code-line-spaced">
-                <span className="device-code-comment">Body:</span>
+                <span className="device-code-comment">{t("body")}</span>
               </div>
               <pre className="device-code-pre">{exampleBody}</pre>
             </div>
@@ -131,8 +133,8 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, comp
 
           {dynFields.length > 0 && (
             <section className="device-section">
-              <h4 className="device-section-title">Manual Override</h4>
-              <p className="device-section-desc">Set values directly without a device (useful for testing).</p>
+              <h4 className="device-section-title">{t("manualOverride")}</h4>
+              <p className="device-section-desc">{t("manualOverrideDescription")}</p>
               <div className="device-manual-grid">
                 {dynFields.map((field) => (
                   <div key={field.key} className="device-manual-row">
@@ -142,7 +144,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, comp
                       type="text"
                       className="device-manual-input"
                       value={manualVals[field.key] ?? ""}
-                      placeholder="Enter value…"
+                      placeholder={t("enterValue")}
                       onChange={(e) => setManualVals((prev) => ({ ...prev, [field.key]: e.target.value }))}
                     />
                   </div>
@@ -150,7 +152,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, comp
               </div>
               <div className="device-manual-actions">
                 <button type="button" className="submit-btn" onClick={handleSaveManual} disabled={saving}>
-                  {saving ? "Saving…" : "Save Values"}
+                  {saving ? t("loading") : t("saveValues")}
                 </button>
                 {saveMsg && <span className="device-save-msg" role="status" aria-live="polite">{saveMsg}</span>}
               </div>
@@ -159,7 +161,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, comp
 
           {dynFields.length === 0 && (
             <div className="device-no-dynamic">
-              This passport type has no dynamic fields defined. Mark fields as "Dynamic" in the passport type editor to enable live data.
+              {t("noDynamicFields")}
             </div>
           )}
         </div>

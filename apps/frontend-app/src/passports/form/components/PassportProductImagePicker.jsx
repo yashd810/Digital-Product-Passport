@@ -1,6 +1,7 @@
 // Product-image control: validates resource links and delegates selection/state to its parent.
 import React from "react";
 import { toSafeImageSrc, toSafeResourceHref } from "../../../shared/security/urlSafety";
+import { useI18n } from "../../../app/providers/i18n";
 
 /**
  * Product-image input for the passport editor.
@@ -9,6 +10,7 @@ import { toSafeImageSrc, toSafeResourceHref } from "../../../shared/security/url
  * only the repository-link UI and validates pasted URLs before returning them.
  */
 function PassportProductImagePicker({ value, disabled, onChange, onOpenPicker }) {
+  const { t } = useI18n();
   const linkedUrl = toSafeImageSrc(value);
 
   const commitPastedUrl = (input) => {
@@ -19,19 +21,19 @@ function PassportProductImagePicker({ value, disabled, onChange, onOpenPicker })
 
   return (
     <div className="passport-field-group passport-product-image-group">
-      <label>Product Image</label>
+      <label>{t("productImage")}</label>
       <div className="file-upload-widget">
         {linkedUrl ? (
           <div className="file-existing image-existing">
-            <img src={linkedUrl} alt="Product" className="pf-product-image-thumb" />
-            <span className="file-existing-link">Repository image linked</span>
+            <img src={linkedUrl} alt={t("product")} className="pf-product-image-thumb" />
+            <span className="file-existing-link">{t("repositoryImageLinked")}</span>
             <button
               type="button"
               className="file-clear-btn"
               disabled={disabled}
               onClick={() => onChange("")}
             >
-              ✕ Remove
+              ✕ {t("remove")}
             </button>
           </div>
         ) : (
@@ -41,7 +43,7 @@ function PassportProductImagePicker({ value, disabled, onChange, onOpenPicker })
             disabled={disabled}
             onClick={onOpenPicker}
           >
-            <span className="file-placeholder">🖼 Link Product Image from Symbols</span>
+            <span className="file-placeholder">🖼 {t("linkProductImage")}</span>
           </button>
         )}
         {linkedUrl && (
@@ -51,14 +53,14 @@ function PassportProductImagePicker({ value, disabled, onChange, onOpenPicker })
             disabled={disabled}
             onClick={onOpenPicker}
           >
-            <span className="file-placeholder">↺ Change</span>
+            <span className="file-placeholder">↺ {t("change")}</span>
           </button>
         )}
         <div className="file-link-paste">
           <input
             type="text"
             className="file-link-input"
-            placeholder="Or paste a repository image link here…"
+            placeholder={t("repositoryImageLinkPaste")}
             disabled={disabled}
             data-field-key="productImage"
             onPaste={(event) => {

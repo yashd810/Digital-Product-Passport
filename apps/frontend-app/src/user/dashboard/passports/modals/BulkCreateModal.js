@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
+import { useI18n } from "../../../../app/providers/i18n";
 
 const api = import.meta.env.VITE_API_URL || "";
 
 export function BulkCreateModal({ passportType, companyId, onClose, onDone }) {
+  const { t } = useI18n();
   const [count, setCount] = useState("10");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -13,7 +15,7 @@ export function BulkCreateModal({ passportType, companyId, onClose, onDone }) {
     e.preventDefault();
     const parsedCount = parseInt(count, 10);
     if (!Number.isInteger(parsedCount) || parsedCount < 1 || parsedCount > 500) {
-      setError("Enter a number between 1 and 500.");
+      setError(t("enterNumberRange"));
       return;
     }
 
@@ -30,10 +32,10 @@ export function BulkCreateModal({ passportType, companyId, onClose, onDone }) {
         }),
       });
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || "Bulk create failed");
+      if (!r.ok) throw new Error(data.error || t("bulkCreateFailed"));
       onDone(data.summary?.created || parsedCount);
     } catch (err) {
-      setError(err.message || "Bulk create failed");
+      setError(err.message || t("bulkCreateFailed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -42,12 +44,12 @@ export function BulkCreateModal({ passportType, companyId, onClose, onDone }) {
   return createPortal(
     <div className="dashboard-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="dashboard-modal-card dashboard-modal-card-compact">
-        <h3 className="dashboard-modal-title">Bulk Create Passports</h3>
+        <h3 className="dashboard-modal-title">{t("bulkCreatePassports")}</h3>
         <p className="dashboard-modal-subtitle">
-          Enter how many <strong>{passportType}</strong> drafts you want to create. Each one will get its own DPP ID and a default untitled name.
+          {t("bulkCreateDescription", { type: passportType })}
         </p>
         <form onSubmit={handleSubmit} className="bulk-create-form">
-          <label htmlFor="bulkCreateCount" className="device-manual-label">Number of Passports</label>
+          <label htmlFor="bulkCreateCount" className="device-manual-label">{t("numberOfPassports")}</label>
           <input
             id="bulkCreateCount"
             type="number"
@@ -60,14 +62,14 @@ export function BulkCreateModal({ passportType, companyId, onClose, onDone }) {
             disabled={isSubmitting}
             autoFocus
           />
-          <p className="bulk-create-note">You can rename and edit the generated drafts later.</p>
+          <p className="bulk-create-note">{t("editDraftsLater")}</p>
           {error && <div className="dashboard-inline-error">{error}</div>}
           <div className="dashboard-modal-actions dashboard-modal-actions-end">
             <button type="button" className="dashboard-btn dashboard-btn-ghost" onClick={onClose} disabled={isSubmitting}>
-              Cancel
+              {t("cancel")}
             </button>
             <button type="submit" className="dashboard-btn dashboard-btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Drafts"}
+              {isSubmitting ? t("creating") : t("createDrafts")}
             </button>
           </div>
         </form>

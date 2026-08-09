@@ -1,4 +1,5 @@
 import React from "react";
+import { useI18n } from "../../../../app/providers/i18n";
 import { PassportListFiltersBar } from "./PassportListFiltersBar";
 import { PassportListHeader } from "./PassportListHeader";
 import { PassportListPagination } from "./PassportListPagination";
@@ -50,6 +51,7 @@ export function PassportListTableSection({
   totalPages,
   activeType,
 }) {
+  const { t } = useI18n();
   return (
     <>
       <PassportListHeader
@@ -89,15 +91,15 @@ export function PassportListTableSection({
 
       {error && <div className="alert alert-error">{error}</div>}
       {successMsg && <div className="alert alert-success">{successMsg}</div>}
-      {isLoading && <div className="loading">Loading passports…</div>}
+      {isLoading && <div className="loading">{t("loadingPassports")}</div>}
 
       {!isLoading && (
         <div className="table-container">
           {filteredAndSortedPassports.length === 0 ? (
             <div className="empty-state"><p>
-              {searchText || filterStatus || Object.values(columnFilters).some(Boolean) ? "No passports match your search/filter."
-                : filterByUser ? "You haven't created any passports yet."
-                : `No ${activeType} passports yet. Create one to get started!`}
+              {searchText || filterStatus || Object.values(columnFilters).some(Boolean) ? t("noPassportMatches")
+                : filterByUser ? t("noMyPassports")
+                : t("noPassportsYet", { type: activeType })}
             </p></div>
           ) : (
             <PassportListTable

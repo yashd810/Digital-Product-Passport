@@ -9,6 +9,7 @@ import SemanticGraphFieldEditor from "../../../shared/passports/SemanticGraphFie
 import { toSafeImageSrc, toSafeResourceHref } from "../../../shared/security/urlSafety";
 import { formatFieldLabelWithUnit } from "../../../passport-viewer/utils/viewerHelpers";
 import { getFieldInputPrompt } from "../passportFormDrafts";
+import { useI18n } from "../../../app/providers/i18n";
 
 /**
  * Type-specific passport field control.
@@ -31,6 +32,7 @@ function PassportFieldInput({
   onOpenRepositoryPicker,
   onOpenSymbolPicker,
 }) {
+  const { t } = useI18n();
   const semanticProperty = field.rangeKind ? field : null;
 
   if (semanticProperty && semanticGraph && !["file", "symbol", "table"].includes(field.type)) {
@@ -61,7 +63,7 @@ function PassportFieldInput({
   if (field.type === "file") {
     const linkedUrl = toSafeResourceHref(value);
     const selectedFile = fileSelections[field.key];
-    const fileName = selectedFile?.name || fileDisplayNames[field.key] || (linkedUrl ? "Linked document" : null);
+    const fileName = selectedFile?.name || fileDisplayNames[field.key] || (linkedUrl ? t("linkedDocument") : null);
     const commitPastedUrl = (input) => {
       const safeUrl = toSafeResourceHref(input);
       if (safeUrl) {
@@ -77,31 +79,31 @@ function PassportFieldInput({
           <div className="file-existing">
             {linkedUrl ? (
               <a href={linkedUrl} target="_blank" rel="noopener noreferrer" className="file-existing-link">
-                📄 {fileName || "Document"}
+                📄 {fileName || t("document")}
               </a>
             ) : (
-              <span className="file-existing-link">📄 {fileName || "Document"}</span>
+              <span className="file-existing-link">📄 {fileName || t("document")}</span>
             )}
             <button type="button" className="file-clear-btn" disabled={disabled}
-              onClick={() => { onClearFileSelection(field.key); onChange(""); }}>✕ Remove</button>
+              onClick={() => { onClearFileSelection(field.key); onChange(""); }}>✕ {t("remove")}</button>
           </div>
         ) : (
           <button type="button" className="file-upload-label" disabled={disabled}
             onClick={() => onOpenRepositoryPicker(field.key)}>
-            <span className="file-placeholder">📁 Link PDF from Repository</span>
+            <span className="file-placeholder">📁 {t("linkPdfFromRepository")}</span>
           </button>
         )}
         {linkedUrl && (
           <button type="button" className="file-upload-label file-replace-label" disabled={disabled}
             onClick={() => onOpenRepositoryPicker(field.key)}>
-            <span className="file-placeholder">↺ Change</span>
+            <span className="file-placeholder">↺ {t("change")}</span>
           </button>
         )}
         <div className="file-link-paste">
           <input
             type="text"
             className={`file-link-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
-            placeholder="Or paste a repository link here…"
+            placeholder={t("repositoryLinkPaste")}
             disabled={disabled}
             value={linkedUrl && document.activeElement?.dataset?.fieldKey !== field.key ? "" : undefined}
             data-field-key={field.key}
@@ -138,25 +140,25 @@ function PassportFieldInput({
             {toSafeImageSrc(linkedUrl) && <img src={toSafeImageSrc(linkedUrl)} alt={picked?.name || "symbol"} className="pf-symbol-thumb" />}
             <span className="file-existing-link">{picked?.name || "Symbol"}</span>
             <button type="button" className="file-clear-btn" disabled={disabled}
-              onClick={() => onChange("")}>✕ Remove</button>
+              onClick={() => onChange("")}>✕ {t("remove")}</button>
           </div>
         ) : (
           <button type="button" className="file-upload-label" disabled={disabled}
             onClick={() => onOpenSymbolPicker(field.key)}>
-            <span className="file-placeholder">🔣 Link Symbol from Repository</span>
+            <span className="file-placeholder">🔣 {t("linkSymbolFromRepository")}</span>
           </button>
         )}
         {linkedUrl && (
           <button type="button" className="file-upload-label file-replace-label" disabled={disabled}
             onClick={() => onOpenSymbolPicker(field.key)}>
-            <span className="file-placeholder">↺ Change</span>
+            <span className="file-placeholder">↺ {t("change")}</span>
           </button>
         )}
         <div className="file-link-paste">
           <input
             type="text"
             className={`file-link-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
-            placeholder="Or paste a repository link here…"
+            placeholder={t("repositoryLinkPaste")}
             disabled={disabled}
             data-field-key={field.key}
             onPaste={(event) => {
@@ -220,13 +222,13 @@ function PassportFieldInput({
                   </td>
                 ))}
                 <td className="pf-table-action-col">
-                  <button type="button" className="pf-table-remove-row" onClick={() => removeRow(rowIndex)} disabled={disabled} title="Remove row">✕</button>
+                  <button type="button" className="pf-table-remove-row" onClick={() => removeRow(rowIndex)} disabled={disabled} title={t("removeRow")}>✕</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <button type="button" className="pf-table-add-row" onClick={addRow} disabled={disabled}>+ Add Row</button>
+        <button type="button" className="pf-table-add-row" onClick={addRow} disabled={disabled}>+ {t("addRow")}</button>
       </div>
     );
   }
@@ -255,7 +257,7 @@ function PassportFieldInput({
           onChange={(event) => onChange(event.target.value)}
           className={`pf-date-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
         />
-        <span className="pf-date-hint">DD/MM/YYYY</span>
+        <span className="pf-date-hint">{t("dateFormatHint")}</span>
       </div>
     );
   }

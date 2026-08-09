@@ -239,6 +239,7 @@ function AdminSecurity({ user }) {
           showPersonalInfo={false}
           showWorkflowDefaults={false}
           showLanguageSelector={false}
+          localize={false}
         />
       </div>
 

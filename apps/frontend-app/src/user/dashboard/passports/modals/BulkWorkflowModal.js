@@ -3,10 +3,12 @@ import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { isEditablePassportStatus } from "../../../../passports/utils/passportStatus";
 import AppSelect from "../../../../shared/components/AppSelect";
+import { useI18n } from "../../../../app/providers/i18n";
 
 const api = import.meta.env.VITE_API_URL || "";
 
 export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDone }) {
+  const { t } = useI18n();
   const [teamUsers, setTeamUsers] = useState([]);
   const [reviewerId, setReviewerId] = useState("");
   const [approverId, setApproverId] = useState("");
@@ -33,7 +35,7 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
 
   const handleSubmit = async () => {
     if (!reviewerId && !approverId) {
-      setError("Select at least one reviewer or approver.");
+      setError(t("selectReviewerOrApprover"));
       return;
     }
     setSubmitting(true);
@@ -51,7 +53,7 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Failed");
-      onDone(`Workflow: ${d.summary?.submitted || 0} submitted, ${d.summary?.skipped || 0} skipped`);
+      onDone(t("workflowSummary", { submitted: d.summary?.submitted || 0, skipped: d.summary?.skipped || 0 }));
     } catch (e) {
       setError(e.message);
       setSubmitting(false);
@@ -64,25 +66,25 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
         <div className="modal-header">
-          <h3>Send {editableCount} Passport{editableCount !== 1 ? "s" : ""} to Workflow</h3>
+          <h3>{t("sendCountToWorkflow", { count: editableCount, suffix: editableCount !== 1 ? "s" : "" })}</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
           <p className="modal-hint">
-            Only draft and in-revision passports will be submitted. Released passports will be skipped.
+            {t("workflowDraftNotice")}
           </p>
           {error && <div className="alert alert-error dashboard-alert-inline">{error}</div>}
           <div className="wf-select-group">
-            <label>Reviewer <span className="wf-opt">(optional if approver selected)</span></label>
-            <AppSelect value={reviewerId} onChange={(e) => setReviewerId(e.target.value)} disabled={submitting} aria-label="Reviewer">
-              <option value="">— Skip review —</option>
+            <label>{t("reviewer")} <span className="wf-opt">({t("reviewerOptional")})</span></label>
+            <AppSelect value={reviewerId} onChange={(e) => setReviewerId(e.target.value)} disabled={submitting} aria-label={t("reviewer")}>
+              <option value="">— {t("skipReview")} —</option>
               {teamUsers.map((member) => <option key={member.id} value={member.id}>{member.firstName} {member.lastName} — {member.role}</option>)}
             </AppSelect>
           </div>
           <div className="wf-select-group">
-            <label>Approver <span className="wf-opt">(optional if reviewer selected)</span></label>
-            <AppSelect value={approverId} onChange={(e) => setApproverId(e.target.value)} disabled={submitting} aria-label="Approver">
-              <option value="">— Skip approval —</option>
+            <label>{t("approver")} <span className="wf-opt">({t("approverOptional")})</span></label>
+            <AppSelect value={approverId} onChange={(e) => setApproverId(e.target.value)} disabled={submitting} aria-label={t("approver")}>
+              <option value="">— {t("skipApproval")} —</option>
               {teamUsers.map((member) => <option key={member.id} value={member.id}>{member.firstName} {member.lastName} — {member.role}</option>)}
             </AppSelect>
           </div>
@@ -93,9 +95,9 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
             disabled={submitting || (!reviewerId && !approverId)}
             onClick={handleSubmit}
           >
-            {submitting ? "Submitting…" : `Submit ${editableCount} to Workflow`}
+            {submitting ? t("submitting") : t("submitCountToWorkflow", { count: editableCount })}
           </button>
-          <button className="dashboard-btn dashboard-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button className="dashboard-btn dashboard-btn-ghost" onClick={onClose} disabled={submitting}>{t("cancel")}</button>
         </div>
       </div>
     </div>,

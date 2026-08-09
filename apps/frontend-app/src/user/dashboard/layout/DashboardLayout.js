@@ -98,7 +98,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
     <div className="dashboard">
       <header className="dashboard-header">
           <div className="header-content">
-          <h1>Dashboard</h1>
+          <h1>{t("dashboardTitle")}</h1>
           <div className="header-actions">
             <span className="user-info">{displayName}</span>
             <NotificationsPanel user={user} />
@@ -106,7 +106,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
             <button
               className="theme-toggle-header-btn"
               onClick={handleThemeToggle}
-              title={`Switch to ${currentTheme === "dark" ? "Light" : "Dark"} mode`}
+              title={t("switchToThemeMode", { theme: t(currentTheme === "dark" ? "light" : "dark") })}
             >
               {currentTheme === "dark" ? "☀️" : "🌙"}
             </button>
@@ -122,14 +122,14 @@ function DashboardLayout({ user, companyId, onLogout }) {
               <div className="user-card-top">
                 <div className="user-avatar user-avatar-initials">{initials}</div>
                 <div className="user-details">
-                  <h3>Your Account</h3>
+                  <h3>{t("yourAccount")}</h3>
                   <p className="user-name">{displayName}</p>
                 </div>
               </div>
 
               <div className="user-meta-row">
                 <span className={`role-chip role-${user?.role}`}>{roleLabel}</span>
-                <p className="user-company">{user?.companyName || "No company assigned"}</p>
+                <p className="user-company">{user?.companyName || t("noCompanyAssigned")}</p>
               </div>
 
               <div className="setting-row sidebar-setting-row">
@@ -153,15 +153,15 @@ function DashboardLayout({ user, companyId, onLogout }) {
               {isEditor && (
                 <>
                   <NavLink to={dashboardPath("create")} className={({isActive})=>`sidebar-link sidebar-create-btn${isActive?" active":""}`}>
-                    + Create Passport
+                    + {t("createPassport")}
                   </NavLink>
                   <NavLink to={dashboardPath("passport-data")} className={({isActive})=>`sidebar-link sidebar-create-btn${isActive?" active":""}`}>
-                    Passport Data Management
+                    {t("passportDataManagement")}
                   </NavLink>
                 </>
               )}
 
-              <p className="sidebar-section-label sidebar-section-label-spaced">Start Here</p>
+              <p className="sidebar-section-label sidebar-section-label-spaced">{t("startHere")}</p>
               <NavLink to={dashboardPath("overview")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📊 {t("overview")}
               </NavLink>
@@ -172,7 +172,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
               {/* Passport Types — grouped by product category */}
               {passportTypes.length > 0 && (
                 <>
-                  <p className="sidebar-section-label sidebar-section-label-spaced">Passport Library</p>
+                  <p className="sidebar-section-label sidebar-section-label-spaced">{t("passportLibrary")}</p>
                   {Object.entries(groupedTypes).map(([productCategory, types]) => (
                     <React.Fragment key={productCategory}>
                       <NavLink
@@ -196,32 +196,32 @@ function DashboardLayout({ user, companyId, onLogout }) {
                 </>
               )}
 
-              <p className="sidebar-section-label sidebar-section-label-spaced">Reusable Content</p>
+              <p className="sidebar-section-label sidebar-section-label-spaced">{t("reusableContent")}</p>
               <NavLink to={dashboardPath("repository/files")} end={false}
                 className={() => `sidebar-link${isDashboardSectionActive("repository") ? " active" : ""}`}>
-                🗂️ Repository
+                🗂️ {t("repository")}
               </NavLink>
               <NavLink to={dashboardPath("templates")} end={false}
                 className={() => `sidebar-link${isDashboardSectionActive("templates") ? " active" : ""}`}>
-                📋 Templates
+                📋 {t("templates")}
               </NavLink>
 
-              <p className="sidebar-section-label sidebar-section-label-spaced">Approvals & Updates</p>
+              <p className="sidebar-section-label sidebar-section-label-spaced">{t("approvalsAndUpdates")}</p>
               <NavLink to={dashboardPath("workflow/inprogress")} end={false}
                 className={() => `sidebar-link${isDashboardSectionActive("workflow") ? " active" : ""}`}>
                 ⚙️ {t("workflow")}
               </NavLink>
               <NavLink to={dashboardPath("notifications")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                🔔 Notifications
+                🔔 {t("notifications")}
               </NavLink>
 
               <NavLink to={dashboardPath("archived")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                📦 Archived
+                📦 {t("archived")}
               </NavLink>
 
-              <p className="sidebar-section-label sidebar-section-label-spaced">Workspace Settings</p>
+              <p className="sidebar-section-label sidebar-section-label-spaced">{t("workspaceSettings")}</p>
               <NavLink to={dashboardPath("company-profile")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                🏢 Company Profile
+                🏢 {t("companyProfile")}
               </NavLink>
               {(isAdmin || isEditor) && (
                 <NavLink to={dashboardPath("team")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
@@ -229,18 +229,18 @@ function DashboardLayout({ user, companyId, onLogout }) {
                 </NavLink>
               )}
               <NavLink to={dashboardPath("security")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                🔐 Security
+                🔐 {t("security")}
               </NavLink>
               <NavLink to={dashboardPath("profile")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 👤 {t("myProfile")}
               </NavLink>
 
-              <p className="sidebar-section-label sidebar-section-label-spaced">Logs & Support</p>
+              <p className="sidebar-section-label sidebar-section-label-spaced">{t("logsAndSupport")}</p>
               <NavLink to={dashboardPath("audit-logs")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📋 {t("auditLogs")}
               </NavLink>
               <NavLink to={dashboardPath("manual")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                📘 Manual
+                📘 {t("manual")}
               </NavLink>
               {semanticModels
                 .map((model) => ({ model, subpath: buildSemanticModelDictionarySubpath(model) }))
@@ -251,7 +251,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
                     to={dashboardPath(subpath)}
                     className={() => `sidebar-link${isDashboardSectionActive("dictionary") ? " active" : ""}`}
                   >
-                    🔖 {model.name || model.semanticModelKey || "Dictionary"}
+                    🔖 {model.name || model.semanticModelKey || t("dictionary")}
                   </NavLink>
                 ))}
             </nav>

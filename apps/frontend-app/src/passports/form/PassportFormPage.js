@@ -24,6 +24,7 @@ import {
 import { toSafeResourceHref } from "../../shared/security/urlSafety";
 import { formatFieldLabelWithUnit } from "../../passport-viewer/utils/viewerHelpers";
 import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
+import { translateSchemaLabel, useI18n } from "../../app/providers/i18n";
 import RepositoryPicker from "./components/RepositoryPicker";
 import SymbolRepositoryPicker from "./components/SymbolRepositoryPicker";
 import PassportFieldInput from "./components/PassportFieldInput";
@@ -58,6 +59,7 @@ const editSessionTimeoutMs = 12 * 60 * 60 * 1000;
 const editHeartbeatMs = 60 * 1000;
 const currentYear = new Date().getFullYear();
 function PassportForm({ user, companyId, mode = "create", passportType: typeProp }) {
+  const { lang, t } = useI18n();
   const navigate  = useNavigate();
   const location  = useLocation();
   const { dppId, passportType: typeParam } = useParams();
@@ -523,6 +525,10 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   };
 
   const isFieldUnfilled = (field) => !hasMeaningfulValue(formData[field.key]);
+  const localizeSchemaEntry = (entry) => ({
+    ...entry,
+    label: translateSchemaLabel(lang, entry),
+  });
 
   const getRequiredMissingFields = () => {
     const currentFormData = formDataRef.current || {};
@@ -681,7 +687,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     if (mode !== "edit" || !dppId || !activePassportType || saveInFlightRef.current) return false;
     const missingRequiredFields = getRequiredMissingFields();
     if (missingRequiredFields.length) {
-      setError(`Required fields need values: ${missingRequiredFields.map((field) => field.label || field.key).join(", ")}`);
+      setError(`Required fields need values: ${missingRequiredFields.map((field) => translateSchemaLabel(lang, field)).join(", ")}`);
       return false;
     }
     const semanticValidationError = getSemanticGraphValidationError();
@@ -874,6 +880,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   // Page-level policy remains here; type-specific input controls stay in the
   // dedicated field component so their behavior is reusable and testable.
   const renderField = (field) => {
+    const localizedField = localizeSchemaEntry(field);
     const isLocked = mode === "create" && modelDataKeys.has(field.key);
     const isSystemPrefilled = isSystemPrefilledField(field.key);
     const disabled = isSaving || (mode === "edit" && isLoading) || isLocked || isSystemPrefilled;
@@ -881,7 +888,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
     return (
       <PassportFieldInput
-        field={field}
+        field={localizedField}
         value={formData[field.key] ?? ""}
         disabled={disabled}
         fieldClassName={highlightMissing ? "pf-needs-input" : ""}
@@ -927,10 +934,10 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
               className={`form-group${field.type === "textarea" || field.type === "file" || field.rangeKind === "class" ? " full-width" : ""}${isLocked ? " form-group-locked" : ""}${isSystemPrefilled ? " form-group-system" : ""}${needsInput ? " form-group-needs-input" : ""}`}>
               {field.type !== "boolean" && (
                 <label htmlFor={field.type === "file" ? `f-${field.key}` : field.key}>
-                  {formatFieldLabelWithUnit(field.label, field)}
-                  {isLocked && <span className="pf-model-badge">📌 Model data</span>}
-                  {isSystemPrefilled && <span className="pf-model-badge">System value</span>}
-                  {needsInput && <span className="pf-required-badge">Needs input</span>}
+                  {formatFieldLabelWithUnit(translateSchemaLabel(lang, field), field)}
+                  {isLocked && <span className="pf-model-badge">📌 {t("modelData")}</span>}
+                  {isSystemPrefilled && <span className="pf-model-badge">{t("systemValue")}</span>}
+                  {needsInput && <span className="pf-required-badge">{t("needsInput")}</span>}
                 </label>
               )}
               {renderField(field)}
@@ -947,7 +954,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     if (!section || !hasVisibleSchemaSectionContent(section)) return null;
 
     const childSections = Array.isArray(section.sections) ? section.sections : [];
-    const sectionLabel = section.label || section.name || section.key || "Untitled section";
+    const sectionLabel = translateSchemaLabel(lang, section) || section.name || section.key || t("untitledSection");
     const sectionKey = `${section.key || "section"}-${path.length}`;
     const sectionPath = [...path, sectionKey];
     const HeadingTag = depth === 1 ? "h3" : depth === 2 ? "h4" : "h5";
@@ -1087,7 +1094,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
                     aria-expanded={!!expanded[sk]}
                     aria-controls={sectionContentId}
                   >
-                    <span className="section-title">{section.label}</span>
+                    <span className="section-title">{translateSchemaLabel(lang, section)}</span>
                     <span className={`toggle-icon${expanded[sk]?" expanded":""}`}>▼</span>
                   </button>
                   <div
@@ -1098,14 +1105,14 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
                     <div id={sectionContentId} className="section-content">
                       {sk==="compliance" && (
                         <p className="section-hint">
-                          Upload official PDF documents. Stored securely and shown in the passport viewer.
+                          {t("uploadOfficialPdfs")}
                         </p>
                       )}
                       {hasVisibleContent ? (
                         renderSchemaSectionTree(section, 0, [sk])
                       ) : (
                         <div className="pf-filter-empty-state">
-                          No fields in this section match the current filter.
+                          {t("noFieldsForFilter")}
                         </div>
                       )}
                     </div>

@@ -5,7 +5,7 @@ import "../styles/App.css";
 import AppSkipLink from "../components/AppSkipLink";
 import RouteErrorBoundary from "../components/RouteErrorBoundary";
 import { useSessionAuth } from "../hooks/useSessionAuth";
-import { I18nProvider } from "../providers/i18n";
+import { I18nProvider, useI18n } from "../providers/i18n";
 import { applyTheme, getStoredTheme } from "../providers/ThemeContext";
 import { AppRoutes } from "../routes/AppRoutes";
 
@@ -17,7 +17,8 @@ import { AppRoutes } from "../routes/AppRoutes";
  * definitions live separately in `app/routes/AppRoutes.jsx`.
  */
 function RouteFallback() {
-  return <div className="loading dashboard-loading-screen">Loading…</div>;
+  const { t } = useI18n();
+  return <div className="loading dashboard-loading-screen">{t("appLoading")}</div>;
 }
 
 export default function App() {

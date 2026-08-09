@@ -8,6 +8,7 @@ import {
 } from "../../../../shared/passports/schemaKeyUtils";
 import { flattenSchemaFieldsFromSections } from "../../../../shared/passports/passportSchemaUtils";
 import { buildPassportJsonLdExport } from "../../../../shared/utils/semanticPassportExport";
+import { useI18n } from "../../../../app/providers/i18n";
 
 const api = import.meta.env.VITE_API_URL || "";
 
@@ -33,6 +34,7 @@ function normalizeCsvCell(value) {
 }
 
 export function ExportModal({ passports, filteredPassports, pagePassports, selectedPassports, activeType, allPassportTypes, companyId, onClose, onDone }) {
+  const { t } = useI18n();
   const [scope, setScope] = useState("all");
   const [format, setFormat] = useState("csv");
   const [exporting, setExporting] = useState(false);
@@ -49,9 +51,9 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
   };
 
   const scopeOptions = [
-    { id: "selected", label: "Selected", description: "Only the passports you have checked.", count: selectedList.length },
-    { id: "filtered", label: "All Pages", description: "Every passport in the current filtered view.", count: filteredPassports.length },
-    { id: "page", label: "This Page", description: "Only the passports visible on the current page.", count: pagePassports.length },
+    { id: "selected", label: t("selected"), description: t("selectedScopeDescription"), count: selectedList.length },
+    { id: "filtered", label: t("allPages"), description: t("allPagesScopeDescription"), count: filteredPassports.length },
+    { id: "page", label: t("thisPage"), description: t("thisPageScopeDescription"), count: pagePassports.length },
   ];
 
   useEffect(() => {
@@ -151,7 +153,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
 
   const handleExport = async () => {
     if (!exportList.length) {
-      setError("No passports in the selected scope.");
+      setError(t("noPassportsInScope"));
       return;
     }
 
@@ -170,9 +172,9 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
         if (format === "jsonld") await exportTypeToJsonLd(type, list);
       }
 
-      onDone(`Exported ${exportList.length} passport${exportList.length !== 1 ? "s" : ""} as ${formatLabel}`);
+      onDone(t("exportedCount", { count: exportList.length, suffix: exportList.length !== 1 ? "s" : "", format: formatLabel }));
     } catch (e) {
-      setError(e.message || "Export failed");
+      setError(e.message || t("exportFailed"));
     } finally {
       setExporting(false);
     }
@@ -181,8 +183,8 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
   return createPortal(
     <div className="dashboard-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget && !exporting) onClose(); }}>
       <div className="dashboard-modal-card bulk-revise-modal-card">
-        <h3 className="dashboard-modal-title">Export Passports</h3>
-        <p className="dashboard-modal-subtitle">Choose which passports to export and the file format.</p>
+        <h3 className="dashboard-modal-title">{t("exportPassportsTitle")}</h3>
+        <p className="dashboard-modal-subtitle">{t("exportPassportsDescription")}</p>
 
         <div className="bulk-revise-scope-grid">
           {scopeOptions.map((option) => (
@@ -193,14 +195,14 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
               onClick={() => setScope(option.id)}
             >
               <strong>{option.label}</strong>
-              <span>{option.count} passport{option.count !== 1 ? "s" : ""}</span>
+              <span>{t("passportCount", { count: option.count, suffix: option.count !== 1 ? "s" : "" })}</span>
               <small>{option.description}</small>
             </button>
           ))}
         </div>
 
         <div className="wf-select-group" style={{ marginTop: 16 }}>
-          <label>Format</label>
+          <label>{t("format")}</label>
           <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
             {["csv", "jsonld"].map((value) => (
               <button
@@ -211,22 +213,22 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
                 onClick={() => setFormat(value)}
               >
                 <strong>{value === "jsonld" ? "JSON-LD" : value.toUpperCase()}</strong>
-                <small>{value === "csv" ? "Spreadsheet — edit in Excel / Sheets" : "Linked data export with semantic contexts and IDs"}</small>
+                <small>{value === "csv" ? t("csvFormatDescription") : t("jsonLdFormatDescription")}</small>
               </button>
             ))}
           </div>
         </div>
 
         <div className="dashboard-note-panel" style={{ marginTop: 16 }}>
-          Exporting <strong>{exportList.length}</strong> passport{exportList.length !== 1 ? "s" : ""} as <strong>{formatLabel}</strong>.
+          {t("exportingCount", { count: exportList.length, suffix: exportList.length !== 1 ? "s" : "", format: formatLabel })}
         </div>
 
         {error && <div className="alert alert-error" style={{ marginTop: 12 }}>{error}</div>}
 
         <div className="dashboard-modal-actions dashboard-modal-actions-end" style={{ marginTop: 20 }}>
-          <button className="dashboard-btn dashboard-btn-ghost" onClick={onClose} disabled={exporting}>Cancel</button>
+          <button className="dashboard-btn dashboard-btn-ghost" onClick={onClose} disabled={exporting}>{t("cancel")}</button>
           <button className="dashboard-btn dashboard-btn-primary" onClick={handleExport} disabled={exporting || !exportList.length}>
-            {exporting ? "Exporting…" : `Export ${exportList.length} passport${exportList.length !== 1 ? "s" : ""}`}
+            {exporting ? t("exporting") : t("exportCount", { count: exportList.length, suffix: exportList.length !== 1 ? "s" : "" })}
           </button>
         </div>
       </div>

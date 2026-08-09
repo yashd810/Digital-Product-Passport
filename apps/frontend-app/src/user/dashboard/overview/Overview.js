@@ -10,6 +10,7 @@ import {
   getAuditActionKind,
   isCompanyDashboardAuditEvent,
 } from "../../../audit/auditDisplay";
+import { useI18n } from "../../../app/providers/i18n";
 
 const api = import.meta.env.VITE_API_URL || "";
 const overviewBarColors = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e"];
@@ -302,6 +303,7 @@ function normalizeActivityRows(rows) {
 }
 
 function Overview({ companyId }) {
+  const { t } = useI18n();
   const resolvedCompanyId = companyId;
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -351,20 +353,20 @@ function Overview({ companyId }) {
       const totalInReview = sumField("inReviewCount");
       const totalObsolete = sumField("obsoleteCount");
       const summaryStats = [
-        { label: "Total Passports", value: analytics?.totalPassports || 0, tone: "default" },
-        { label: "Draft", value: totalDraft, tone: "draft" },
-        { label: "In Review", value: totalInReview, tone: "review" },
-        { label: "Released", value: totalReleased, tone: "released" },
-        { label: "In Revision", value: totalInRevision, tone: "revised" },
-        ...(totalObsolete > 0 ? [{ label: "Obsolete", value: totalObsolete, tone: "obsolete" }] : []),
-        ...(analytics?.archivedCount > 0 ? [{ label: "Archived", value: analytics.archivedCount, tone: "archived" }] : []),
-        { label: "QR Scans", value: analytics?.scanStats || 0, tone: "scans" },
+        { label: t("totalPassports"), value: analytics?.totalPassports || 0, tone: "default" },
+        { label: t("draft"), value: totalDraft, tone: "draft" },
+        { label: t("inReview"), value: totalInReview, tone: "review" },
+        { label: t("released"), value: totalReleased, tone: "released" },
+        { label: t("revised"), value: totalInRevision, tone: "revised" },
+        ...(totalObsolete > 0 ? [{ label: t("obsolete"), value: totalObsolete, tone: "obsolete" }] : []),
+        ...(analytics?.archivedCount > 0 ? [{ label: t("archived"), value: analytics.archivedCount, tone: "archived" }] : []),
+        { label: t("qrScans"), value: analytics?.scanStats || 0, tone: "scans" },
       ];
       const statusChartItems = [
-        { label: "Draft",       value: totalDraft,       color: statusColors.draft },
-        { label: "In Review",   value: totalInReview,    color: statusColors.review },
-        { label: "Released",    value: totalReleased,    color: statusColors.released },
-        { label: "In Revision", value: totalInRevision,  color: statusColors.revised },
+        { label: t("draft"),       value: totalDraft,       color: statusColors.draft },
+        { label: t("inReview"),   value: totalInReview,    color: statusColors.review },
+        { label: t("released"),    value: totalReleased,    color: statusColors.released },
+        { label: t("revised"), value: totalInRevision,  color: statusColors.revised },
       ].filter((item) => item.value > 0);
       const typeChartData = (analytics?.analytics || []).map((stat, index) => ({
         label: stat.passportType.charAt(0).toUpperCase() + stat.passportType.slice(1),
@@ -430,7 +432,7 @@ function Overview({ companyId }) {
     }
   };
 
-  if(!analytics) return <div className="loading dashboard-loading-panel">Loading overview...</div>;
+  if(!analytics) return <div className="loading dashboard-loading-panel">{t("loadingOverview")}</div>;
 
   const sumField=(field)=>analytics?.analytics?.reduce((s,x)=>s+parseInt(x[field]||0),0)||0;
   const totalDraft    = sumField("draftCount");
@@ -442,10 +444,10 @@ function Overview({ companyId }) {
   const archivedCount = analytics?.archivedCount||0;
 
   const statusChartItems=[
-    { label:"Draft",       value:totalDraft,       color: statusColors.draft },
-    { label:"In Review",   value:totalInReview,    color: statusColors.review },
-    { label:"Released",    value:totalReleased,    color: statusColors.released },
-    { label:"In Revision", value:totalInRevision,  color: statusColors.revised },
+    { label:t("draft"),       value:totalDraft,       color: statusColors.draft },
+    { label:t("inReview"),   value:totalInReview,    color: statusColors.review },
+    { label:t("released"),    value:totalReleased,    color: statusColors.released },
+    { label:t("revised"), value:totalInRevision,  color: statusColors.revised },
   ].filter(s=>s.value>0);
 
   const typeChartData=analytics?.analytics?.map(s=>({
@@ -464,15 +466,15 @@ function Overview({ companyId }) {
     <div className="overview-wrapper">
       <div className="overview-header">
         <div>
-          <h2>📊 Analytics</h2>
-          <p>Company passport statistics and activity</p>
+          <h2>📊 {t("analytics")}</h2>
+          <p>{t("companyPassportStatistics")}</p>
         </div>
         <button
           className="export-pdf-btn"
           onClick={exportAnalyticsToPDF}
           disabled={exporting || !analytics}
         >
-          {exporting ? "⏳ Exporting..." : "📄 Export as PDF"}
+          {exporting ? `⏳ ${t("exportingPdf")}` : `📄 ${t("exportAsPdf")}`}
         </button>
       </div>
       {message.text && (
@@ -483,14 +485,14 @@ function Overview({ companyId }) {
 
       {analytics&&(
         <div className="overview-stats-row">
-          <div className="ov-stat"><div className="ov-stat-num">{analytics.totalPassports}</div><div className="ov-stat-label">Total Passports</div></div>
-          <div className="ov-stat stat-draft"><div className="ov-stat-num">{totalDraft}</div><div className="ov-stat-label">📋 Draft</div></div>
-          <div className="ov-stat stat-review"><div className="ov-stat-num">{totalInReview}</div><div className="ov-stat-label">🔍 In Review</div></div>
-          <div className="ov-stat stat-released"><div className="ov-stat-num">{totalReleased}</div><div className="ov-stat-label">✅ Released</div></div>
-          <div className="ov-stat stat-revised"><div className="ov-stat-num">{totalInRevision}</div><div className="ov-stat-label">📝 In Revision</div></div>
-          <div className="ov-stat stat-obsolete"><div className="ov-stat-num">{totalObsolete}</div><div className="ov-stat-label">⚪ Obsolete</div></div>
-          <div className="ov-stat stat-archived"><div className="ov-stat-num">{archivedCount}</div><div className="ov-stat-label">📦 Archived</div></div>
-          <div className="ov-stat stat-scans"><div className="ov-stat-num">{scanStats}</div><div className="ov-stat-label">📊 QR Scans</div></div>
+          <div className="ov-stat"><div className="ov-stat-num">{analytics.totalPassports}</div><div className="ov-stat-label">{t("totalPassports")}</div></div>
+          <div className="ov-stat stat-draft"><div className="ov-stat-num">{totalDraft}</div><div className="ov-stat-label">📋 {t("draft")}</div></div>
+          <div className="ov-stat stat-review"><div className="ov-stat-num">{totalInReview}</div><div className="ov-stat-label">🔍 {t("inReview")}</div></div>
+          <div className="ov-stat stat-released"><div className="ov-stat-num">{totalReleased}</div><div className="ov-stat-label">✅ {t("released")}</div></div>
+          <div className="ov-stat stat-revised"><div className="ov-stat-num">{totalInRevision}</div><div className="ov-stat-label">📝 {t("revised")}</div></div>
+          <div className="ov-stat stat-obsolete"><div className="ov-stat-num">{totalObsolete}</div><div className="ov-stat-label">⚪ {t("obsolete")}</div></div>
+          <div className="ov-stat stat-archived"><div className="ov-stat-num">{archivedCount}</div><div className="ov-stat-label">📦 {t("archived")}</div></div>
+          <div className="ov-stat stat-scans"><div className="ov-stat-num">{scanStats}</div><div className="ov-stat-label">📊 {t("qrScans")}</div></div>
         </div>
       )}
 
@@ -498,17 +500,17 @@ function Overview({ companyId }) {
         <div>
           <h3 className="overview-section-title">
             <span className="overview-section-icon">📊</span>
-            <span>Analytics</span>
+            <span>{t("analytics")}</span>
           </h3>
           {analytics&&analytics.analytics?.length>0?(
             <>
               <div className="overview-chart-row">
                 <div className="chart-card">
-                  <div className="chart-title">Status breakdown</div>
+                  <div className="chart-title">{t("statusBreakdown")}</div>
                   {statusChartItems.length > 0 ? (
                     <PieChart items={statusChartItems} displayMode="value" showTotalNote={false} />
                   ) : (
-                    <div className="overview-empty-chart">No status data yet</div>
+                    <div className="overview-empty-chart">{t("noStatusDataYet")}</div>
                   )}
                 </div>
                 <div className="chart-card chart-card-wide">
@@ -516,14 +518,14 @@ function Overview({ companyId }) {
                   {trendChartData.length > 0 && normalizedTrend.labels.length > 0 ? (
                     <LineChart labels={normalizedTrend.labels} series={trendChartData} />
                   ) : (
-                    <div className="overview-empty-chart">No trend data yet</div>
+                    <div className="overview-empty-chart">{t("noTrendDataYet")}</div>
                   )}
                 </div>
               </div>
               {typeChartData.length > 2 && (
                 <div className="overview-chart-row overview-chart-row-center">
                   <div className="chart-card overview-type-chart-card">
-                    <div className="chart-title">Passports by type</div>
+                    <div className="chart-title">{t("passportsByType")}</div>
                     <PassportTypeChart data={typeChartData} />
                   </div>
                 </div>
@@ -543,7 +545,7 @@ function Overview({ companyId }) {
               </div>
             </>
           ):(
-            <div className="chart-card"><p className="overview-empty-copy">No passport data yet. Create your first passport to see analytics.</p></div>
+            <div className="chart-card"><p className="overview-empty-copy">{t("noPassportDataYet")}</p></div>
           )}
         </div>
       </div>
@@ -552,7 +554,7 @@ function Overview({ companyId }) {
         <>
           <h3 className="overview-section-title">
             <span className="overview-section-icon">🕐</span>
-            <span>Recent Activity</span>
+            <span>{t("recentActivity")}</span>
           </h3>
           <div className="activity-full-row">
             <div className="activity-feed">
