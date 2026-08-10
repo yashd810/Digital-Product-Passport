@@ -72,6 +72,14 @@ const dppContext = {
   updatedAt: { "@id": "dpp:updatedAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
 };
 
+// `dppStatus` is a platform-managed header.  It is projected from the
+// passport lifecycle (Draft, Released, Archived, etc.) by the canonical
+// serializer; it is not a user-entered value for the dictionary enum.  Some
+// older dictionary packages still declare that enum with legacy keys which do
+// not match the canonical lifecycle labels.  Never run the generated header
+// through a user-field enum validator while producing a read-only export.
+const platformManagedSemanticHeaderKeys = new Set(["dppStatus"]);
+
 function readTypeValue(typeDef, camelKey) {
   if (!typeDef || typeof typeDef !== "object") return null;
   if (typeDef[camelKey] !== undefined) return typeDef[camelKey];
@@ -114,6 +122,7 @@ function coercePassportSchemaValues(passport, typeDef) {
 
   for (const field of schemaFields) {
     if (!field?.key) continue;
+    if (platformManagedSemanticHeaderKeys.has(field.key)) continue;
     if (!field.rangeKind) {
       throw new Error(`Field "${field.key}" is missing required semantic graph metadata.`);
     }
@@ -181,6 +190,7 @@ function decoratePassportSemanticGraph(passport, typeDef) {
   const schemaFields = flattenSchemaFieldsFromSections(getFieldsJson(typeDef).sections || []);
   for (const property of schemaFields) {
     if (!property?.key || !property.rangeKind) continue;
+    if (platformManagedSemanticHeaderKeys.has(property.key)) continue;
     if (Object.prototype.hasOwnProperty.call(decorated, property.key)) {
       decorated[property.key] = decorateSemanticGraphValue(property, decorated[property.key], semanticGraph);
     }

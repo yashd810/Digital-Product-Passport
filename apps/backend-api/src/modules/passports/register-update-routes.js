@@ -51,6 +51,7 @@ function registerUpdateRoutes(app, deps) {
     buildCarrierAuthenticityStorageValue,
     getCompanyNameMap,
     buildComplianceManagedFields,
+    productIdentifierService,
     normalizePassportRow,
   } = deps;
 
@@ -122,6 +123,12 @@ function registerUpdateRoutes(app, deps) {
       const invalidKeys = Object.keys(update).filter((key) => !typeSchema.allowedKeys.has(key) && key !== "modelName" && key !== "internalAliasId");
       if (invalidKeys.length) return res.status(400).json({ error: `Unknown field(s): ${invalidKeys.join(", ")}` });
       if (update.internalAliasId !== undefined) return res.status(400).json({ error: "Cannot bulk-update internalAliasId — it must be unique per passport." });
+      const businessIdentifierField = productIdentifierService?.getBusinessIdentifierField?.(typeSchema.typeDef || typeSchema) || "";
+      if (businessIdentifierField && update[businessIdentifierField] !== undefined) {
+        return res.status(400).json({
+          error: `Cannot bulk-update ${businessIdentifierField} — each passport must keep a unique business identifier. Create a version instead.`,
+        });
+      }
       if (update.granularity !== undefined) {
         return res.status(400).json({ error: "Cannot bulk-update granularity. Use the granularity transition workflow for linked successor identifiers." });
       }
@@ -331,6 +338,33 @@ function registerUpdateRoutes(app, deps) {
             currentRow = fullRowRes.rows[0] || currentRow;
           }
           currentRow = normalizePassportRow(currentRow, typeSchema);
+          const businessIdentifierField = productIdentifierService?.getBusinessIdentifierField?.(typeSchema.typeDef || typeSchema) || "";
+          if (
+            businessIdentifierField
+            && businessIdentifierField !== "internalAliasId"
+            && fields[businessIdentifierField] !== undefined
+            && typeof deps.findExistingPassportByBusinessIdentifier === "function"
+          ) {
+            const candidate = fields[businessIdentifierField];
+            const normalizedCandidate = (
+              typeof candidate === "string" || typeof candidate === "number"
+            ) ? String(candidate).trim() : "";
+            if (normalizedCandidate) {
+              const duplicate = await deps.findExistingPassportByBusinessIdentifier({
+                tableName,
+                companyId,
+                fieldKey: businessIdentifierField,
+                fieldValue: normalizedCandidate,
+                excludeDppId: matchedGuid,
+                excludeLineageId: matchedLineageId,
+              });
+              if (duplicate) {
+                details.push({ dppId: matchedGuid, status: "failed", error: `${businessIdentifierField} "${normalizedCandidate}" already belongs to another passport` });
+                failed += 1;
+                continue;
+              }
+            }
+          }
           if (fields.internalAliasId !== undefined) {
             if (!normalizedProductId) {
               details.push({ dppId: matchedGuid, status: "failed", error: "internalAliasId cannot be blank" });

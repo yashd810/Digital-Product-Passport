@@ -120,6 +120,7 @@ module.exports = function createPassportService({
   // ─── PASSPORT QUERIES ────────────────────────────────────────────────────
   const {
     findExistingPassportByInternalAliasId,
+    findExistingPassportByBusinessIdentifier,
     getPassportLineageContext,
     getCompanyNameMap,
     getPassportVersionsByLineage,
@@ -133,6 +134,7 @@ module.exports = function createPassportService({
     getPassportTypeSchema,
     normalizePassportRow,
     isPublicHistoryStatus,
+    quoteSqlIdentifier,
   });
   const {
     archivePassportSnapshot,
@@ -256,6 +258,7 @@ module.exports = function createPassportService({
     getPassportTypeSchema,
     hasCompanyPassportTypeAccess,
     findExistingPassportByInternalAliasId,
+    findExistingPassportByBusinessIdentifier,
     getPassportLineageContext,
     getPassportVersionsByLineage,
     getCompanyNameMap,

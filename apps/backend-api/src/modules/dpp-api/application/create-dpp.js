@@ -9,6 +9,7 @@ function createDppUseCase(deps) {
     normalizePassportRow,
     normalizeInternalAliasIdValue,
     findExistingPassportByInternalAliasId,
+    findExistingPassportByBusinessIdentifier,
     productIdentifierService,
     complianceService,
     systemPassportFields,
@@ -116,6 +117,43 @@ function createDppUseCase(deps) {
       error.statusCode = 400;
       error.payload = { fields: invalidFieldKeys };
       throw error;
+    }
+
+    const businessIdentifierField = productIdentifierService?.getBusinessIdentifierField?.(typeSchema.typeDef || typeSchema) || "";
+    const businessIdentifierValue = businessIdentifierField === "internalAliasId"
+      ? storedProductIdentifiers.internalAliasIdInput
+      : businessIdentifierField === "uniqueProductIdentifier"
+        ? storedProductIdentifiers.productIdentifierDid
+        : businessIdentifierField === "modelName"
+          ? modelName
+          : fields[businessIdentifierField];
+    const normalizedBusinessIdentifier = (
+      typeof businessIdentifierValue === "string" || typeof businessIdentifierValue === "number"
+    ) ? String(businessIdentifierValue).trim() : "";
+    if (
+      businessIdentifierField
+      && normalizedBusinessIdentifier
+      && businessIdentifierField !== "internalAliasId"
+      && typeof findExistingPassportByBusinessIdentifier === "function"
+    ) {
+      const existingByBusinessIdentifier = await findExistingPassportByBusinessIdentifier({
+        tableName,
+        companyId,
+        fieldKey: businessIdentifierField,
+        fieldValue: normalizedBusinessIdentifier,
+      });
+      if (existingByBusinessIdentifier) {
+        const fieldLabel = typeSchema.schemaFields?.find((field) => field?.key === businessIdentifierField)?.label
+          || businessIdentifierField;
+        const conflict = new Error(`A passport with ${fieldLabel} "${normalizedBusinessIdentifier}" already exists. Create a new version instead.`);
+        conflict.statusCode = 409;
+        conflict.payload = {
+          field: businessIdentifierField,
+          existingDppId: existingByBusinessIdentifier.dppId,
+          releaseStatus: existingByBusinessIdentifier.releaseStatus || null,
+        };
+        throw conflict;
+      }
     }
 
     const complianceManagedFields = await buildStandardsCreateFields({

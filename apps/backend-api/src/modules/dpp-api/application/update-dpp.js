@@ -16,6 +16,7 @@ function updateDppUseCase(deps) {
     updatePassportRowById,
     logAudit,
     findExistingPassportByInternalAliasId,
+    findExistingPassportByBusinessIdentifier,
     productIdentifierService,
     complianceService,
     systemPassportFields,
@@ -241,6 +242,50 @@ function updateDppUseCase(deps) {
     );
     const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
     Object.assign(updateData, processedFields);
+
+    const businessIdentifierField = productIdentifierService?.getBusinessIdentifierField?.(editable.typeDef) || "";
+    const hasBusinessIdentifierUpdate = businessIdentifierField === "modelName"
+      ? modelName !== undefined
+      : businessIdentifierField === "uniqueProductIdentifier"
+        ? productIdentifier !== undefined || explicitUniqueProductIdentifier !== null
+        : fields[businessIdentifierField] !== undefined;
+    if (
+      hasBusinessIdentifierUpdate
+      && businessIdentifierField !== "internalAliasId"
+      && typeof findExistingPassportByBusinessIdentifier === "function"
+    ) {
+      const businessIdentifierValue = businessIdentifierField === "modelName"
+        ? updateData.modelName
+        : businessIdentifierField === "uniqueProductIdentifier"
+          ? updateData.uniqueProductIdentifier
+          : updateData[businessIdentifierField];
+      const normalizedBusinessIdentifier = (
+        typeof businessIdentifierValue === "string" || typeof businessIdentifierValue === "number"
+      ) ? String(businessIdentifierValue).trim() : "";
+      if (normalizedBusinessIdentifier) {
+        const existingByBusinessIdentifier = await findExistingPassportByBusinessIdentifier({
+          tableName: editable.tableName,
+          companyId: editable.passport.companyId,
+          fieldKey: businessIdentifierField,
+          fieldValue: normalizedBusinessIdentifier,
+          excludeDppId: editable.passport.dppId,
+          excludeLineageId: editable.passport.lineageId,
+        });
+        if (existingByBusinessIdentifier) {
+          const fieldLabel = flattenSchemaFieldsFromSections(editable.typeDef?.fieldsJson?.sections || [])
+            .find((field) => field?.key === businessIdentifierField)?.label || businessIdentifierField;
+          return {
+            statusCode: 409,
+            body: {
+              error: `A passport with ${fieldLabel} "${normalizedBusinessIdentifier}" already exists. Create a new version instead.`,
+              field: businessIdentifierField,
+              existingDppId: existingByBusinessIdentifier.dppId,
+              releaseStatus: existingByBusinessIdentifier.releaseStatus || null,
+            },
+          };
+        }
+      }
+    }
 
     await archivePassportSnapshot({
       passport: editable.passport,

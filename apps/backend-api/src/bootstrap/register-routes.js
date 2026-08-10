@@ -184,6 +184,7 @@ function registerAppRoutes(app, deps) {
     getPassportTypeSchema: deps.getPassportTypeSchema,
     hasCompanyPassportTypeAccess: deps.hasCompanyPassportTypeAccess,
     findExistingPassportByInternalAliasId: deps.findExistingPassportByInternalAliasId,
+    findExistingPassportByBusinessIdentifier: deps.findExistingPassportByBusinessIdentifier,
     getPassportLineageContext: deps.getPassportLineageContext,
     getPassportVersionsByLineage: deps.getPassportVersionsByLineage,
     fetchCompanyPassportRecord: deps.fetchCompanyPassportRecord,
@@ -297,6 +298,7 @@ function registerAppRoutes(app, deps) {
     getPassportTypeSchema: deps.getPassportTypeSchema,
     hasCompanyPassportTypeAccess: deps.hasCompanyPassportTypeAccess,
     findExistingPassportByInternalAliasId: deps.findExistingPassportByInternalAliasId,
+    findExistingPassportByBusinessIdentifier: deps.findExistingPassportByBusinessIdentifier,
     complianceService: deps.complianceService,
     backupProviderService: deps.backupProviderService,
   });

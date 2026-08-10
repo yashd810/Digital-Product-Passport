@@ -44,6 +44,7 @@ module.exports = function registerDppApiRoutes(app, {
   getPassportTypeSchema,
   hasCompanyPassportTypeAccess,
   findExistingPassportByInternalAliasId,
+  findExistingPassportByBusinessIdentifier,
   complianceService,
   backupProviderService
 }) {
@@ -166,6 +167,7 @@ module.exports = function registerDppApiRoutes(app, {
     updatePassportRowById,
     logAudit,
     findExistingPassportByInternalAliasId,
+    findExistingPassportByBusinessIdentifier,
     productIdentifierService,
     complianceService,
     systemPassportFields,

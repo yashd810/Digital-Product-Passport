@@ -34,8 +34,10 @@ function createDraftPassportUseCase(deps) {
     normalizeInternalAliasIdValue,
     generateInternalAliasIdValue,
     findExistingPassportByInternalAliasId,
+    findExistingPassportByBusinessIdentifier,
     resolveGranularityForCreate,
     buildStoredProductIdentifiers,
+    productIdentifierService,
     buildComplianceManagedFields,
     getWritablePassportColumns,
     joinQuotedSqlIdentifiers,
@@ -169,6 +171,46 @@ function createDraftPassportUseCase(deps) {
       passportLike: { ...fields, modelName, internalAliasId: normalizedProductId },
       typeDef: typeSchema.typeDef || typeSchema,
     });
+    const businessIdentifierField = productIdentifierService?.getBusinessIdentifierField?.(typeSchema.typeDef || typeSchema) || "";
+    const businessIdentifierValue = businessIdentifierField === "internalAliasId"
+      ? storedProductIdentifiers.internalAliasId
+      : businessIdentifierField === "uniqueProductIdentifier"
+        ? storedProductIdentifiers.uniqueProductIdentifier
+        : businessIdentifierField === "modelName"
+          ? modelName
+          : fields[businessIdentifierField];
+    const normalizedBusinessIdentifier = (
+      typeof businessIdentifierValue === "string" || typeof businessIdentifierValue === "number"
+    ) ? String(businessIdentifierValue).trim() : "";
+    if (
+      businessIdentifierField
+      && normalizedBusinessIdentifier
+      && businessIdentifierField !== "internalAliasId"
+      && typeof findExistingPassportByBusinessIdentifier === "function"
+    ) {
+      const existingByBusinessIdentifier = await findExistingPassportByBusinessIdentifier({
+        tableName,
+        companyId,
+        fieldKey: businessIdentifierField,
+        fieldValue: normalizedBusinessIdentifier,
+      });
+      if (existingByBusinessIdentifier) {
+        const fieldLabel = typeSchema.schemaFields?.find((field) => field?.key === businessIdentifierField)?.label
+          || businessIdentifierField;
+        const error = new Error(
+          isBulk
+            ? `A passport with ${fieldLabel} "${normalizedBusinessIdentifier}" already exists — skipped`
+            : `A passport with ${fieldLabel} "${normalizedBusinessIdentifier}" already exists. Create a new version instead.`
+        );
+        error.statusCode = 409;
+        error.payload = isBulk ? null : {
+          field: businessIdentifierField,
+          existingDppId: existingByBusinessIdentifier.dppId,
+          releaseStatus: normalizeReleaseStatus(existingByBusinessIdentifier.releaseStatus),
+        };
+        throw error;
+      }
+    }
     // `uniqueProductIdentifier` may be the user-selected business identifier
     // field. Its canonical, platform-resolved value is written through the
     // dedicated column below, so it must not be added twice to this INSERT.

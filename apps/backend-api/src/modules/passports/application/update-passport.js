@@ -37,6 +37,7 @@ function updateEditablePassportUseCase(deps) {
     buildStoredProductIdentifiers,
     productIdentifierService,
     findExistingPassportByInternalAliasId,
+    findExistingPassportByBusinessIdentifier,
     normalizeReleaseStatus,
     getCompanyNameMap,
     maybeSignCarrierPayload,
@@ -206,6 +207,43 @@ function updateEditablePassportUseCase(deps) {
         typeDef: typeSchema.typeDef || typeSchema,
       });
       fields.uniqueProductIdentifier = storedProductIdentifiers.uniqueProductIdentifier;
+    }
+
+    if (
+      hasBusinessIdentifierUpdate
+      && businessIdentifierField !== "internalAliasId"
+      && typeof findExistingPassportByBusinessIdentifier === "function"
+    ) {
+      const businessIdentifierValue = businessIdentifierField === "uniqueProductIdentifier"
+        ? fields.uniqueProductIdentifier
+        : businessIdentifierField === "modelName"
+          ? fields.modelName
+          : fields[businessIdentifierField];
+      const normalizedBusinessIdentifier = (
+        typeof businessIdentifierValue === "string" || typeof businessIdentifierValue === "number"
+      ) ? String(businessIdentifierValue).trim() : "";
+      if (normalizedBusinessIdentifier) {
+        const existingByBusinessIdentifier = await findExistingPassportByBusinessIdentifier({
+          tableName,
+          companyId,
+          fieldKey: businessIdentifierField,
+          fieldValue: normalizedBusinessIdentifier,
+          excludeDppId: dppId,
+          excludeLineageId: currentRow.lineageId,
+        });
+        if (existingByBusinessIdentifier) {
+          const fieldLabel = typeSchema.schemaFields?.find((field) => field?.key === businessIdentifierField)?.label
+            || businessIdentifierField;
+          const error = new Error(`A passport with ${fieldLabel} "${normalizedBusinessIdentifier}" already exists. Create a new version instead.`);
+          error.statusCode = 409;
+          error.payload = {
+            field: businessIdentifierField,
+            existingDppId: existingByBusinessIdentifier.dppId,
+            releaseStatus: normalizeReleaseStatus(existingByBusinessIdentifier.releaseStatus),
+          };
+          throw error;
+        }
+      }
     }
 
     const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({

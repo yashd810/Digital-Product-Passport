@@ -473,3 +473,73 @@ test("semantic export restores long logical field keys before applying the selec
   assert.equal(Object.prototype.hasOwnProperty.call(exported["@graph"][0], storageKey), false);
   assert.equal(Object.prototype.hasOwnProperty.call(exported["@graph"][0], "excludedLegacyField"), false);
 });
+
+test("semantic export preserves every platform-managed lifecycle status without validating it as a dictionary field", () => {
+  const { buildPassportJsonLdExport } = createExportService();
+  const statusEnumIri = "https://example.test/dictionary/custom-product/v3/enums/DppStatus";
+  const typeDef = {
+    typeName: "customProductPassportV3",
+    fieldsJson: {
+      semanticGraph: {
+        schemaVersion: 1,
+        rootClassKey: "customProductPassport",
+        classes: [{
+          key: "customProductPassport",
+          label: "Custom Product Passport",
+          semanticId: "https://example.test/dictionary/custom-product/v3/classes/CustomProductPassport",
+          root: true,
+          properties: [{
+            key: "dppStatus",
+            label: "DPP Status",
+            semanticId: "https://example.test/dictionary/custom-product/v3/terms/dpp-status",
+            rangeKind: "enum",
+            rangeEnumKey: "dppStatus",
+            minCount: 0,
+            maxCount: 1,
+          }],
+        }],
+        enums: [{
+          key: "dppStatus",
+          label: "DPP Status",
+          semanticId: statusEnumIri,
+          values: ["active", "inActive", "archieved", "obeslete"].map((key) => ({
+            key,
+            label: key,
+            semanticId: `${statusEnumIri}/${key}`,
+          })),
+        }],
+      },
+      sections: [{
+        key: "administration",
+        label: "Administration",
+        fields: [{
+          key: "dppStatus",
+          label: "DPP Status",
+          type: "text",
+          dataType: "string",
+          objectType: "SingleValuedDataElement",
+          valueDataType: "String",
+          semanticId: "https://example.test/dictionary/custom-product/v3/terms/dpp-status",
+          rangeKind: "enum",
+          rangeEnumKey: "dppStatus",
+          rangeIri: statusEnumIri,
+          minCount: 0,
+          maxCount: 1,
+        }],
+      }],
+    },
+  };
+  const lifecycleStatuses = ["Active", "Inactive", "Archived", "Invalid"];
+
+  const exported = buildPassportJsonLdExport(
+    lifecycleStatuses.map((dppStatus, index) => ({
+      dppId: `dpp-status-${index}`,
+      passportType: typeDef.typeName,
+      dppStatus,
+    })),
+    typeDef.typeName,
+    { typeDef }
+  );
+
+  assert.deepEqual(exported["@graph"].map((passport) => passport.dppStatus), lifecycleStatuses);
+});

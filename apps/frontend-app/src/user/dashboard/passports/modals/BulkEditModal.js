@@ -337,7 +337,7 @@ export function BulkEditModal({
       {tab === "form" && (
         <form onSubmit={handleFormSubmit} className="bulk-edit-form">
           {changeRows.map((row) => (
-            <div key={row.id} className="bulk-revise-row">
+            <div key={row.id} className="bulk-revise-change-row bulk-edit-change-row">
               <AppSelect className="device-manual-input" value={row.key} onChange={(event) => updateChangeRow(row.id, { key: event.target.value, value: "" })} aria-label="Field to update">
                 <option value="">Choose field…</option>
                 {availableFields.map((field) => (
@@ -387,7 +387,7 @@ export function BulkEditModal({
 
   return createPortal(
     <div className="dashboard-modal-overlay" onClick={(event) => { if (event.target === event.currentTarget && !submitting) onClose(); }}>
-      <div className="dashboard-modal-card">
+      <div className="dashboard-modal-card bulk-revise-modal-card bulk-edit-modal-card">
         {modalBody}
       </div>
     </div>,

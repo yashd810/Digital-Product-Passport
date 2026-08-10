@@ -44,6 +44,11 @@ const dppContext = {
   updatedAt: { "@id": "dpp:updatedAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
 };
 
+// The canonical payload generates this header from lifecycle state.  It must
+// not be treated as a user-entered field and revalidated against a legacy
+// dictionary enum while a JSON-LD file is being exported.
+const platformManagedSemanticHeaderKeys = new Set(["dppStatus"]);
+
 function normalizeSemanticModel(options = {}) {
   const semanticModel = options.semanticModel && typeof options.semanticModel === "object"
     ? options.semanticModel
@@ -85,6 +90,7 @@ function coercePassportSchemaValues(passport, typeDef) {
 
   for (const field of schemaFields) {
     if (!field?.key) continue;
+    if (platformManagedSemanticHeaderKeys.has(field.key)) continue;
     const semanticProperty = field.rangeKind ? field : null;
     if (!semanticProperty) {
       throw new Error(`Field "${field.key}" is missing required semantic graph metadata.`);
@@ -140,6 +146,7 @@ function sanitizePassport(passport, passportType, typeDef = null) {
   }
 
   for (const field of flattenSchemaFieldsFromSections(getTypeDefSections(typeDef))) {
+    if (platformManagedSemanticHeaderKeys.has(field?.key)) continue;
     const property = field?.rangeKind ? field : null;
     if (!property) {
       throw new Error(`Field "${field?.key || "unknown"}" is missing required semantic graph metadata.`);

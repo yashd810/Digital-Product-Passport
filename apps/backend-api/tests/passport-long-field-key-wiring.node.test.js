@@ -56,6 +56,37 @@ function createResponse() {
 
 const noopMiddleware = (_req, _res, next) => next?.();
 
+test("business identifier lookup scopes duplicates to another live lineage", async () => {
+  let captured = null;
+  const repository = createPassportQueryRepository({
+    pool: {
+      query: async (sql, params) => {
+        captured = { sql, params };
+        return { rows: [{ dppId: "dpp-existing-serial", lineageId: "lineage-existing" }] };
+      },
+    },
+    getTable: () => '"batteryPassportV1Passports"',
+    normalizePassportRow: (row) => row,
+    isPublicHistoryStatus: () => false,
+    quoteSqlIdentifier: (key) => `"${key}"`,
+  });
+
+  const found = await repository.findExistingPassportByBusinessIdentifier({
+    tableName: '"batteryPassportV1Passports"',
+    companyId: 7,
+    fieldKey: longFieldKey,
+    fieldValue: "  bt-123  ",
+    excludeDppId: "dpp-current-version",
+    excludeLineageId: "lineage-current",
+  });
+
+  assert.equal(found.dppId, "dpp-existing-serial");
+  assert.match(captured.sql, new RegExp(`LOWER\\(BTRIM\\(COALESCE\\("${physicalFieldKey}"::text, ''\\)\\)\\) = LOWER\\(BTRIM\\(\\$2::text\\)\\)`));
+  assert.match(captured.sql, /"dppId" <> \$3/);
+  assert.match(captured.sql, /"lineageId" <> \$4/);
+  assert.deepEqual(captured.params, [7, "bt-123", "dpp-current-version", "lineage-current"]);
+});
+
 test("draft create stores a long logical key physically and returns and archives the logical key", async () => {
   let insertQuery = null;
   let archivedPassport = null;
@@ -243,6 +274,78 @@ test("draft create stores the selected model and mapped operator fields once in 
   assert.equal(insertQuery.match(/"economicOperatorId"/g)?.length, 1);
   assert.equal(result.passport.modelName, "Example Model");
   assert.equal(result.passport.economicOperatorId, "EO-001");
+});
+
+test("draft create rejects a duplicate configured business identifier before creating a new lineage", async () => {
+  const serialField = "batterySerialNumber";
+  const serialTypeSchema = {
+    typeName: "batteryPassportV1",
+    allowedKeys: new Set([serialField]),
+    schemaFields: [{ key: serialField, label: "Battery Serial Number", type: "text", required: true }],
+    fieldsJson: {
+      identity: { businessIdentifierField: serialField },
+      sections: [{ key: "identity", fields: [{ key: serialField, label: "Battery Serial Number", type: "text", required: true }] }],
+    },
+  };
+  let duplicateLookup = null;
+  const createDraftPassport = createDraftPassportUseCase({
+    pool: { connect: async () => { throw new Error("a duplicate must not open an insert transaction"); } },
+    generateDppRecordId: () => "dpp-duplicate-serial",
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
+    generateInternalAliasIdValue: (dppId) => dppId,
+    findExistingPassportByInternalAliasId: async () => null,
+    findExistingPassportByBusinessIdentifier: async (params) => {
+      duplicateLookup = params;
+      return { dppId: "dpp-existing-serial", releaseStatus: "released" };
+    },
+    resolveGranularityForCreate: () => "item",
+    buildStoredProductIdentifiers: ({ internalAliasId }) => ({
+      internalAliasId,
+      uniqueProductIdentifier: `did:example:${internalAliasId}`,
+    }),
+    productIdentifierService: { getBusinessIdentifierField: () => serialField },
+    buildComplianceManagedFields: async () => ({
+      passportPolicyKey: "policy",
+      contentSpecificationIds: "[]",
+      carrierPolicyKey: null,
+      economicOperatorId: null,
+      economicOperatorIdentifierScheme: null,
+      facilityId: null,
+    }),
+    getCompanyNameMap: async () => new Map([["7", "Example Company"]]),
+    normalizeReleaseStatus: (status) => status,
+    systemPassportFields,
+  });
+
+  await assert.rejects(
+    createDraftPassport({
+      companyId: 7,
+      userId: 9,
+      reqUser: { userId: 9 },
+      typeSchema: serialTypeSchema,
+      resolvedPassportType: serialTypeSchema.typeName,
+      tableName: '"batteryPassportV1Passports"',
+      item: {
+        passportType: serialTypeSchema.typeName,
+        internalAliasId: "BAT-NEW-001",
+        [serialField]: " BT-123 ",
+      },
+      companyPolicy: {},
+      snapshotReason: "afterCreate",
+    }),
+    (error) => {
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /Battery Serial Number "BT-123" already exists/);
+      assert.equal(error.payload.existingDppId, "dpp-existing-serial");
+      return true;
+    }
+  );
+  assert.deepEqual(duplicateLookup, {
+    tableName: '"batteryPassportV1Passports"',
+    companyId: 7,
+    fieldKey: serialField,
+    fieldValue: "BT-123",
+  });
 });
 
 test("editable update reads and returns a long logical key while writing through the logical API key", async () => {

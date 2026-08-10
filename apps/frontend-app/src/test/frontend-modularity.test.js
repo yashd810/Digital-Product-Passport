@@ -854,6 +854,58 @@ describe("frontend modularity helpers", () => {
     }
   });
 
+  test("JSON-LD export preserves generated lifecycle statuses without legacy enum validation", () => {
+    const statusEnumIri = "https://example.test/dictionary/dpp-status";
+    const typeDef = {
+      fieldsJson: {
+        semanticGraph: {
+          rootClassKey: "passport",
+          classes: [{
+            key: "passport",
+            semanticId: "https://example.test/classes/Passport",
+            root: true,
+            properties: [{
+              key: "dppStatus",
+              semanticId: "https://example.test/terms/dpp-status",
+              rangeKind: "enum",
+              rangeEnumKey: "legacyDppStatus",
+              minCount: 0,
+              maxCount: 1,
+            }],
+          }],
+          enums: [{
+            key: "legacyDppStatus",
+            semanticId: statusEnumIri,
+            values: ["active", "inActive", "archieved", "obeslete"].map((key) => ({
+              key,
+              semanticId: `${statusEnumIri}/${key}`,
+            })),
+          }],
+        },
+        sections: [{
+          key: "administration",
+          fields: [{
+            key: "dppStatus",
+            label: "DPP Status",
+            rangeKind: "enum",
+            rangeEnumKey: "legacyDppStatus",
+            minCount: 0,
+            maxCount: 1,
+          }],
+        }],
+      },
+    };
+    const statuses = ["Active", "Inactive", "Archived", "Invalid"];
+
+    const exported = buildPassportJsonLdExport(
+      statuses.map((dppStatus, index) => ({ dppId: `dpp-${index}`, dppStatus })),
+      "customPassport",
+      { typeDef }
+    );
+
+    expect(exported["@graph"].map((passport) => passport.dppStatus)).toEqual(statuses);
+  });
+
   test("app-owned dropdown helpers retain option values and skip disabled choices", () => {
     const options = getAppSelectOptions(
       React.createElement(React.Fragment, null,

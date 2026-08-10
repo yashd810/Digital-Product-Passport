@@ -1,6 +1,7 @@
 "use strict";
 
 const { isPublicVersionVisible } = require("../public-passports/visibility");
+const { toPassportStorageColumnKey } = require("../../shared/passports/passport-helpers");
 
 function createPassportQueryRepository({
   pool,
@@ -8,6 +9,7 @@ function createPassportQueryRepository({
   getPassportTypeSchema = null,
   normalizePassportRow,
   isPublicHistoryStatus,
+  quoteSqlIdentifier,
 }) {
   const loadNormalizationSchema = async (passportType) => (
     typeof getPassportTypeSchema === "function"
@@ -38,6 +40,42 @@ function createPassportQueryRepository({
        FROM ${tableName}
        WHERE "companyId" = $1
          AND "internalAliasId" = $2
+         AND "deletedAt" IS NULL${exclusionSql}
+       ORDER BY "versionNumber" DESC, "updatedAt" DESC, id DESC
+       LIMIT 1`,
+      params
+    );
+    return existing.rows[0] || null;
+  }
+
+  async function findExistingPassportByBusinessIdentifier({
+    tableName,
+    companyId,
+    fieldKey,
+    fieldValue,
+    excludeDppId = null,
+    excludeLineageId = null,
+  }) {
+    const normalizedFieldKey = String(fieldKey || "").trim();
+    const normalizedFieldValue = String(fieldValue ?? "").trim();
+    if (!normalizedFieldKey || !normalizedFieldValue) return null;
+
+    const fieldColumn = quoteSqlIdentifier(toPassportStorageColumnKey(normalizedFieldKey));
+    const params = [companyId, normalizedFieldValue];
+    let exclusionSql = "";
+    if (excludeDppId) {
+      params.push(excludeDppId);
+      exclusionSql += ` AND "dppId" <> $${params.length}`;
+    }
+    if (excludeLineageId) {
+      params.push(excludeLineageId);
+      exclusionSql += ` AND "lineageId" <> $${params.length}`;
+    }
+    const existing = await pool.query(
+      `SELECT id, "dppId", "lineageId", "internalAliasId", "releaseStatus", "versionNumber"
+       FROM ${tableName}
+       WHERE "companyId" = $1
+         AND LOWER(BTRIM(COALESCE(${fieldColumn}::text, ''))) = LOWER(BTRIM($2::text))
          AND "deletedAt" IS NULL${exclusionSql}
        ORDER BY "versionNumber" DESC, "updatedAt" DESC, id DESC
        LIMIT 1`,
@@ -384,6 +422,7 @@ function createPassportQueryRepository({
 
   return {
     findExistingPassportByInternalAliasId,
+    findExistingPassportByBusinessIdentifier,
     getPassportLineageContext,
     getCompanyNameMap,
     getPassportVersionsByLineage,
