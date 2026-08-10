@@ -412,6 +412,20 @@
   min-width: 8.7rem;
 }
 
+@media (min-width: 1100px) {
+  .passport-list-table:not(.passport-list-table--wide-identifiers) .passport-serial-col,
+  .passport-list-table:not(.passport-list-table--wide-identifiers) .passport-model-col {
+    width: clamp(12rem, 16vw, 20rem);
+    min-width: 12rem;
+  }
+
+  .passport-list-table .passport-completeness-col {
+    width: 13rem;
+    min-width: 13rem;
+    max-width: 13rem;
+  }
+}
+
 .passport-list-table .passport-creator-col {
   width: 7.25rem;
   min-width: 7.25rem;

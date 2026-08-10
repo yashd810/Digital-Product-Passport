@@ -480,6 +480,7 @@
 }
 
 .completeness-bar {
+  width: min(13rem, 100%);
   min-width: 68px;
 }
 

@@ -232,7 +232,7 @@ export function PassportListRow({
           />
         )}
       </td>
-      <td><CompletenessBar pct={pct} /></td>
+      <td className="passport-completeness-col"><CompletenessBar pct={pct} /></td>
     </tr>
   );
 }
