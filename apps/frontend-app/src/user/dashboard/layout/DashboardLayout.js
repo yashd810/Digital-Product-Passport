@@ -165,9 +165,6 @@ function DashboardLayout({ user, companyId, onLogout }) {
               <NavLink to={dashboardPath("overview")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📊 {t("overview")}
               </NavLink>
-              <NavLink to={dashboardPath("my-passports")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                ✓ {t("myPassports")}
-              </NavLink>
 
               {/* Passport Types — grouped by product category */}
               {passportTypes.length > 0 && (
