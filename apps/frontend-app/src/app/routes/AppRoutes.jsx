@@ -149,12 +149,11 @@ export function AppRoutes({
         }>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview"      element={<Overview companyId={companyId} />} />
-          <Route path="my-passports"  element={<PassportList user={user} companyId={companyId} filterByUser={true} />} />
-          <Route path="passports/product/:productKey" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
-          <Route path="passports/productCategory/:productCategoryKey" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
+          <Route path="passports/product/:productKey" element={<PassportList user={user} companyId={companyId} />} />
+          <Route path="passports/productCategory/:productCategoryKey" element={<PassportList user={user} companyId={companyId} />} />
           <Route path="passports/:dppId/diff" element={<VersionDiff companyId={companyId} />} />
           <Route path="passports/:dppId/history" element={<VersionDiff companyId={companyId} />} />
-          <Route path="passports/:passportType" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
+          <Route path="passports/:passportType" element={<PassportList user={user} companyId={companyId} />} />
           <Route path="notifications"   element={<NotificationsPage user={user} />} />
           <Route path="templates"       element={<TemplatesPage user={user} companyId={companyId} view="list" />} />
           <Route path="templates/new"   element={<TemplatesPage user={user} companyId={companyId} view="create" />} />

@@ -24,7 +24,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
     companyId,
     subpath,
   });
-  const listRoute = firstType ? dashboardPath(`passports/${encodeURIComponent(firstType.typeName)}`) : dashboardPath("my-passports");
+  const listRoute = firstType ? dashboardPath(`passports/${encodeURIComponent(firstType.typeName)}`) : dashboardPath("overview");
 
   return [
     {
@@ -61,7 +61,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         {
           title: "Use the sidebar intentionally",
           items: [
-            "Analytics contains Overview, My Passports, Workflow, and the product-category passport navigation tree.",
+            "Analytics contains Overview, Workflow, and the product-category passport navigation tree.",
             "Account contains your profile, security, company profile, repository, templates, and team tools depending on your role.",
             "Audit contains Notifications and Audit Logs so operational history is always separate from creation work.",
           ],
@@ -141,7 +141,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "Choose 'Bulk create (empty drafts)' and enter the number of passports you need (up to 500).",
             "All drafts are created immediately with auto-generated names. They can be renamed and filled later.",
-            "After bulk create, open the relevant passport list or My Passports, use Export to download the drafts as CSV or JSON, then select the editable drafts and use Bulk Edit > CSV or JSON once you have unit-level data ready.",
+            "After bulk create, open the relevant passport list, use Export to download the drafts as CSV or JSON, then select the editable drafts and use Bulk Edit > CSV or JSON once you have unit-level data ready.",
             "Best for: when you need to generate serial numbers or unit IDs for a batch before data is available.",
           ],
         },
@@ -169,7 +169,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "Go to Templates and create a template for the model. Mark shared fields (e.g. manufacturer, product category) as model data.",
             "In the Create Hub, choose that template and bulk create the quantity you need  -  all pre-filled with model data.",
-            "Open the passport list for that type or My Passports and export the newly created drafts as CSV or JSON.",
+            "Open the passport list for that type and export the newly created drafts as CSV or JSON.",
             "Open the file in Excel or Sheets, fill in the unit-specific columns (serial number, manufacture date, etc.).",
             "Select the target editable drafts in the passport list, choose Bulk Edit, and upload the CSV or JSON update file. Bulk Edit matches only the selected existing passports by dppId or internalAliasId; it does not create extra records from unmatched rows.",
           ],
@@ -178,7 +178,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       links: [
         { label: "Open Create Hub", route: dashboardPath("create"), description: "The single entry point for all creation methods." },
         { label: "Open Templates", route: dashboardPath("templates"), description: "Manage reusable model templates for single and bulk creation." },
-        { label: "Open CSV Import Guide", route: csvRoute || dashboardPath("my-passports"), description: "Create new drafts from a CSV or JSON file for the first available type; use Bulk Edit from a passport list for updates." },
+        { label: "Open CSV Import Guide", route: csvRoute || dashboardPath("create"), description: "Create new drafts from a CSV or JSON file for the first available type; use Bulk Edit from a passport list for updates." },
       ],
       previews: [
         buildPreview(
@@ -313,7 +313,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         ],
       },
       links: [
-        { label: "Open My Passports", route: dashboardPath("my-passports"), description: "See records assigned to or created by you." },
+        { label: "Open Passport List", route: listRoute, description: "See records for the first available passport type." },
         { label: "Open Workflow", route: dashboardPath("workflow/inprogress"), description: "Monitor approvals and backlog items." },
       ],
       previews: [
@@ -703,7 +703,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       ],
       links: [
         { label: "Open Company Profile", route: dashboardPath("company-profile"), description: "Review company identity and public presentation settings." },
-        { label: "Open My Passports", route: dashboardPath("my-passports"), description: "Find DPP IDs, public links, versions, and passport actions." },
+        { label: "Open Passport List", route: listRoute, description: "Find DPP IDs, public links, versions, and passport actions." },
       ],
       table: governanceSecurityApiTable,
       tips: [
@@ -1014,7 +1014,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       ],
       links: [
         { label: "Open Company Profile", route: dashboardPath("company-profile"), description: "Set the public introduction and public-view styling." },
-        { label: "Open My Passports", route: dashboardPath("my-passports"), description: "Use row actions to copy links, export, and print QR labels." },
+        { label: "Open Passport List", route: listRoute, description: "Use row actions to copy links, export, and print QR labels." },
       ],
       tips: [
         "Treat the public viewer as the final external presentation layer. Company introduction text and release quality matter as much as raw field completeness.",

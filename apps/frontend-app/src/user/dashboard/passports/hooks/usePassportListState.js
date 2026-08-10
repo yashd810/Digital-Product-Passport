@@ -5,7 +5,6 @@ import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { isObsoletePassportStatus, normalizePassportStatus } from "../../../../passports/utils/passportStatus";
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
-import { useI18n } from "../../../../app/providers/i18n";
 import {
   calcCompleteness,
   formatPassportTypeLabel,
@@ -18,8 +17,7 @@ import {
 
 const api = import.meta.env.VITE_API_URL || "";
 
-export function usePassportListState({ user, companyId, filterByUser }) {
-  const { t } = useI18n();
+export function usePassportListState({ user, companyId }) {
   const { passportType, productKey, productCategoryKey } = useParams();
   const navigate = useNavigate();
 
@@ -161,7 +159,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     setShowFilters(false);
     setSortConfig({ key: "createdAt", direction: "desc" });
     setColumnFilters({});
-  }, [filterByUser, passportType, productKey, productCategoryKey]);
+  }, [passportType, productKey, productCategoryKey]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -173,7 +171,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   }, [companyId]);
 
   const fetchPassports = useCallback(async () => {
-    if (!activeType && !filterByUser && !activeProductCategory) return;
+    if (!activeType && !activeProductCategory) return;
 
     try {
       setIsLoading(true);
@@ -198,18 +196,6 @@ export function usePassportListState({ user, companyId, filterByUser }) {
 
         return all;
       };
-
-      if (filterByUser) {
-        const typeResponse = await fetchWithAuth(`${api}/api/companies/${companyId}/passport-types`, {
-          headers: authHeaders(),
-        });
-        const types = typeResponse.ok ? await typeResponse.json() : [];
-        const all = (await fetchForTypes(Array.isArray(types) ? types : []))
-          .filter((passport) => passport.createdBy === user?.id)
-          .sort((left, right) => getPassportDateTimestamp(right) - getPassportDateTimestamp(left));
-        setPassports(all);
-        return;
-      }
 
       if (activeProductCategory) {
         const typeResponse = await fetchWithAuth(`${api}/api/companies/${companyId}/passport-types`, {
@@ -244,7 +230,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     } finally {
       setIsLoading(false);
     }
-  }, [activeProductCategory, activeType, companyId, filterByUser, filterStatus, searchText, user?.id]);
+  }, [activeProductCategory, activeType, companyId, filterStatus, searchText]);
 
   useEffect(() => {
     fetchPassports();
@@ -264,13 +250,11 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     return () => document.removeEventListener("click", handleClickOutside);
   }, [openMenuId]);
 
-  const pageTitle = filterByUser
-    ? t("myPassports")
-    : activeProductCategory
-      ? activeProductCategory
-      : activeType
-        ? `${activeTypeData?.displayName || formatPassportTypeLabel(activeType)} Passports`
-        : "Passports";
+  const pageTitle = activeProductCategory
+    ? activeProductCategory
+    : activeType
+      ? `${activeTypeData?.displayName || formatPassportTypeLabel(activeType)} Passports`
+      : "Passports";
 
   const displayedPassports = useMemo(() => (
     [...passports].sort((left, right) => {
@@ -315,16 +299,8 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       { key: "completeness", type: "number", getValue: (group) => calcCompleteness(group.latest, allPassportTypes) ?? -1 },
     ];
 
-    if (filterByUser) {
-      columns.splice(3, 0, {
-        key: "passportType",
-        type: "string",
-        getValue: (group) => group.latest?.passportType || activeType || "",
-      });
-    }
-
     return columns;
-  }, [activeType, allPassportTypes, filterByUser]);
+  }, [allPassportTypes]);
 
   const filteredAndSortedPassports = useMemo(
     () => applyTableControls(groupedPassports, tableColumns, sortConfig, columnFilters),
@@ -344,7 +320,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchText, filterStatus, columnFilters, sortConfig, activeType, activeProductCategory, filterByUser, selectionMode]);
+  }, [searchText, filterStatus, columnFilters, sortConfig, activeType, activeProductCategory, selectionMode]);
 
   useEffect(() => {
     if (currentPage > totalPages) {

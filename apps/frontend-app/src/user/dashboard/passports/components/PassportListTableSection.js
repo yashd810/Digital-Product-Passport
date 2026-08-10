@@ -41,7 +41,6 @@ export function PassportListTableSection({
   getVisiblePassportKeys,
   selectedPassports,
   toggleSelectAll,
-  filterByUser,
   sortConfig,
   toggleSort,
   expandedPassportGroups,
@@ -97,8 +96,8 @@ export function PassportListTableSection({
         <div className="table-container">
           {filteredAndSortedPassports.length === 0 ? (
             <div className="empty-state"><p>
-              {searchText || filterStatus || Object.values(columnFilters).some(Boolean) ? t("noPassportMatches")
-                : filterByUser ? t("noMyPassports")
+              {searchText || filterStatus || Object.values(columnFilters).some(Boolean)
+                ? t("noPassportMatches")
                 : t("noPassportsYet", { type: activeType })}
             </p></div>
           ) : (
@@ -109,7 +108,6 @@ export function PassportListTableSection({
               paginatedPassports={paginatedPassports}
               selectedPassports={selectedPassports}
               toggleSelectAll={toggleSelectAll}
-              filterByUser={filterByUser}
               sortConfig={sortConfig}
               toggleSort={toggleSort}
               showFilters={showFilters}

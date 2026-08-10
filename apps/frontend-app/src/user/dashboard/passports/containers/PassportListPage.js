@@ -8,9 +8,9 @@ import { usePassportListState } from "../hooks/usePassportListState";
 import { calcCompleteness } from "../utils/passportListHelpers";
 import "../../../../shared/styles/Dashboard.css";
 
-function PassportList({ user, companyId, filterByUser }) {
+function PassportList({ user, companyId }) {
   const navigate = useNavigate();
-  const state = usePassportListState({ user, companyId, filterByUser });
+  const state = usePassportListState({ user, companyId });
   const actions = usePassportListActions({
     activeType: state.activeType,
     allPassportTypes: state.allPassportTypes,
@@ -48,7 +48,6 @@ function PassportList({ user, companyId, filterByUser }) {
       setOpenMenuId={state.setOpenMenuId}
       setMenuAnchorRect={state.setMenuAnchorRect}
       openMenu={state.openMenu}
-      filterByUser={filterByUser}
       navigate={navigate}
       setReleaseModal={state.setReleaseModal}
       handleRevise={actions.handleRevise}
@@ -103,7 +102,6 @@ function PassportList({ user, companyId, filterByUser }) {
         getVisiblePassportKeys={state.getVisiblePassportKeys}
         selectedPassports={state.selectedPassports}
         toggleSelectAll={state.toggleSelectAll}
-        filterByUser={filterByUser}
         sortConfig={state.sortConfig}
         toggleSort={state.toggleSort}
         expandedPassportGroups={state.expandedPassportGroups}

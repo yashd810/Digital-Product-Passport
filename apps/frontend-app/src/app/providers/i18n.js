@@ -6,7 +6,6 @@ const translations = {
     // Nav
     dashboard:        "Dashboard",
     overview:         "Overview",
-    myPassports:      "My Passports",
     auditLogs:        "Audit Logs",
     workflow:         "Workflow",
     manageTeam:       "Manage Team",
@@ -106,7 +105,6 @@ const translations = {
   sv: {
     dashboard:        "Instrumentpanel",
     overview:         "Översikt",
-    myPassports:      "Mina pass",
     auditLogs:        "Granskningsloggar",
     workflow:         "Arbetsflöde",
     manageTeam:       "Hantera team",
@@ -197,7 +195,6 @@ const translations = {
   de: {
     dashboard:        "Dashboard",
     overview:         "Übersicht",
-    myPassports:      "Meine Pässe",
     auditLogs:        "Prüfprotokolle",
     workflow:         "Arbeitsablauf",
     manageTeam:       "Team verwalten",
@@ -336,7 +333,6 @@ const dashboardTranslations = {
     options: "Options",
     complete: "Complete",
     noPassportMatches: "No passports match your search or filters.",
-    noMyPassports: "You have not created any passports yet.",
     noPassportsYet: "No {{type}} passports yet. Create one to get started!",
     loadingPassports: "Loading passports…",
     showingPassports: "Showing {{from}}–{{to}} of {{total}}",
@@ -694,7 +690,6 @@ const dashboardTranslations = {
     options: "Alternativ",
     complete: "Klar",
     noPassportMatches: "Inga pass matchar din sökning eller dina filter.",
-    noMyPassports: "Du har inte skapat några pass ännu.",
     noPassportsYet: "Inga {{type}}-pass ännu. Skapa ett för att komma igång!",
     loadingPassports: "Läser in pass…",
     showingPassports: "Visar {{from}}–{{to}} av {{total}}",
@@ -1052,7 +1047,6 @@ const dashboardTranslations = {
     options: "Optionen",
     complete: "Vollständig",
     noPassportMatches: "Keine Pässe entsprechen Ihrer Suche oder Ihren Filtern.",
-    noMyPassports: "Sie haben noch keine Pässe erstellt.",
     noPassportsYet: "Noch keine {{type}}-Pässe. Erstellen Sie einen, um loszulegen!",
     loadingPassports: "Pässe werden geladen…",
     showingPassports: "{{from}}–{{to}} von {{total}} werden angezeigt",

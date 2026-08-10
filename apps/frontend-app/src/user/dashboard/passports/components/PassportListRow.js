@@ -79,7 +79,6 @@ export function PassportListRow({
   setOpenMenuId,
   setMenuAnchorRect,
   openMenu,
-  filterByUser,
   navigate,
   setReleaseModal,
   handleRevise,
@@ -167,9 +166,6 @@ export function PassportListRow({
       <td className="passport-model-col">
         {passport.modelName ? <PassportIdentifierText value={passport.modelName} className="passport-model-cell" cellId={`${menuId}-model`} onIdentifierColumnWidthChange={onIdentifierColumnWidthChange} /> : <span className="no-product-id">—</span>}
       </td>
-      {filterByUser && (
-        <td><span className="type-badge passport-type-badge">{pType}</span></td>
-      )}
       <td className="passport-date-col">{formatPassportDate(passport)}</td>
       <td className="passport-status-col">
         <div className="passport-status-cell">
@@ -236,7 +232,7 @@ export function PassportListRow({
           />
         )}
       </td>
-      <td className="passport-completeness-col"><CompletenessBar pct={pct} /></td>
+      <td><CompletenessBar pct={pct} /></td>
     </tr>
   );
 }
