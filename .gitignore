@@ -58,7 +58,6 @@ npm-debug.log*
 # Editor / local tools
 .vscode/
 .idea/
-.claude/
 
 # Local API surface and request collection
 /Test APIs/
