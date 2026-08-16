@@ -403,9 +403,17 @@ function readRequestCookie(req, name) {
 function normalizeRedirectPath(redirectTo, fallback = "/") {
   const raw = String(redirectTo || "").trim();
   if (!raw) return fallback;
-  if (!raw.startsWith("/")) return fallback;
-  if (raw.startsWith("//")) return fallback;
-  return raw;
+  if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\") || /[\u0000-\u001f\u007f]/.test(raw)) {
+    return fallback;
+  }
+  try {
+    const base = new URL("https://redirect.invalid");
+    const resolved = new URL(raw, base);
+    if (resolved.origin !== base.origin) return fallback;
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  } catch {
+    return fallback;
+  }
 }
 
 function createOauthService({

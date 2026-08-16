@@ -6,6 +6,25 @@
  * Starts HTTP only after startup checks complete and closes HTTP, scheduled
  * work, and PostgreSQL in a deterministic order when the process stops.
  */
+function configureHttpServerLimits(httpServer) {
+  const requestTimeoutMs = 5 * 60 * 1000;
+  const headersTimeoutMs = 15 * 1000;
+  const inactiveSocketTimeoutMs = 2 * 60 * 1000;
+
+  httpServer.requestTimeout = requestTimeoutMs;
+  httpServer.headersTimeout = headersTimeoutMs;
+  httpServer.keepAliveTimeout = 5 * 1000;
+  if ("keepAliveTimeoutBuffer" in httpServer) httpServer.keepAliveTimeoutBuffer = 1000;
+  httpServer.maxHeadersCount = 100;
+  httpServer.maxRequestsPerSocket = 100;
+  httpServer.setTimeout?.(inactiveSocketTimeoutMs);
+  return {
+    headersTimeoutMs,
+    inactiveSocketTimeoutMs,
+    requestTimeoutMs,
+  };
+}
+
 function configureServerLifecycle({
   app,
   startup,
@@ -23,6 +42,7 @@ function configureServerLifecycle({
     httpServer = app.listen(port, () => {
       logger.info(`[Server] Listening on port ${port}`);
     });
+    configureHttpServerLimits(httpServer);
   });
 
   async function closeHttpServer() {
@@ -83,5 +103,6 @@ function configureServerLifecycle({
 }
 
 module.exports = {
+  configureHttpServerLimits,
   configureServerLifecycle,
 };

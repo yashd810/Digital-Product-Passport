@@ -2,6 +2,10 @@ import React, { useRef, useState } from "react";
 import { useNavigate, useParams, NavLink } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../../shared/passports/passportSchemaUtils";
+import {
+  assertLocalFileSize,
+  assertRecordCount,
+} from "../../../shared/security/fileSafety";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import { useI18n } from "../../../app/providers/i18n";
 import "../../../shared/styles/Dashboard.css";
@@ -125,6 +129,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
     setIsImporting(true);
     setCreateError("");
     try {
+      assertLocalFileSize(file, { label: "CSV file" });
       const typeResponse = await fetchWithAuth(`${api}/api/internal/passport-types/${passportType}`);
       if (!typeResponse.ok) throw new Error("Failed to fetch passport type definition");
       const passportTypeData = await typeResponse.json();
@@ -139,6 +144,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       const rows = parseCsvText(text);
       if (rows.length < 2) throw new Error("CSV must have at least a header row and one data row");
       const numPassports = rows[0].length - 1;
+      assertRecordCount(numPassports, { label: "CSV import" });
       const fieldRows = rows.slice(1);
       const unknownKeys = fieldRows
         .map((row) => String(row[0] || "").trim())
@@ -200,10 +206,12 @@ function CSVImportGuide({ user, companyId, activeTab }) {
     setUpdateError("");
     setUpdateResult(null);
     try {
+      assertLocalFileSize(file, { label: "JSON file" });
       const text = await file.text();
       let passports;
       try { passports = JSON.parse(text); } catch { throw new Error("Invalid JSON file"); }
       if (!Array.isArray(passports)) throw new Error("JSON must be an array of passport objects");
+      assertRecordCount(passports.length, { label: "JSON import" });
       if (passports.some((passport) => passport?.dppId)) {
         throw new Error("Create-only JSON import does not accept dppId. Remove update identifiers and use new internalAliasId values.");
       }

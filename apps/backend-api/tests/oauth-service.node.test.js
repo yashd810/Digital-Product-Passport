@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 const { EventEmitter } = require("node:events");
 const test = require("node:test");
 const createOauthService = require("../src/platform/identity/oauth-service");
-const { fetchPinnedOauth, validateOauthUrl } = createOauthService;
+const { fetchPinnedOauth, normalizeRedirectPath, validateOauthUrl } = createOauthService;
 
 function restoreEnv(name, value) {
   if (value === undefined) delete process.env[name];
@@ -26,6 +26,19 @@ function createProviderEnv(overrides = {}) {
 }
 
 const publicDnsLookup = async () => [{ address: "93.184.216.34", family: 4 }];
+
+test("OAuth post-login redirects remain same-origin paths", () => {
+  assert.equal(normalizeRedirectPath("/dashboard/acme?tab=security#keys"), "/dashboard/acme?tab=security#keys");
+  for (const malicious of [
+    "https://evil.example/",
+    "//evil.example/",
+    "/\\evil.example/",
+    "\\\\evil.example/",
+    "/dashboard\nevil",
+  ]) {
+    assert.equal(normalizeRedirectPath(malicious, "/safe"), "/safe");
+  }
+});
 
 function createOauthTransactionPool(delegate = { query: async () => ({ rows: [] }) }) {
   const transactions = new Map();

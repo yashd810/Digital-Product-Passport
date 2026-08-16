@@ -34,7 +34,7 @@ const crypto         = require("crypto");
 const jwt            = require("jsonwebtoken");
 const multer         = require("multer");
 const fs             = require("fs");
-const { configureHttp } = require("./http");
+const { configureHttp, configureHttpErrorHandling } = require("./http");
 const { registerAppRoutes } = require("./register-routes");
 const { registerSupportRoutes } = require("./support-routes");
 const { configureServerLifecycle } = require("./server-lifecycle");
@@ -289,6 +289,7 @@ const {
   authRateLimit, otpRateLimit, passwordResetRateLimit, publicReadRateLimit,
   publicHeavyRateLimit, publicUnlockRateLimit,
   integrationWriteRateLimit, assetWriteRateLimit, assetSourceFetchRateLimit,
+  sensitiveActionRateLimit,
   contactIpRateLimit, contactEmailRateLimit, contactRecipientRateLimit,
 } = createRateLimiters(pool);
 const rateLimitMaintenanceTimer = startRateLimitMaintenance(pool);
@@ -333,15 +334,39 @@ async function assertCompanyAssetPassportTypeAccess(companyId, passportType) {
 
 // ─── FILE STORAGE ────────────────────────────────────────────────────────────
 const upload = multer({
-  storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 20 * 1024 * 1024,
+    files: 1,
+    fields: 8,
+    parts: 9,
+    fieldSize: 64 * 1024,
+    fieldNameSize: 100,
+  },
   fileFilter: (_, file, cb) => file.mimetype === "application/pdf" ? cb(null, true) : cb(new Error("Only PDF files are allowed"), false),
 });
 const repoUpload = multer({
-  storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024,
+    files: 1,
+    fields: 8,
+    parts: 9,
+    fieldSize: 64 * 1024,
+    fieldNameSize: 100,
+  },
   fileFilter: (_, file, cb) => file.mimetype === "application/pdf" ? cb(null, true) : cb(new Error("Only PDF files are allowed"), false),
 });
 const repoSymbolUpload = multer({
-  storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+    files: 1,
+    fields: 8,
+    parts: 9,
+    fieldSize: 64 * 1024,
+    fieldNameSize: 100,
+  },
   fileFilter: (_, file, cb) => { const allowed = [".png",".jpg",".jpeg",".webp"]; allowed.includes(path.extname(file.originalname).toLowerCase()) ? cb(null, true) : cb(new Error("Only PNG, JPG, and WebP files are allowed")); },
 });
 const bufferStartsWith = (buffer, bytes, offset = 0) =>
@@ -538,6 +563,7 @@ registerAppRoutes(app, {
   integrationWriteRateLimit,
   assetWriteRateLimit,
   assetSourceFetchRateLimit,
+  sensitiveActionRateLimit,
   authenticateToken,
   requireBearerToken,
   isSuperAdmin,
@@ -664,6 +690,7 @@ registerSupportRoutes(app, {
   brandedEmail,
   renderInfoTable,
 });
+configureHttpErrorHandling(app, { logger });
 
 const shutdownTimeoutMs = Number.parseInt(process.env.SHUTDOWN_TIMEOUT_MS || "10000", 10);
 configureServerLifecycle({

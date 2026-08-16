@@ -293,14 +293,14 @@ describe("frontend modularity helpers", () => {
     );
 
     expect(rowSource).toContain('className="passport-view-btn"');
-    expect(rowSource).toContain("View passport");
-    expect(rowSource).toContain("Preview passport");
+    expect(rowSource).toContain('t("viewPassport")');
+    expect(rowSource).toContain('t("previewPassport")');
     expect(rowSource).toContain('target="_blank"');
     expect(rowSource).toContain("onClick={selectionMode ? () =>");
     expect(rowSource).toContain('className="passport-model-cell"');
     expect(rowSource).toContain('className="passport-serial-cell"');
     expect(rowSource).not.toContain('className="model-link-btn"');
-    expect(tableSource).toContain('className="passport-view-col" scope="col">Viewer</th>');
+    expect(tableSource).toContain('className="passport-view-col" scope="col">{t("viewer")}</th>');
     expect(listStateSource).toContain("navigate(destination.path)");
     expect(listStateSource).toContain("window.location.assign(destination.url)");
   });

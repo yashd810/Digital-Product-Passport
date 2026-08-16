@@ -1,0 +1,36 @@
+[Unit]
+Description=Block Docker containers from OCI instance metadata
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/dpp-container-imds-firewall apply
+ExecReload=/usr/local/sbin/dpp-container-imds-firewall apply
+ExecStop=/usr/local/sbin/dpp-container-imds-firewall remove
+RemainAfterExit=yes
+User=root
+Group=root
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+CapabilityBoundingSet=CAP_NET_ADMIN
+
+[Install]
+# Tie the persistent rule to every Docker start. `PartOf` propagates explicit
+# Docker restarts to this one-shot unit; the Docker wants-link also re-applies
+# the rule if Docker recreated its chains while this unit was inactive.
+WantedBy=docker.service

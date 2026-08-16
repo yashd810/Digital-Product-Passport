@@ -10,6 +10,14 @@ const {
 const { getAppOrigin } = require("../../shared/security/configured-origin");
 const { normalizeSafeImageReference } = require("../../shared/passports/passport-uri");
 
+async function defaultPasswordResetTimingGuard(startedAt) {
+  const configuredFloor = Number.parseInt(process.env.PASSWORD_RESET_MIN_RESPONSE_MS || "750", 10);
+  const floorMs = Math.min(2_000, Math.max(250, Number.isFinite(configuredFloor) ? configuredFloor : 750));
+  const jitterMs = crypto.randomInt(0, 251);
+  const remainingMs = Math.max(0, (startedAt + floorMs + jitterMs) - Date.now());
+  if (remainingMs > 0) await new Promise((resolve) => setTimeout(resolve, remainingMs));
+}
+
 module.exports = function registerAuthRoutes(app, {
   pool,
   jwt,
@@ -33,12 +41,14 @@ module.exports = function registerAuthRoutes(app, {
   authRateLimit,
   otpRateLimit,
   passwordResetRateLimit,
+  sensitiveActionRateLimit = (_req, _res, next) => next(),
   publicReadRateLimit,
   authenticateToken,
   checkCompanyAccess,
   requireEditor,
   oauthService,
   backupProviderService,
+  passwordResetTimingGuard = defaultPasswordResetTimingGuard,
 }) {
   const safeAvatarUrl = (value) => {
     try {
@@ -260,14 +270,17 @@ module.exports = function registerAuthRoutes(app, {
       const normalizedEmail = String(email).trim().toLowerCase();
 
       // Per-email lockout: max 5 failures in 15 minutes
-      const lockKey = `login-lockout:${normalizedEmail}`;
+      const loginIdentityHash = crypto.createHash("sha256").update(normalizedEmail).digest("base64url");
+      const lockKey = `login-lockout:${loginIdentityHash}`;
       const lockRow = await pool.query(
         "SELECT count, \"resetAt\" FROM \"requestRateLimits\" WHERE \"bucketKey\" = $1",
         [lockKey]
       );
-      if (lockRow.rows.length && lockRow.rows[0].count >= 5 && new Date() < new Date(lockRow.rows[0].resetAt)) {
-        return res.status(429).json({ error: "Account temporarily locked due to too many failed attempts. Please try again later." });
-      }
+      const accountLocked = Boolean(
+        lockRow.rows.length
+        && lockRow.rows[0].count >= 5
+        && new Date() < new Date(lockRow.rows[0].resetAt)
+      );
 
       const result = await pool.query(
         `SELECT u.id,
@@ -303,32 +316,34 @@ module.exports = function registerAuthRoutes(app, {
          WHERE u.email = $1 AND u."isActive" = true`,
         [normalizedEmail]
       );
-      if (!result.rows.length) return res.status(401).json({ error: "Invalid credentials" });
-      const u  = result.rows[0];
-      if (u.ssoOnly) {
-        return res.status(400).json({ error: "This account uses enterprise SSO. Use the SSO sign-in option instead." });
-      }
-      const passwordValid = await verifyPassword(password, u.passwordHash);
-      if (!passwordValid) {
+      const u = result.rows[0] || null;
+      const canUsePasswordLogin = Boolean(u && !u.ssoOnly && !accountLocked);
+      // A valid dummy Argon2 hash is verified for unknown, inactive, SSO-only,
+      // and locally locked identities so account state cannot be inferred from
+      // password-work differences or response status/messages.
+      const passwordValid = await verifyPassword(password, canUsePasswordLogin ? u.passwordHash : null);
+      if (!canUsePasswordLogin || !passwordValid) {
         // Increment lockout counter
-        const resetAt = new Date(Date.now() + 15 * 60 * 1000);
-        await pool.query(
-          `INSERT INTO "requestRateLimits" ("bucketKey", count, "resetAt", "updatedAt")
-           VALUES ($1, 1, $2, NOW())
-           ON CONFLICT ("bucketKey") DO UPDATE
-           SET count = CASE WHEN "requestRateLimits"."resetAt" <= NOW() THEN 1 ELSE "requestRateLimits".count + 1 END,
-               "resetAt" = CASE WHEN "requestRateLimits"."resetAt" <= NOW() THEN $2 ELSE "requestRateLimits"."resetAt" END,
-               "updatedAt" = NOW()`,
-          [lockKey, resetAt]
-        ).catch((error) => {
-          logger.warn({ err: error, email: normalizedEmail }, "Failed to increment login lockout counter");
-        });
+        if (u && !u.ssoOnly && !accountLocked) {
+          const resetAt = new Date(Date.now() + 15 * 60 * 1000);
+          await pool.query(
+            `INSERT INTO "requestRateLimits" ("bucketKey", count, "resetAt", "updatedAt")
+             VALUES ($1, 1, $2, NOW())
+             ON CONFLICT ("bucketKey") DO UPDATE
+             SET count = CASE WHEN "requestRateLimits"."resetAt" <= NOW() THEN 1 ELSE "requestRateLimits".count + 1 END,
+                 "resetAt" = CASE WHEN "requestRateLimits"."resetAt" <= NOW() THEN $2 ELSE "requestRateLimits"."resetAt" END,
+                 "updatedAt" = NOW()`,
+            [lockKey, resetAt]
+          ).catch((error) => {
+            logger.warn({ err: error, loginIdentityHash }, "Failed to increment login lockout counter");
+          });
+        }
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
       // Clear lockout on successful login
       await pool.query("DELETE FROM \"requestRateLimits\" WHERE \"bucketKey\" = $1", [lockKey]).catch((error) => {
-        logger.warn({ err: error, email: normalizedEmail }, "Failed to clear login lockout counter");
+        logger.warn({ err: error, loginIdentityHash }, "Failed to clear login lockout counter");
       });
 
       if (u.twoFactorEnabled) {
@@ -344,10 +359,18 @@ module.exports = function registerAuthRoutes(app, {
         );
         try { await sendOtpEmail(u, otp); }
         catch (emailErr) {
-          logger.error("OTP email failed:", emailErr.message);
+          await pool.query(
+            'UPDATE users SET "otpCodeHash" = NULL, "otpExpiresAt" = NULL WHERE id = $1',
+            [u.id]
+          ).catch(() => {});
+          logger.error({ err: emailErr, userId: u.id }, "OTP email failed");
           return res.status(500).json({ error: "Failed to send verification code. Please try again." });
         }
-        const preAuthToken = jwt.sign({ userId: u.id, preAuth: true }, jwtSecret, {
+        const preAuthToken = jwt.sign({
+          userId: u.id,
+          preAuth: true,
+          sessionVersion: u.sessionVersion ?? 1,
+        }, jwtSecret, {
           algorithm: "HS256",
           expiresIn: "10m",
           issuer: "dpp-api",
@@ -404,6 +427,7 @@ module.exports = function registerAuthRoutes(app, {
                 u."defaultApproverId" AS "defaultApproverId",
                 u."createdAt" AS "createdAt",
                 u."twoFactorEnabled" AS "twoFactorEnabled",
+                u."sessionVersion" AS "sessionVersion",
                 u."otpCodeHash" AS "otpCodeHash",
                 u."otpExpiresAt" AS "otpExpiresAt",
                 c."companyName" AS "companyName",
@@ -417,6 +441,12 @@ module.exports = function registerAuthRoutes(app, {
       );
       if (!result.rows.length) return res.status(401).json({ error: "User not found" });
       const u = result.rows[0];
+      const preAuthSessionVersion = Number(payload.sessionVersion);
+      const currentSessionVersion = Number(u.sessionVersion ?? 1);
+      if (!Number.isSafeInteger(preAuthSessionVersion) || preAuthSessionVersion !== currentSessionVersion) {
+        return res.status(401).json({ error: "Session expired. Please log in again." });
+      }
+      if (!u.twoFactorEnabled) return res.status(401).json({ error: "Invalid session token" });
 
       const storedOtpHash = String(u.otpCodeHash || "").trim();
       if (!storedOtpHash || !u.otpExpiresAt || new Date() > new Date(u.otpExpiresAt)) {
@@ -430,10 +460,20 @@ module.exports = function registerAuthRoutes(app, {
         return res.status(401).json({ error: "Invalid verification code" });
       }
 
-      await pool.query(
-        'UPDATE users SET "otpCodeHash" = NULL, "otpExpiresAt" = NULL, "lastLoginAt" = NOW() WHERE id = $1',
-        [u.id]
+      const claimedOtp = await pool.query(
+        `UPDATE users
+         SET "otpCodeHash" = NULL, "otpExpiresAt" = NULL, "lastLoginAt" = NOW()
+         WHERE id = $1
+           AND "otpCodeHash" = $2
+           AND "otpExpiresAt" > NOW()
+           AND "isActive" = true
+           AND COALESCE("sessionVersion", 1) = $3
+         RETURNING id`,
+        [u.id, storedOtpHash, currentSessionVersion]
       );
+      if (!claimedOtp.rows.length) {
+        return res.status(401).json({ error: "Verification code has expired or was already used." });
+      }
       const sessionToken = generateToken(u, undefined, undefined, undefined, undefined, {
         mfaVerifiedAt: new Date().toISOString(),
         amr: ["pwd", "otp"],
@@ -539,9 +579,23 @@ module.exports = function registerAuthRoutes(app, {
       catch { return res.status(401).json({ error: "Session expired. Please log in again." }); }
       if (!payload.preAuth) return res.status(401).json({ error: "Invalid session" });
 
-      const result = await pool.query('SELECT * FROM users WHERE id = $1 AND "isActive" = true', [payload.userId]);
+      const result = await pool.query(
+        `SELECT id,
+                email,
+                "sessionVersion" AS "sessionVersion",
+                "twoFactorEnabled" AS "twoFactorEnabled"
+         FROM users
+         WHERE id = $1 AND "isActive" = true`,
+        [payload.userId]
+      );
       if (!result.rows.length) return res.status(401).json({ error: "User not found" });
       const u = result.rows[0];
+      const preAuthSessionVersion = Number(payload.sessionVersion);
+      const currentSessionVersion = Number(u.sessionVersion ?? 1);
+      if (!Number.isSafeInteger(preAuthSessionVersion) || preAuthSessionVersion !== currentSessionVersion) {
+        return res.status(401).json({ error: "Session expired. Please log in again." });
+      }
+      if (!u.twoFactorEnabled) return res.status(401).json({ error: "Invalid session" });
 
       if (!isEmailConfigured()) {
         return res.status(503).json({ error: "Two-factor email delivery is not configured on the server." });
@@ -561,6 +615,7 @@ module.exports = function registerAuthRoutes(app, {
 
   // ─── FORGOT PASSWORD ─────────────────────────────────────────────────────────
   app.post("/api/auth/forgot-password", passwordResetRateLimit, async (req, res) => {
+    const startedAt = Date.now();
     try {
       const { email } = req.body;
       if (!email) return res.status(400).json({ error: "Email required" });
@@ -569,23 +624,29 @@ module.exports = function registerAuthRoutes(app, {
         return res.status(503).json({ error: "Password reset email delivery is not configured on the server." });
       }
       const u = await pool.query('SELECT id FROM users WHERE email = $1 AND "isActive" = true', [normalizedEmail]);
-      if (!u.rows.length) return res.json({ success: true });
-      const token = generateOneTimeToken();
-      const tokenHash = hashOpaqueToken(token);
-      const exp   = new Date(Date.now() + 60 * 60 * 1000);
-      await pool.query(
-        "INSERT INTO \"passwordResetTokens\" (\"userId\", \"tokenHash\", \"expiresAt\") VALUES ($1,$2,$3)",
-        [u.rows[0].id, tokenHash, exp]
-      );
-      const resetUrl = `${getAppOrigin()}/reset-password#token=${encodeURIComponent(token)}`;
-      await createTransporter().sendMail({
-        from: getEmailFromAddress(), to: normalizedEmail,
-        subject: "Reset your Digital Product Passport password",
-        html: brandedEmail({
-          preheader: "Password Reset Request",
-          bodyHtml: renderPasswordResetBody({ email: normalizedEmail, resetUrl }),
-        }),
-      });
+      if (u.rows.length) {
+        const token = generateOneTimeToken();
+        const tokenHash = hashOpaqueToken(token);
+        const exp   = new Date(Date.now() + 60 * 60 * 1000);
+        await pool.query(
+          "INSERT INTO \"passwordResetTokens\" (\"userId\", \"tokenHash\", \"expiresAt\") VALUES ($1,$2,$3)",
+          [u.rows[0].id, tokenHash, exp]
+        );
+        const resetUrl = `${getAppOrigin()}/reset-password#token=${encodeURIComponent(token)}`;
+        Promise.resolve()
+          .then(() => createTransporter().sendMail({
+            from: getEmailFromAddress(), to: normalizedEmail,
+            subject: "Reset your Digital Product Passport password",
+            html: brandedEmail({
+              preheader: "Password Reset Request",
+              bodyHtml: renderPasswordResetBody({ email: normalizedEmail, resetUrl }),
+            }),
+          }))
+          .catch((error) => {
+            logger.error({ err: error, userId: u.rows[0].id }, "Password reset email delivery failed");
+          });
+      }
+      await passwordResetTimingGuard(startedAt);
       res.json({ success: true });
     } catch (e) { logger.error("Forgot password:", e.message); res.status(500).json({ error: "Failed to send email" }); }
   });
@@ -609,7 +670,6 @@ module.exports = function registerAuthRoutes(app, {
       const passwordPolicyError = validatePasswordPolicy(newPassword);
       if (passwordPolicyError) return res.status(400).json({ error: passwordPolicyError });
       const tokenHash = hashOpaqueToken(token);
-      const { hash, pepperVersion } = await hashPassword(newPassword);
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -624,11 +684,18 @@ module.exports = function registerAuthRoutes(app, {
           await client.query("ROLLBACK");
           return res.status(400).json({ error: "Invalid or expired token" });
         }
+        const { hash, pepperVersion } = await hashPassword(newPassword);
+        await client.query(
+          'UPDATE "passwordResetTokens" SET used = true WHERE "userId" = $1 AND used = false',
+          [claimed.rows[0].userId]
+        );
         await client.query(
           `UPDATE users
            SET "passwordHash" = $1,
                "pepperVersion" = $2,
                "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
+               "otpCodeHash" = NULL,
+               "otpExpiresAt" = NULL,
                "updatedAt" = NOW()
            WHERE id = $3`,
           [hash, pepperVersion, claimed.rows[0].userId]
@@ -786,7 +853,7 @@ module.exports = function registerAuthRoutes(app, {
     } catch (e) { res.status(500).json({ error: "Failed to update profile" }); }
   });
 
-  app.patch("/api/users/me/2fa", authenticateToken, async (req, res) => {
+  app.patch("/api/users/me/2fa", authenticateToken, sensitiveActionRateLimit, async (req, res) => {
     try {
       const { enable, currentPassword } = req.body;
       if (typeof enable !== "boolean") return res.status(400).json({ error: "enable (boolean) required" });
@@ -798,20 +865,26 @@ module.exports = function registerAuthRoutes(app, {
         return res.status(401).json({ error: "Current password is incorrect" });
 
       await pool.query(
-        'UPDATE users SET "twoFactorEnabled" = $1, "updatedAt" = NOW() WHERE id = $2',
+        `UPDATE users
+         SET "twoFactorEnabled" = $1,
+             "otpCodeHash" = CASE WHEN $1 THEN "otpCodeHash" ELSE NULL END,
+             "otpExpiresAt" = CASE WHEN $1 THEN "otpExpiresAt" ELSE NULL END,
+             "updatedAt" = NOW()
+         WHERE id = $2`,
         [enable, req.user.userId]
       );
       res.json({ success: true, twoFactorEnabled: enable });
     } catch (e) { logger.error("2FA toggle error:", e.message); res.status(500).json({ error: "Failed to update 2FA setting" }); }
   });
 
-  app.patch("/api/users/me/password", authenticateToken, async (req, res) => {
+  app.patch("/api/users/me/password", authenticateToken, sensitiveActionRateLimit, async (req, res) => {
     try {
       const { currentPassword, newPassword } = req.body;
       if (!currentPassword || !newPassword) return res.status(400).json({ error: "Both passwords required" });
       const passwordPolicyError = validatePasswordPolicy(newPassword);
       if (passwordPolicyError) return res.status(400).json({ error: passwordPolicyError });
       const u = await pool.query('SELECT "passwordHash" AS "passwordHash" FROM users WHERE id = $1', [req.user.userId]);
+      if (!u.rows.length) return res.status(404).json({ error: "User not found" });
       if (!await verifyPassword(currentPassword, u.rows[0].passwordHash))
         return res.status(401).json({ error: "Current password is incorrect" });
       const { hash, pepperVersion } = await hashPassword(newPassword);
@@ -820,6 +893,8 @@ module.exports = function registerAuthRoutes(app, {
          SET "passwordHash" = $1,
              "pepperVersion" = $2,
              "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
+             "otpCodeHash" = NULL,
+             "otpExpiresAt" = NULL,
              "updatedAt" = NOW()
          WHERE id = $3
          RETURNING id, email, "companyId" AS "companyId", role, "sessionVersion" AS "sessionVersion"`,

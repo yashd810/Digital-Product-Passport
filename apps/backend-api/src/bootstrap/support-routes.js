@@ -16,6 +16,57 @@ const {
 
 const normalizeHeaderText = (value) => String(value ?? "").replace(/[\r\n]+/g, " ").trim();
 
+// Keep the public read path aligned with the upload policy.  Storage may
+// contain historical or manually-created objects, so it is not safe to rely on
+// the upload middleware alone when reading a public symbol back out.
+const maxPublicSymbolBytes = 2 * 1024 * 1024;
+const maxPassportAttachmentBytes = 20 * 1024 * 1024;
+
+function readBoundedObjectLength(value, maxBytes) {
+  if (value === undefined || value === null || value === "") return null;
+  const text = String(value).trim();
+  if (!/^\d+$/.test(text)) {
+    const error = new Error("Stored object has an invalid content length");
+    error.code = "invalidStorageObjectLength";
+    throw error;
+  }
+  const length = Number(text);
+  if (!Number.isSafeInteger(length) || length > maxBytes) {
+    const error = new Error("Stored object exceeds its permitted read limit");
+    error.code = "storageObjectTooLarge";
+    throw error;
+  }
+  return length;
+}
+
+function applyStoredObjectHeaders(res, objectResponse, maxBytes) {
+  const contentLength = objectResponse.headers?.get("content-length");
+  const etag = objectResponse.headers?.get("etag");
+  const boundedLength = readBoundedObjectLength(contentLength, maxBytes);
+  if (boundedLength !== null) res.setHeader("Content-Length", String(boundedLength));
+  if (etag) res.setHeader("ETag", etag);
+}
+
+async function sendBoundedStoredObject(res, objectResponse, maxBytes) {
+  if (typeof objectResponse.pipeTo === "function") {
+    await objectResponse.pipeTo(res, { maxBytes });
+    return res;
+  }
+  // Compatibility for older storage adapters and test doubles. The buffer
+  // fallback still receives the same explicit route limit.
+  return res.send(Buffer.from(await objectResponse.arrayBuffer(maxBytes)));
+}
+
+async function assertContainedFileSize(fs, safePath, maxBytes) {
+  const stat = await fs.promises.stat(safePath);
+  if (!stat.isFile() || stat.size > maxBytes) {
+    const error = new Error("Stored file exceeds its permitted read limit");
+    error.code = "storageObjectTooLarge";
+    throw error;
+  }
+  return stat.size;
+}
+
 function getPublicSymbolContentType(value) {
   const match = /^uploads\/symbols\/symbol[a-zA-Z0-9_-]+\.(png|jpe?g|webp)$/i.exec(String(value || ""));
   if (!match) return null;
@@ -29,15 +80,31 @@ function isPublicStorageKey(value) {
   return Boolean(getPublicSymbolContentType(value));
 }
 
+function setPassportAttachmentHeaders(res, mimeType, { requirePublic = true } = {}) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  // A restricted attachment is authorized by a bearer-style access URL. Do
+  // not leave its bytes in a shared or browser cache after that link expires.
+  res.setHeader("Cache-Control", requirePublic ? "public, max-age=300" : "private, no-store");
+  res.setHeader("Referrer-Policy", requirePublic ? "strict-origin-when-cross-origin" : "no-referrer");
+  res.setHeader("Content-Type", mimeType);
+  res.setHeader("Content-Security-Policy", "sandbox");
+  if (mimeType === "application/pdf") {
+    res.setHeader("Content-Disposition", "inline");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.removeHeader("X-Frame-Options");
+  } else {
+    res.setHeader("Content-Disposition", "attachment");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+  }
+}
+
 function registerSupportRoutes(app, deps) {
   const {
-    express,
     pool,
     fs,
     path,
     logger,
     storageService,
-    localStorageDir,
     filesBaseDir,
     normalizeStorageRequestKey,
     isPassportStorageKey,
@@ -50,20 +117,6 @@ function registerSupportRoutes(app, deps) {
   } = deps;
 
   if (storageService.isLocal) {
-    app.use("/storage", publicReadRateLimit, (req, res, next) => {
-      const storageKey = normalizeStorageRequestKey(req.path);
-      if (!isPublicStorageKey(storageKey)) {
-        return res.status(404).json({ error: "File not found" });
-      }
-      next();
-    }, express.static(localStorageDir, {
-      setHeaders: (res) => {
-        res.setHeader("X-Content-Type-Options", "nosniff");
-        res.setHeader("Cross-Origin-Resource-Policy", "same-site");
-        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      },
-    }));
-
     // /passport-files direct static serving is intentionally removed.
     // Passport files must be served through /public-files/:publicId so the app
     // can enforce visibility rules and avoid exposing predictable bucket paths.
@@ -74,8 +127,8 @@ function registerSupportRoutes(app, deps) {
     app.use("/repository-files", (_req, res) => res.status(404).json({ error: "File not found" }));
   }
 
-  if (!storageService.isLocal && storageService.fetchObject) {
-    app.get(/^\/storage\/(.+)$/, publicReadRateLimit, async (req, res) => {
+  if (storageService.fetchObject) {
+    const servePublicStorageObject = async (req, res) => {
       const storageKey = normalizeStorageRequestKey(req.params[0]);
       if (!storageKey) return res.status(400).json({ error: "Storage key required" });
       const contentType = getPublicSymbolContentType(storageKey);
@@ -84,24 +137,27 @@ function registerSupportRoutes(app, deps) {
       }
       try {
         const objectResponse = await storageService.fetchObject(storageKey);
-        const contentLength = objectResponse.headers.get("content-length");
-        const etag = objectResponse.headers.get("etag");
+        applyStoredObjectHeaders(res, objectResponse, maxPublicSymbolBytes);
 
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("Cross-Origin-Resource-Policy", "same-site");
         res.setHeader("Content-Type", contentType);
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-        if (contentLength) res.setHeader("Content-Length", contentLength);
-        if (etag) res.setHeader("ETag", etag);
 
-        const buffer = Buffer.from(await objectResponse.arrayBuffer());
+        if (req.method === "HEAD") return res.status(200).end();
         // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write -- The route admits only image keys, derives a fixed image MIME type, and sends opaque bytes with nosniff.
-        res.send(buffer);
+        return await sendBoundedStoredObject(res, objectResponse, maxPublicSymbolBytes);
       } catch (error) {
         logger.error({ storageKey, err: error }, "[storage] Failed to proxy object");
+        if (res.headersSent || res.destroyed) {
+          res.destroy?.();
+          return;
+        }
         res.status(404).json({ error: "Stored object not found" });
       }
-    });
+    };
+    app.get(/^\/storage\/(.+)$/, publicReadRateLimit, servePublicStorageObject);
+    app.head(/^\/storage\/(.+)$/, publicReadRateLimit, servePublicStorageObject);
   }
 
   async function servePassportAttachment(req, res, { requirePublic = true } = {}) {
@@ -137,10 +193,6 @@ function registerSupportRoutes(app, deps) {
       const mimeType = attachment.mimeType === "application/pdf"
         ? "application/pdf"
         : "application/octet-stream";
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      res.setHeader("Cache-Control", requirePublic ? "public, max-age=300" : "private, max-age=60");
-      res.setHeader("Cross-Origin-Resource-Policy", mimeType === "application/pdf" ? "cross-origin" : "same-site");
-
       if (attachment.filePath) {
         const safePath = resolveExistingContainedPath({
           fs,
@@ -149,11 +201,9 @@ function registerSupportRoutes(app, deps) {
           basePath: filesBaseDir,
         });
         if (safePath) {
-          res.setHeader("Content-Type", mimeType);
-          if (mimeType === "application/pdf") {
-            res.setHeader("Content-Disposition", "inline");
-            res.removeHeader("X-Frame-Options");
-          }
+          const fileSize = await assertContainedFileSize(fs, safePath, maxPassportAttachmentBytes);
+          setPassportAttachmentHeaders(res, mimeType, { requirePublic });
+          res.setHeader("Content-Length", String(fileSize));
           // nosemgrep: javascript.express.security.audit.express-res-sendfile.express-res-sendfile -- The existing path is canonicalized and constrained to filesBaseDir above.
           return res.sendFile(safePath);
         }
@@ -161,23 +211,19 @@ function registerSupportRoutes(app, deps) {
 
       if (storageService.fetchObject && isPassportStorageKey(attachment.storageKey)) {
         const objectResponse = await storageService.fetchObject(attachment.storageKey);
-        const contentLength = objectResponse.headers?.get("content-length");
-        const etag = objectResponse.headers?.get("etag");
-        res.setHeader("Content-Type", mimeType);
-        if (contentLength) res.setHeader("Content-Length", contentLength);
-        if (etag) res.setHeader("ETag", etag);
-        if (mimeType === "application/pdf") {
-          res.setHeader("Content-Disposition", "inline");
-          res.removeHeader("X-Frame-Options");
-        }
-        const buffer = Buffer.from(await objectResponse.arrayBuffer());
+        applyStoredObjectHeaders(res, objectResponse, maxPassportAttachmentBytes);
+        setPassportAttachmentHeaders(res, mimeType, { requirePublic });
         // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write -- Attachment access and storage keys are authorized above; only PDFs are rendered, while all other types are served as octet-stream with nosniff.
-        return res.send(buffer);
+        return await sendBoundedStoredObject(res, objectResponse, maxPassportAttachmentBytes);
       }
 
       res.status(404).json({ error: "File not available" });
     } catch (error) {
       logger.error({ err: error }, "[public-files] Failed to serve file");
+      if (res.headersSent || res.destroyed) {
+        res.destroy?.();
+        return;
+      }
       res.status(500).json({ error: "Failed to serve file" });
     }
   }
@@ -232,7 +278,14 @@ function registerSupportRoutes(app, deps) {
 }
 
 module.exports = {
+  applyStoredObjectHeaders,
+  assertContainedFileSize,
   getPublicSymbolContentType,
   isPublicStorageKey,
+  maxPassportAttachmentBytes,
+  maxPublicSymbolBytes,
+  readBoundedObjectLength,
   registerSupportRoutes,
+  sendBoundedStoredObject,
+  setPassportAttachmentHeaders,
 };

@@ -2,11 +2,11 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const http = require("node:http");
 const path = require("node:path");
 const test = require("node:test");
 const express = require("express");
 const registerHealthRoutes = require("../src/http/routes/health");
+const { requestApp } = require("./helpers/in-memory-http");
 
 const repoRoot = path.resolve(__dirname, "../../..");
 
@@ -42,7 +42,8 @@ function createStorageService({ saveError } = {}) {
         const buffer = objects.get(key);
         if (!buffer) throw new Error("Missing storage probe object");
         return {
-          async arrayBuffer() {
+          async arrayBuffer(maxBytes) {
+            calls.maxReadBytes = maxBytes;
             return Uint8Array.from(buffer).buffer;
           },
         };
@@ -62,23 +63,11 @@ async function withServer({ pool, storageService }, run) {
   app.set("trust proxy", 1);
   registerHealthRoutes(app, { pool, storageService });
 
-  const server = http.createServer(app);
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.once("listening", resolve);
-    server.listen(0, "127.0.0.1");
-  });
-  try {
-    const address = server.address();
-    await run(`http://127.0.0.1:${address.port}`);
-  } finally {
-    server.closeAllConnections?.();
-    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-  }
+  await run((path, options) => requestApp(app, { path, ...options }));
 }
 
-async function fetchJson(url, options) {
-  const response = await fetch(url, options);
+async function fetchJson(request, path, options) {
+  const response = await request(path, options);
   return { body: await response.json(), response };
 }
 
@@ -86,8 +75,8 @@ test("public health stays read-only and does not invoke object storage", async (
   const { pool, queries } = createPool();
   const { calls, storageService } = createStorageService();
 
-  await withServer({ pool, storageService }, async (baseUrl) => {
-    const { body, response } = await fetchJson(`${baseUrl}/health`);
+  await withServer({ pool, storageService }, async (request) => {
+    const { body, response } = await fetchJson(request, "/health");
 
     assert.equal(response.status, 200);
     assert.deepEqual(body, {
@@ -105,8 +94,8 @@ test("storage probe only permits a direct loopback request", async () => {
   const { pool } = createPool();
   const { calls, objects, storageService } = createStorageService();
 
-  await withServer({ pool, storageService }, async (baseUrl) => {
-    const forwarded = await fetchJson(`${baseUrl}/health/storage`, {
+  await withServer({ pool, storageService }, async (request) => {
+    const forwarded = await fetchJson(request, "/health/storage", {
       headers: { "x-forwarded-for": "198.51.100.24" },
     });
     assert.equal(forwarded.response.status, 403);
@@ -118,13 +107,13 @@ test("storage probe only permits a direct loopback request", async () => {
     // A client cannot make a public address look local by prepending a
     // loopback value: with one trusted proxy hop Express uses the rightmost
     // client address supplied by Caddy.
-    const spoofed = await fetchJson(`${baseUrl}/health/storage`, {
+    const spoofed = await fetchJson(request, "/health/storage", {
       headers: { "x-forwarded-for": "127.0.0.1, 198.51.100.24" },
     });
     assert.equal(spoofed.response.status, 403);
     assert.deepEqual(calls, { save: [], fetch: [], delete: [] });
 
-    const direct = await fetchJson(`${baseUrl}/health/storage`);
+    const direct = await fetchJson(request, "/health/storage");
     assert.equal(direct.response.status, 200);
     assert.deepEqual(direct.body, { status: "OK", storage: "ok" });
   });
@@ -132,6 +121,8 @@ test("storage probe only permits a direct loopback request", async () => {
   assert.equal(calls.save.length, 1);
   assert.equal(calls.fetch.length, 1);
   assert.equal(calls.delete.length, 1);
+  assert.ok(Number.isSafeInteger(calls.maxReadBytes));
+  assert.ok(calls.maxReadBytes > 0 && calls.maxReadBytes < 1024);
   assert.equal(objects.size, 0);
 });
 
@@ -141,8 +132,8 @@ test("storage failures do not disclose provider or error details", async () => {
     saveError: new Error("secret storage credential failure"),
   });
 
-  await withServer({ pool, storageService }, async (baseUrl) => {
-    const { body, response } = await fetchJson(`${baseUrl}/health/storage`);
+  await withServer({ pool, storageService }, async (request) => {
+    const { body, response } = await fetchJson(request, "/health/storage");
 
     assert.equal(response.status, 503);
     assert.deepEqual(body, { status: "UNAVAILABLE", storage: "failed" });

@@ -635,7 +635,14 @@ module.exports = function registerCatalogRoutes(app, deps) {
 
   const symbolUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 2 * 1024 * 1024 },
+    limits: {
+      fileSize: 2 * 1024 * 1024,
+      files: 1,
+      fields: 4,
+      parts: 5,
+      fieldSize: 16 * 1024,
+      fieldNameSize: 100,
+    },
     fileFilter: (req, file, cb) => {
       const allowed = [".png", ".jpg", ".jpeg", ".webp"];
       if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);

@@ -51,9 +51,19 @@ That activation is audited. Set `BACKUP_PROVIDER_SUPPORTS_PUBLIC_HANDOVER=true`
 only after approving the provider for this exceptional continuity role; implicit
 environment providers default to `false`.
 
-When `DB_BACKUP_ENABLED=true`, configure all five dedicated values:
+When `DB_BACKUP_ENABLED=true`, configure the dedicated endpoint, region,
+bucket, credential pair, path-style setting, object prefixes, retention count,
+and `DB_BACKUP_MAX_BYTES` cap:
 `DB_BACKUP_S3_ENDPOINT`, `DB_BACKUP_S3_REGION`, `DB_BACKUP_S3_BUCKET`,
-`DB_BACKUP_S3_ACCESS_KEY_ID`, and `DB_BACKUP_S3_SECRET_ACCESS_KEY`.
+`DB_BACKUP_S3_ACCESS_KEY_ID`, `DB_BACKUP_S3_SECRET_ACCESS_KEY`,
+`DB_BACKUP_S3_FORCE_PATH_STYLE`, `DB_BACKUP_S3_PREFIX`,
+`DB_BACKUP_EVIDENCE_S3_PREFIX`, `DB_BACKUP_MAX_BYTES`, and
+`DB_BACKUP_RETENTION_COUNT`. Also set an independent 256-bit
+`DB_BACKUP_MANIFEST_HMAC_SECRET`; it authenticates a versioned manifest before
+a restore trusts an object key, exact size, or checksum. Each backup key embeds
+a cryptographic backup ID, so a bucket writer cannot replay an older signed
+manifest under a newer key. Do not rotate that key as part of routine
+application-secret rotation because older manifests must remain verifiable.
 
 Use a separate OCI customer-secret pair with permission only for the separate
 DB-backup bucket. It must not reuse the application file-storage access key,
@@ -68,7 +78,10 @@ running a backup, verification, or restore drill.
 The OCI DB-backup bucket may enforce checksum and retention rules. The DB backup
 uploader sends `Content-MD5` and `x-amz-checksum-sha256` on backup writes. Old
 backup pruning deletes objects one by one and treats retention-rule blocks as
-retained objects, not as backup-job failures.
+retained objects, not as backup-job failures. Manifest scans use paginated,
+duplicate-safe inventory and are capped at 10,000 objects, enough for the
+documented multi-year nightly archive while still failing closed on abnormal
+bucket growth.
 
 A healthy manual check should show:
 
@@ -84,6 +97,28 @@ output reports `retainedObjectsSkipped`, OCI is preserving older backup objects
 under the bucket retention rule. Do not remove the retention rule during routine
 cleanup unless the owner explicitly accepts that compliance/security change.
 
+The installer enables these timers only when `DB_BACKUP_ENABLED=true`. With
+`DB_BACKUP_ENABLED=false`, it installs their definitions but disables the three
+timers, and a manual invocation exits with status `3` instead of reporting a
+successful no-op. An enabled timer alongside a disabled backup configuration is
+configuration drift and must not be treated as evidence that backups exist.
+
+The backup, verification, and drill services run with a read-only host
+filesystem except for `/var/lib/dpp-db-backups`, private temporary/device
+namespaces, kernel and control-group protections, no privilege escalation, and
+only Unix-domain socket creation. They still require the Docker daemon socket;
+that socket remains a high-trust boundary, so only root-owned checked-in scripts
+may be installed as these service entrypoints.
+
+Database dumps transferred through the backend container use the mode-`700`
+`/data/.db-backup-tmp` directory and are removed by the job trap. They do not
+use the backend's memory-backed `/tmp`; this keeps large dumps compatible with
+the read-only container root filesystem without consuming the host's limited
+RAM twice. The runner applies the configured maximum dump size to both
+`pg_dump` staging and object-store downloads; downloads stream directly into
+a mode-`600` temporary file, verify their signed length and checksum, then
+atomically replace the restore artifact.
+
 The backup runner requires `/etc/dpp/dpp.env` to be a regular mode-`600` file,
 requires an explicit `DB_BACKUP_ENABLED=true|false`, and refuses to fall back to
 application-storage credentials, a default database name, or user. Backup,
@@ -91,3 +126,10 @@ verification, and restore-drill runs share an exclusive lock so they cannot
 overwrite each other's temporary files. The systemd units allow up to two hours
 for a large backup or restore check; investigate a timeout rather than launching
 a parallel manual run.
+
+Production backend deployment requires both application backup replication
+(`BACKUP_PROVIDER_ENABLED=true` and `BACKUP_PROVIDER_REQUIRED=true`) and host
+PostgreSQL backups (`DB_BACKUP_ENABLED=true`). Disabled flags fail the deployment
+preflight. The application, replication, and DB-backup buckets and credentials
+must all be distinct so one compromised credential cannot overwrite every
+recovery layer.

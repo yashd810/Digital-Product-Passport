@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   readBackupProviderObjectStorageConfig,
+  validateBackupProviderObjectPrefix,
 } = require("../src/shared/backups/backup-provider-object-storage-config");
 
 const validBackupProviderConfig = {
@@ -47,6 +48,11 @@ test("backup provider object storage rejects unsafe endpoint, placeholders, and 
 
   assert.throws(() => readBackupProviderObjectStorageConfig({
     ...validBackupProviderConfig,
+    endpoint: "https://127.0.0.1",
+  }), /must be an HTTPS origin/);
+
+  assert.throws(() => readBackupProviderObjectStorageConfig({
+    ...validBackupProviderConfig,
     accessKeyId: ["REPLACE", "WITH", "BACKUP", "ACCESS", "KEY"].join("_"),
   }), /must not use a placeholder/);
 
@@ -54,4 +60,11 @@ test("backup provider object storage rejects unsafe endpoint, placeholders, and 
     ...validBackupProviderConfig,
     forcePathStyle: "sometimes",
   }), /BACKUP_PROVIDER_FORCE_PATH_STYLE must be true or false/);
+});
+
+test("backup-provider object prefixes cannot escape or ambiguously normalize a storage namespace", () => {
+  assert.equal(validateBackupProviderObjectPrefix("backups/passports"), "backups/passports");
+  for (const prefix of ["", "/backups", "backups/", "backups//passports", "backups/../other", "backups\\other", " backups"]) {
+    assert.throws(() => validateBackupProviderObjectPrefix(prefix), /BACKUP_PROVIDER_OBJECT_PREFIX/);
+  }
 });

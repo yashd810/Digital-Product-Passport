@@ -2,6 +2,9 @@
 
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
+const fs = require("node:fs/promises");
+const os = require("node:os");
+const path = require("node:path");
 const test = require("node:test");
 const createBackupProviderService = require("../src/platform/backups/backup-provider-service");
 
@@ -136,6 +139,79 @@ test("backup provider queries use quoted canonical schema columns and expose no 
   assert.equal(service.ensureAutomaticPublicHandover, undefined);
 });
 
+test("backup replication rejects legacy attachment symlinks that escape configured storage", async (t) => {
+  const names = ["BACKUP_PROVIDER_ENABLED", "BACKUP_PROVIDER_KEY"];
+  const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  process.env.BACKUP_PROVIDER_ENABLED = "true";
+  process.env.BACKUP_PROVIDER_KEY = "test-backup";
+  t.after(() => names.forEach((name) => restoreEnv(name, previous[name])));
+
+  const storageRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dpp-backup-local-storage-"));
+  const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dpp-backup-outside-"));
+  t.after(async () => {
+    await fs.rm(storageRoot, { recursive: true, force: true });
+    await fs.rm(outsideRoot, { recursive: true, force: true });
+  });
+  const attachmentDir = path.join(storageRoot, "passport-files", "dpp-1");
+  const symlinkPath = path.join(attachmentDir, "legacy.pdf");
+  const outsideFile = path.join(outsideRoot, "outside.pdf");
+  await fs.mkdir(attachmentDir, { recursive: true });
+  await fs.writeFile(outsideFile, "%PDF-outside-secret", "utf8");
+  await fs.symlink(outsideFile, symlinkPath);
+
+  const writes = [];
+  const service = createBackupProviderService({
+    pool: {
+      async query(sql, params = []) {
+        if (sql.includes("FROM \"backupServiceProviders\"")) return { rows: [] };
+        if (sql.includes("FROM \"passportAttachments\"")) {
+          return {
+            rows: [{
+              id: 1,
+              fieldKey: "complianceDocument",
+              filePath: symlinkPath,
+              storageKey: null,
+              mimeType: "application/pdf",
+              isPublic: false,
+              sizeBytes: 19,
+              createdAt: new Date().toISOString(),
+            }],
+          };
+        }
+        if (sql.includes("INSERT INTO \"passportBackupReplications\"")) {
+          return { rows: [{ replicationStatus: params[10], errorMessage: params[16] }] };
+        }
+        return { rows: [] };
+      },
+    },
+    storageService: { filesBaseDir: path.join(storageRoot, "passport-files") },
+    backupStorageService: {
+      provider: "backup-s3",
+      async saveObject(input) {
+        writes.push(input);
+        return { storageKey: input.key, url: null };
+      },
+    },
+    apiOrigin: "https://api.example.test",
+    buildCanonicalPassportPayload: () => ({}),
+  });
+
+  const result = await service.replicatePassportSnapshot({
+    passport: { dppId: "dpp-1", companyId: 7, passportType: "example", versionNumber: 1 },
+    typeDef: {
+      fieldsJson: { sections: [{ fields: [{ key: "complianceDocument", type: "document" }] }] },
+    },
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(writes.length, 1, "the escaped attachment must not be copied to backup storage");
+  const snapshot = JSON.parse(writes[0].buffer.toString("utf8"));
+  const copy = snapshot.documentation.attachmentCopies[0].backupCopy;
+  assert.equal(copy.storageKey, null);
+  assert.match(copy.error, /not a regular file inside configured storage directories/);
+  assert.equal(copy.error.includes(outsideRoot), false);
+});
+
 test("public handover rows expose camelCase fields expected by callers", async () => {
   const pool = {
     async query(sql) {
@@ -191,6 +267,7 @@ test("backup verification reads the provider-scoped backup store rather than app
   const serializedPayload = JSON.stringify(payload);
   const expectedHash = crypto.createHash("sha256").update(serializedPayload).digest("hex");
   const backupReads = [];
+  const backupReadLimits = [];
   let applicationStorageReads = 0;
   let verificationUpdate = null;
   const service = createBackupProviderService({
@@ -223,7 +300,12 @@ test("backup verification reads the provider-scoped backup store rather than app
       provider: "backup-s3",
       async fetchObject(storageKey) {
         backupReads.push(storageKey);
-        return { arrayBuffer: async () => Buffer.from(serializedPayload, "utf8") };
+        return {
+          arrayBuffer: async (maxBytes) => {
+            backupReadLimits.push(maxBytes);
+            return Buffer.from(serializedPayload, "utf8");
+          },
+        };
       },
     },
     buildCanonicalPassportPayload: () => ({}),
@@ -234,5 +316,6 @@ test("backup verification reads the provider-scoped backup store rather than app
   assert.equal(result.success, true);
   assert.equal(applicationStorageReads, 0);
   assert.deepEqual(backupReads, ["backup-provider/company-7/passport-dpp-1/v1/releasedCurrent.json"]);
+  assert.deepEqual(backupReadLimits, [10 * 1024 * 1024]);
   assert.deepEqual(verificationUpdate.slice(0, 2), [42, "verified"]);
 });

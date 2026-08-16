@@ -4,6 +4,7 @@ import {
   isTrustedApiRequestUrl,
   safeWindowOpen,
   toSafeExternalHref,
+  toSafeConfiguredHttpOrigin,
   toSafeHttpOrigin,
   toSafeInternalPath,
   toSafeResourceHref,
@@ -35,6 +36,13 @@ describe("URL safety policy", () => {
     expect(toSafeHttpOrigin("https://viewer.example.test/?next=1")).toBeNull();
     expect(toSafeHttpOrigin("https://user:pass@viewer.example.test")).toBeNull();
     expect(toSafeHttpOrigin("javascript:alert(1)")).toBeNull();
+    expect(toSafeConfiguredHttpOrigin("https://viewer.example.test")).toBe("https://viewer.example.test");
+    expect(toSafeConfiguredHttpOrigin("http://viewer.example.test")).toBeNull();
+    expect(toSafeConfiguredHttpOrigin("http://localhost:3004")).toBe("http://localhost:3004");
+    expect(toSafeConfiguredHttpOrigin("http://127.0.0.8:3004")).toBe("http://127.0.0.8:3004");
+    expect(toSafeConfiguredHttpOrigin("https://192.168.1.10")).toBeNull();
+    expect(toSafeConfiguredHttpOrigin("https://169.254.169.254")).toBeNull();
+    expect(toSafeConfiguredHttpOrigin("https://localhost:3004")).toBe("https://localhost:3004");
   });
 
   test("does not treat cross-origin or protocol-relative values as application navigation", () => {
@@ -68,8 +76,10 @@ describe("URL safety policy", () => {
     expect(safeWindowOpen("http://localhost:3000/dpp/preview/acme/model/dpp-preview")).not.toBeNull();
     expect(safeWindowOpen("http://localhost:3004/dpp/acme/model/dpp-public", { viewer: true })).not.toBeNull();
     expect(safeWindowOpen("http://localhost:3005/dpp/acme/model/dpp-public", { viewer: true })).toBeNull();
+    expect(safeWindowOpen("https://attacker.example.test/dpp/acme/model/dpp-public", { viewer: true })).toBeNull();
     expect(safeWindowOpen("http://localhost:3004/dpp/%2e%2e/admin", { viewer: true })).toBeNull();
     expect(open).toHaveBeenCalledTimes(2);
+    expect(open.mock.calls.every(([, , features]) => features.includes("noopener") && features.includes("noreferrer"))).toBe(true);
 
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();

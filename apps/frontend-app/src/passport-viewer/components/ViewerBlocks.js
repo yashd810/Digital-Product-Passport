@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { normalizePublicViewerOrigin } from "../../passports/utils/publicViewerUrl";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { readSafePdfResponse } from "../../shared/security/documentSafety";
 import {
   isTrustedApiRequestUrl,
   toSafeImageSrc,
@@ -114,7 +115,7 @@ export function FileCell({ url, label, onRefreshUrl = null }) {
         response = await fetchWithAuth(activeUrl);
       }
       if (!response.ok) throw new Error(`Could not load PDF (${response.status})`);
-      setBlobUrl(URL.createObjectURL(await response.blob()));
+      setBlobUrl(URL.createObjectURL(await readSafePdfResponse(response)));
       setOpen(true);
     } catch (caught) {
       setError(caught.message);
@@ -134,7 +135,16 @@ export function FileCell({ url, label, onRefreshUrl = null }) {
   return (
     <div className="pdf-cell">
       {error && <div className="pdf-err" role="alert">{error}</div>}
-      {open && blobUrl && <iframe id={previewId} src={blobUrl} title={label} className="pdf-iframe" />}
+      {open && blobUrl && (
+        <iframe
+          id={previewId}
+          src={blobUrl}
+          title={label}
+          className="pdf-iframe"
+          sandbox=""
+          referrerPolicy="no-referrer"
+        />
+      )}
       <div className="pdf-cell-actions">
         {safeInitialUrl ? (
           <a href={safeInitialUrl} target="_blank" rel="noopener noreferrer" className="pdf-open-link">

@@ -32,9 +32,19 @@ module.exports = function registerApiKeyRoutes(app, deps) {
   }
 
   function normalizeStringList(values) {
-    return Array.isArray(values)
-      ? [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))]
-      : [];
+    if (!Array.isArray(values)) return [];
+    if (values.length > 500) {
+      const error = new Error("A security group may select at most 500 values");
+      error.statusCode = 400;
+      throw error;
+    }
+    const normalized = values.map((value) => String(value || "").trim()).filter(Boolean);
+    if (normalized.some((value) => value.length > 512)) {
+      const error = new Error("Security group selections must be 512 characters or fewer");
+      error.statusCode = 400;
+      throw error;
+    }
+    return [...new Set(normalized)];
   }
 
   function flattenRestrictedFields(typeDef) {

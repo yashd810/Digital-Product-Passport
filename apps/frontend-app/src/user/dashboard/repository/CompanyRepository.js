@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { NavLink, useParams } from "react-router";
 import { fetchWithAuth } from "../../../shared/api/authHeaders";
 import { isTrustedApiRequestUrl, toSafeImageSrc, toSafeResourceHref } from "../../../shared/security/urlSafety";
+import { assertFileType, assertLocalFileSize } from "../../../shared/security/fileSafety";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import { useI18n } from "../../../app/providers/i18n";
 import "./CompanyRepository.css";
 
 const api = import.meta.env.VITE_API_URL || "";
+const allowedSymbolTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 function copyText(value) {
   const text = String(value || "");
@@ -118,10 +120,27 @@ function SymbolsTab({ companyId }) {
       flash("Open a folder before selecting a symbol", true);
       return;
     }
+    try {
+      assertLocalFileSize(f, { maxBytes: 5 * 1024 * 1024, label: "Symbol image" });
+      assertFileType(f, allowedSymbolTypes, { label: "Symbol image" });
+    } catch (error) {
+      e.target.value = "";
+      flash(error.message, true);
+      return;
+    }
     setFile(f);
     if (!name) setName(f.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " "));
     const reader = new FileReader();
-    reader.onload = (ev) => setPreview(ev.target.result);
+    reader.onload = (ev) => {
+      const safePreview = toSafeImageSrc(ev.target.result);
+      if (!safePreview) {
+        setFile(null);
+        e.target.value = "";
+        flash("The selected symbol image could not be used safely", true);
+        return;
+      }
+      setPreview(safePreview);
+    };
     reader.readAsDataURL(f);
   };
 
@@ -390,6 +409,7 @@ function PreviewDialog({ item, onClose }) {
               src={safeFileUrl}
               title={item.name}
               className="repo-preview-pdf"
+              sandbox=""
               referrerPolicy="no-referrer"
             />
           ) : (
@@ -540,6 +560,11 @@ function FilesTab({ companyId }) {
     if (file.type !== "application/pdf") {
       e.target.value = "";
       flash("Only PDF files allowed", true);
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      e.target.value = "";
+      flash("PDF exceeds the 50 MB safety limit", true);
       return;
     }
     setSelectedFile(file);

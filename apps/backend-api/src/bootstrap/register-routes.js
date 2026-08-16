@@ -74,6 +74,7 @@ function registerAppRoutes(app, deps) {
     authRateLimit: deps.authRateLimit,
     otpRateLimit: deps.otpRateLimit,
     passwordResetRateLimit: deps.passwordResetRateLimit,
+    sensitiveActionRateLimit: deps.sensitiveActionRateLimit,
     publicReadRateLimit: deps.publicReadRateLimit,
     authenticateToken: deps.authenticateToken,
     checkCompanyAccess: deps.checkCompanyAccess,

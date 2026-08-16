@@ -64,6 +64,12 @@ const validDbBackupConfig = {
   DB_BACKUP_S3_BUCKET: "dpp-prod-db-backups",
   DB_BACKUP_S3_ACCESS_KEY_ID: "database-backup-access-key",
   DB_BACKUP_S3_SECRET_ACCESS_KEY: "database-backup-secret-key",
+  DB_BACKUP_MANIFEST_HMAC_SECRET: "database-backup-manifest-hmac-secret-at-least-32-characters",
+  DB_BACKUP_S3_FORCE_PATH_STYLE: "true",
+  DB_BACKUP_S3_PREFIX: "db-backups/postgres",
+  DB_BACKUP_EVIDENCE_S3_PREFIX: "db-backups/evidence/restore-drills",
+  DB_BACKUP_MAX_BYTES: "5368709120",
+  DB_BACKUP_RETENTION_COUNT: "14",
 };
 
 const validBackupProviderStorageConfig = {
@@ -124,6 +130,34 @@ function captureEnvironmentGuard(overrides = {}, isProduction = true) {
 
 function captureProductionGuard(overrides = {}) {
   return captureEnvironmentGuard(overrides, true);
+}
+
+function captureProductionStorageGuard(overrides = {}) {
+  const errors = [];
+  const originalExit = process.exit;
+  process.exit = (code) => {
+    const error = new Error(`process.exit:${code}`);
+    error.code = code;
+    throw error;
+  };
+  try {
+    return withEnv({
+      ...validStorageConfig,
+      ...validDbBackupConfig,
+      ...validBackupProviderStorageConfig,
+      ...overrides,
+    }, () => {
+      assertProductionStorageReadiness({
+        isProduction: true,
+        logger: { error: (...args) => errors.push(args) },
+      });
+      return { exited: false, errors };
+    });
+  } catch (error) {
+    return { exited: true, code: error.code, errors };
+  } finally {
+    process.exit = originalExit;
+  }
 }
 
 test("production environment guard accepts public HTTPS app and API URLs", () => {
@@ -197,7 +231,8 @@ test("runtime origin guard rejects malformed development origins", () => {
 test("runtime guard rejects unsafe origin whitespace and cookie scope configuration", () => {
   assert.equal(captureEnvironmentGuard({ APP_URL: " https://app.example.com" }, false).exited, true);
   assert.equal(captureEnvironmentGuard({ ALLOWED_ORIGINS: "https://app.example.com, https://viewer.example.com" }, false).exited, true);
-  assert.equal(captureProductionGuard({ COOKIE_DOMAIN: ".example.com" }).exited, false);
+  assert.equal(captureProductionGuard({ COOKIE_DOMAIN: ".example.com" }).exited, true);
+  assert.equal(captureEnvironmentGuard({ COOKIE_DOMAIN: ".example.com" }, false).exited, false);
   for (const value of ["evil.example", "https://example.com", "127.0.0.1", "example.com/", "example.com\r\nSet-Cookie: injected=1"]) {
     assert.equal(captureProductionGuard({ COOKIE_DOMAIN: value }).exited, true);
   }
@@ -302,42 +337,25 @@ test("production storage guard requires S3 without local-storage escape hatches"
 
 test("production storage guard rejects placeholder S3 credentials", () => {
   const placeholderCredential = ["REPLACE", "ME"].join("_");
-  const keys = [
-    "STORAGE_PROVIDER",
-    "STORAGE_S3_ENDPOINT",
-    "STORAGE_S3_REGION",
-    "STORAGE_S3_BUCKET",
-    "STORAGE_S3_ACCESS_KEY_ID",
-    "STORAGE_S3_SECRET_ACCESS_KEY",
-    "DB_BACKUP_ENABLED",
-  ];
-  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
-  Object.assign(process.env, {
-    STORAGE_PROVIDER: "s3",
-    STORAGE_S3_ENDPOINT: "https://storage.example.com",
-    STORAGE_S3_REGION: "eu-frankfurt-1",
-    STORAGE_S3_BUCKET: "dpp-prod",
+  withEnv({
+    ...validStorageConfig,
+    ...validDbBackupConfig,
+    ...validBackupProviderStorageConfig,
     STORAGE_S3_ACCESS_KEY_ID: placeholderCredential,
     STORAGE_S3_SECRET_ACCESS_KEY: placeholderCredential,
-    DB_BACKUP_ENABLED: "false",
-  });
-  try {
+  }, () => {
     assert.throws(
       () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
       /must not use placeholders/
     );
-  } finally {
-    for (const [key, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  }
+  });
 });
 
 test("production storage guard requires dedicated DB backup S3 configuration", () => {
   withEnv({
     ...validStorageConfig,
     ...validDbBackupConfig,
+    ...validBackupProviderStorageConfig,
     DB_BACKUP_S3_ENDPOINT: undefined,
   }, () => {
     assert.throws(
@@ -351,11 +369,25 @@ test("production storage guard accepts a complete isolated DB backup configurati
   withEnv({
     ...validStorageConfig,
     ...validDbBackupConfig,
+    ...validBackupProviderStorageConfig,
   }, () => {
     assert.doesNotThrow(() => {
       assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } });
     });
   });
+});
+
+test("production storage guard rejects private-literal object-storage endpoints before any client is constructed", () => {
+  for (const name of [
+    "STORAGE_S3_ENDPOINT",
+    "DB_BACKUP_S3_ENDPOINT",
+    "BACKUP_PROVIDER_ENDPOINT",
+  ]) {
+    const result = captureProductionStorageGuard({ [name]: "https://169.254.169.254" });
+    assert.equal(result.exited, true, name);
+    assert.equal(result.code, 1, name);
+    assert.equal(result.errors[0][0].env, name, name);
+  }
 });
 
 test("production storage guard rejects DB backup credentials or buckets shared with application storage", () => {
@@ -367,6 +399,7 @@ test("production storage guard rejects DB backup credentials or buckets shared w
     withEnv({
       ...validStorageConfig,
       ...validDbBackupConfig,
+      ...validBackupProviderStorageConfig,
       [key]: duplicateValue,
     }, () => {
       assert.throws(
@@ -377,9 +410,31 @@ test("production storage guard rejects DB backup credentials or buckets shared w
   }
 });
 
+test("production storage guard requires an independent DB backup manifest authentication key", () => {
+  for (const duplicateValue of [
+    "too-short",
+    validDbBackupConfig.DB_BACKUP_S3_SECRET_ACCESS_KEY,
+    validStorageConfig.STORAGE_S3_SECRET_ACCESS_KEY,
+    requiredProductionEnv.JWT_SECRET,
+  ]) {
+    withEnv({
+      ...validStorageConfig,
+      ...validDbBackupConfig,
+      ...validBackupProviderStorageConfig,
+      DB_BACKUP_MANIFEST_HMAC_SECRET: duplicateValue,
+    }, () => {
+      assert.throws(
+        () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
+        /DB_BACKUP_MANIFEST_HMAC_SECRET/
+      );
+    });
+  }
+});
+
 test("production storage guard requires complete, explicitly enabled provider-scoped backup storage", () => {
   withEnv({
     ...validStorageConfig,
+    ...validDbBackupConfig,
     ...validBackupProviderStorageConfig,
     BACKUP_PROVIDER_ENDPOINT: undefined,
   }, () => {
@@ -390,9 +445,29 @@ test("production storage guard requires complete, explicitly enabled provider-sc
   });
 });
 
+test("production storage guard requires a named, contained backup-provider namespace", () => {
+  for (const [key, value] of [
+    ["BACKUP_PROVIDER_KEY", undefined],
+    ["BACKUP_PROVIDER_OBJECT_PREFIX", "backup-provider/../application-files"],
+  ]) {
+    withEnv({
+      ...validStorageConfig,
+      ...validDbBackupConfig,
+      ...validBackupProviderStorageConfig,
+      [key]: value,
+    }, () => {
+      assert.throws(
+        () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
+        /BACKUP_PROVIDER_(KEY|OBJECT_PREFIX)/
+      );
+    });
+  }
+});
+
 test("production storage guard accepts isolated application backup-provider storage", () => {
   withEnv({
     ...validStorageConfig,
+    ...validDbBackupConfig,
     ...validBackupProviderStorageConfig,
   }, () => {
     assert.doesNotThrow(() => {
@@ -409,6 +484,7 @@ test("production storage guard rejects backup-provider bucket or credential mate
   ]) {
     withEnv({
       ...validStorageConfig,
+      ...validDbBackupConfig,
       ...validBackupProviderStorageConfig,
       [key]: duplicateValue,
     }, () => {
@@ -420,15 +496,37 @@ test("production storage guard rejects backup-provider bucket or credential mate
   }
 });
 
+test("production storage guard keeps DB backups and passport backup-provider storage pairwise isolated", () => {
+  for (const [key, duplicateValue] of [
+    ["BACKUP_PROVIDER_BUCKET", validDbBackupConfig.DB_BACKUP_S3_BUCKET],
+    ["BACKUP_PROVIDER_ACCESS_KEY_ID", validDbBackupConfig.DB_BACKUP_S3_ACCESS_KEY_ID],
+    ["BACKUP_PROVIDER_SECRET_ACCESS_KEY", validDbBackupConfig.DB_BACKUP_S3_SECRET_ACCESS_KEY],
+    ["BACKUP_PROVIDER_SECRET_ACCESS_KEY", validDbBackupConfig.DB_BACKUP_MANIFEST_HMAC_SECRET],
+  ]) {
+    withEnv({
+      ...validStorageConfig,
+      ...validDbBackupConfig,
+      ...validBackupProviderStorageConfig,
+      [key]: duplicateValue,
+    }, () => {
+      assert.throws(
+        () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
+        /pairwise-isolated/
+      );
+    });
+  }
+});
+
 test("production storage guard rejects a required backup provider that is disabled", () => {
   withEnv({
     ...validStorageConfig,
+    ...validDbBackupConfig,
     BACKUP_PROVIDER_ENABLED: "false",
     BACKUP_PROVIDER_REQUIRED: "true",
   }, () => {
     assert.throws(
       () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
-      /BACKUP_PROVIDER_ENABLED=true/
+      /BACKUP_PROVIDER_ENABLED and BACKUP_PROVIDER_REQUIRED must both be true/
     );
   });
 });
@@ -436,6 +534,7 @@ test("production storage guard rejects a required backup provider that is disabl
 test("production storage guard rejects a non-boolean DB backup enablement value", () => {
   withEnv({
     ...validStorageConfig,
+    ...validBackupProviderStorageConfig,
     DB_BACKUP_ENABLED: "enabled",
   }, () => {
     assert.throws(

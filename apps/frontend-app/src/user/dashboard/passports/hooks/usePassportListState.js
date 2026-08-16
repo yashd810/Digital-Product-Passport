@@ -17,6 +17,15 @@ import {
 
 const api = import.meta.env.VITE_API_URL || "";
 
+export function decodePassportListRouteSegment(value) {
+  if (!value) return null;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
 export function usePassportListState({ user, companyId }) {
   const { passportType, productKey, productCategoryKey } = useParams();
   const navigate = useNavigate();
@@ -53,9 +62,9 @@ export function usePassportListState({ user, companyId }) {
 
   const activeType = passportType || null;
   const activeProductCategory = productKey
-    ? decodeURIComponent(productKey)
+    ? decodePassportListRouteSegment(productKey)
     : productCategoryKey
-      ? decodeURIComponent(productCategoryKey)
+      ? decodePassportListRouteSegment(productCategoryKey)
       : null;
 
   const activeTypeData = useMemo(

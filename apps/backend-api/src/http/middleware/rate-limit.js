@@ -74,6 +74,27 @@ const hashRateLimitIdentity = (value) => crypto
   .update(String(value || ""))
   .digest("base64url");
 
+const routeBucketName = (req) => {
+  const routePath = req?.route?.path;
+  if (typeof routePath === "string" && routePath) return routePath.slice(0, 160);
+  if (routePath instanceof RegExp) return routePath.toString().slice(0, 160);
+  // Route middleware normally receives Express's stable route template. If a
+  // future call site invokes a limiter before route matching, fail closed into
+  // one shared bucket rather than persist an attacker-controlled URL/ID.
+  return "unmatched";
+};
+
+const composeRateLimiters = (...middleware) => (req, res, next) => {
+  let index = 0;
+  const runNext = (error) => {
+    if (error) return next(error);
+    const current = middleware[index];
+    index += 1;
+    return current ? current(req, res, runNext) : next();
+  };
+  return runNext();
+};
+
 async function cleanupExpiredRateLimits(pool) {
   const result = await pool.query(
     `DELETE FROM "requestRateLimits"
@@ -111,27 +132,63 @@ const createRateLimiters = (pool) => {
   };
   const rateLimit = createRateLimiter(pool, state);
 
+  const authIpRateLimit = rateLimit({
+    key: (req) => `auth-ip:${req.ip}:${routeBucketName(req)}`,
+    limit: envInt("rateLimitAuthIpMax", 30),
+    windowMs: envInt("rateLimitAuthWindowMs", 15 * 60 * 1000),
+    message: "Too many attempts. Please wait a few minutes and try again."
+  });
+  const authIdentityRateLimit = rateLimit({
+    key: (req) => {
+      const identity = String(req.body?.email || req.body?.token || "").trim().toLowerCase();
+      // Keep the account budget independent of the network budget. Including
+      // req.ip here would let a distributed password-spraying attempt reset
+      // the supposedly identity-scoped counter on every new source address.
+      return `auth-identity:${routeBucketName(req)}:${hashRateLimitIdentity(identity || "anonymous")}`;
+    },
+    limit: envInt("rateLimitAuthMax", 8),
+    windowMs: envInt("rateLimitAuthWindowMs", 15 * 60 * 1000),
+    message: "Too many attempts. Please wait a few minutes and try again."
+  });
+
+  const otpIpRateLimit = rateLimit({
+    key: (req) => `otp-ip:${req.ip}:${routeBucketName(req)}`,
+    limit: envInt("rateLimitOtpIpMax", 20),
+    windowMs: envInt("rateLimitOtpWindowMs", 15 * 60 * 1000),
+    message: "Too many verification attempts. Please log in again in a few minutes."
+  });
+  const otpTokenRateLimit = rateLimit({
+    key: (req) => `otp-token:${routeBucketName(req)}:${hashRateLimitIdentity(req.body?.preAuthToken || "anonymous")}`,
+    limit: envInt("rateLimitOtpMax", 8),
+    windowMs: envInt("rateLimitOtpWindowMs", 15 * 60 * 1000),
+    message: "Too many verification attempts. Please log in again in a few minutes."
+  });
+
+  const passwordResetIpRateLimit = rateLimit({
+    key: (req) => `reset-ip:${req.ip}:${routeBucketName(req)}`,
+    limit: envInt("rateLimitPasswordResetIpMax", 15),
+    windowMs: envInt("rateLimitPasswordResetWindowMs", 15 * 60 * 1000),
+    message: "Too many password reset attempts. Please wait a few minutes and try again."
+  });
+  const passwordResetIdentityRateLimit = rateLimit({
+    key: (req) => {
+      const identity = String(req.body?.email || req.body?.token || "anonymous").trim().toLowerCase();
+      return `reset-identity:${routeBucketName(req)}:${hashRateLimitIdentity(identity)}`;
+    },
+    limit: envInt("rateLimitPasswordResetMax", 5),
+    windowMs: envInt("rateLimitPasswordResetWindowMs", 15 * 60 * 1000),
+    message: "Too many password reset attempts. Please wait a few minutes and try again."
+  });
+
   return {
-    authRateLimit: rateLimit({
-      key: (req) => `auth:${req.ip}:${req.path}:${String(req.body?.email || "").trim().toLowerCase()}`,
-      limit: envInt("rateLimitAuthMax", 8),
-      windowMs: envInt("rateLimitAuthWindowMs", 15 * 60 * 1000),
-      message: "Too many attempts. Please wait a few minutes and try again."
-    }),
+    authRateLimit: composeRateLimiters(authIpRateLimit, authIdentityRateLimit),
 
-    otpRateLimit: rateLimit({
-      key: (req) => `otp:${req.ip}:${req.path}:${String(req.body?.preAuthToken || "").slice(0, 32)}`,
-      limit: envInt("rateLimitOtpMax", 8),
-      windowMs: envInt("rateLimitOtpWindowMs", 15 * 60 * 1000),
-      message: "Too many verification attempts. Please log in again in a few minutes."
-    }),
+    otpRateLimit: composeRateLimiters(otpIpRateLimit, otpTokenRateLimit),
 
-    passwordResetRateLimit: rateLimit({
-      key: (req) => `reset:${req.ip}:${req.path}:${String(req.body?.email || req.body?.token || "").slice(0, 64)}`,
-      limit: envInt("rateLimitPasswordResetMax", 5),
-      windowMs: envInt("rateLimitPasswordResetWindowMs", 15 * 60 * 1000),
-      message: "Too many password reset attempts. Please wait a few minutes and try again."
-    }),
+    passwordResetRateLimit: composeRateLimiters(
+      passwordResetIpRateLimit,
+      passwordResetIdentityRateLimit
+    ),
 
     // Contact submissions can cause email delivery, so they have their own
     // limits rather than sharing the comparatively permissive public-read
@@ -165,42 +222,42 @@ const createRateLimiters = (pool) => {
     }),
 
     publicReadRateLimit: rateLimit({
-      key: (req) => `public-read:${req.ip}:${req.path}:${String(req.params?.dppId || req.params?.companyId || req.params?.typeName || "")}`,
+      key: (req) => `public-read:${req.ip}:${routeBucketName(req)}`,
       limit: envInt("rateLimitPublicReadMax", 120),
       windowMs: envInt("rateLimitPublicReadWindowMs", 60 * 1000),
       message: "Too many public requests. Please slow down and try again shortly."
     }),
 
     publicHeavyRateLimit: rateLimit({
-      key: (req) => `public-heavy:${req.ip}:${req.path}:${String(req.params?.dppId || "")}`,
+      key: (req) => `public-heavy:${req.ip}:${routeBucketName(req)}`,
       limit: envInt("rateLimitPublicHeavyMax", 20),
       windowMs: envInt("rateLimitPublicHeavyWindowMs", 5 * 60 * 1000),
       message: "Too many export requests. Please try again in a few minutes."
     }),
 
     publicUnlockRateLimit: rateLimit({
-      key: (req) => `public-unlock:${req.ip}:${req.path}:${String(req.params?.dppId || "")}`,
+      key: (req) => `public-unlock:${req.ip}:${routeBucketName(req)}`,
       limit: envInt("rateLimitPublicUnlockMax", 10),
       windowMs: envInt("rateLimitPublicUnlockWindowMs", 15 * 60 * 1000),
       message: "Too many unlock attempts. Please wait before trying again."
     }),
 
     integrationWriteRateLimit: rateLimit({
-      key: (req) => `integration-write:${req.ip}:${req.user?.userId || ""}:${req.path}`,
+      key: (req) => `integration-write:${req.ip}:${req.user?.userId || ""}:${routeBucketName(req)}`,
       limit: envInt("rateLimitIntegrationWriteMax", 180),
       windowMs: envInt("rateLimitIntegrationWriteWindowMs", 60 * 1000),
       message: "Too many integration write requests. Please slow down and try again shortly."
     }),
 
     publicScanRateLimit: rateLimit({
-      key: (req) => `public-scan:${req.ip}:${String(req.params?.dppId || "")}`,
+      key: (req) => `public-scan:${req.ip}:${routeBucketName(req)}`,
       limit: envInt("rateLimitPublicScanMax", 30),
       windowMs: envInt("rateLimitPublicScanWindowMs", 60 * 1000),
       message: "Too many scan requests. Please try again shortly."
     }),
 
     assetWriteRateLimit: rateLimit({
-      key: (req) => `asset-write:${req.ip}:${req.assetContext?.companyId || ""}:${req.assetContext?.userId || ""}:${req.path}`,
+      key: (req) => `asset-write:${req.ip}:${req.assetContext?.companyId || ""}:${req.assetContext?.userId || ""}:${routeBucketName(req)}`,
       limit: envInt("rateLimitAssetWriteMax", 90),
       windowMs: envInt("rateLimitAssetWriteWindowMs", 60 * 1000),
       message: "Too many Passport Data Management requests. Please slow down and try again shortly."
@@ -211,12 +268,31 @@ const createRateLimiters = (pool) => {
       limit: envInt("rateLimitAssetSourceFetchMax", 20),
       windowMs: envInt("rateLimitAssetSourceFetchWindowMs", 5 * 60 * 1000),
       message: "Too many ERP/API fetch requests. Please wait a few minutes and try again."
-    })
+    }),
+
+    sensitiveActionRateLimit: composeRateLimiters(
+      rateLimit({
+        key: (req) => `sensitive-action-ip:${req.ip}:${routeBucketName(req)}`,
+        limit: envInt("rateLimitSensitiveActionIpMax", 20),
+        windowMs: envInt("rateLimitSensitiveActionWindowMs", 15 * 60 * 1000),
+        message: "Too many sensitive account changes. Please wait before trying again."
+      }),
+      rateLimit({
+        // Sensitive account changes need a per-user budget as well as a
+        // source-IP budget. Otherwise a stolen session could toggle MFA or
+        // exhaust recovery attempts from a rotating botnet.
+        key: (req) => `sensitive-action-user:${routeBucketName(req)}:${hashRateLimitIdentity(req.user?.userId || "anonymous")}`,
+        limit: envInt("rateLimitSensitiveActionMax", 8),
+        windowMs: envInt("rateLimitSensitiveActionWindowMs", 15 * 60 * 1000),
+        message: "Too many sensitive account changes. Please wait before trying again."
+      })
+    )
   };
 };
 
 module.exports = {
   envInt,
   createRateLimiters,
+  hashRateLimitIdentity,
   startRateLimitMaintenance
 };

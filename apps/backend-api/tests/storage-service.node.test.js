@@ -5,9 +5,10 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
+const { PassThrough, Readable } = require("node:stream");
 
 const createStorageService = require("../src/platform/storage/storage-service");
-const { createBackupProviderStorageService } = createStorageService;
+const { createBackupProviderStorageService, pipeBodyToWritable } = createStorageService;
 
 const pdfBuffer = Buffer.from("%PDF-1.7\nvalidated document\n", "utf8");
 const pngBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -24,7 +25,7 @@ async function withLocalStorage(run) {
     serverBaseUrl: "http://localhost:3001",
   });
   try {
-    await run(service);
+    await run(service, root);
   } finally {
     if (previousProvider === undefined) delete process.env.STORAGE_PROVIDER;
     else process.env.STORAGE_PROVIDER = previousProvider;
@@ -92,6 +93,47 @@ test("storage rejects files whose bytes do not match the declared upload class",
       (error) => error?.code === "invalidFileSignature"
     );
   });
+});
+
+test("local storage rejects symlinked objects and never follows them outside its root", async () => {
+  await withLocalStorage(async (storageService, root) => {
+    const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "dpp-storage-outside-"));
+    const outsideFile = path.join(outsideDir, "outside.pdf");
+    const symlinkPath = path.join(root, "passport-files", "linked.pdf");
+    try {
+      await fs.writeFile(outsideFile, pdfBuffer);
+      await fs.mkdir(path.dirname(symlinkPath), { recursive: true });
+      await fs.symlink(outsideFile, symlinkPath);
+
+      await assert.rejects(
+        storageService.fetchObject("passport-files/linked.pdf"),
+        (error) => error?.code === "invalidStorageKey"
+      );
+      await assert.rejects(
+        storageService.saveObject({
+          key: "passport-files/linked.pdf",
+          buffer: pdfBuffer,
+          contentType: "application/pdf",
+        }),
+        (error) => error?.code === "EEXIST"
+      );
+      assert.equal((await fs.readFile(outsideFile)).toString("utf8"), pdfBuffer.toString("utf8"));
+    } finally {
+      await fs.rm(outsideDir, { recursive: true, force: true });
+    }
+  });
+});
+
+test("bounded storage streaming destroys the response when a source exceeds its limit", async () => {
+  const source = Readable.from([Buffer.from("abc"), Buffer.from("def")]);
+  const response = new PassThrough();
+  response.resume();
+
+  await assert.rejects(
+    pipeBodyToWritable(source, response, 4),
+    (error) => error?.code === "storageObjectTooLarge"
+  );
+  assert.equal(response.destroyed, true);
 });
 
 test("backup storage fails closed without its own scoped S3 configuration", () => {

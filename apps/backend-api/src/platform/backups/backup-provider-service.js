@@ -21,6 +21,10 @@ const {
   flattenSchemaFieldsFromSections,
 } = require("../../shared/passports/passport-helpers");
 const { getApiOrigin } = require("../../shared/security/configured-origin");
+const { resolveExistingContainedPath } = require("../../shared/storage/path-containment");
+
+const maxBackupAttachmentBytes = 20 * 1024 * 1024;
+const maxBackupReplicationPayloadBytes = 10 * 1024 * 1024;
 
 function toBoolean(value, fallback = false) {
   if (value === undefined || value === null || value === "") return fallback;
@@ -64,13 +68,6 @@ function parsePositiveInteger(value, fallback) {
 
 function sha256Hex(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("hex");
-}
-
-function isPathInsideBase(targetPath, basePath) {
-  if (!targetPath || !basePath) return false;
-  const resolvedTarget = path.resolve(targetPath);
-  const resolvedBase = path.resolve(basePath);
-  return resolvedTarget === resolvedBase || resolvedTarget.startsWith(`${resolvedBase}${path.sep}`);
 }
 
 function normalizeProviderRecord(provider = {}) {
@@ -476,7 +473,7 @@ module.exports = function createBackupProviderService({
   async function readAttachmentBuffer(attachment) {
     if (attachment?.storageKey && applicationStorageService?.fetchObject) {
       const objectResponse = await applicationStorageService.fetchObject(attachment.storageKey);
-      return Buffer.from(await objectResponse.arrayBuffer());
+      return Buffer.from(await objectResponse.arrayBuffer(maxBackupAttachmentBytes));
     }
     if (attachment?.filePath) {
       return readLocalAttachmentFile(attachment.filePath);
@@ -508,12 +505,44 @@ module.exports = function createBackupProviderService({
   async function readLocalAttachmentFile(filePath) {
     const absolutePath = path.resolve(String(filePath || ""));
     const allowedRoots = getAllowedLocalAttachmentRoots();
-    if (!allowedRoots.some((root) => isPathInsideBase(absolutePath, root))) {
-      const error = new Error("Attachment file path resolves outside configured storage directories");
+    const containedPath = allowedRoots
+      .map((root) => resolveExistingContainedPath({ fs, path, targetPath: absolutePath, basePath: root }))
+      .find(Boolean);
+    if (!containedPath) {
+      const error = new Error("Attachment file path is not a regular file inside configured storage directories");
       error.code = "invalidAttachmentFilePath";
       throw error;
     }
-    return fs.promises.readFile(absolutePath);
+    const entry = await fs.promises.lstat(containedPath);
+    if (!entry.isFile() || entry.isSymbolicLink()) {
+      const error = new Error("Attachment file path is not a regular file inside configured storage directories");
+      error.code = "invalidAttachmentFilePath";
+      throw error;
+    }
+    const noFollow = fs.constants.O_NOFOLLOW || 0;
+    const handle = await fs.promises.open(containedPath, fs.constants.O_RDONLY | noFollow);
+    try {
+      const stats = await handle.stat();
+      if (!stats.isFile() || stats.dev !== entry.dev || stats.ino !== entry.ino) {
+        const error = new Error("Attachment file changed while it was being opened");
+        error.code = "invalidAttachmentFilePath";
+        throw error;
+      }
+      if (stats.size > maxBackupAttachmentBytes) {
+        const error = new Error("Attachment file exceeds the backup copy size limit");
+        error.code = "backupAttachmentTooLarge";
+        throw error;
+      }
+      const buffer = await handle.readFile();
+      if (buffer.length > maxBackupAttachmentBytes) {
+        const error = new Error("Attachment file exceeds the backup copy size limit");
+        error.code = "backupAttachmentTooLarge";
+        throw error;
+      }
+      return buffer;
+    } finally {
+      await handle.close().catch(() => {});
+    }
   }
 
   async function buildDocumentationManifest({ passport, typeDef, provider }) {
@@ -1071,7 +1100,7 @@ module.exports = function createBackupProviderService({
         continue;
       }
       const objectResponse = await providerStorageService.fetchObject(storageKey);
-      const buffer = Buffer.from(await objectResponse.arrayBuffer());
+      const buffer = Buffer.from(await objectResponse.arrayBuffer(maxBackupAttachmentBytes));
       const actualHash = normalizeHash(sha256Hex(buffer));
       if (expectedHash !== actualHash) {
         throw new Error(`Backup document hash mismatch for field "${entry.fieldKey || "document"}"`);
@@ -1097,7 +1126,7 @@ module.exports = function createBackupProviderService({
 
     try {
       const objectResponse = await providerStorageService.fetchObject(row.storageKey);
-      const buffer = Buffer.from(await objectResponse.arrayBuffer());
+      const buffer = Buffer.from(await objectResponse.arrayBuffer(maxBackupReplicationPayloadBytes));
       const parsed = JSON.parse(buffer.toString("utf8"));
       const verifiedPayloadHash = computeEnvelopeHash(parsed);
       const expectedPayloadHash = normalizeHash(row.payloadHash);

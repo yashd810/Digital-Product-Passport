@@ -36,6 +36,14 @@
       || parsed.hash) {
       throw new Error(`${label} must be an HTTP(S) origin without credentials, paths, queries, or fragments`);
     }
+    const normalizedHostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    const isLoopback = normalizedHostname === 'localhost'
+      || normalizedHostname.endsWith('.localhost')
+      || normalizedHostname === '::1'
+      || /^127(?:\.\d{1,3}){3}$/.test(normalizedHostname);
+    if (parsed.protocol !== 'https:' && !isLoopback) {
+      throw new Error(`${label} must use HTTPS unless it is a loopback development origin`);
+    }
     return parsed.origin;
   }
 

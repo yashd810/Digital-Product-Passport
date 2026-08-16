@@ -4,9 +4,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const express = require("express");
-const http = require("node:http");
 
 const registerPassportPublicRoutes = require("../src/http/routes/passport-public");
+const { requestApp } = require("./helpers/in-memory-http");
 
 function registerTestRoutes(app, { activeKey, historicalKeys, backupProviderService = {} }) {
   const passThrough = (_req, _res, next) => next();
@@ -57,25 +57,6 @@ function registerTestRoutes(app, { activeKey, historicalKeys, backupProviderServ
   });
 }
 
-async function withServer(app, run) {
-  const server = http.createServer(app);
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.once("listening", resolve);
-    server.listen(0, "127.0.0.1");
-  });
-  try {
-    const { port } = server.address();
-    await run(`http://127.0.0.1:${port}`);
-  } finally {
-    // Node's fetch client can retain a keep-alive socket after the final
-    // response. Explicitly close test-owned connections so server.close()
-    // cannot wait indefinitely for that idle socket.
-    server.closeAllConnections?.();
-    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-  }
-}
-
 test("public signing key discovery retains verification material across rotations", async () => {
   const activeKey = {
     keyId: "active-key",
@@ -97,19 +78,17 @@ test("public signing key discovery retains verification material across rotation
   const app = express();
   registerTestRoutes(app, { activeKey, historicalKeys });
 
-  await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/public/signing-key`);
-    assert.equal(response.status, 200);
-    const body = await response.json();
+  const response = await requestApp(app, { path: "/api/public/signing-key" });
+  assert.equal(response.status, 200);
+  const body = await response.json();
 
-    assert.equal(body.publicKey, activeKey.publicKey);
-    assert.deepEqual(body.historicalKeys, historicalKeys.map((key) => ({
-      keyId: key.keyId,
-      publicKey: key.publicKey,
-      algorithm: key.algorithmVersion,
-      createdAt: key.createdAt,
-    })));
-  });
+  assert.equal(body.publicKey, activeKey.publicKey);
+  assert.deepEqual(body.historicalKeys, historicalKeys.map((key) => ({
+    keyId: key.keyId,
+    publicKey: key.publicKey,
+    algorithm: key.algorithmVersion,
+    createdAt: key.createdAt,
+  })));
 });
 
 test("public passport requests never trigger automatic backup-handover activation", async () => {
@@ -136,9 +115,7 @@ test("public passport requests never trigger automatic backup-handover activatio
     },
   });
 
-  await withServer(app, async (baseUrl) => {
-    const response = await fetch(baseUrl + "/api/public/passports/dpp-1");
-    assert.equal(response.status, 404);
-  });
+  const response = await requestApp(app, { path: "/api/public/passports/dpp-1" });
+  assert.equal(response.status, 404);
   assert.equal(automaticActivationCalls, 0);
 });

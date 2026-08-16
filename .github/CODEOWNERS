@@ -1,0 +1,18 @@
+# Security-sensitive release, infrastructure, dependency, and trust-boundary
+# changes require review from the repository security owner. Enforcement still
+# depends on a protected branch/ruleset requiring Code Owner approval.
+/.github/ @yashd810
+/infra/ @yashd810
+/docker/ @yashd810
+/scripts/deploy/ @yashd810
+/.gitleaks.toml @yashd810
+/.gitignore @yashd810
+/apps/*/Dockerfile @yashd810
+/apps/*/.npmrc @yashd810
+/apps/*/package.json @yashd810
+/apps/*/package-lock.json @yashd810
+/apps/backend-api/src/http/middleware/ @yashd810
+/apps/backend-api/src/http/routes/auth.js @yashd810
+/apps/backend-api/src/platform/security/ @yashd810
+/apps/backend-api/src/shared/security/ @yashd810
+/apps/frontend-app/src/shared/security/ @yashd810

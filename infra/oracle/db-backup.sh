@@ -6,6 +6,11 @@ APP_DIR="${APP_DIR:-/opt/dpp}"
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 WORK_DIR="${DB_BACKUP_WORK_DIR:-/var/lib/dpp-db-backups}"
 MODE="${1:-backup}"
+BACKEND_BACKUP_DIR="/data/.db-backup-tmp"
+BACKEND_UPLOAD_DUMP="$BACKEND_BACKUP_DIR/upload.dump"
+BACKEND_RESTORE_DUMP="$BACKEND_BACKUP_DIR/restore.dump"
+BACKEND_RESTORE_MANIFEST="$BACKEND_BACKUP_DIR/restore-manifest.json"
+BACKEND_DRILL_EVIDENCE="$BACKEND_BACKUP_DIR/restore-drill.json"
 
 file_mode() {
   local file="$1"
@@ -70,12 +75,24 @@ validate_db_backup_configuration() {
   local bucket
   local access_key_id
   local secret_access_key
+  local manifest_hmac_secret
+  local force_path_style
+  local backup_prefix
+  local evidence_prefix
+  local max_bytes
+  local retention_count
 
   endpoint="$(require_db_backup_env_var "DB_BACKUP_S3_ENDPOINT")"
   region="$(require_db_backup_env_var "DB_BACKUP_S3_REGION")"
   bucket="$(require_db_backup_env_var "DB_BACKUP_S3_BUCKET")"
   access_key_id="$(require_db_backup_env_var "DB_BACKUP_S3_ACCESS_KEY_ID")"
   secret_access_key="$(require_db_backup_env_var "DB_BACKUP_S3_SECRET_ACCESS_KEY")"
+  manifest_hmac_secret="$(require_db_backup_env_var "DB_BACKUP_MANIFEST_HMAC_SECRET")"
+  force_path_style="$(require_db_backup_env_var "DB_BACKUP_S3_FORCE_PATH_STYLE")"
+  backup_prefix="$(require_db_backup_env_var "DB_BACKUP_S3_PREFIX")"
+  evidence_prefix="$(require_db_backup_env_var "DB_BACKUP_EVIDENCE_S3_PREFIX")"
+  max_bytes="$(require_db_backup_env_var "DB_BACKUP_MAX_BYTES")"
+  retention_count="$(require_db_backup_env_var "DB_BACKUP_RETENTION_COUNT")"
 
   case "$endpoint" in
     https://*)
@@ -95,6 +112,31 @@ validate_db_backup_configuration() {
   fi
   if [[ "$access_key_id" =~ [[:space:]] ]] || [[ "$secret_access_key" =~ [[:space:]] ]]; then
     echo "DB backup S3 credentials must not contain whitespace"
+    exit 1
+  fi
+  if [ "$(printf %s "$manifest_hmac_secret" | wc -c | tr -d ' ')" -lt 32 ] || [[ "$manifest_hmac_secret" =~ [[:space:]] ]] || [ "$manifest_hmac_secret" = "$secret_access_key" ]; then
+    echo "DB_BACKUP_MANIFEST_HMAC_SECRET must be a distinct non-whitespace secret of at least 32 characters"
+    exit 1
+  fi
+  case "$force_path_style" in
+    true|false) ;;
+    *)
+      echo "DB_BACKUP_S3_FORCE_PATH_STYLE must be true or false"
+      exit 1
+      ;;
+  esac
+  for prefix in "$backup_prefix" "$evidence_prefix"; do
+    if [ -z "$prefix" ] || [ "$(printf %s "$prefix" | wc -c | tr -d ' ')" -gt 512 ] || [[ "$prefix" == /* ]] || [[ "$prefix" == */ ]] || [[ "$prefix" == *\\* ]] || [[ "$prefix" == *"//"* ]] || [[ "$prefix" == "." ]] || [[ "$prefix" == ".." ]] || [[ "$prefix" == */./* ]] || [[ "$prefix" == */../* ]] || [[ "$prefix" == */. ]] || [[ "$prefix" == */.. ]]; then
+      echo "DB backup object prefixes must be relative paths without dot, empty, or backslash segments"
+      exit 1
+    fi
+  done
+  if ! [[ "$max_bytes" =~ ^[1-9][0-9]*$ ]] || [ "$max_bytes" -lt 1048576 ] || [ "$max_bytes" -gt 107374182400 ]; then
+    echo "DB_BACKUP_MAX_BYTES must be an integer from 1048576 to 107374182400"
+    exit 1
+  fi
+  if ! [[ "$retention_count" =~ ^[1-9][0-9]*$ ]] || [ "$retention_count" -gt 128 ]; then
+    echo "DB_BACKUP_RETENTION_COUNT must be an integer from 1 to 128"
     exit 1
   fi
 }
@@ -128,14 +170,18 @@ case "$DB_BACKUP_ENABLED" in
     validate_db_backup_configuration
     ;;
   false)
-    echo "DB backup is disabled via DB_BACKUP_ENABLED=false"
-    exit 0
+    echo "DB backup is disabled via DB_BACKUP_ENABLED=false" >&2
+    # A manual or scheduled backup invocation must never look successful when
+    # it produced no recovery artifact. The installer disables the timers for
+    # this state; this non-zero exit is a final fail-closed guard.
+    exit 3
     ;;
   *)
     echo "DB_BACKUP_ENABLED must be explicitly set to true or false in $ENV_FILE"
     exit 1
     ;;
 esac
+DB_BACKUP_MAX_BYTES="$(read_env_var DB_BACKUP_MAX_BYTES)"
 
 install -d -o root -g root -m 0700 "$WORK_DIR"
 
@@ -158,6 +204,11 @@ if [ -z "$POSTGRES_CONTAINER" ] || [ -z "$BACKEND_CONTAINER" ]; then
   echo "Could not find backend/postgres containers for compose project $COMPOSE_PROJECT_NAME"
   exit 1
 fi
+
+# Keep full database dumps on the persistent data filesystem rather than an
+# in-memory /tmp mount. This permits a read-only backend root filesystem without
+# doubling a large backup into the host's limited RAM.
+docker exec -u 0 "$BACKEND_CONTAINER" install -d -o node -g node -m 0700 "$BACKEND_BACKUP_DIR"
 
 DB_USER="${DB_USER:-$(read_env_var DB_USER)}"
 DB_NAME="${DB_NAME:-$(read_env_var DB_NAME)}"
@@ -199,11 +250,10 @@ secure_backend_file_for_node() {
 
 cleanup_remote_temp() {
   docker exec -u 0 "$BACKEND_CONTAINER" rm -f -- \
-    /tmp/dpp-db-backup.dump \
-    /tmp/dpp-db-backup-manifest.json \
-    /tmp/dpp-db-restore.dump \
-    /tmp/dpp-db-restore-manifest.json \
-    /tmp/dpp-db-restore-drill.json >/dev/null 2>&1 || true
+    "$BACKEND_UPLOAD_DUMP" \
+    "$BACKEND_RESTORE_DUMP" \
+    "$BACKEND_RESTORE_MANIFEST" \
+    "$BACKEND_DRILL_EVIDENCE" >/dev/null 2>&1 || true
 }
 
 cleanup_postgres_temp() {
@@ -222,20 +272,27 @@ trap cleanup EXIT
 
 run_backup() {
   echo "Creating PostgreSQL backup from $POSTGRES_CONTAINER..."
-  docker exec "$POSTGRES_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" -F c > "$HOST_DUMP"
-  copy_file_to_backend_for_node "$HOST_DUMP" /tmp/dpp-db-backup.dump
+  # pg_dump writes through the host shell. Set a per-process file limit before
+  # it starts so a malformed or unexpectedly large database cannot exhaust the
+  # backup staging filesystem before the object-store uploader enforces its
+  # independent stream limit.
+  (
+    ulimit -f "$(((DB_BACKUP_MAX_BYTES + 511) / 512))"
+    docker exec "$POSTGRES_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" -F c > "$HOST_DUMP"
+  )
+  copy_file_to_backend_for_node "$HOST_DUMP" "$BACKEND_UPLOAD_DUMP"
   echo "Uploading backup to OCI Object Storage through $BACKEND_CONTAINER..."
-  docker exec -w /app "$BACKEND_CONTAINER" node scripts/db-backup-object-storage.js upload --file /tmp/dpp-db-backup.dump
+  docker exec -w /app "$BACKEND_CONTAINER" node scripts/db-backup-object-storage.js upload --file "$BACKEND_UPLOAD_DUMP"
   cleanup_file "$HOST_DUMP"
 }
 
 run_verify() {
   echo "Downloading latest backup from OCI Object Storage..."
-  docker exec -w /app "$BACKEND_CONTAINER" node scripts/db-backup-object-storage.js download-latest --output /tmp/dpp-db-restore.dump --manifest-output /tmp/dpp-db-restore-manifest.json
-  secure_backend_file_for_node /tmp/dpp-db-restore.dump
-  secure_backend_file_for_node /tmp/dpp-db-restore-manifest.json
-  docker cp "$BACKEND_CONTAINER:/tmp/dpp-db-restore.dump" "$HOST_DUMP"
-  docker cp "$BACKEND_CONTAINER:/tmp/dpp-db-restore-manifest.json" "$HOST_MANIFEST"
+  docker exec -w /app "$BACKEND_CONTAINER" node scripts/db-backup-object-storage.js download-latest --output "$BACKEND_RESTORE_DUMP" --manifest-output "$BACKEND_RESTORE_MANIFEST"
+  secure_backend_file_for_node "$BACKEND_RESTORE_DUMP"
+  secure_backend_file_for_node "$BACKEND_RESTORE_MANIFEST"
+  docker cp "$BACKEND_CONTAINER:$BACKEND_RESTORE_DUMP" "$HOST_DUMP"
+  docker cp "$BACKEND_CONTAINER:$BACKEND_RESTORE_MANIFEST" "$HOST_MANIFEST"
   docker cp "$HOST_DUMP" "$POSTGRES_CONTAINER:/tmp/dpp-db-restore.dump"
   echo "Verifying PostgreSQL custom dump readability..."
   docker exec "$POSTGRES_CONTAINER" pg_restore -l /tmp/dpp-db-restore.dump >/dev/null
@@ -245,11 +302,11 @@ run_verify() {
 
 run_drill() {
   echo "Running restore drill from latest OCI Object Storage backup..."
-  docker exec -w /app "$BACKEND_CONTAINER" node scripts/db-backup-object-storage.js download-latest --output /tmp/dpp-db-restore.dump --manifest-output /tmp/dpp-db-restore-manifest.json
-  secure_backend_file_for_node /tmp/dpp-db-restore.dump
-  secure_backend_file_for_node /tmp/dpp-db-restore-manifest.json
-  docker cp "$BACKEND_CONTAINER:/tmp/dpp-db-restore.dump" "$HOST_DUMP"
-  docker cp "$BACKEND_CONTAINER:/tmp/dpp-db-restore-manifest.json" "$HOST_MANIFEST"
+  docker exec -w /app "$BACKEND_CONTAINER" node scripts/db-backup-object-storage.js download-latest --output "$BACKEND_RESTORE_DUMP" --manifest-output "$BACKEND_RESTORE_MANIFEST"
+  secure_backend_file_for_node "$BACKEND_RESTORE_DUMP"
+  secure_backend_file_for_node "$BACKEND_RESTORE_MANIFEST"
+  docker cp "$BACKEND_CONTAINER:$BACKEND_RESTORE_DUMP" "$HOST_DUMP"
+  docker cp "$BACKEND_CONTAINER:$BACKEND_RESTORE_MANIFEST" "$HOST_MANIFEST"
   docker cp "$HOST_DUMP" "$POSTGRES_CONTAINER:/tmp/dpp-db-restore.dump"
   echo "Verifying PostgreSQL custom dump readability..."
   docker exec "$POSTGRES_CONTAINER" pg_restore -l /tmp/dpp-db-restore.dump >/dev/null
@@ -301,9 +358,9 @@ PY
   EVIDENCE_PREFIX="${DB_BACKUP_EVIDENCE_S3_PREFIX:-db-backups/evidence/restore-drills}"
   EVIDENCE_KEY="${EVIDENCE_PREFIX%/}/${DB_NAME}-${TS}-restore-drill.json"
   EVIDENCE_BUCKET="$(read_env_var DB_BACKUP_S3_BUCKET)"
-  copy_file_to_backend_for_node "$HOST_DRILL_EVIDENCE" /tmp/dpp-db-restore-drill.json
+  copy_file_to_backend_for_node "$HOST_DRILL_EVIDENCE" "$BACKEND_DRILL_EVIDENCE"
   echo "Uploading restore drill evidence..."
-  docker exec -w /app "$BACKEND_CONTAINER" node scripts/db-backup-object-storage.js put-object --file /tmp/dpp-db-restore-drill.json --key "$EVIDENCE_KEY" --content-type application/json
+  docker exec -w /app "$BACKEND_CONTAINER" node scripts/db-backup-object-storage.js put-object --file "$BACKEND_DRILL_EVIDENCE" --key "$EVIDENCE_KEY" --content-type application/json
 
   echo "Restore drill complete."
   echo "Set BACKUP_LAST_RESTORE_DRILL_AT=$VERIFY_AT"

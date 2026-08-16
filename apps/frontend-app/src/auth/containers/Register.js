@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { clearSensitiveHashParameter } from "../../shared/security/sensitiveLocation";
 import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 import {
   passwordMinLength,
@@ -15,9 +16,13 @@ function Register({ setIsAuthenticated, setUser, setCompanyId }) {
   const navigate  = useNavigate();
   const location  = useLocation();
 
-  // Fragments are not sent to web servers, keeping one-time tokens out of access logs.
-  const fragmentParams = new URLSearchParams(location.hash.replace(/^#/, ""));
-  const inviteToken = fragmentParams.get("token");
+  // Capture the one-time token exactly once before removing it from the URL.
+  // Reading location.hash again after replaceState would make an in-progress
+  // registration appear tokenless on the next render.
+  const [inviteToken] = useState(() => {
+    const fragmentParams = new URLSearchParams(location.hash.replace(/^#/, ""));
+    return fragmentParams.get("token");
+  });
 
   // Token validation state
   const [tokenStatus,  setTokenStatus]  = useState("checking"); // checking | valid | invalid
@@ -31,6 +36,10 @@ function Register({ setIsAuthenticated, setUser, setCompanyId }) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error,        setError]        = useState("");
   const [isLoading,    setIsLoading]    = useState(false);
+
+  useEffect(() => {
+    clearSensitiveHashParameter("token");
+  }, []);
 
   // ── Validate token on mount ───────────────────────────────────────────────
   useEffect(() => {

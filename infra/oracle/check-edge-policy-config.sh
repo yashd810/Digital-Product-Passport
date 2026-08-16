@@ -13,6 +13,11 @@ check_caddyfile_template() {
     exit 1
   fi
 
+  if ! grep -Eq 'strict_sni_host[[:space:]]+on' "$file"; then
+    echo "FAIL: $file does not reject Host headers that disagree with TLS SNI"
+    exit 1
+  fi
+
   if ! grep -Eq 'protocols[[:space:]]+tls1\.2[[:space:]]+tls1\.3' "$file"; then
     echo "FAIL: $file does not pin TLS to tls1.2/tls1.3"
     exit 1
@@ -35,6 +40,11 @@ check_caddyfile_template() {
 
   if ! grep -q 'Permissions-Policy' "$file"; then
     echo "FAIL: $file does not set Permissions-Policy at the edge"
+    exit 1
+  fi
+
+  if ! grep -Eq '^[[:space:]]*-Server[[:space:]]*$' "$file"; then
+    echo "FAIL: $file does not remove the edge Server fingerprint"
     exit 1
   fi
 }

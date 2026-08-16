@@ -3,6 +3,12 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const networkAddressModule = process.env.DPP_NETWORK_ADDRESS_MODULE
+  || path.resolve(__dirname, "../backend-api/src/shared/security/network-address.js");
+const {
+  isPrivateOrReservedHostname,
+  normalizeHostname,
+} = require(networkAddressModule);
 
 if (process.env.DPP_MARKETING_RUNTIME_RENDER !== "true") {
   throw new Error("Marketing runtime rendering is restricted to the Docker build stage");
@@ -33,6 +39,17 @@ function configuredOrigin(name) {
     || (parsed.protocol !== "http:" && parsed.protocol !== "https:")
     || hasNonOriginComponents) {
     throw new Error(`${name} must be an HTTP(S) origin without credentials, paths, queries, or fragments`);
+  }
+  const normalizedHostname = normalizeHostname(parsed.hostname);
+  const isLoopback = normalizedHostname === "localhost"
+    || normalizedHostname.endsWith(".localhost")
+    || normalizedHostname === "::1"
+    || /^127(?:\.\d{1,3}){3}$/.test(normalizedHostname);
+  if (isPrivateOrReservedHostname(normalizedHostname) && !isLoopback) {
+    throw new Error(`${name} must not target a private, reserved, or local network host`);
+  }
+  if (parsed.protocol !== "https:" && !isLoopback) {
+    throw new Error(`${name} must use HTTPS unless it is a loopback development origin`);
   }
   return parsed.origin;
 }

@@ -9,10 +9,21 @@ const {
   PutObjectCommand,
   GetObjectCommand,
   ListObjectsV2Command,
-  DeleteObjectCommand,
-  HeadBucketCommand,
-  CreateBucketCommand
+  DeleteObjectCommand
 } = require("@aws-sdk/client-s3");
+
+const maxManifestBytes = 1024 * 1024;
+// The nightly job can coexist with a multi-year immutable bucket-retention
+// rule. Keep the scan bounded, but large enough for the documented seven-year
+// daily archive without turning retention into a future availability outage.
+const maxManifestInventory = 10_000;
+const manifestInventoryPageSize = 1_000;
+
+function invalidManifestError(message) {
+  const error = new Error(message);
+  error.code = "invalidDatabaseBackupManifest";
+  return error;
+}
 
 function readArg(flag, fallback = null) {
   const index = process.argv.indexOf(flag);
@@ -35,8 +46,11 @@ function readConfig() {
     bucket: process.env.DB_BACKUP_S3_BUCKET,
     accessKeyId: process.env.DB_BACKUP_S3_ACCESS_KEY_ID,
     secretAccessKey: process.env.DB_BACKUP_S3_SECRET_ACCESS_KEY,
+    manifestHmacSecret: process.env.DB_BACKUP_MANIFEST_HMAC_SECRET,
     forcePathStyle: process.env.DB_BACKUP_S3_FORCE_PATH_STYLE,
     prefix: process.env.DB_BACKUP_S3_PREFIX,
+    evidencePrefix: process.env.DB_BACKUP_EVIDENCE_S3_PREFIX,
+    maxBytes: process.env.DB_BACKUP_MAX_BYTES,
     retentionCount: process.env.DB_BACKUP_RETENTION_COUNT,
     dbName: process.env.DB_NAME || process.env.POSTGRES_DB,
   });
@@ -54,10 +68,6 @@ function createClient(config) {
   });
 }
 
-function sha256Hex(buffer) {
-  return crypto.createHash("sha256").update(buffer).digest("hex");
-}
-
 function sha256Base64(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("base64");
 }
@@ -66,43 +76,225 @@ function md5Base64(buffer) {
   return crypto.createHash("md5").update(buffer).digest("base64");
 }
 
-async function streamToBuffer(body) {
-  if (!body) return Buffer.alloc(0);
-  if (Buffer.isBuffer(body)) return body;
-  if (typeof body.transformToByteArray === "function") {
-    return Buffer.from(await body.transformToByteArray());
+function databaseBackupObjectTooLargeError(maxBytes) {
+  const error = new Error("Database backup object exceeds the " + maxBytes + "-byte limit");
+  error.code = "databaseBackupObjectTooLarge";
+  return error;
+}
+
+async function* bodyChunks(body) {
+  if (!body) return;
+  if (Buffer.isBuffer(body)) {
+    yield body;
+    return;
   }
   if (typeof body[Symbol.asyncIterator] === "function") {
-    const chunks = [];
     for await (const chunk of body) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      yield Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     }
-    return Buffer.concat(chunks);
+    return;
   }
-  return Buffer.from(String(body));
+  if (typeof body.transformToByteArray === "function") {
+    yield Buffer.from(await body.transformToByteArray());
+    return;
+  }
+  if (typeof body.transformToString === "function") {
+    yield Buffer.from(await body.transformToString());
+    return;
+  }
+  throw new TypeError("Object response body is not readable");
+}
+
+async function streamToBuffer(body, maxBytes = Number.POSITIVE_INFINITY) {
+  const chunks = [];
+  let totalBytes = 0;
+  for await (const chunk of bodyChunks(body)) {
+    totalBytes += chunk.length;
+    if (totalBytes > maxBytes) {
+      body?.destroy?.();
+      throw databaseBackupObjectTooLargeError(maxBytes);
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+async function hashFile(filePath, maxBytes) {
+  const stat = await fs.promises.stat(filePath);
+  if (!stat.isFile()) throw new Error("Database backup input must be a regular file");
+  if (stat.size < 1 || stat.size > maxBytes) throw databaseBackupObjectTooLargeError(maxBytes);
+
+  const sha256 = crypto.createHash("sha256");
+  const md5 = crypto.createHash("md5");
+  let sizeBytes = 0;
+  for await (const chunk of fs.createReadStream(filePath)) {
+    sizeBytes += chunk.length;
+    if (sizeBytes > maxBytes) throw databaseBackupObjectTooLargeError(maxBytes);
+    sha256.update(chunk);
+    md5.update(chunk);
+  }
+  if (sizeBytes !== stat.size) {
+    throw new Error("Database backup input changed while it was being hashed");
+  }
+  const sha256HexDigest = sha256.digest("hex");
+  return {
+    sizeBytes,
+    sha256: sha256HexDigest,
+    sha256Base64: Buffer.from(sha256HexDigest, "hex").toString("base64"),
+    md5Base64: md5.digest("base64"),
+  };
+}
+
+function canonicalManifestPayload(manifest) {
+  const payload = Object.fromEntries(
+    Object.entries(manifest || {})
+      .filter(([key]) => key !== "authentication")
+      .sort(([left], [right]) => left.localeCompare(right))
+  );
+  return Buffer.from(JSON.stringify(payload));
+}
+
+function signManifest(manifest, secret) {
+  return crypto
+    .createHmac("sha256", secret)
+    .update(canonicalManifestPayload(manifest))
+    .digest("base64url");
+}
+
+function authenticateManifest(manifest, config, { expectedManifestKey = null } = {}) {
+  if (!manifest || manifest.schemaVersion !== 2 || manifest.type !== "postgresCustomDump") {
+    throw invalidManifestError("Database backup manifest schema is invalid");
+  }
+  const authentication = manifest.authentication;
+  if (authentication?.algorithm !== "HMAC-SHA256" || !/^[A-Za-z0-9_-]{43}$/.test(String(authentication.digest || ""))) {
+    throw invalidManifestError("Database backup manifest is not authenticated");
+  }
+  const expected = Buffer.from(signManifest(manifest, config.manifestHmacSecret), "base64url");
+  const received = Buffer.from(authentication.digest, "base64url");
+  if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
+    throw invalidManifestError("Database backup manifest authentication failed");
+  }
+
+  if (manifest.dbName !== config.dbName
+    || !Number.isSafeInteger(manifest.sizeBytes)
+    || manifest.sizeBytes < 1
+    || manifest.sizeBytes > config.maxBytes
+    || !/^[a-f0-9]{64}$/.test(String(manifest.sha256 || ""))
+    || !/^[A-Za-z0-9_-]{22}$/.test(String(manifest.backupId || ""))) {
+    throw invalidManifestError("Database backup manifest metadata is invalid");
+  }
+
+  const createdAt = new Date(String(manifest.createdAt || ""));
+  if (Number.isNaN(createdAt.getTime()) || createdAt.toISOString() !== manifest.createdAt) {
+    throw invalidManifestError("Database backup manifest timestamp is invalid");
+  }
+  const expectedKeys = buildKeys(config, createdAt, manifest.backupId);
+  if (manifest.dumpKey !== expectedKeys.dumpKey
+    || manifest.manifestKey !== expectedKeys.manifestKey
+    || (expectedManifestKey !== null && manifest.manifestKey !== expectedManifestKey)) {
+    throw invalidManifestError("Database backup manifest object keys are invalid");
+  }
+  return manifest;
+}
+
+async function writeSensitiveFile(filePath, content) {
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
+  const noFollow = fs.constants.O_NOFOLLOW || 0;
+  const handle = await fs.promises.open(
+    filePath,
+    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | noFollow,
+    0o600
+  );
+  try {
+    await handle.chmod(0o600);
+    await handle.writeFile(content);
+  } finally {
+    await handle.close();
+  }
+}
+
+async function writeSensitiveObjectStream(filePath, body, maxBytes, expectedSha256 = null) {
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
+  const partialPath = `${filePath}.${process.pid}.${crypto.randomBytes(16).toString("hex")}.partial`;
+  const noFollow = fs.constants.O_NOFOLLOW || 0;
+  let handle = null;
+  let committed = false;
+  let totalBytes = 0;
+  const checksum = crypto.createHash("sha256");
+
+  try {
+    handle = await fs.promises.open(
+      partialPath,
+      fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | noFollow,
+      0o600
+    );
+    await handle.chmod(0o600);
+    for await (const chunk of bodyChunks(body)) {
+      totalBytes += chunk.length;
+      if (totalBytes > maxBytes) {
+        body?.destroy?.();
+        throw databaseBackupObjectTooLargeError(maxBytes);
+      }
+      checksum.update(chunk);
+      await handle.write(chunk);
+    }
+    if (totalBytes !== maxBytes) {
+      throw new Error("Database backup object size did not match its authenticated manifest");
+    }
+    const sha256 = checksum.digest("hex");
+    if (expectedSha256 !== null) {
+      const expected = Buffer.from(String(expectedSha256), "hex");
+      const received = Buffer.from(sha256, "hex");
+      if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
+        throw new Error("Database backup object checksum did not match its authenticated manifest");
+      }
+    }
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    await fs.promises.rename(partialPath, filePath);
+    await fs.promises.chmod(filePath, 0o600);
+    committed = true;
+    return {
+      sizeBytes: totalBytes,
+      sha256,
+    };
+  } finally {
+    if (handle) await handle.close().catch(() => {});
+    if (!committed) await fs.promises.rm(partialPath, { force: true }).catch(() => {});
+  }
 }
 
 async function listAllManifestKeys(client, config) {
   const keys = [];
-  let token = undefined;
+  const seenKeys = new Set();
+  const seenContinuationTokens = new Set();
   const prefix = `${config.prefix}/manifests/`;
+  let continuationToken = null;
 
-  do {
+  while (true) {
     const result = await client.send(new ListObjectsV2Command({
       Bucket: config.bucket,
       Prefix: prefix,
-      ContinuationToken: token
+      MaxKeys: manifestInventoryPageSize,
+      ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
     }));
-
     for (const item of result.Contents || []) {
-      if (item.Key && item.Key.endsWith(".json")) {
-        keys.push(item.Key);
+      if (!item.Key || !item.Key.endsWith(".json") || seenKeys.has(item.Key)) continue;
+      seenKeys.add(item.Key);
+      keys.push(item.Key);
+      if (keys.length > maxManifestInventory) {
+        throw new Error(`Database backup manifest inventory exceeds the ${maxManifestInventory}-object safety limit`);
       }
     }
+    if (!result.IsTruncated) break;
 
-    token = result.IsTruncated ? result.NextContinuationToken : undefined;
-  } while (token);
-
+    continuationToken = String(result.NextContinuationToken || "");
+    if (!continuationToken || seenContinuationTokens.has(continuationToken)) {
+      throw new Error("Database backup manifest inventory returned an invalid continuation token");
+    }
+    seenContinuationTokens.add(continuationToken);
+  }
   return keys.sort().reverse();
 }
 
@@ -111,26 +303,60 @@ async function readManifest(client, config, manifestKey) {
     Bucket: config.bucket,
     Key: manifestKey
   }));
-  const buffer = await streamToBuffer(response.Body);
-  return JSON.parse(buffer.toString("utf8"));
+  if (Number(response.ContentLength || 0) > maxManifestBytes) {
+    throw invalidManifestError("Database backup manifest is too large");
+  }
+  let manifest;
+  try {
+    const buffer = await streamToBuffer(response.Body, maxManifestBytes);
+    manifest = JSON.parse(buffer.toString("utf8"));
+  } catch (error) {
+    if (error?.code === "databaseBackupObjectTooLarge") {
+      throw invalidManifestError("Database backup manifest is too large");
+    }
+    if (error?.code === "invalidDatabaseBackupManifest") throw error;
+    throw invalidManifestError("Database backup manifest is invalid JSON");
+  }
+  return authenticateManifest(manifest, config, { expectedManifestKey: manifestKey });
 }
 
-function buildKeys(config) {
-  const now = new Date();
+async function findLatestAuthenticatedManifest(client, config, manifestKeys) {
+  for (const manifestKey of manifestKeys) {
+    try {
+      const manifest = await readManifest(client, config, manifestKey);
+      return { manifest, manifestKey };
+    } catch (error) {
+      if (error?.code !== "invalidDatabaseBackupManifest") throw error;
+      process.stderr.write("Ignoring an invalid database backup manifest object.\n");
+    }
+  }
+  throw new Error("No authenticated database backup manifests found in object storage");
+}
+
+function buildKeys(config, now = new Date(), backupId = crypto.randomBytes(16).toString("base64url")) {
+  if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
+    throw invalidManifestError("Database backup timestamp is invalid");
+  }
+  if (!/^[A-Za-z0-9_-]{22}$/.test(String(backupId || ""))) {
+    throw invalidManifestError("Database backup identifier is invalid");
+  }
   const iso = now.toISOString();
-  const timestamp = iso.replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const timestamp = iso.replace(/[-:.]/g, "");
   const year = iso.slice(0, 4);
   const month = iso.slice(5, 7);
   const safeDbName = String(config.dbName).replace(/[^a-zA-Z0-9._-]+/g, "-");
   return {
     createdAt: iso,
-    dumpKey: `${config.prefix}/dumps/${year}/${month}/${timestamp}-${safeDbName}.dump`,
-    manifestKey: `${config.prefix}/manifests/${timestamp}-${safeDbName}.json`
+    backupId,
+    dumpKey: `${config.prefix}/dumps/${year}/${month}/${timestamp}-${safeDbName}-${backupId}.dump`,
+    manifestKey: `${config.prefix}/manifests/${timestamp}-${safeDbName}-${backupId}.json`
   };
 }
 
 async function pruneOldBackups(client, config, manifests) {
-  const stale = manifests.slice(config.retentionCount);
+  const stale = [...manifests]
+    .sort((left, right) => String(right.manifestKey).localeCompare(String(left.manifestKey)))
+    .slice(config.retentionCount);
   if (!stale.length) {
     return { deleted: 0, skippedRetained: 0 };
   }
@@ -155,7 +381,10 @@ async function pruneOldBackups(client, config, manifests) {
       }));
       deleted += 1;
     } catch (error) {
-      if (/retention rule/i.test(String(error?.message || ""))) {
+      const retentionError = /retention|object.?lock|legal.?hold|immutable/i.test(
+        `${String(error?.name || "")} ${String(error?.code || "")} ${String(error?.message || "")}`
+      );
+      if (retentionError) {
         skippedRetained += 1;
         continue;
       }
@@ -170,34 +399,37 @@ async function uploadBackup() {
   const config = readConfig();
   const filePath = requireArg("--file");
   const client = createClient(config);
-  const fileBuffer = await fs.promises.readFile(filePath);
-  const stat = await fs.promises.stat(filePath);
+  const fileChecksum = await hashFile(filePath, config.maxBytes);
   const keys = buildKeys(config);
-  const checksum = sha256Hex(fileBuffer);
-  const checksumSha256 = sha256Base64(fileBuffer);
 
   const manifest = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     type: "postgresCustomDump",
     dbName: config.dbName,
     createdAt: keys.createdAt,
+    backupId: keys.backupId,
     dumpKey: keys.dumpKey,
     manifestKey: keys.manifestKey,
-    sizeBytes: stat.size,
-    sha256: checksum,
+    sizeBytes: fileChecksum.sizeBytes,
+    sha256: fileChecksum.sha256,
     hostname: process.env.HOSTNAME || "unknown",
     composeProjectName: process.env.COMPOSE_PROJECT_NAME || null
+  };
+  manifest.authentication = {
+    algorithm: "HMAC-SHA256",
+    digest: signManifest(manifest, config.manifestHmacSecret),
   };
 
   await client.send(new PutObjectCommand({
     Bucket: config.bucket,
     Key: keys.dumpKey,
-    Body: fileBuffer,
+    Body: fs.createReadStream(filePath),
+    ContentLength: fileChecksum.sizeBytes,
     ContentType: "application/octet-stream",
-    ContentMD5: md5Base64(fileBuffer),
-    ChecksumSHA256: checksumSha256,
+    ContentMD5: fileChecksum.md5Base64,
+    ChecksumSHA256: fileChecksum.sha256Base64,
     Metadata: {
-      sha256: checksum,
+      sha256: fileChecksum.sha256,
       dbname: config.dbName,
       createdat: keys.createdAt
     }
@@ -218,10 +450,11 @@ async function uploadBackup() {
   for (const key of manifestKeys) {
     try {
       const item = await readManifest(client, config, key);
-      item.manifestKey = item.manifestKey || key;
       manifests.push(item);
-    } catch {
-      // Ignore malformed historical manifests; keep the upload path robust.
+    } catch (error) {
+      if (error?.code !== "invalidDatabaseBackupManifest") throw error;
+      // Ignore unauthenticated or malformed objects in a bucket inventory;
+      // never let them become deletion candidates.
     }
   }
 
@@ -231,8 +464,8 @@ async function uploadBackup() {
     bucket: config.bucket,
     dumpKey: keys.dumpKey,
     manifestKey: keys.manifestKey,
-    sha256: checksum,
-    sizeBytes: stat.size,
+    sha256: fileChecksum.sha256,
+    sizeBytes: fileChecksum.sizeBytes,
     prunedObjects: pruneResult.deleted,
     retainedObjectsSkipped: pruneResult.skippedRetained
   }) + "\n");
@@ -249,74 +482,34 @@ async function downloadLatest() {
     throw new Error("No database backup manifests found in object storage");
   }
 
-  const manifest = await readManifest(client, config, manifestKeys[0]);
+  const { manifest, manifestKey } = await findLatestAuthenticatedManifest(client, config, manifestKeys);
   const dumpResponse = await client.send(new GetObjectCommand({
     Bucket: config.bucket,
     Key: manifest.dumpKey
   }));
-  const dumpBuffer = await streamToBuffer(dumpResponse.Body);
-  const checksum = sha256Hex(dumpBuffer);
-  if (manifest.sha256 && manifest.sha256 !== checksum) {
-    throw new Error(`Checksum mismatch for latest backup: expected ${manifest.sha256}, received ${checksum}`);
+  const declaredLength = dumpResponse.ContentLength;
+  if (declaredLength !== undefined && declaredLength !== null
+    && (!Number.isSafeInteger(Number(declaredLength)) || Number(declaredLength) !== manifest.sizeBytes)) {
+    throw new Error("Database backup object length did not match its authenticated manifest");
   }
-
-  await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
-  await fs.promises.writeFile(outputPath, dumpBuffer);
+  const downloaded = await writeSensitiveObjectStream(
+    outputPath,
+    dumpResponse.Body,
+    manifest.sizeBytes,
+    manifest.sha256
+  );
   if (manifestOutputPath) {
-    await fs.promises.mkdir(path.dirname(manifestOutputPath), { recursive: true });
-    await fs.promises.writeFile(manifestOutputPath, JSON.stringify(manifest, null, 2));
+    await writeSensitiveFile(manifestOutputPath, JSON.stringify(manifest, null, 2));
   }
 
   process.stdout.write(JSON.stringify({
     ok: true,
     dumpKey: manifest.dumpKey,
-    manifestKey: manifest.manifestKey || manifestKeys[0],
+    manifestKey,
     outputPath,
-    sizeBytes: dumpBuffer.length,
-    sha256: checksum
+    sizeBytes: downloaded.sizeBytes,
+    sha256: downloaded.sha256
   }) + "\n");
-}
-
-async function ensureBucket() {
-  const config = readConfig();
-  const bucket = readArg("--bucket", config.bucket);
-  const client = createClient(config);
-
-  try {
-    await client.send(new HeadBucketCommand({
-      Bucket: bucket
-    }));
-    process.stdout.write(JSON.stringify({
-      ok: true,
-      bucket,
-      exists: true
-    }) + "\n");
-    return;
-  } catch {
-    // Continue into create path.
-  }
-
-  try {
-    await client.send(new CreateBucketCommand({
-      Bucket: bucket
-    }));
-    process.stdout.write(JSON.stringify({
-      ok: true,
-      bucket,
-      created: true
-    }) + "\n");
-  } catch (error) {
-    const status = error && error.$metadata ? error.$metadata.httpStatusCode : null;
-    if (error.name === "BucketAlreadyOwnedByYou" || status === 409) {
-      process.stdout.write(JSON.stringify({
-        ok: true,
-        bucket,
-        exists: true
-      }) + "\n");
-      return;
-    }
-    throw error;
-  }
 }
 
 async function putObjectFile() {
@@ -324,19 +517,29 @@ async function putObjectFile() {
   const filePath = requireArg("--file");
   const key = requireArg("--key");
   const contentType = readArg("--content-type", "application/octet-stream");
+  if (contentType !== "application/json") {
+    throw new Error("Backup evidence uploads must use application/json");
+  }
+  if (!key.startsWith(`${config.evidencePrefix}/`)
+    || key.length > 1024
+    || key.includes("\\")
+    || key.split("/").some((segment) => !segment || segment === "." || segment === "..")
+    || !key.endsWith(".json")) {
+    throw new Error("Backup evidence key is outside the configured evidence prefix");
+  }
   const client = createClient(config);
-  const fileBuffer = await fs.promises.readFile(filePath);
-  const checksum = sha256Hex(fileBuffer);
+  const fileChecksum = await hashFile(filePath, config.maxBytes);
 
   await client.send(new PutObjectCommand({
     Bucket: config.bucket,
     Key: key,
-    Body: fileBuffer,
+    Body: fs.createReadStream(filePath),
+    ContentLength: fileChecksum.sizeBytes,
     ContentType: contentType,
-    ContentMD5: md5Base64(fileBuffer),
-    ChecksumSHA256: sha256Base64(fileBuffer),
+    ContentMD5: fileChecksum.md5Base64,
+    ChecksumSHA256: fileChecksum.sha256Base64,
     Metadata: {
-      sha256: checksum,
+      sha256: fileChecksum.sha256,
     }
   }));
 
@@ -344,8 +547,8 @@ async function putObjectFile() {
     ok: true,
     bucket: config.bucket,
     key,
-    sizeBytes: fileBuffer.length,
-    sha256: checksum,
+    sizeBytes: fileChecksum.sizeBytes,
+    sha256: fileChecksum.sha256,
   }) + "\n");
 }
 
@@ -359,16 +562,12 @@ async function main() {
     await downloadLatest();
     return;
   }
-  if (command === "ensure-bucket") {
-    await ensureBucket();
-    return;
-  }
   if (command === "put-object") {
     await putObjectFile();
     return;
   }
 
-  throw new Error("Usage: node scripts/db-backup-object-storage.js <upload|download-latest|ensure-bucket|put-object> [options]");
+  throw new Error("Usage: node scripts/db-backup-object-storage.js <upload|download-latest|put-object> [options]");
 }
 
 if (require.main === module) {
@@ -379,5 +578,12 @@ if (require.main === module) {
 }
 
 module.exports = {
+  authenticateManifest,
+  buildKeys,
+  canonicalManifestPayload,
+  listAllManifestKeys,
   readConfig,
+  signManifest,
+  writeSensitiveFile,
+  writeSensitiveObjectStream,
 };

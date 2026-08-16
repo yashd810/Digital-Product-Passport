@@ -22,7 +22,7 @@ function parseEnvLines(content) {
   );
 }
 
-test("production template documents a disabled-by-default isolated backup-provider store", () => {
+test("production template makes the isolated backup-provider store mandatory and visibly unprovisioned", () => {
   const values = parseEnvLines(fs.readFileSync(productionTemplatePath, "utf8"));
   for (const name of [
     "BACKUP_PROVIDER_ENABLED",
@@ -36,14 +36,14 @@ test("production template documents a disabled-by-default isolated backup-provid
   ]) {
     assert.equal(values.has(name), true, `missing ${name} from production template`);
   }
-  assert.equal(values.get("BACKUP_PROVIDER_ENABLED"), "false");
-  assert.equal(values.get("BACKUP_PROVIDER_REQUIRED"), "false");
+  assert.equal(values.get("BACKUP_PROVIDER_ENABLED"), "true");
+  assert.equal(values.get("BACKUP_PROVIDER_REQUIRED"), "true");
   assert.match(values.get("BACKUP_PROVIDER_ENDPOINT"), /^https:\/\/YOUR_/);
   assert.match(values.get("BACKUP_PROVIDER_ACCESS_KEY_ID"), /^REPLACE_/);
   assert.match(values.get("BACKUP_PROVIDER_SECRET_ACCESS_KEY"), /^REPLACE_/);
 });
 
-test("production deploy guard requires scoped backup-provider storage before enablement", () => {
+test("production deploy guard requires scoped backup-provider storage before release", () => {
   const deployScript = fs.readFileSync(productionDeployScriptPath, "utf8");
   for (const name of [
     "BACKUP_PROVIDER_ENABLED",
@@ -52,7 +52,7 @@ test("production deploy guard requires scoped backup-provider storage before ena
     "BACKUP_PROVIDER_ACCESS_KEY_ID",
     "BACKUP_PROVIDER_SECRET_ACCESS_KEY",
   ]) {
-    assert.match(deployScript, new RegExp(`require_(?:boolean_env_var|non_placeholder_env_var|secret_env_var) \"${name}\"`));
+    assert.match(deployScript, new RegExp(`require_(?:exact_env_value|boolean_env_var|non_placeholder_env_var|secret_env_var) \"${name}\"`));
   }
   assert.match(deployScript, /require_distinct_env_vars "BACKUP_PROVIDER_BUCKET" "STORAGE_S3_BUCKET"/);
   assert.match(deployScript, /require_distinct_env_vars "BACKUP_PROVIDER_ACCESS_KEY_ID" "STORAGE_S3_ACCESS_KEY_ID"/);

@@ -40,6 +40,7 @@ jobs:
     # The repository variable is set to true only after the dedicated runner
     # and protected production Environment have been verified.
     if: >-
+      github.event.repository.private == true &&
       vars.DPP_PRODUCTION_DEPLOY_ENABLED == 'true' &&
       (github.event_name == 'workflow_dispatch' ||
        (github.event.workflow_run.conclusion == 'success' &&
@@ -52,6 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
+          persist-credentials: false
           fetch-depth: 0
       - id: release
         name: Resolve an approved main revision
@@ -110,6 +112,7 @@ jobs:
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
+          persist-credentials: false
           ref: ${{ needs.resolve-release.outputs.release_sha }}
           fetch-depth: 0
       - name: Verify dedicated deployment runner

@@ -9,6 +9,8 @@ ENV MARKETING_URL=${MARKETING_URL}
 ENV MARKETING_APP_URL=${MARKETING_APP_URL}
 ENV MARKETING_API_URL=${MARKETING_API_URL}
 ENV DPP_MARKETING_RUNTIME_RENDER=true
+COPY apps/backend-api/src/shared/security/network-address.js /tmp/dpp-network-address.js
+ENV DPP_NETWORK_ADDRESS_MODULE=/tmp/dpp-network-address.js
 RUN node configure-runtime.js && rm configure-runtime.js nginx.conf.template
 
 FROM nginxinc/nginx-unprivileged:1.30.3-alpine@sha256:b3f2436575bd5be7386518084d842dac414ab4962712afa31e99e0942a56e3b2

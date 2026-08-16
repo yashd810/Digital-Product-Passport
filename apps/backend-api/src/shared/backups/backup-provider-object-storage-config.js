@@ -1,5 +1,10 @@
 "use strict";
 
+const {
+  isPrivateOrReservedHostname,
+  normalizeHostname,
+} = require("../security/network-address");
+
 const backupProviderS3EnvNames = [
   "BACKUP_PROVIDER_ENDPOINT",
   "BACKUP_PROVIDER_REGION",
@@ -34,9 +39,11 @@ function validateBackupProviderEndpoint(value) {
     || parsed.search
     || parsed.hash
   );
-  if (parsed.protocol !== "https:" || !parsed.hostname || hasNonOriginComponents) {
+  const hostname = normalizeHostname(parsed.hostname);
+  if (parsed.protocol !== "https:" || !hostname || hasNonOriginComponents || isPrivateOrReservedHostname(hostname)) {
     throw new Error("Backup-provider S3 endpoint must be an HTTPS origin without credentials, paths, queries, or fragments");
   }
+  parsed.hostname = hostname;
   return parsed.origin;
 }
 
@@ -52,6 +59,22 @@ function validateBackupProviderBucket(value) {
     throw new Error("Backup-provider S3 bucket must be an object-storage bucket name without paths");
   }
   return value;
+}
+
+function validateBackupProviderObjectPrefix(value) {
+  const prefix = String(value ?? "");
+  if (
+    !prefix
+    || prefix.trim() !== prefix
+    || prefix.length > 512
+    || prefix.startsWith("/")
+    || prefix.endsWith("/")
+    || prefix.includes("\\")
+    || prefix.split("/").some((segment) => !segment || segment === "." || segment === "..")
+  ) {
+    throw new Error("BACKUP_PROVIDER_OBJECT_PREFIX must be a relative object-storage prefix without empty, dot, or backslash segments");
+  }
+  return prefix;
 }
 
 function validateBackupProviderCredential(name, value) {
@@ -120,4 +143,5 @@ module.exports = {
   backupProviderS3EnvNames,
   readBackupProviderObjectStorageConfig,
   readBackupProviderObjectStorageConfigFromEnvironment,
+  validateBackupProviderObjectPrefix,
 };

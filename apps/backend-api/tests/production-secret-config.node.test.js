@@ -117,22 +117,33 @@ test("bootstrap super-admin uses ADMIN_USERNAME independently from contact notif
   assert.doesNotMatch(validLoginWithoutContactRecipient.stderr, /ADMIN_EMAIL/);
 });
 
-test("production environment template declares dedicated DB backup S3 configuration without enabling an incomplete backup job", () => {
+test("production environment template makes independent backup coverage mandatory and visibly incomplete until provisioned", () => {
   const values = parseEnvLines(fs.readFileSync(templatePath, "utf8"));
   for (const name of [
+    "BACKUP_PROVIDER_ENABLED",
+    "BACKUP_PROVIDER_REQUIRED",
+    "BACKUP_PROVIDER_BUCKET",
+    "BACKUP_PROVIDER_ACCESS_KEY_ID",
+    "BACKUP_PROVIDER_SECRET_ACCESS_KEY",
     "DB_BACKUP_ENABLED",
     "DB_BACKUP_S3_ENDPOINT",
     "DB_BACKUP_S3_REGION",
     "DB_BACKUP_S3_BUCKET",
     "DB_BACKUP_S3_ACCESS_KEY_ID",
     "DB_BACKUP_S3_SECRET_ACCESS_KEY",
+    "DB_BACKUP_MANIFEST_HMAC_SECRET",
+    "DB_BACKUP_MAX_BYTES",
   ]) {
     assert.equal(values.has(name), true, `missing ${name} from production template`);
   }
-  assert.equal(values.get("DB_BACKUP_ENABLED"), "false");
+  assert.equal(values.get("BACKUP_PROVIDER_ENABLED"), "true");
+  assert.equal(values.get("BACKUP_PROVIDER_REQUIRED"), "true");
+  assert.equal(values.get("DB_BACKUP_ENABLED"), "true");
   assert.match(values.get("DB_BACKUP_S3_ENDPOINT"), /^https:\/\/YOUR_/);
   assert.match(values.get("DB_BACKUP_S3_ACCESS_KEY_ID"), /^REPLACE_/);
   assert.match(values.get("DB_BACKUP_S3_SECRET_ACCESS_KEY"), /^REPLACE_/);
+  assert.match(values.get("DB_BACKUP_MANIFEST_HMAC_SECRET"), /^REPLACE_/);
+  assert.equal(values.get("DB_BACKUP_MAX_BYTES"), "5368709120");
 });
 
 test("production environment template fixes data-volume identities and disables startup migrations", () => {
@@ -142,6 +153,7 @@ test("production environment template fixes data-volume identities and disables 
   assert.match(values.get("LOCAL_STORAGE_VOLUME_NAME"), /^[A-Za-z0-9][A-Za-z0-9_.-]*$/);
   assert.match(values.get("POSTGRES_VOLUME_NAME"), /^[A-Za-z0-9][A-Za-z0-9_.-]*$/);
   assert.equal(values.get("RUN_SCHEMA_MIGRATIONS"), "false");
+  assert.equal(values.has("COOKIE_DOMAIN"), false, "production cookies must remain host-only");
   assert.equal(values.get(["DPP", "DEPLOY", "TARGET"].join("_")), ["REPLACE", "WITH", "DEPLOY", "TARGET"].join("_"));
 });
 
@@ -170,6 +182,14 @@ test("production deployment fails closed rather than selecting a fresh database 
 
   const deployScript = fs.readFileSync(deployScriptPath, "utf8");
   assert.match(deployScript, /require_exact_env_value "RUN_SCHEMA_MIGRATIONS" "false"/);
+  assert.match(deployScript, /require_empty_env_var "COOKIE_DOMAIN"/);
+  assert.match(deployScript, /require_exact_env_value "BACKUP_PROVIDER_ENABLED" "true"/);
+  assert.match(deployScript, /require_exact_env_value "BACKUP_PROVIDER_REQUIRED" "true"/);
+  assert.match(deployScript, /require_exact_env_value "DB_BACKUP_ENABLED" "true"/);
+  assert.match(deployScript, /require_secret_env_var "DB_BACKUP_MANIFEST_HMAC_SECRET"/);
+  assert.match(deployScript, /require_integer_range_env_var "DB_BACKUP_MAX_BYTES" "1048576" "107374182400"/);
+  assert.match(deployScript, /require_integer_range_env_var "DB_BACKUP_RETENTION_COUNT" "1" "128"/);
+  assert.match(deployScript, /require_distinct_env_vars "DB_BACKUP_S3_BUCKET" "BACKUP_PROVIDER_BUCKET"/);
   assert.match(deployScript, /Refusing deployment: expected PostgreSQL data volume is missing/);
   assert.match(deployScript, /DPP_INITIALIZE_POSTGRES_VOLUME=true/);
   assert.match(deployScript, /node scripts\/migrate-db\.js/);
@@ -230,7 +250,21 @@ test("security workflow retains code-change triggers and provides manual plus we
   assert.match(workflow, /^  schedule:\n    - cron: "\d+ \d+ \* \* [0-6]"$/m);
 });
 
-function assertApplicationSecretOutput(values, { includesDbPassword }) {
+test("offline CI scan containers are network-isolated and resource-bounded", () => {
+  const workflow = fs.readFileSync(securityWorkflowPath, "utf8");
+
+  assert.match(
+    workflow,
+    /docker run --rm --network none --read-only\s+\\\n\s+--cap-drop ALL --security-opt no-new-privileges\s+\\\n\s+--pids-limit 128 --memory 256m/
+  );
+  assert.match(workflow, /--tmpfs \/tmp:rw,noexec,nosuid,size=64m/);
+  assert.match(
+    workflow,
+    /Check deployment-runner Terraform formatting[\s\S]*?docker run --rm\s+--network none\s+--read-only\s+--cap-drop ALL\s+--security-opt no-new-privileges\s+--pids-limit 64\s+--memory 128m/
+  );
+});
+
+function assertApplicationSecretOutput(values, { includesDbPassword, includesBackupManifestKey = false }) {
   const secretNames = [
     "JWT_SECRET",
     "PEPPER_V1",
@@ -238,6 +272,7 @@ function assertApplicationSecretOutput(values, { includesDbPassword }) {
     "REPOSITORY_FILE_LINK_SECRET",
   ];
   if (includesDbPassword) secretNames.unshift("DB_PASSWORD");
+  if (includesBackupManifestKey) secretNames.push("DB_BACKUP_MANIFEST_HMAC_SECRET");
   const secrets = secretNames.map((name) => values.get(name) || "");
 
   assert.equal(secrets.every((value) => /^[0-9a-f]{64}$/.test(value)), true);
@@ -256,7 +291,7 @@ function assertApplicationSecretOutput(values, { includesDbPassword }) {
 test("production secret generator emits distinct 256-bit bootstrap values and a P-256 keypair", () => {
   execFileSync("bash", ["-n", generatorPath]);
   const values = parseEnvLines(execFileSync("bash", [generatorPath], { encoding: "utf8" }));
-  assertApplicationSecretOutput(values, { includesDbPassword: true });
+  assertApplicationSecretOutput(values, { includesDbPassword: true, includesBackupManifestKey: true });
 });
 
 test("application-secret rotation does not silently rotate the database password", () => {
@@ -267,5 +302,6 @@ test("application-secret rotation does not silently rotate the database password
   ));
 
   assert.equal(values.has("DB_PASSWORD"), false);
+  assert.equal(values.has("DB_BACKUP_MANIFEST_HMAC_SECRET"), false);
   assertApplicationSecretOutput(values, { includesDbPassword: false });
 });

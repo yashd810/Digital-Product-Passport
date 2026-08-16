@@ -156,6 +156,18 @@ require_boolean_env_var() {
   esac
 }
 
+require_integer_range_env_var() {
+  local key="$1"
+  local minimum="$2"
+  local maximum="$3"
+  local value
+  value="$(read_env_var "$key")"
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]] || [ "$value" -lt "$minimum" ] || [ "$value" -gt "$maximum" ]; then
+    echo "Production env var $key must be an integer from $minimum to $maximum"
+    exit 1
+  fi
+}
+
 require_exact_env_value() {
   local key="$1"
   local expected="$2"
@@ -163,6 +175,16 @@ require_exact_env_value() {
   value="$(read_env_var "$key")"
   if [ "$value" != "$expected" ]; then
     echo "Production env var $key must be $expected"
+    exit 1
+  fi
+}
+
+require_empty_env_var() {
+  local key="$1"
+  local value
+  value="$(read_env_var "$key")"
+  if [ -n "$value" ]; then
+    echo "Production env var $key must be unset to preserve host-only session cookies"
     exit 1
   fi
 }
@@ -399,6 +421,7 @@ case "$DEPLOY_TARGET" in
     require_env_var "ALLOWED_ORIGINS"
     require_https_url_env "APP_URL"
     require_https_url_env "SERVER_URL"
+    require_empty_env_var "COOKIE_DOMAIN"
     require_distinct_secret_env_vars "JWT_SECRET" "PEPPER_V1"
     require_distinct_secret_env_vars "JWT_SECRET" "OTP_HMAC_SECRET"
     require_distinct_secret_env_vars "JWT_SECRET" "REPOSITORY_FILE_LINK_SECRET"
@@ -419,41 +442,52 @@ case "$DEPLOY_TARGET" in
     require_non_placeholder_env_var "STORAGE_S3_SECRET_ACCESS_KEY"
     require_secret_env_var "STORAGE_S3_SECRET_ACCESS_KEY"
 
-    require_boolean_env_var "BACKUP_PROVIDER_ENABLED"
-    require_boolean_env_var "BACKUP_PROVIDER_REQUIRED"
-    if [ "$(read_env_var BACKUP_PROVIDER_REQUIRED)" = "true" ] && [ "$(read_env_var BACKUP_PROVIDER_ENABLED)" != "true" ]; then
-      echo "BACKUP_PROVIDER_REQUIRED=true requires BACKUP_PROVIDER_ENABLED=true"
-      exit 1
-    fi
-    if [ "$(read_env_var BACKUP_PROVIDER_ENABLED)" = "true" ]; then
-      require_non_placeholder_env_var "BACKUP_PROVIDER_KEY"
-      require_non_placeholder_env_var "BACKUP_PROVIDER_OBJECT_PREFIX"
-      require_https_url_env "BACKUP_PROVIDER_ENDPOINT"
-      require_non_placeholder_env_var "BACKUP_PROVIDER_ENDPOINT"
-      require_non_placeholder_env_var "BACKUP_PROVIDER_REGION"
-      require_non_placeholder_env_var "BACKUP_PROVIDER_BUCKET"
-      require_non_placeholder_env_var "BACKUP_PROVIDER_ACCESS_KEY_ID"
-      require_non_placeholder_env_var "BACKUP_PROVIDER_SECRET_ACCESS_KEY"
-      require_secret_env_var "BACKUP_PROVIDER_SECRET_ACCESS_KEY"
-      require_boolean_env_var "BACKUP_PROVIDER_FORCE_PATH_STYLE"
-      require_distinct_env_vars "BACKUP_PROVIDER_BUCKET" "STORAGE_S3_BUCKET"
-      require_distinct_env_vars "BACKUP_PROVIDER_ACCESS_KEY_ID" "STORAGE_S3_ACCESS_KEY_ID"
-      require_distinct_env_vars "BACKUP_PROVIDER_SECRET_ACCESS_KEY" "STORAGE_S3_SECRET_ACCESS_KEY"
-    fi
+    # A production release must never turn backup coverage into an optional
+    # best-effort feature. These exact-value gates make disabled replication or
+    # DB backups a visible deployment failure instead of a green no-op.
+    require_exact_env_value "BACKUP_PROVIDER_ENABLED" "true"
+    require_exact_env_value "BACKUP_PROVIDER_REQUIRED" "true"
+    require_non_placeholder_env_var "BACKUP_PROVIDER_KEY"
+    require_non_placeholder_env_var "BACKUP_PROVIDER_OBJECT_PREFIX"
+    require_https_url_env "BACKUP_PROVIDER_ENDPOINT"
+    require_non_placeholder_env_var "BACKUP_PROVIDER_ENDPOINT"
+    require_non_placeholder_env_var "BACKUP_PROVIDER_REGION"
+    require_non_placeholder_env_var "BACKUP_PROVIDER_BUCKET"
+    require_non_placeholder_env_var "BACKUP_PROVIDER_ACCESS_KEY_ID"
+    require_non_placeholder_env_var "BACKUP_PROVIDER_SECRET_ACCESS_KEY"
+    require_secret_env_var "BACKUP_PROVIDER_SECRET_ACCESS_KEY"
+    require_boolean_env_var "BACKUP_PROVIDER_FORCE_PATH_STYLE"
+    require_distinct_env_vars "BACKUP_PROVIDER_BUCKET" "STORAGE_S3_BUCKET"
+    require_distinct_env_vars "BACKUP_PROVIDER_ACCESS_KEY_ID" "STORAGE_S3_ACCESS_KEY_ID"
+    require_distinct_env_vars "BACKUP_PROVIDER_SECRET_ACCESS_KEY" "STORAGE_S3_SECRET_ACCESS_KEY"
 
-    require_boolean_env_var "DB_BACKUP_ENABLED"
-    if [ "$(read_env_var DB_BACKUP_ENABLED)" = "true" ]; then
-      require_https_url_env "DB_BACKUP_S3_ENDPOINT"
-      require_non_placeholder_env_var "DB_BACKUP_S3_ENDPOINT"
-      require_non_placeholder_env_var "DB_BACKUP_S3_REGION"
-      require_non_placeholder_env_var "DB_BACKUP_S3_BUCKET"
-      require_non_placeholder_env_var "DB_BACKUP_S3_ACCESS_KEY_ID"
-      require_non_placeholder_env_var "DB_BACKUP_S3_SECRET_ACCESS_KEY"
-      require_secret_env_var "DB_BACKUP_S3_SECRET_ACCESS_KEY"
-      require_distinct_env_vars "DB_BACKUP_S3_BUCKET" "STORAGE_S3_BUCKET"
-      require_distinct_env_vars "DB_BACKUP_S3_ACCESS_KEY_ID" "STORAGE_S3_ACCESS_KEY_ID"
-      require_distinct_env_vars "DB_BACKUP_S3_SECRET_ACCESS_KEY" "STORAGE_S3_SECRET_ACCESS_KEY"
-    fi
+    require_exact_env_value "DB_BACKUP_ENABLED" "true"
+    require_https_url_env "DB_BACKUP_S3_ENDPOINT"
+    require_non_placeholder_env_var "DB_BACKUP_S3_ENDPOINT"
+    require_non_placeholder_env_var "DB_BACKUP_S3_REGION"
+    require_non_placeholder_env_var "DB_BACKUP_S3_BUCKET"
+    require_non_placeholder_env_var "DB_BACKUP_S3_ACCESS_KEY_ID"
+    require_non_placeholder_env_var "DB_BACKUP_S3_SECRET_ACCESS_KEY"
+    require_secret_env_var "DB_BACKUP_S3_SECRET_ACCESS_KEY"
+    require_secret_env_var "DB_BACKUP_MANIFEST_HMAC_SECRET"
+    require_boolean_env_var "DB_BACKUP_S3_FORCE_PATH_STYLE"
+    require_non_placeholder_env_var "DB_BACKUP_S3_PREFIX"
+    require_non_placeholder_env_var "DB_BACKUP_EVIDENCE_S3_PREFIX"
+    require_integer_range_env_var "DB_BACKUP_MAX_BYTES" "1048576" "107374182400"
+    require_integer_range_env_var "DB_BACKUP_RETENTION_COUNT" "1" "128"
+    require_distinct_env_vars "DB_BACKUP_S3_BUCKET" "STORAGE_S3_BUCKET"
+    require_distinct_env_vars "DB_BACKUP_S3_BUCKET" "BACKUP_PROVIDER_BUCKET"
+    require_distinct_env_vars "DB_BACKUP_S3_ACCESS_KEY_ID" "STORAGE_S3_ACCESS_KEY_ID"
+    require_distinct_env_vars "DB_BACKUP_S3_ACCESS_KEY_ID" "BACKUP_PROVIDER_ACCESS_KEY_ID"
+    require_distinct_env_vars "DB_BACKUP_S3_SECRET_ACCESS_KEY" "STORAGE_S3_SECRET_ACCESS_KEY"
+    require_distinct_env_vars "DB_BACKUP_S3_SECRET_ACCESS_KEY" "BACKUP_PROVIDER_SECRET_ACCESS_KEY"
+    require_distinct_env_vars "DB_BACKUP_MANIFEST_HMAC_SECRET" "DB_BACKUP_S3_SECRET_ACCESS_KEY"
+    require_distinct_env_vars "DB_BACKUP_MANIFEST_HMAC_SECRET" "BACKUP_PROVIDER_SECRET_ACCESS_KEY"
+    require_distinct_env_vars "DB_BACKUP_MANIFEST_HMAC_SECRET" "STORAGE_S3_SECRET_ACCESS_KEY"
+    require_distinct_env_vars "DB_BACKUP_MANIFEST_HMAC_SECRET" "JWT_SECRET"
+    require_distinct_env_vars "DB_BACKUP_MANIFEST_HMAC_SECRET" "PEPPER_V1"
+    require_distinct_env_vars "DB_BACKUP_MANIFEST_HMAC_SECRET" "OTP_HMAC_SECRET"
+    require_distinct_env_vars "DB_BACKUP_MANIFEST_HMAC_SECRET" "REPOSITORY_FILE_LINK_SECRET"
     ;;
 esac
 
@@ -854,6 +888,10 @@ if [ "$DEPLOY_TARGET" = "frontend" ]; then
 else
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "${UP_ARGS[@]}"
 fi
+# Docker recreates its chains during daemon restarts, so install the persistent
+# systemd unit only after the target stack is running and the DOCKER-USER chain
+# is present. This applies on both split OCI hosts, not just the backend host.
+APP_DIR="$APP_DIR" "$APP_DIR/infra/oracle/install-container-imds-firewall.sh"
 if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   APP_DIR="$APP_DIR" "$APP_DIR/infra/oracle/install-db-backup-jobs.sh"
   echo "Running storage probe health check..."

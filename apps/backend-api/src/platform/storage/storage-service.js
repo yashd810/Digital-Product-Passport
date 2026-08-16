@@ -8,6 +8,7 @@
  */
 
 const crypto = require("crypto");
+const { once } = require("events");
 const fs = require("fs");
 const path = require("path");
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
@@ -16,6 +17,11 @@ const {
   readBackupProviderObjectStorageConfigFromEnvironment,
 } = require("../../shared/backups/backup-provider-object-storage-config");
 const logger = require("../observability/logger");
+
+// Smaller route-specific limits are passed explicitly. This finite default
+// protects any future storage read from silently buffering an unbounded object
+// in the API process.
+const defaultObjectReadMaxBytes = 64 * 1024 * 1024;
 
 function normalizeBaseUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
@@ -64,8 +70,70 @@ function joinUrl(base, nextPath) {
   return `${normalizeBaseUrl(base)}/${String(nextPath || "").replace(/^\/+/, "")}`;
 }
 
-function ensureDir(targetPath) {
-  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+function storageObjectTooLargeError(maxBytes) {
+  const error = new Error(`Stored object exceeds the ${maxBytes}-byte read limit`);
+  error.code = "storageObjectTooLarge";
+  return error;
+}
+
+async function bodyToBuffer(body, maxBytes = defaultObjectReadMaxBytes) {
+  if (!body) return Buffer.alloc(0);
+  if (Buffer.isBuffer(body)) {
+    if (body.length > maxBytes) throw storageObjectTooLargeError(maxBytes);
+    return body;
+  }
+  if (typeof body[Symbol.asyncIterator] === "function") {
+    const chunks = [];
+    let totalBytes = 0;
+    for await (const chunk of body) {
+      const normalized = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += normalized.length;
+      if (totalBytes > maxBytes) {
+        body.destroy?.();
+        throw storageObjectTooLargeError(maxBytes);
+      }
+      chunks.push(normalized);
+    }
+    return Buffer.concat(chunks);
+  }
+  if (typeof body.transformToByteArray === "function") {
+    const buffer = Buffer.from(await body.transformToByteArray());
+    if (buffer.length > maxBytes) throw storageObjectTooLargeError(maxBytes);
+    return buffer;
+  }
+  const buffer = Buffer.from(await body.transformToString());
+  if (buffer.length > maxBytes) throw storageObjectTooLargeError(maxBytes);
+  return buffer;
+}
+
+async function pipeBodyToWritable(body, writable, maxBytes = defaultObjectReadMaxBytes) {
+  let totalBytes = 0;
+  const chunks = Buffer.isBuffer(body) ? [body] : body;
+  try {
+    if (!chunks || typeof chunks[Symbol.asyncIterator] !== "function") {
+      const buffer = await bodyToBuffer(body, maxBytes);
+      writable.end(buffer);
+      return buffer.length;
+    }
+    for await (const chunk of chunks) {
+      const normalized = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += normalized.length;
+      if (totalBytes > maxBytes) {
+        body.destroy?.();
+        throw storageObjectTooLargeError(maxBytes);
+      }
+      if (!writable.write(normalized)) await once(writable, "drain");
+    }
+    writable.end();
+    return totalBytes;
+  } catch (error) {
+    // If a source violates its bounded-read contract after streaming begins,
+    // close the response instead of attempting a second response after bytes
+    // may already have been sent.
+    body?.destroy?.();
+    if (!writable?.destroyed) writable?.destroy?.();
+    throw error;
+  }
 }
 
 function createLocalStorageService(options) {
@@ -77,16 +145,30 @@ function createLocalStorageService(options) {
     serverBaseUrl
   } = options;
   const resolvedLocalStorageDir = path.resolve(localStorageDir);
+  fs.mkdirSync(resolvedLocalStorageDir, { recursive: true, mode: 0o700 });
+  const realLocalStorageDir = fs.realpathSync(resolvedLocalStorageDir);
+
+  function invalidStorageKeyError(message = "Storage key resolves outside the configured storage directory") {
+    const error = new Error(message);
+    error.code = "invalidStorageKey";
+    return error;
+  }
+
+  function isInsideRealStorageDirectory(candidatePath) {
+    return candidatePath.startsWith(`${realLocalStorageDir}${path.sep}`);
+  }
 
   function absolutePathForKey(key) {
     const relativeKey = String(key || "").replace(/^[/\\]+/, "");
+    const segments = relativeKey.split(/[\\/]+/);
+    if (!relativeKey || segments.some((segment) => !segment || segment === "." || segment === "..")) {
+      throw invalidStorageKeyError();
+    }
     const absolutePath = path.resolve(resolvedLocalStorageDir, relativeKey);
     const insideBase = absolutePath === resolvedLocalStorageDir
       || absolutePath.startsWith(`${resolvedLocalStorageDir}${path.sep}`);
     if (!insideBase) {
-      const error = new Error("Storage key resolves outside the configured storage directory");
-      error.code = "invalidStorageKey";
-      throw error;
+      throw invalidStorageKeyError();
     }
     return absolutePath;
   }
@@ -95,11 +177,58 @@ function createLocalStorageService(options) {
     return joinUrl(serverBaseUrl, `/storage/${key}`);
   }
 
+  async function resolveSafeWritePath(key) {
+    const absolutePath = absolutePathForKey(key);
+    const parentPath = path.dirname(absolutePath);
+    await fs.promises.mkdir(parentPath, { recursive: true, mode: 0o700 });
+    const realParentPath = await fs.promises.realpath(parentPath);
+    if (!isInsideRealStorageDirectory(realParentPath) && realParentPath !== realLocalStorageDir) {
+      throw invalidStorageKeyError();
+    }
+    return { absolutePath, targetPath: path.join(realParentPath, path.basename(absolutePath)) };
+  }
+
+  async function inspectLocalObject(key) {
+    const absolutePath = absolutePathForKey(key);
+    const entry = await fs.promises.lstat(absolutePath);
+    if (!entry.isFile() || entry.isSymbolicLink()) {
+      throw invalidStorageKeyError("Storage object is not a regular file inside the configured storage directory");
+    }
+    const realObjectPath = await fs.promises.realpath(absolutePath);
+    if (!isInsideRealStorageDirectory(realObjectPath)) {
+      throw invalidStorageKeyError();
+    }
+    return { absolutePath, entry };
+  }
+
+  async function openLocalObjectForRead(key) {
+    const { absolutePath, entry } = await inspectLocalObject(key);
+    const noFollow = fs.constants.O_NOFOLLOW || 0;
+    const handle = await fs.promises.open(absolutePath, fs.constants.O_RDONLY | noFollow);
+    try {
+      const stats = await handle.stat();
+      if (!stats.isFile() || stats.dev !== entry.dev || stats.ino !== entry.ino) {
+        throw invalidStorageKeyError("Storage object changed while it was being opened");
+      }
+      return { handle, stats };
+    } catch (error) {
+      await handle.close().catch(() => {});
+      throw error;
+    }
+  }
+
   async function writeLocalObject(key, buffer) {
-    const abs = absolutePathForKey(key);
-    ensureDir(abs);
-    await fs.promises.writeFile(abs, buffer);
-    return abs;
+    const { absolutePath, targetPath } = await resolveSafeWritePath(key);
+    const noFollow = fs.constants.O_NOFOLLOW || 0;
+    const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | noFollow;
+    const handle = await fs.promises.open(targetPath, flags, 0o600);
+    try {
+      await handle.writeFile(buffer);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    return absolutePath;
   }
 
   return {
@@ -120,8 +249,13 @@ function createLocalStorageService(options) {
     },
     async deleteObject(storageKey) {
       if (!storageKey) return;
-      const absolutePath = absolutePathForKey(storageKey);
-      await fs.promises.rm(absolutePath, { force: true }).catch((error) => {
+      const deletion = inspectLocalObject(storageKey)
+        .then(({ absolutePath }) => fs.promises.unlink(absolutePath))
+        .catch((error) => {
+          if (error?.code === "ENOENT") return;
+          throw error;
+        });
+      await deletion.catch((error) => {
         logger.warn({ err: error, storageKey }, "Failed to delete local storage object");
       });
     },
@@ -132,18 +266,33 @@ function createLocalStorageService(options) {
       return absolutePathForKey(storageKey);
     },
     async fetchObject(storageKey) {
-      const absolutePath = absolutePathForKey(storageKey);
-      const stats = await fs.promises.stat(absolutePath);
-      const buffer = await fs.promises.readFile(absolutePath);
+      const { entry } = await inspectLocalObject(storageKey);
       return {
         headers: {
           get(name) {
             const normalized = String(name || "").toLowerCase();
-            if (normalized === "content-length") return String(stats.size);
+            if (normalized === "content-length") return String(entry.size);
             return null;
           }
         },
-        arrayBuffer: async () => buffer
+        async arrayBuffer(maxBytes = defaultObjectReadMaxBytes) {
+          const { handle, stats } = await openLocalObjectForRead(storageKey);
+          try {
+            if (stats.size > maxBytes) throw storageObjectTooLargeError(maxBytes);
+            return handle.readFile();
+          } finally {
+            await handle.close().catch(() => {});
+          }
+        },
+        async pipeTo(writable, { maxBytes = defaultObjectReadMaxBytes } = {}) {
+          const { handle, stats } = await openLocalObjectForRead(storageKey);
+          try {
+            if (stats.size > maxBytes) throw storageObjectTooLargeError(maxBytes);
+            return await pipeBodyToWritable(handle.createReadStream({ autoClose: true }), writable, maxBytes);
+          } finally {
+            await handle.close().catch(() => {});
+          }
+        },
       };
     }
   };
@@ -217,22 +366,6 @@ function createS3StorageService(options) {
     };
   }
 
-  async function bodyToBuffer(body) {
-    if (!body) return Buffer.alloc(0);
-    if (Buffer.isBuffer(body)) return body;
-    if (typeof body.transformToByteArray === "function") {
-      return Buffer.from(await body.transformToByteArray());
-    }
-    if (typeof body[Symbol.asyncIterator] === "function") {
-      const chunks = [];
-      for await (const chunk of body) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-      }
-      return Buffer.concat(chunks);
-    }
-    return Buffer.from(await body.transformToString());
-  }
-
   return {
     name: providerName,
     provider: providerName,
@@ -267,7 +400,14 @@ function createS3StorageService(options) {
       }));
       return {
         headers: buildHeaderReader(response),
-        arrayBuffer: async () => bodyToBuffer(response.Body)
+        async arrayBuffer(maxBytes = defaultObjectReadMaxBytes) {
+          if (Number(response.ContentLength || 0) > maxBytes) throw storageObjectTooLargeError(maxBytes);
+          return bodyToBuffer(response.Body, maxBytes);
+        },
+        async pipeTo(writable, { maxBytes = defaultObjectReadMaxBytes } = {}) {
+          if (Number(response.ContentLength || 0) > maxBytes) throw storageObjectTooLargeError(maxBytes);
+          return pipeBodyToWritable(response.Body, writable, maxBytes);
+        },
       };
     },
     getPublicUrl(storageKey) {
@@ -412,5 +552,8 @@ function createStorageService(options) {
 }
 
 module.exports = createStorageService;
+module.exports.bodyToBuffer = bodyToBuffer;
 module.exports.createBackupProviderStorageService = createBackupProviderStorageService;
+module.exports.defaultObjectReadMaxBytes = defaultObjectReadMaxBytes;
+module.exports.pipeBodyToWritable = pipeBodyToWritable;
 module.exports.createS3StorageService = createS3StorageService;

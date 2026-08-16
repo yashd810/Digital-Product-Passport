@@ -33,7 +33,7 @@ async function withoutEmailConfiguration(callback) {
   }
 }
 
-function registerRoutes(pool, { verifyPassword = async () => true, jwt = { verify: () => ({ preAuth: true, userId: 1 }) } } = {}) {
+function registerRoutes(pool, { verifyPassword = async () => true, jwt = { verify: () => ({ preAuth: true, userId: 1, sessionVersion: 1 }) } } = {}) {
   const routes = [];
   const app = {};
   for (const method of ["get", "post", "patch"]) {
@@ -125,7 +125,13 @@ test("MFA login and OTP resend fail before storing an undeliverable OTP", async 
   const resendRoutes = registerRoutes({
     async query(sql) {
       resendQueries.push(sql);
-      return { rows: [{ id: 1, email: "user@example.test", isActive: true }] };
+      return { rows: [{
+        id: 1,
+        email: "user@example.test",
+        isActive: true,
+        sessionVersion: 1,
+        twoFactorEnabled: true,
+      }] };
     },
   });
   const resendResponse = createResponse();

@@ -26,14 +26,14 @@ describe("passport form system field handling", () => {
     expect(source).toContain("platformGeneratedHeaderSlots");
     expect(source).toContain("applicationPrefilledFieldKeys");
     expect(source).toContain("form-group-system");
-    expect(source).toContain('System value');
+    expect(source).toContain('t("systemValue")');
     expect(source).toContain("<PassportProductImagePicker");
     expect(source).toContain('onOpenPicker={() => setSymbolPicker("productImage")}');
     expect(productImageSource).not.toContain("onOpenRepositoryPicker");
-    expect(fieldInputSource).toContain('Link PDF from Repository');
+    expect(fieldInputSource).toContain('t("linkPdfFromRepository")');
     expect(source).toContain("fileDisplayNames");
     expect(source).toContain("onSelect={(url, fileName)");
-    expect(fieldInputSource).toContain('linkedUrl ? "Linked document" : null');
+    expect(fieldInputSource).toContain('linkedUrl ? t("linkedDocument") : null');
     expect(fieldInputSource).not.toContain('linkedUrl ? linkedUrl.split("/").pop() : null');
     expect(source).not.toContain("renderPassportHeaderSection");
     expect(source).not.toContain("renderManagedComplianceSection");

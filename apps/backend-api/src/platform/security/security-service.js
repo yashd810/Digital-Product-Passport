@@ -9,7 +9,11 @@
 
 const crypto = require("crypto");
 
-const passwordMinLength = Math.max(10, Number.parseInt(process.env.PASSWORD_MIN_LENGTH || "12", 10) || 12);
+const passwordMaxLength = 256;
+const passwordMinLength = Math.min(
+  passwordMaxLength,
+  Math.max(10, Number.parseInt(process.env.PASSWORD_MIN_LENGTH || "12", 10) || 12)
+);
 const commonWeakPasswords = new Set([
   "password",
   "password123",
@@ -23,9 +27,13 @@ const commonWeakPasswords = new Set([
 ]);
 
 function validatePasswordPolicy(password) {
-  const value = String(password || "");
+  if (typeof password !== "string") return "Password must be text";
+  const value = password;
   if (value.length < passwordMinLength) {
     return `Password must be at least ${passwordMinLength} characters`;
+  }
+  if (value.length > passwordMaxLength) {
+    return `Password must be ${passwordMaxLength} characters or fewer`;
   }
   if (/\s/.test(value)) {
     return "Password must not contain whitespace";
@@ -87,6 +95,7 @@ function createDeviceKeyMaterial() {
 }
 
 module.exports = {
+  passwordMaxLength,
   passwordMinLength,
   validatePasswordPolicy,
   hashSecret,

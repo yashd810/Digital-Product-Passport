@@ -11,7 +11,9 @@ ARG VITE_MARKETING_URL
 ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_PUBLIC_VIEWER_URL=${VITE_PUBLIC_VIEWER_URL}
 ENV VITE_MARKETING_URL=${VITE_MARKETING_URL}
-RUN node -e 'const validOrigin = (name) => { const value = process.env[name] || ""; try { const url = new URL(value); return value.trim() === value && !/[\u0000-\u001F\u007F\s\\]/.test(value) && ["http:", "https:"].includes(url.protocol) && !!url.hostname && !url.username && !url.password && url.pathname === "/" && !url.search && !url.hash; } catch { return false; } }; const validOptionalOrigin = (name) => !String(process.env[name] || "") || validOrigin(name); if (!validOptionalOrigin("VITE_API_URL") || !validOrigin("VITE_PUBLIC_VIEWER_URL") || !validOrigin("VITE_MARKETING_URL")) process.exit(1);'
+COPY apps/backend-api/src/shared/security/network-address.js /tmp/dpp-network-address.js
+ENV DPP_NETWORK_ADDRESS_MODULE=/tmp/dpp-network-address.js
+RUN node scripts/validate-build-origins.js
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.30.3-alpine@sha256:b3f2436575bd5be7386518084d842dac414ab4962712afa31e99e0942a56e3b2

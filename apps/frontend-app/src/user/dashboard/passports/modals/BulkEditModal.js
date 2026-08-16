@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { assertLocalFileSize, assertRecordCount } from "../../../../shared/security/fileSafety";
 import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../../../shared/passports/passportSchemaUtils";
@@ -175,9 +176,11 @@ export function BulkEditModal({
     event.target.value = "";
     if (!file) return;
     try {
+      assertLocalFileSize(file, { label: "CSV file" });
       const text = await file.text();
       const rows = parseCsvText(text);
       if (rows.length < 2) throw new Error("CSV must include a header row and at least one data row.");
+      assertRecordCount(rows.length - 1, { label: "CSV update" });
       const headers = rows[0].map((cell) => String(cell || "").trim());
       const identifierIndex = headers.findIndex((cell) => cell === "dppId" || cell === "internalAliasId");
       if (identifierIndex < 0) throw new Error("CSV must include a dppId or internalAliasId column.");
@@ -218,9 +221,11 @@ export function BulkEditModal({
     event.target.value = "";
     if (!file) return;
     try {
+      assertLocalFileSize(file, { label: "JSON file" });
       const text = await file.text();
       const parsed = JSON.parse(text);
       if (!Array.isArray(parsed)) throw new Error("JSON must be an array of update objects.");
+      assertRecordCount(parsed.length, { label: "JSON update" });
       const allowedJsonKeys = new Set(["dppId", "internalAliasId", ...availableFields.map((field) => field.key)]);
       const unknownJsonKeys = parsed.flatMap((item) =>
         Object.keys(item || {}).filter((key) => !allowedJsonKeys.has(key))

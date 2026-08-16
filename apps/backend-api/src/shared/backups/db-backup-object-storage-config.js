@@ -1,10 +1,27 @@
 "use strict";
 
-function normalizePrefix(value, fallback) {
-  return String(value || fallback || "db-backups/postgres")
-    .trim()
-    .replace(/^\/+/, "")
-    .replace(/\/+$/, "");
+const {
+  isPrivateOrReservedHostname,
+  normalizeHostname,
+} = require("../security/network-address");
+
+function normalizeStrictPrefix(name, value, fallback) {
+  const rawValue = value === undefined || value === null || value === ""
+    ? String(fallback || "db-backups/postgres")
+    : String(value);
+  if (rawValue.trim() !== rawValue) {
+    throw new Error(`${name} must not contain leading or trailing whitespace`);
+  }
+  const prefix = rawValue;
+  if (!prefix
+    || prefix.length > 512
+    || prefix.startsWith("/")
+    || prefix.endsWith("/")
+    || prefix.includes("\\")
+    || prefix.split("/").some((segment) => !segment || segment === "." || segment === "..")) {
+    throw new Error(`${name} must be a relative object-storage prefix without empty, dot, or backslash segments`);
+  }
+  return prefix;
 }
 
 function readRequiredBackupConfig(name, rawValue) {
@@ -33,9 +50,11 @@ function validateBackupEndpoint(value) {
     || parsed.search
     || parsed.hash
   );
-  if (parsed.protocol !== "https:" || !parsed.hostname || hasNonOriginComponents) {
+  const hostname = normalizeHostname(parsed.hostname);
+  if (parsed.protocol !== "https:" || !hostname || hasNonOriginComponents || isPrivateOrReservedHostname(hostname)) {
     throw new Error("DB backup S3 endpoint must be an HTTPS origin without credentials, paths, queries, or fragments");
   }
+  parsed.hostname = hostname;
   return parsed.origin;
 }
 
@@ -60,6 +79,37 @@ function validateBackupCredential(name, value) {
   return value;
 }
 
+function validateManifestHmacSecret(value) {
+  if (value.length < 32) {
+    throw new Error("DB_BACKUP_MANIFEST_HMAC_SECRET must contain at least 32 characters");
+  }
+  return value;
+}
+
+function validateBackupMaxBytes(value) {
+  if (!/^[1-9][0-9]{0,13}$/.test(value)) {
+    throw new Error("DB_BACKUP_MAX_BYTES must be a positive integer number of bytes");
+  }
+  const maxBytes = Number(value);
+  const minBytes = 1024 * 1024;
+  const maxAllowedBytes = 100 * 1024 * 1024 * 1024;
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < minBytes || maxBytes > maxAllowedBytes) {
+    throw new Error("DB_BACKUP_MAX_BYTES must be between 1048576 and 107374182400 bytes");
+  }
+  return maxBytes;
+}
+
+function validateRetentionCount(value) {
+  if (!/^[1-9][0-9]{0,2}$/.test(value)) {
+    throw new Error("DB_BACKUP_RETENTION_COUNT must be a positive integer");
+  }
+  const retentionCount = Number(value);
+  if (!Number.isSafeInteger(retentionCount) || retentionCount > 128) {
+    throw new Error("DB_BACKUP_RETENTION_COUNT must be between 1 and 128");
+  }
+  return retentionCount;
+}
+
 function readOptionalBoolean(name, rawValue, fallback) {
   const value = String(rawValue || "").trim().toLowerCase();
   if (!value) return fallback;
@@ -74,8 +124,11 @@ function readDbBackupObjectStorageConfig({
   bucket,
   accessKeyId,
   secretAccessKey,
+  manifestHmacSecret,
   forcePathStyle,
   prefix,
+  evidencePrefix,
+  maxBytes,
   retentionCount,
   dbName,
 }) {
@@ -96,12 +149,20 @@ function readDbBackupObjectStorageConfig({
     "DB_BACKUP_S3_SECRET_ACCESS_KEY",
     readRequiredBackupConfig("DB_BACKUP_S3_SECRET_ACCESS_KEY", secretAccessKey)
   );
+  const normalizedManifestHmacSecret = validateManifestHmacSecret(
+    readRequiredBackupConfig("DB_BACKUP_MANIFEST_HMAC_SECRET", manifestHmacSecret)
+  );
   const normalizedForcePathStyle = readOptionalBoolean(
     "DB_BACKUP_S3_FORCE_PATH_STYLE",
     forcePathStyle,
     true
   );
-  const normalizedRetentionCount = Number.parseInt(retentionCount || "14", 10);
+  const normalizedMaxBytes = validateBackupMaxBytes(
+    readRequiredBackupConfig("DB_BACKUP_MAX_BYTES", maxBytes)
+  );
+  const normalizedRetentionCount = validateRetentionCount(
+    readRequiredBackupConfig("DB_BACKUP_RETENTION_COUNT", retentionCount)
+  );
 
   return {
     endpoint: normalizedEndpoint,
@@ -109,11 +170,16 @@ function readDbBackupObjectStorageConfig({
     bucket: normalizedBucket,
     accessKeyId: normalizedAccessKeyId,
     secretAccessKey: normalizedSecretAccessKey,
+    manifestHmacSecret: normalizedManifestHmacSecret,
     forcePathStyle: normalizedForcePathStyle,
-    prefix: normalizePrefix(prefix, "db-backups/postgres"),
-    retentionCount: Number.isFinite(normalizedRetentionCount) && normalizedRetentionCount > 0
-      ? normalizedRetentionCount
-      : 14,
+    prefix: normalizeStrictPrefix("DB_BACKUP_S3_PREFIX", prefix, "db-backups/postgres"),
+    evidencePrefix: normalizeStrictPrefix(
+      "DB_BACKUP_EVIDENCE_S3_PREFIX",
+      evidencePrefix,
+      "db-backups/evidence/restore-drills"
+    ),
+    maxBytes: normalizedMaxBytes,
+    retentionCount: normalizedRetentionCount,
     dbName: dbName || "dppSystem",
   };
 }

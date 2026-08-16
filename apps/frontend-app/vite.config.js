@@ -1,6 +1,15 @@
 import { defineConfig, transformWithOxc } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const developmentSecurityHeaders = {
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  'Referrer-Policy': 'no-referrer',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+};
+
 export default defineConfig({
   plugins: [
     {
@@ -24,7 +33,17 @@ export default defineConfig({
   server: {
     host: 'localhost',
     port: 3000,
+    strictPort: true,
+    allowedHosts: ['localhost'],
+    cors: { origin: /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/ },
     open: false,
+    headers: developmentSecurityHeaders,
+    fs: {
+      deny: [
+        '.env', '.env.*', '*.{crt,pem,key,p12,pfx,cer,der}', '.npmrc', '.yarnrc.yml',
+        '**/.git/**', 'package-lock.json', 'Dockerfile',
+      ],
+    },
     proxy: {
       '/api': {
         target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3001',
@@ -43,6 +62,13 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  preview: {
+    host: 'localhost',
+    port: 3000,
+    strictPort: true,
+    allowedHosts: ['localhost'],
+    headers: developmentSecurityHeaders,
   },
   build: {
     rolldownOptions: {

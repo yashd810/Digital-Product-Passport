@@ -7,6 +7,10 @@ services:
     pull_policy: build
     ports:
       - "127.0.0.1:${BACKEND_PORT:-3001}:3001"
+    read_only: true
+    pids_limit: 256
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000,mode=1777
     env_file:
       - path: ${DPP_ENV_FILE:-/etc/dpp/dpp.env}
         required: true
@@ -53,10 +57,13 @@ services:
         /data/repository-files
         /data/uploads
         /data/uploads/symbols
+        && install -d -o 1000 -g 1000 -m 0700 /data/.db-backup-tmp
     volumes:
       - localStorageData:/data
     restart: "no"
     network_mode: none
+    read_only: true
+    pids_limit: 32
     security_opt:
       - no-new-privileges:true
     # This one-shot initializer only needs to create/chown the shared data
@@ -76,6 +83,11 @@ services:
     image: dpp-postgres:18.4-trixie-gosu1.19-go1.26.5
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    read_only: true
+    pids_limit: 256
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+      - /var/run/postgresql:rw,nosuid,nodev,size=16m,uid=999,gid=999,mode=0755
     environment:
       POSTGRES_DB: "${DB_NAME:?DB_NAME is required}"
       POSTGRES_USER: "${DB_USER:?DB_USER is required}"

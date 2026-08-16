@@ -56,6 +56,15 @@ function isLocalOrPrivateLiteralHostname(value) {
   return hostname.includes(":");
 }
 
+function isLoopbackConfigurationHostname(value) {
+  const hostname = normalizeHostname(value);
+  if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname === "::1") return true;
+  const parts = hostname.split(".");
+  return parts.length === 4
+    && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255)
+    && Number(parts[0]) === 127;
+}
+
 function parseAbsoluteHttpUrl(value) {
   const text = normalizeText(value);
   if (!text || unsafeUrlCharacters.test(text)) return null;
@@ -110,7 +119,16 @@ function parseBrowserOrigin(value) {
 // dedicated public viewer. Keep this parser separate from `parseAbsoluteHttpUrl`
 // so untrusted external links continue to reject private-network destinations.
 function parseConfiguredHttpOrigin(value) {
-  return parseBrowserOrigin(value);
+  const parsed = parseBrowserOrigin(value);
+  if (!parsed) return null;
+  // A hostile build-time configuration must not turn a deployed dashboard into
+  // a browser-side pivot to an internal literal address. Loopback remains
+  // supported for local development only.
+  if (isLocalOrPrivateLiteralHostname(parsed.hostname) && !isLoopbackConfigurationHostname(parsed.hostname)) {
+    return null;
+  }
+  if (parsed.protocol === "http:" && !isLoopbackConfigurationHostname(parsed.hostname)) return null;
+  return parsed;
 }
 
 function hasUnsafePathTraversal(pathname) {
@@ -164,7 +182,7 @@ function currentOrigin() {
 
 function configuredApiOrigin() {
   const configured = normalizeText(import.meta.env.VITE_API_URL);
-  const parsed = parseAbsoluteHttpUrl(configured);
+  const parsed = parseConfiguredHttpOrigin(configured);
   return parsed?.origin || null;
 }
 
@@ -324,10 +342,21 @@ export function safeWindowOpen(value, options = {}) {
   const href = options.resource === true
     ? toSafeResourceHref(value)
     : options.viewer === true
-      ? (toSafeConfiguredViewerHref(value) || toSafeExternalHref(value))
+      ? toSafeConfiguredViewerHref(value)
       : (toSafeExternalHref(value) || toSafeSameOriginNavigationHref(value));
   if (!href || typeof globalThis.window?.open !== "function") return null;
-  return globalThis.window.open(href, options.target || "_blank", options.features || "noopener,noreferrer");
+  const requestedFeatures = normalizeText(options.features);
+  const features = [requestedFeatures, "noopener", "noreferrer"].filter(Boolean).join(",");
+  const opened = globalThis.window.open(href, options.target || "_blank", features);
+  if (opened) {
+    try {
+      opened.opener = null;
+    } catch {
+      // `noopener` remains enforced even when a browser prevents access to the
+      // already-navigated cross-origin WindowProxy.
+    }
+  }
+  return opened;
 }
 
 export const vettedResourcePathRoots = Object.freeze([...vettedResourceRoots]);

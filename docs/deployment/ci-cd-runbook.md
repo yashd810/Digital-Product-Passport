@@ -92,19 +92,30 @@ credentials to this public repository.
 
 In GitHub repository settings:
 
-1. Go to **Settings → Actions → Runners → New self-hosted runner**, select
+1. Create a `main` branch ruleset before enabling deployments. Require pull
+   requests, at least one approving review, Code Owner review from
+   `.github/CODEOWNERS`, dismissal of stale approvals, resolved conversations,
+   and the complete `Security And Smoke` workflow. Block force pushes and
+   deletion, and restrict ruleset bypass to the smallest break-glass owner set.
+   Source CODEOWNERS entries do not enforce anything until this ruleset exists.
+2. Go to **Settings → Actions → Runners → New self-hosted runner**, select
    **Linux** and **ARM64**, and generate a short-lived registration token. This
    user-owned repository uses GitHub's built-in `Default` runner group; the
    dedicated `dpp-production-deploy` label selects the runner for production.
    Do not store the token in
    a repository, Actions secret, shell history, or ticket.
-2. Create a `production` Environment. Require production reviewers, disallow
+3. Create a `production` Environment. Require production reviewers, disallow
    self-approval, and restrict deployment branches to protected `main`.
-3. Ensure pull-request workflows continue to use GitHub-hosted runners. The
+4. Ensure pull-request workflows continue to use GitHub-hosted runners. The
    `dpp-production-deploy` label must be available only to the dedicated runner.
-4. Only after the runner completes its local preflight, create the repository
+5. Only after the runner completes its local preflight, create the repository
    Actions variable `DPP_PRODUCTION_DEPLOY_ENABLED` with the exact value
    `true`. Until then, the production workflow is skipped even after CI passes.
+
+The production workflow also checks the event's repository visibility and will
+not schedule the deployment job while the repository is public. Every checkout
+uses `persist-credentials: false`, including the self-hosted runner, so the
+job-scoped GitHub token is not retained in checkout Git configuration.
 
 Connect to the private VM through OCI Bastion, obtain the selected Actions
 runner release SHA-256 from GitHub's release checksums, and run as root:

@@ -2,6 +2,9 @@
 	# prEN 18216 requires HTTP/2 as the minimum public transport version.
 	servers :443 {
 		protocols h1 h2 h3
+		# Reject an HTTP Host that does not match the TLS SNI name. Without
+		# this, Caddy's unmatched-host path returns an empty 200 response.
+		strict_sni_host on
 	}
 }
 
@@ -13,6 +16,7 @@
 
 (security_headers) {
 	header {
+		-Server
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "SAMEORIGIN"

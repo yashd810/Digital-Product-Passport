@@ -124,6 +124,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   const cloneHydratedRef   = useRef(false);
 
   const draftStorageKey = buildDraftStorageKey({
+    userId: user?.id,
     mode,
     companyId: effectiveCompanyId,
     passportType: activePassportType,

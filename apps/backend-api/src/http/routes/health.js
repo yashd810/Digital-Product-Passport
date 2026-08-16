@@ -85,7 +85,10 @@ module.exports = function registerHealthRoutes(app, { pool, storageService }) {
       });
 
       const fetched = await storageService.fetchObject(stored?.storageKey || probeKey);
-      const fetchedBuffer = Buffer.from(await fetched.arrayBuffer());
+      // The probe created this exact payload. Refuse a substituted or
+      // unexpectedly large object before it can become a diagnostic-path
+      // memory-exhaustion primitive.
+      const fetchedBuffer = Buffer.from(await fetched.arrayBuffer(probeBody.length));
       const actualHash = sha256Hex(fetchedBuffer);
       if (actualHash !== expectedHash) {
         throw new Error(`Storage probe hash mismatch: expected ${expectedHash}, received ${actualHash}`);

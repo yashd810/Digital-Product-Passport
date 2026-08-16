@@ -39,17 +39,30 @@ const {
   getSectionTreeLimitError,
 } = require("../shared/schema-limits");
 
-const port = Number.parseInt(process.env.PORT || "5055", 10);
+const portText = String(process.env.PORT || "5055").trim();
+const port = /^\d{1,5}$/.test(portText) ? Number(portText) : NaN;
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  throw new Error("PORT must be an integer from 1 to 65535");
+}
 const appDir = path.resolve(__dirname, "..");
 const maxBodyBytes = 2 * 1024 * 1024;
 const allowedApiOrigins = new Set([
   `http://127.0.0.1:${port}`,
   `http://localhost:${port}`,
 ]);
+const allowedHosts = new Set([
+  `127.0.0.1:${port}`,
+  `localhost:${port}`,
+]);
 const staticSecurityHeaders = {
-  "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+  "Content-Security-Policy": "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'none'; worker-src 'none'",
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Origin-Agent-Cluster": "?1",
 };
 
 const mime = {
@@ -57,6 +70,7 @@ const mime = {
   ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
 };
 const {
   readBody,
@@ -64,10 +78,12 @@ const {
   sendJson,
   serveStatic,
   validateApiPostRequest,
+  validateRequestHost,
 } = createGeneratorTransport({
   appDir,
   maxBodyBytes,
   allowedApiOrigins,
+  allowedHosts,
   staticSecurityHeaders,
   mime,
 });
@@ -2162,16 +2178,32 @@ async function handleApi(req, res, pathname) {
 // nosemgrep: problem-based-packs.insecure-transport.js-node.using-http-server.using-http-server -- This export-only tool listens exclusively on 127.0.0.1, never a network interface; HTTPS would require a locally trusted certificate without improving transport security.
 const server = http.createServer((req, res) => {
   try {
+    validateRequestHost(req);
     const url = new URL(req.url || "/", "http://127.0.0.1");
     if (url.pathname.startsWith("/api/")) {
       handleApi(req, res, url.pathname);
       return;
     }
     serveStatic(req, res, url.pathname);
-  } catch {
-    sendJson(res, 400, { error: "Request URL is invalid" });
+  } catch (error) {
+    const statusCode = [400, 403, 405, 413, 415].includes(error?.statusCode)
+      ? error.statusCode
+      : 400;
+    // Static-file races and URL parser exceptions may carry local filesystem
+    // details. Only transport errors explicitly intended for a caller are
+    // reflected; API validation remains handled inside `handleApi`.
+    const message = error?.expose === true
+      ? error.message
+      : "Request URL is invalid";
+    sendJson(res, statusCode, { error: message });
   }
 });
+
+server.headersTimeout = 5_000;
+server.requestTimeout = 10_000;
+server.keepAliveTimeout = 5_000;
+server.maxHeadersCount = 100;
+server.maxConnections = 32;
 
 function startGeneratorServer() {
   server.listen(port, "127.0.0.1", () => {

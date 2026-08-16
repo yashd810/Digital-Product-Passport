@@ -1,6 +1,5 @@
 "use strict";
 
-const http = require("http");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
@@ -8,6 +7,7 @@ const { configureHttp } = require("../src/bootstrap/http");
 const { registerSupportRoutes } = require("../src/bootstrap/support-routes");
 const { createRateLimiters } = require("../src/http/middleware/rate-limit");
 const { normalizeContactSubmission } = require("../src/shared/http/contact-request");
+const { requestApp } = require("./helpers/in-memory-http");
 
 const emailEnvironment = {
   ADMIN_EMAIL: "contact-inbox@example.test",
@@ -77,24 +77,11 @@ async function withContactApp(run) {
     brandedEmail: ({ preheader, bodyHtml }) => `${preheader}\n${bodyHtml}`,
   });
 
-  const server = http.createServer(app);
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.once("listening", resolve);
-    server.listen(0, "127.0.0.1");
+  await run({
+    request: (path, options) => requestApp(app, { path, ...options }),
+    rateLimitCalls,
+    sentMessages,
   });
-
-  try {
-    const { port } = server.address();
-    await run({
-      baseUrl: `http://127.0.0.1:${port}`,
-      rateLimitCalls,
-      sentMessages,
-    });
-  } finally {
-    server.closeAllConnections?.();
-    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-  }
 }
 
 const validContact = () => ({
@@ -107,8 +94,8 @@ const validContact = () => ({
   howFound: "Search",
 });
 
-async function postContact(baseUrl, body) {
-  return fetch(`${baseUrl}/api/contact`, {
+async function postContact(request, body) {
+  return request("/api/contact", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -117,8 +104,8 @@ async function postContact(baseUrl, body) {
 
 test("contact form sends one administrator notification and never confirms arbitrary mailboxes", async () => {
   await withEnvironment(emailEnvironment, async () => {
-    await withContactApp(async ({ baseUrl, rateLimitCalls, sentMessages }) => {
-      const response = await postContact(baseUrl, validContact());
+    await withContactApp(async ({ request, rateLimitCalls, sentMessages }) => {
+      const response = await postContact(request, validContact());
       assert.equal(response.status, 200);
       assert.deepEqual(await response.json(), { ok: true });
       assert.deepEqual(rateLimitCalls, ["ip", "email", "recipient"]);
@@ -129,7 +116,7 @@ test("contact form sends one administrator notification and never confirms arbit
 
       rateLimitCalls.length = 0;
       sentMessages.length = 0;
-      const honeypotResponse = await postContact(baseUrl, { ...validContact(), _gotcha: "spam" });
+      const honeypotResponse = await postContact(request, { ...validContact(), _gotcha: "spam" });
       assert.equal(honeypotResponse.status, 200);
       assert.deepEqual(await honeypotResponse.json(), { ok: true });
       assert.deepEqual(rateLimitCalls, ["ip"]);
@@ -140,20 +127,20 @@ test("contact form sends one administrator notification and never confirms arbit
 
 test("contact form rejects oversized, malformed, and unsupported submissions before email delivery", async () => {
   await withEnvironment(emailEnvironment, async () => {
-    await withContactApp(async ({ baseUrl, sentMessages }) => {
-      const unsupportedField = await postContact(baseUrl, { ...validContact(), redirectTo: "https://evil.example.test" });
+    await withContactApp(async ({ request, sentMessages }) => {
+      const unsupportedField = await postContact(request, { ...validContact(), redirectTo: "https://evil.example.test" });
       assert.equal(unsupportedField.status, 400);
       assert.equal((await unsupportedField.json()).error, "Contact request contains an unsupported field");
 
-      const multiByteMessage = await postContact(baseUrl, { ...validContact(), message: "界".repeat(4000) });
+      const multiByteMessage = await postContact(request, { ...validContact(), message: "界".repeat(4000) });
       assert.equal(multiByteMessage.status, 400);
       assert.equal((await multiByteMessage.json()).error, "message is too long");
 
-      const oversizedBody = await postContact(baseUrl, { ...validContact(), message: "x".repeat(17 * 1024) });
+      const oversizedBody = await postContact(request, { ...validContact(), message: "x".repeat(17 * 1024) });
       assert.equal(oversizedBody.status, 413);
       assert.equal((await oversizedBody.json()).error, "Contact request is too large");
 
-      const malformedJson = await fetch(`${baseUrl}/api/contact`, {
+      const malformedJson = await request("/api/contact", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: "{",
@@ -167,8 +154,8 @@ test("contact form rejects oversized, malformed, and unsupported submissions bef
 
 test("contact form fails closed when its administrator recipient is not configured", async () => {
   await withEnvironment({ ...emailEnvironment, ADMIN_EMAIL: "" }, async () => {
-    await withContactApp(async ({ baseUrl, sentMessages }) => {
-      const response = await postContact(baseUrl, validContact());
+    await withContactApp(async ({ request, sentMessages }) => {
+      const response = await postContact(request, validContact());
       assert.equal(response.status, 503);
       assert.equal((await response.json()).error, "Contact form is temporarily unavailable. Please email us directly.");
       assert.equal(sentMessages.length, 0);

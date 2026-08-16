@@ -24,6 +24,8 @@ It is not a second architecture guide. Use it when you are already dealing with 
 | `infra/oracle/terraform/deployment-runner/*` | private CI/CD deployment-runner infrastructure |
 | `infra/oracle/db-backup.sh` | backup job script |
 | `infra/oracle/install-db-backup-jobs.sh` | installs backup timers/services |
+| `infra/oracle/container-imds-firewall.sh` | reversible Docker-forwarding rule that blocks OCI IMDS from containers |
+| `infra/oracle/install-container-imds-firewall.sh` | explicitly installs and enables the approved IMDS rule |
 | `infra/oracle/systemd/*` | systemd units for backup automation |
 | `infra/oracle/terraform/object-storage-backups/*` | Terraform for object-storage backup resources |
 
@@ -66,6 +68,37 @@ After every deployment, external probes should show only SSH plus HTTP/HTTPS
 reachable from the internet. Ports `3000`, `3001`, `3004`, `5432`, and `8080`
 should be closed externally.
 
+## Container Access To OCI Instance Metadata
+
+OCI instance metadata at `169.254.169.254` is intentionally reachable from the
+host, but application containers do not need it. Docker bridge traffic can
+otherwise reach IMDSv2, increasing the impact of a future container compromise
+when instance-principal policies or sensitive instance metadata exist.
+
+Every successful production rollout installs and verifies the repository's
+reversible `DOCKER-USER` control after Docker has created its chains. For an
+existing host that has not yet received this hardened deployment, install it
+once manually:
+
+```bash
+cd /opt/dpp
+sudo APP_DIR=/opt/dpp bash infra/oracle/install-container-imds-firewall.sh
+sudo /usr/local/sbin/dpp-container-imds-firewall check
+```
+
+The rule is limited to Docker-forwarded traffic and leaves host `OUTPUT`
+traffic unchanged. Verify both sides: a request from a container to
+`http://169.254.169.254/opc/v2/instance/` must fail, while an approved host-side
+IMDSv2 diagnostic may still succeed. To roll the control back deliberately:
+
+```bash
+sudo systemctl disable --now dpp-container-imds-firewall.service
+```
+
+Do not add a broad host `OUTPUT` rule for this purpose, and do not alter OCI
+IAM, dynamic-group, security-list, or NSG policy as an incidental deployment
+step.
+
 ## Credential and Host-Key Preflight
 
 Keep `/etc/dpp/dpp.env` outside the repository as a regular root-owned mode-`600`
@@ -83,6 +116,15 @@ S3-compatible customer-secret pair in `DB_BACKUP_S3_ACCESS_KEY_ID` and
 `DB_BACKUP_S3_BUCKET`. Do not reuse the `STORAGE_S3_*` credential or bucket.
 The backend startup and deployment checks reject missing, placeholder, or
 duplicated DB-backup credential material.
+
+Production backend deployment is fail-closed: application backup replication
+must be enabled and required, and host-level DB backups must be enabled. Supply
+an independent `DB_BACKUP_MANIFEST_HMAC_SECRET` for manifest authenticity,
+plus explicit `DB_BACKUP_MAX_BYTES`, prefix, and retention settings. The
+three storage layers (application files, replication, and DB backups) must use
+distinct buckets and credential pairs. Enabling these controls requires an
+approved OCI bucket/IAM configuration; never weaken the gate to bypass missing
+infrastructure.
 
 The deployment and troubleshooting helpers require a non-symlinked private key
 that is not group/world-readable and a pre-verified `known_hosts` file. Verify

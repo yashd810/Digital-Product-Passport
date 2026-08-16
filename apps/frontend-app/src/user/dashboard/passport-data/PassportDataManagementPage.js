@@ -1,4 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  assertLocalFileSize,
+  assertRecordCount,
+  assertTextSize,
+  maxStructuredImportBytes,
+} from "../../../shared/security/fileSafety";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
 import AppSelect from "../../../shared/components/AppSelect";
@@ -493,7 +499,9 @@ function PassportDataManagementPage({ companyId, user }) {
     const [file] = event.target.files || [];
     if (!file) return;
     try {
+      assertLocalFileSize(file, { label: "CSV file" });
       const importedRows = parseCsvRows(await file.text());
+      assertRecordCount(importedRows.length, { label: "CSV import" });
       setRows(importedRows);
       setPreview(null);
       setMessage(`Imported ${importedRows.length} row-based CSV records.`);
@@ -508,9 +516,11 @@ function PassportDataManagementPage({ companyId, user }) {
   const applyJsonPaste = () => {
     if (!canManagePassportData) return;
     try {
+      assertTextSize(jsonPaste, { label: "JSON input" });
       const parsed = JSON.parse(jsonPaste);
       const importedRows = Array.isArray(parsed) ? parsed : parsed?.records;
       if (!Array.isArray(importedRows)) throw new Error("JSON must be an array or { records: [...] }.");
+      assertRecordCount(importedRows.length, { label: "JSON import" });
       setRows(importedRows.map((row) => ({ ...row })));
       setPreview(null);
       setMessage(`Imported ${importedRows.length} JSON records.`);
@@ -1034,7 +1044,7 @@ function PassportDataManagementPage({ companyId, user }) {
 
             <div className="pdm-source-block">
               <h4>{t("jsonImport")}</h4>
-              <textarea value={jsonPaste} onChange={(event) => setJsonPaste(event.target.value)} rows={4} placeholder='[{"internalAliasId":"SKU-001"}]' disabled={!canManagePassportData} />
+              <textarea value={jsonPaste} onChange={(event) => setJsonPaste(event.target.value)} maxLength={maxStructuredImportBytes} rows={4} placeholder='[{"internalAliasId":"SKU-001"}]' disabled={!canManagePassportData} />
               <button type="button" className="dashboard-btn dashboard-btn-ghost" onClick={applyJsonPaste} disabled={!canManagePassportData}>Apply JSON</button>
             </div>
 

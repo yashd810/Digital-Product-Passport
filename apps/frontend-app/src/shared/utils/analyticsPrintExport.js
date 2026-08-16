@@ -186,13 +186,63 @@ const escapeHtml = (value) => String(value ?? "")
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#39;");
 
-const sanitizeReportSvg = (svg) => {
+const allowedSvgTags = new Set(["svg", "g", "path", "rect", "text", "circle", "polyline", "line"]);
+const allowedSvgAttributes = new Set([
+  "aria-hidden", "class", "cx", "cy", "d", "fill", "font-size", "font-weight",
+  "height", "points", "r", "rx", "stroke", "stroke-linecap", "stroke-linejoin",
+  "stroke-width", "text-anchor", "viewBox", "width", "x", "x1", "x2", "xmlns",
+  "y", "y1", "y2",
+]);
+const allowedToneNames = new Set([
+  "default", "draft", "review", "released", "revised", "obsolete", "archived", "scans",
+]);
+
+const safeReportColor = (value, fallback = "#14b8a6") => {
+  const color = String(value || "").trim();
+  return /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(color) ? color : fallback;
+};
+
+export const sanitizeReportSvg = (svg) => {
   const value = String(svg || "").trim();
   if (!value) return "";
   if (!/^<svg[\s>]/i.test(value)) return "";
-  if (/<script[\s>]/i.test(value)) return "";
-  if (/\son[a-z]+\s*=/i.test(value)) return "";
-  if (/\s(?:href|xlink:href)\s*=\s*["']?\s*(?:javascript|data):/i.test(value)) return "";
+  if (!/<\/svg>\s*$/i.test(value)) return "";
+
+  const tagPattern = /<\/?\s*([A-Za-z][\w:-]*)([^>]*)>/g;
+  let match;
+  let sawRoot = false;
+  while ((match = tagPattern.exec(value))) {
+    const tagName = match[1].toLowerCase();
+    if (!allowedSvgTags.has(tagName)) return "";
+    if (tagName === "svg") sawRoot = true;
+    if (match[0].startsWith("</")) {
+      if (match[2].trim()) return "";
+      continue;
+    }
+
+    const attributes = match[2];
+    const attributePattern = /([A-Za-z_:][\w:.-]*)\s*=\s*(["'])(.*?)\2/gs;
+    let attributeMatch;
+    let unmatchedAttributes = attributes;
+    while ((attributeMatch = attributePattern.exec(attributes))) {
+      const attributeName = attributeMatch[1];
+      const attributeValue = attributeMatch[3];
+      if (
+        !allowedSvgAttributes.has(attributeName)
+        || /[\u0000-\u001f\u007f<>]/.test(attributeValue)
+        || /(?:javascript|data|vbscript)\s*:|url\s*\(/i.test(attributeValue)
+      ) {
+        return "";
+      }
+      unmatchedAttributes = unmatchedAttributes.replace(attributeMatch[0], "");
+    }
+    if (unmatchedAttributes.replace(/\/\s*$/, "").trim()) return "";
+  }
+
+  // All markup must have been consumed by the allowlisted tag parser. Text
+  // nodes and escaped entities may remain, but no alternate tag syntax may.
+  const textOnly = value.replace(tagPattern, "");
+  if (!sawRoot || /[<>]/.test(textOnly)) return "";
   return value;
 };
 
@@ -202,7 +252,7 @@ const renderLegend = (items = []) => {
     <div class="legend">
       ${items.map((item) => `
         <div class="legend-item">
-          <span class="swatch" style="background:${escapeHtml(item.color)}"></span>
+          <span class="swatch" style="background:${safeReportColor(item.color)}"></span>
           <span>${escapeHtml(item.label)}</span>
         </div>
       `).join("")}
@@ -240,7 +290,7 @@ export function renderPieChartSvg(items = []) {
       "Z",
     ].join(" ");
     currentAngle += angle;
-    return `<path d="${path}" fill="${escapeHtml(item.color)}" stroke="#ffffff" stroke-width="2"></path>`;
+    return `<path d="${path}" fill="${safeReportColor(item.color)}" stroke="#ffffff" stroke-width="2"></path>`;
   }).join("");
 
   return `
@@ -271,7 +321,7 @@ export function renderBarChartSvg(data = [], { height = 180 } = {}) {
     const label = item.label.length > 10 ? `${item.label.slice(0, 8)}...` : item.label;
     return `
       <g>
-        <rect x="${x}" y="${y}" width="${barW}" height="${barHeight}" rx="5" fill="${escapeHtml(item.color)}"></rect>
+        <rect x="${x}" y="${y}" width="${barW}" height="${barHeight}" rx="5" fill="${safeReportColor(item.color)}"></rect>
         <text x="${x + barW / 2}" y="${y - 6}" text-anchor="middle" font-size="10" font-weight="700" fill="#17304a">${escapeHtml(value)}</text>
         <text x="${x + barW / 2}" y="${svgH - 10}" text-anchor="middle" font-size="10" font-weight="600" fill="#557185">${escapeHtml(label)}</text>
       </g>
@@ -309,7 +359,7 @@ export function renderClusteredBarChartSvg(data = [], series = [], { height = 20
       const y = topPad + height - barHeight;
       return `
         <g>
-          <rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="3" fill="${escapeHtml(item.color)}"></rect>
+          <rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="3" fill="${safeReportColor(item.color)}"></rect>
           <text x="${x + barWidth / 2}" y="${y - 5}" text-anchor="middle" font-size="9" font-weight="700" fill="#17304a">${escapeHtml(value)}</text>
         </g>
       `;
@@ -365,11 +415,11 @@ export function renderLineChartSvg(labels = [], series = [], { width = 420, heig
   const lines = series.map((item) => {
     const points = (item.values || []).map((value, index) => `${getX(index)},${getY(value)}`).join(" ");
     const dots = (item.values || []).map((value, index) => `
-      <circle cx="${getX(index)}" cy="${getY(value)}" r="3.5" fill="${escapeHtml(item.color)}" stroke="#ffffff" stroke-width="1.2"></circle>
+      <circle cx="${getX(index)}" cy="${getY(value)}" r="3.5" fill="${safeReportColor(item.color)}" stroke="#ffffff" stroke-width="1.2"></circle>
     `).join("");
     return `
       <g>
-        <polyline points="${points}" fill="none" stroke="${escapeHtml(item.color)}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+        <polyline points="${points}" fill="none" stroke="${safeReportColor(item.color)}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
         ${dots}
       </g>
     `;
@@ -394,13 +444,14 @@ export function openAnalyticsPrintReport({
 }) {
   const win = window.open("", "_blank", "width=1240,height=860");
   if (!win) throw new Error("Popup blocked");
+  win.opener = null;
 
   const statsHtml = stats.length ? `
     <div class="stats-grid">
       ${stats.map((item) => `
         <div class="stat-card">
           <div class="stat-label">${escapeHtml(item.label)}</div>
-          <div class="stat-value tone-${escapeHtml(item.tone || "default")}">${escapeHtml(item.value)}</div>
+          <div class="stat-value tone-${allowedToneNames.has(item.tone) ? item.tone : "default"}">${escapeHtml(item.value)}</div>
         </div>
       `).join("")}
     </div>
@@ -441,6 +492,8 @@ export function openAnalyticsPrintReport({
       <head>
         <title>${escapeHtml(title)}</title>
         <meta charset="utf-8" />
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; img-src data:; style-src 'unsafe-inline'" />
+        <meta name="referrer" content="no-referrer" />
         <style>${lightReportStyles}</style>
       </head>
       <body>

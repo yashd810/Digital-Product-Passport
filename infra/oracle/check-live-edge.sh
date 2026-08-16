@@ -94,6 +94,7 @@ check_host() {
   local path
   local failed=0
   local headers
+  local mismatched_host_status
 
   host="$(host_for_target "$target")"
   path="$(path_for_host "$host" "$(explicit_path_for_target "$target")")"
@@ -107,6 +108,16 @@ check_host() {
   require_header "$host" "$headers" "strict-transport-security" || failed=1
   require_header "$host" "$headers" "x-content-type-options" || failed=1
   require_header "$host" "$headers" "referrer-policy" || failed=1
+
+  mismatched_host_status="$(
+    curl -sS -o /dev/null --http2 --max-time 20 \
+      -H 'Host: invalid.invalid' \
+      -w '%{http_code}' "https://${host}${path}" 2>/dev/null || true
+  )"
+  if [ "$mismatched_host_status" != "421" ]; then
+    echo "FAIL: https://${host}${path} returned ${mismatched_host_status:-no response} for a Host/SNI mismatch; expected 421"
+    failed=1
+  fi
 
   local marketing_host=""
   if [ -n "$MARKETING_URL" ]; then

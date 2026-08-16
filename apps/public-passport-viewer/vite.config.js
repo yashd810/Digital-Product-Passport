@@ -5,6 +5,14 @@ import react from "@vitejs/plugin-react";
 
 const frontendSrc = path.resolve(__dirname, "../frontend-app/src");
 const appNodeModules = path.resolve(__dirname, "node_modules");
+const developmentSecurityHeaders = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+};
 const resolveAppDependency = (pkg) => {
   const localPackage = path.resolve(appNodeModules, pkg);
   return fs.existsSync(localPackage) ? localPackage : pkg;
@@ -48,12 +56,28 @@ export default defineConfig({
   server: {
     host: "localhost",
     port: 3004,
+    strictPort: true,
+    allowedHosts: ["localhost"],
+    cors: { origin: /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/ },
     open: false,
+    headers: developmentSecurityHeaders,
     fs: {
       allow: [
-        path.resolve(__dirname, ".."),
+        __dirname,
+        frontendSrc,
+      ],
+      deny: [
+        ".env", ".env.*", "*.{crt,pem,key,p12,pfx,cer,der}", ".npmrc", ".yarnrc.yml",
+        "**/.git/**", "package-lock.json", "Dockerfile",
       ],
     },
+  },
+  preview: {
+    host: "localhost",
+    port: 3004,
+    strictPort: true,
+    allowedHosts: ["localhost"],
+    headers: developmentSecurityHeaders,
   },
   build: {
     rolldownOptions: {

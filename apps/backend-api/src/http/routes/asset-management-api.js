@@ -471,7 +471,10 @@ module.exports = function registerAssetManagementApiRoutes(app, {
   app.get(`${routeBase}/runs`, publicReadRateLimit, requireEditor, async (req, res) => {
     try {
       const companyId = getCompanyId(req);
-      const limit = Math.min(Number.parseInt(req.query.limit, 10) || 25, 100);
+      const requestedLimit = Number.parseInt(req.query.limit, 10);
+      const limit = Number.isSafeInteger(requestedLimit)
+        ? Math.min(Math.max(requestedLimit, 1), 100)
+        : 25;
 
       const runs = await pool.query(
         `SELECT id, "jobId", "companyId", "passportType", "triggerType", "sourceKind", status,

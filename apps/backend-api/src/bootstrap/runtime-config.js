@@ -9,7 +9,11 @@ const { normalizeConfiguredOrigin } = require("../shared/security/configured-ori
 const {
   backupProviderS3EnvNames,
   readBackupProviderObjectStorageConfigFromEnvironment,
+  validateBackupProviderObjectPrefix,
 } = require("../shared/backups/backup-provider-object-storage-config");
+const {
+  readDbBackupObjectStorageConfig,
+} = require("../shared/backups/db-backup-object-storage-config");
 
 const requiredSecurityEnvVars = [
   "JWT_SECRET",
@@ -162,19 +166,47 @@ function isPlainRecord(value) {
     && !Buffer.isBuffer(value);
 }
 
-function normalizeJsonFriendlyValue(value) {
+function normalizeJsonFriendlyValue(value, {
+  depth = 0,
+  maxDepth = 128,
+  maxNodes = 250_000,
+  state = { nodes: 0, ancestors: new WeakSet() },
+  errorCode = "jsonOutputTooComplex",
+} = {}) {
+  state.nodes += 1;
+  if (depth > maxDepth || state.nodes > maxNodes) {
+    const error = new Error("JSON value exceeds structural limits");
+    error.code = errorCode;
+    error.statusCode = errorCode === "jsonInputTooComplex" ? 413 : 500;
+    throw error;
+  }
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : value.toISOString();
   }
   if (Array.isArray(value)) {
-    return value.map((entry) => normalizeJsonFriendlyValue(entry));
+    if (state.ancestors.has(value)) {
+      const error = new Error("Circular JSON value is not supported");
+      error.code = errorCode;
+      error.statusCode = errorCode === "jsonInputTooComplex" ? 413 : 500;
+      throw error;
+    }
+    state.ancestors.add(value);
+    try {
+      return value.map((entry) => normalizeJsonFriendlyValue(entry, {
+        depth: depth + 1, maxDepth, maxNodes, state, errorCode,
+      }));
+    } finally {
+      state.ancestors.delete(value);
+    }
   }
   if (!value || typeof value !== "object") return value;
 
   if (!isPlainRecord(value)) {
     if (typeof value.toJSON === "function") {
       const jsonValue = value.toJSON();
-      if (jsonValue !== value) return normalizeJsonFriendlyValue(jsonValue);
+      if (jsonValue !== value) return normalizeJsonFriendlyValue(jsonValue, {
+        depth: depth + 1, maxDepth, maxNodes, state, errorCode,
+      });
     }
     if (typeof value.toISO === "function") {
       const isoValue = value.toISO();
@@ -190,13 +222,30 @@ function normalizeJsonFriendlyValue(value) {
     return value;
   }
 
-  return Object.fromEntries(
-    Object.entries(value).map(([key, entry]) => [key, normalizeJsonFriendlyValue(entry)])
-  );
+  if (state.ancestors.has(value)) {
+    const error = new Error("Circular JSON value is not supported");
+    error.code = errorCode;
+    error.statusCode = errorCode === "jsonInputTooComplex" ? 413 : 500;
+    throw error;
+  }
+  state.ancestors.add(value);
+  try {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, normalizeJsonFriendlyValue(entry, {
+        depth: depth + 1, maxDepth, maxNodes, state, errorCode,
+      })])
+    );
+  } finally {
+    state.ancestors.delete(value);
+  }
 }
 
 function normalizeIncomingJsonValue(value) {
-  return normalizeJsonFriendlyValue(value);
+  return normalizeJsonFriendlyValue(value, {
+    maxDepth: 64,
+    maxNodes: 100_000,
+    errorCode: "jsonInputTooComplex",
+  });
 }
 
 function normalizeOutgoingJsonValue(value) {
@@ -249,10 +298,16 @@ function normalizeCookieDomain(value, serverOrigin = process.env.SERVER_URL) {
   return domain;
 }
 
-function assertCookieConfiguration({ logger }) {
+function assertCookieConfiguration({ logger, isProduction = process.env.NODE_ENV === "production" }) {
   try {
     normalizeSessionCookieName(process.env.SESSION_COOKIE_NAME);
-    normalizeCookieDomain(process.env.COOKIE_DOMAIN, process.env.SERVER_URL);
+    const cookieDomain = normalizeCookieDomain(process.env.COOKIE_DOMAIN, process.env.SERVER_URL);
+    // The session cookie is issued by the API origin, so it does not need a
+    // parent-domain scope for dashboard requests. A parent scope would expose
+    // it to every sibling subdomain (including marketing/viewer properties).
+    if (isProduction && cookieDomain) {
+      throw new Error("COOKIE_DOMAIN must be unset in production so session cookies remain host-only");
+    }
   } catch (error) {
     logger.error({ err: error }, "Invalid session-cookie configuration");
     process.exit(1);
@@ -368,7 +423,7 @@ function deriveRuntimeFlags() {
 function assertRequiredProductionEnvironment({ isProduction, logger }) {
   assertRequiredSecurityEnvironment({ logger });
   assertRequiredRuntimeOrigins({ isProduction, logger });
-  assertCookieConfiguration({ logger });
+  assertCookieConfiguration({ logger, isProduction });
   if (!isProduction) return;
 
   if (String(process.env.RUN_SCHEMA_MIGRATIONS || "false").trim().toLowerCase() !== "false") {
@@ -422,6 +477,12 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
     "DB_BACKUP_S3_BUCKET",
     "DB_BACKUP_S3_ACCESS_KEY_ID",
     "DB_BACKUP_S3_SECRET_ACCESS_KEY",
+    "DB_BACKUP_MANIFEST_HMAC_SECRET",
+    "DB_BACKUP_S3_FORCE_PATH_STYLE",
+    "DB_BACKUP_S3_PREFIX",
+    "DB_BACKUP_EVIDENCE_S3_PREFIX",
+    "DB_BACKUP_MAX_BYTES",
+    "DB_BACKUP_RETENTION_COUNT",
   ];
 
   if (storageProvider !== "s3") {
@@ -440,6 +501,12 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
       logger.error({ env: name }, "Backup-provider enablement flags must be true or false");
       throw new Error(`[PRODUCTION] ${name} must be true or false.`);
     }
+  }
+  if (dbBackupEnabledValue !== "true") {
+    throw new Error("[PRODUCTION] DB_BACKUP_ENABLED must be true; production database recovery cannot be optional.");
+  }
+  if (backupProviderEnabledValue !== "true" || backupProviderRequiredValue !== "true") {
+    throw new Error("[PRODUCTION] BACKUP_PROVIDER_ENABLED and BACKUP_PROVIDER_REQUIRED must both be true; production passport recovery cannot be optional.");
   }
 
   for (const key of [
@@ -479,8 +546,30 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
   if (dbBackupEnabled && process.env.DB_BACKUP_S3_ENDPOINT) {
     validateProductionUrl("DB_BACKUP_S3_ENDPOINT", logger);
   }
+  if (backupProviderEnabled && process.env.BACKUP_PROVIDER_ENDPOINT) {
+    validateProductionUrl("BACKUP_PROVIDER_ENDPOINT", logger);
+  }
 
   if (dbBackupEnabled && !missing.length) {
+    try {
+      readDbBackupObjectStorageConfig({
+        endpoint: process.env.DB_BACKUP_S3_ENDPOINT,
+        region: process.env.DB_BACKUP_S3_REGION,
+        bucket: process.env.DB_BACKUP_S3_BUCKET,
+        accessKeyId: process.env.DB_BACKUP_S3_ACCESS_KEY_ID,
+        secretAccessKey: process.env.DB_BACKUP_S3_SECRET_ACCESS_KEY,
+        manifestHmacSecret: process.env.DB_BACKUP_MANIFEST_HMAC_SECRET,
+        forcePathStyle: process.env.DB_BACKUP_S3_FORCE_PATH_STYLE,
+        prefix: process.env.DB_BACKUP_S3_PREFIX,
+        evidencePrefix: process.env.DB_BACKUP_EVIDENCE_S3_PREFIX,
+        maxBytes: process.env.DB_BACKUP_MAX_BYTES,
+        retentionCount: process.env.DB_BACKUP_RETENTION_COUNT,
+        dbName: process.env.DB_NAME,
+      });
+    } catch (error) {
+      logger.error({ env: "DB_BACKUP_*" }, "Database backup S3 configuration is invalid");
+      throw new Error(`[PRODUCTION] ${error.message}`);
+    }
     const duplicatedBackupValues = [
       ["DB_BACKUP_S3_BUCKET", "STORAGE_S3_BUCKET"],
       ["DB_BACKUP_S3_ACCESS_KEY_ID", "STORAGE_S3_ACCESS_KEY_ID"],
@@ -492,13 +581,32 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
       logger.error({ duplicated: duplicatedNames }, "DB backups must use a separate bucket and credential material");
       throw new Error(`[PRODUCTION] DB backups must use separate bucket and credential material: ${duplicatedNames.join(", ")}`);
     }
+
+    const manifestHmacSecret = String(process.env.DB_BACKUP_MANIFEST_HMAC_SECRET || "");
+    const duplicatedManifestSecretNames = [
+      "JWT_SECRET",
+      "PEPPER_V1",
+      "OTP_HMAC_SECRET",
+      "REPOSITORY_FILE_LINK_SECRET",
+      "DB_PASSWORD",
+      "STORAGE_S3_SECRET_ACCESS_KEY",
+      "DB_BACKUP_S3_SECRET_ACCESS_KEY",
+    ].filter((name) => manifestHmacSecret === String(process.env[name] || ""));
+    if (manifestHmacSecret.length < 32 || duplicatedManifestSecretNames.length) {
+      logger.error({ duplicated: duplicatedManifestSecretNames }, "DB backup manifest authentication must use an independent strong secret");
+      throw new Error("[PRODUCTION] DB_BACKUP_MANIFEST_HMAC_SECRET must be at least 32 characters and independent of application and storage credentials");
+    }
   }
 
   if (backupProviderRequired && !backupProviderEnabled) {
     missing.push("BACKUP_PROVIDER_ENABLED=true");
   }
   if (backupProviderEnabled) {
-    for (const key of [...backupProviderS3EnvNames, "BACKUP_PROVIDER_OBJECT_PREFIX"]) {
+    for (const key of [
+      ...backupProviderS3EnvNames,
+      "BACKUP_PROVIDER_KEY",
+      "BACKUP_PROVIDER_OBJECT_PREFIX",
+    ]) {
       if (!String(process.env[key] || "").trim()) missing.push(key);
     }
   }
@@ -507,6 +615,7 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
     let backupProviderStorage;
     try {
       backupProviderStorage = readBackupProviderObjectStorageConfigFromEnvironment();
+      validateBackupProviderObjectPrefix(process.env.BACKUP_PROVIDER_OBJECT_PREFIX);
     } catch (error) {
       logger.error({ env: "BACKUP_PROVIDER_*" }, "Backup-provider S3 configuration is invalid");
       throw new Error(`[PRODUCTION] ${error.message}`);
@@ -522,6 +631,26 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
         .map(([backupKey, storageKey]) => `${backupKey}/${storageKey}`);
       logger.error({ duplicated: duplicatedNames }, "Backup-provider storage must use a separate bucket and credential material");
       throw new Error(`[PRODUCTION] Backup-provider storage must use separate bucket and credential material: ${duplicatedNames.join(", ")}`);
+    }
+
+
+    if (dbBackupEnabled) {
+      const duplicatedDisasterRecoveryValues = [
+        ["BACKUP_PROVIDER_BUCKET", "DB_BACKUP_S3_BUCKET", backupProviderStorage.bucket],
+        ["BACKUP_PROVIDER_ACCESS_KEY_ID", "DB_BACKUP_S3_ACCESS_KEY_ID", backupProviderStorage.accessKeyId],
+        ["BACKUP_PROVIDER_SECRET_ACCESS_KEY", "DB_BACKUP_S3_SECRET_ACCESS_KEY", backupProviderStorage.secretAccessKey],
+      ].filter(([, dbBackupKey, backupValue]) => backupValue === String(process.env[dbBackupKey] || "").trim());
+      const providerSecretReusesManifestKey = backupProviderStorage.secretAccessKey
+        === String(process.env.DB_BACKUP_MANIFEST_HMAC_SECRET || "");
+      if (duplicatedDisasterRecoveryValues.length || providerSecretReusesManifestKey) {
+        const duplicatedNames = duplicatedDisasterRecoveryValues
+          .map(([backupKey, dbBackupKey]) => `${backupKey}/${dbBackupKey}`);
+        if (providerSecretReusesManifestKey) {
+          duplicatedNames.push("BACKUP_PROVIDER_SECRET_ACCESS_KEY/DB_BACKUP_MANIFEST_HMAC_SECRET");
+        }
+        logger.error({ duplicated: duplicatedNames }, "Disaster-recovery stores must have pairwise-isolated buckets and credential material");
+        throw new Error(`[PRODUCTION] Disaster-recovery stores must use pairwise-isolated bucket and credential material: ${duplicatedNames.join(", ")}`);
+      }
     }
   }
 

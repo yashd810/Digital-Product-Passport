@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { clearSensitiveHashParameter } from "../../shared/security/sensitiveLocation";
 import {
   passwordMinLength,
   passwordRequirementText,
@@ -106,8 +107,12 @@ export function ForgotPassword() {
 // ─────────────────────────────────────────────────────────────────
 export function ResetPassword() {
   const navigate  = useNavigate();
-  const params    = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-  const token     = params.get("token");
+  // Preserve the initial one-time token in component state before the fragment
+  // is removed from browser history. The token is never persisted to storage.
+  const [token] = useState(() => {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    return params.get("token");
+  });
 
   const [password,  setPassword]  = useState("");
   const [confirm,   setConfirm]   = useState("");
@@ -115,6 +120,10 @@ export function ResetPassword() {
   const [done,      setDone]      = useState(false);
   const [error,     setError]     = useState("");
   const [tokenOk,   setTokenOk]   = useState(true);
+
+  React.useEffect(() => {
+    clearSensitiveHashParameter("token");
+  }, []);
 
   React.useEffect(() => {
     if (!token) { setTokenOk(false); return; }

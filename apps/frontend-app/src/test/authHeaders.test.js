@@ -21,7 +21,7 @@ describe("fetchWithAuth redirect handling", () => {
     expect(replace).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.test/api/public/passports/id",
-      expect.objectContaining({ credentials: "include" })
+      expect.objectContaining({ credentials: "include", redirect: "error" })
     );
   });
 
@@ -62,11 +62,25 @@ describe("fetchWithAuth redirect handling", () => {
     vi.stubGlobal("window", { location: { origin: "https://viewer.example.test", pathname: "/dpp/example/model/id", replace } });
     vi.stubGlobal("fetch", fetchMock);
 
-    await fetchWithAuth("https://viewer.example.test/api/public/passports/id");
+    await fetchWithAuth("https://viewer.example.test/api/public/passports/id", {
+      credentials: "include",
+      redirect: "follow",
+    });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://viewer.example.test/api/public/passports/id",
-      expect.objectContaining({ credentials: "omit" })
+      expect.objectContaining({ credentials: "omit", redirect: "error" })
     );
+  });
+
+  test("classifies endpoint paths without trusting public-looking query text", async () => {
+    const replace = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({ status: 401 });
+    vi.stubGlobal("window", { location: { origin: "https://app.example.test", pathname: "/dashboard", replace } });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchWithAuth("https://app.example.test/api/companies/7/profile?next=/api/public/passports/id");
+
+    expect(replace).toHaveBeenCalledWith("/login?session=expired");
   });
 });

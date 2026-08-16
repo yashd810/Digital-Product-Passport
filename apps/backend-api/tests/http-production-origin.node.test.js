@@ -3,8 +3,15 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
-const http = require("http");
-const { configureHttp } = require("../src/bootstrap/http");
+const {
+  configureHttp,
+  configureHttpErrorHandling,
+  createEarlyJsonBodyGuard,
+  createTrustedProxyAddressChecker,
+  isLoopbackProxyAddress,
+  parseDockerDefaultGatewayAddresses,
+} = require("../src/bootstrap/http");
+const { requestApp } = require("./helpers/in-memory-http");
 
 async function withApp({ isProduction }, run) {
   const app = express();
@@ -20,38 +27,21 @@ async function withApp({ isProduction }, run) {
     port: 3001,
   });
   app.post("/mutation", (_req, res) => res.json({ success: true }));
-
-  const server = http.createServer(app);
-  await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error("Timed out waiting for production-origin test server to listen"));
-    }, 1000);
-    const settle = (fn) => (value) => {
-      clearTimeout(timer);
-      fn(value);
-    };
-    server.once("error", settle(reject));
-    server.once("listening", settle(resolve));
-    server.listen(0, "127.0.0.1");
+  app.post("/api/auth/login", (_req, res) => res.status(401).json({ error: "Invalid credentials" }));
+  app.post("/unhandled", () => {
+    throw new Error("sensitive internal failure detail");
   });
-  try {
-    const address = server.address();
-    await run(`http://127.0.0.1:${address.port}`);
-  } finally {
-    // Node's fetch client can retain a keep-alive socket after the final
-    // response. Explicitly close test-owned connections so server.close()
-    // cannot wait indefinitely for that idle socket.
-    server.closeAllConnections?.();
-    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-  }
+  configureHttpErrorHandling(app, { logger: { error() {} } });
+
+  await run((path, options) => requestApp(app, { path, ...options }));
 }
 
 const withProductionApp = (run) => withApp({ isProduction: true }, run);
 const withDevelopmentApp = (run) => withApp({ isProduction: false }, run);
 
 test("production mutations allow bearer automation without weakening browser-origin checks", async () => {
-  await withProductionApp(async (baseUrl) => {
-    const request = (headers = {}) => fetch(`${baseUrl}/mutation`, {
+  await withProductionApp(async (sendRequest) => {
+    const request = (headers = {}) => sendRequest("/mutation", {
       method: "POST",
       headers: { "content-type": "application/json", ...headers },
       body: "{}",
@@ -99,9 +89,9 @@ test("production mutations allow bearer automation without weakening browser-ori
 });
 
 test("development cookie mutations still require a trusted browser origin", async () => {
-  await withDevelopmentApp(async (baseUrl) => {
+  await withDevelopmentApp(async (sendRequest) => {
     const request = async (headers = {}) => {
-      const response = await fetch(`${baseUrl}/mutation`, {
+      const response = await sendRequest("/mutation", {
         method: "POST",
         headers: { "content-type": "application/json", ...headers },
         body: "{}",
@@ -121,4 +111,138 @@ test("development cookie mutations still require a trusted browser origin", asyn
     }), 200);
     assert.equal(await request(), 200);
   });
+});
+
+test("proxy trust defaults to host loopback and only the exact Docker gateway", () => {
+  const defaultTrust = createTrustedProxyAddressChecker("", { dockerGatewayAddresses: ["172.20.0.1"] });
+  assert.equal(defaultTrust("127.0.0.1"), true);
+  assert.equal(defaultTrust("::1"), true);
+  assert.equal(defaultTrust("::ffff:127.0.0.1"), true);
+  assert.equal(defaultTrust("172.20.0.1"), true);
+  assert.equal(defaultTrust("172.20.0.4"), false);
+  assert.equal(defaultTrust("::ffff:10.0.0.8"), false);
+  assert.equal(defaultTrust("93.184.216.34"), false);
+  assert.equal(defaultTrust("not-an-address"), false);
+
+  const explicitlyConfiguredTrust = createTrustedProxyAddressChecker("172.20.0.4,::ffff:10.0.0.8");
+  assert.equal(explicitlyConfiguredTrust("172.20.0.4"), true);
+  assert.equal(explicitlyConfiguredTrust("::ffff:10.0.0.8"), true);
+  assert.equal(explicitlyConfiguredTrust("127.0.0.1"), false);
+  assert.throws(() => createTrustedProxyAddressChecker("93.184.216.34"), /TRUSTED_PROXY_IPS/);
+  assert.throws(() => createTrustedProxyAddressChecker("not-an-address"), /TRUSTED_PROXY_IPS/);
+  assert.equal(isLoopbackProxyAddress("127.0.0.1"), true);
+  assert.equal(isLoopbackProxyAddress("172.20.0.4"), false);
+});
+
+test("Docker gateway discovery trusts only a private default route in a container", () => {
+  const routeTable = [
+    "Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT",
+    "eth0 00000000 010014AC 0003 0 0 0 00000000 0 0 0",
+    "eth0 000014AC 00000000 0001 0 0 0 00FFFFFF 0 0 0",
+    "eth1 00000000 08080808 0003 0 0 0 00000000 0 0 0",
+  ].join("\n");
+  assert.deepEqual(parseDockerDefaultGatewayAddresses(routeTable, true), ["172.20.0.1"]);
+  assert.deepEqual(parseDockerDefaultGatewayAddresses(routeTable, false), []);
+});
+
+test("JSON parsing rejects malformed and pathological structures with redacted JSON errors", async () => {
+  await withProductionApp(async (sendRequest) => {
+    const send = (body, path = "/mutation") => sendRequest(path, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer integration-token",
+        "content-type": "application/json",
+      },
+      body,
+    });
+
+    const malformed = await send("{");
+    assert.equal(malformed.status, 400);
+    assert.deepEqual(await malformed.json(), { error: "Invalid JSON request body" });
+
+    const nested = await send(`${"[".repeat(65)}0${"]".repeat(65)}`);
+    assert.equal(nested.status, 413);
+    assert.deepEqual(await nested.json(), { error: "JSON request body is too complex" });
+
+    const tooManyValues = await send(JSON.stringify(Array(100_001).fill(0)));
+    assert.equal(tooManyValues.status, 413);
+    assert.deepEqual(await tooManyValues.json(), { error: "JSON request body is too complex" });
+
+    const unhandled = await send("{}", "/unhandled");
+    assert.equal(unhandled.status, 500);
+    const body = await unhandled.json();
+    assert.deepEqual(body, { error: "Internal server error" });
+    assert.equal(JSON.stringify(body).includes("sensitive internal failure detail"), false);
+  });
+});
+
+test("authentication failures and token-bearing responses cannot be cached", async () => {
+  await withProductionApp(async (sendRequest) => {
+    const response = await sendRequest("/api/auth/login", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer invalid-login-attempt",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ email: "user@example.test", password: "wrong" }),
+    });
+    assert.equal(response.status, 401);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.equal(response.headers.get("pragma"), "no-cache");
+    assert.equal(response.headers.get("expires"), "0");
+    await response.text();
+  });
+});
+
+function invokeGuard(guard, req) {
+  return new Promise((resolve, reject) => {
+    const response = {
+      headers: {},
+      statusCode: 200,
+      setHeader(name, value) {
+        this.headers[name.toLowerCase()] = String(value);
+      },
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(body) {
+        resolve({ statusCode: this.statusCode, body, headers: this.headers });
+        return this;
+      },
+    };
+    try {
+      guard(req, response, () => resolve({ statusCode: 200, body: null, headers: response.headers }));
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+test("pre-parser guards cap large-body frequency, declared size, and compressed JSON", async () => {
+  const guard = createEarlyJsonBodyGuard({
+    maxRequests: 3,
+    maxLargeRequests: 1,
+    largeBodyThresholdBytes: 100,
+  });
+  const request = (headers = {}) => ({
+    method: "POST",
+    ip: "198.51.100.120",
+    headers: { "content-type": "application/json", ...headers },
+  });
+
+  assert.equal((await invokeGuard(guard, request({ "content-length": "100" }))).statusCode, 200);
+  const repeatedLargeBody = await invokeGuard(guard, request({ "content-length": "101" }));
+  assert.equal(repeatedLargeBody.statusCode, 429);
+  assert.match(repeatedLargeBody.headers["retry-after"], /^\d+$/);
+
+  const oversized = await invokeGuard(createEarlyJsonBodyGuard(), request({
+    "content-length": String((10 * 1024 * 1024) + 1),
+  }));
+  assert.equal(oversized.statusCode, 413);
+
+  const compressed = await invokeGuard(createEarlyJsonBodyGuard(), request({
+    "content-encoding": "gzip",
+  }));
+  assert.equal(compressed.statusCode, 415);
 });
