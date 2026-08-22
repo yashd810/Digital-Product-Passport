@@ -35,6 +35,14 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     resolveSecurityGroupApiKey,
   } = createApiKeyHelpers({ crypto });
 
+  function setNoStoreHeaders(res) {
+    if (typeof res?.setHeader !== "function") return;
+
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+
   function sendPreviewRouteError(res, error, fallbackMessage) {
     if (error?.code === "ambiguousProductId") {
       return res.status(409).json({ error: "Passport identifier is ambiguous" });
@@ -73,6 +81,9 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
 
   app.get("/api/companies/:companyId/passports/:passportKey/preview", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
+      // Preview branding is mutable and the response is authenticated. Do not
+      // allow a browser or shared intermediary to retain an obsolete logo.
+      setNoStoreHeaders(res);
       const { companyId, passportKey } = req.params;
       const resolved = await resolveCompanyPreviewPassport({ companyId, passportKey });
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });

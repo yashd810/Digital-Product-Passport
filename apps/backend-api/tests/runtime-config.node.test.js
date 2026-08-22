@@ -8,6 +8,7 @@ const {
   assertProductionStorageReadiness,
   assertRequiredProductionEnvironment,
   deriveRuntimeFlags,
+  normalizeSessionCookieName,
 } = require("../src/bootstrap/runtime-config");
 
 function generateEscapedP256KeyPair() {
@@ -39,8 +40,6 @@ const requiredProductionEnv = {
   SERVER_URL: "https://api.example.com",
   VITE_PUBLIC_VIEWER_URL: "https://viewer.example.com",
   ALLOWED_ORIGINS: "https://app.example.com,https://viewer.example.com",
-  COOKIE_DOMAIN: "",
-  SESSION_COOKIE_NAME: "",
   ASSET_SOURCE_ALLOWED_HOSTS: "erp.example.com",
   OAUTH_ALLOW_INSECURE_HTTP: "",
   RUN_SCHEMA_MIGRATIONS: "false",
@@ -229,14 +228,24 @@ test("runtime origin guard rejects malformed development origins", () => {
 });
 
 test("runtime guard rejects unsafe origin whitespace and cookie scope configuration", () => {
+  assert.equal(normalizeSessionCookieName(undefined, { isProduction: false }), "dppSession");
+  assert.equal(normalizeSessionCookieName(undefined, { isProduction: true }), "__Host-dppSession");
+  assert.equal(normalizeSessionCookieName("__Host-dppSession", { isProduction: true }), "__Host-dppSession");
+  assert.throws(
+    () => normalizeSessionCookieName("dppSession", { isProduction: true }),
+    /fixed to __Host-dppSession/
+  );
   assert.equal(captureEnvironmentGuard({ APP_URL: " https://app.example.com" }, false).exited, true);
   assert.equal(captureEnvironmentGuard({ ALLOWED_ORIGINS: "https://app.example.com, https://viewer.example.com" }, false).exited, true);
   assert.equal(captureProductionGuard({ COOKIE_DOMAIN: ".example.com" }).exited, true);
-  assert.equal(captureEnvironmentGuard({ COOKIE_DOMAIN: ".example.com" }, false).exited, false);
+  assert.equal(captureEnvironmentGuard({ COOKIE_DOMAIN: ".example.com" }, false).exited, true);
   for (const value of ["evil.example", "https://example.com", "127.0.0.1", "example.com/", "example.com\r\nSet-Cookie: injected=1"]) {
     assert.equal(captureProductionGuard({ COOKIE_DOMAIN: value }).exited, true);
   }
   assert.equal(captureProductionGuard({ SESSION_COOKIE_NAME: "session\r\nSet-Cookie: injected=1" }).exited, true);
+  assert.equal(captureProductionGuard({ SESSION_COOKIE_NAME: "dppSession" }).exited, true);
+  assert.equal(captureProductionGuard({ SESSION_COOKIE_NAME: "__Host-customSession" }).exited, true);
+  assert.equal(captureProductionGuard({ SESSION_COOKIE_NAME: "__Host-dppSession" }).exited, false);
 });
 
 test("production environment guard requires SERVER_URL", () => {

@@ -91,7 +91,9 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   );
 
   const fetchPassportRecord = useCallback(async ({ applyState = false } = {}) => {
-    const response = await fetchWithAuth(passportEndpoint, isPreviewMode ? { headers: authHeaders() } : undefined);
+    const response = await fetchWithAuth(passportEndpoint, isPreviewMode
+      ? { headers: authHeaders(), cache: "no-store" }
+      : { cache: "no-store" });
     if (!response.ok) throw new Error("Could not refresh passport resources");
     const data = await response.json();
     if (applyState) {
@@ -99,7 +101,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       setPassport(data);
       if (data?.companyProfile) setCompanyData(data.companyProfile);
       if (isPreviewMode && resolvedCompanyId) {
-        const profileRes = await fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/profile`);
+        const profileRes = await fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/profile`, { cache: "no-store" });
         if (profileRes?.ok) setCompanyData(await profileRes.json());
       }
     }
@@ -170,7 +172,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         // 2. Fetch company branding and type definition when needed
         const [profileRes, typeRes, historyPayload] = await Promise.all([
           isPreviewMode && resolvedCompanyId
-            ? fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/profile`)
+            ? fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/profile`, { cache: "no-store" })
             : Promise.resolve(null),
           embeddedViewerSchema
             ? Promise.resolve(null)
@@ -197,13 +199,29 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
   useEffect(() => {
     if (!isPreviewMode || !previewCompanyId) return;
-    fetchWithAuth(`${api}/api/companies/${previewCompanyId}/profile`)
+    fetchWithAuth(`${api}/api/companies/${previewCompanyId}/profile`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setCompanyData(d);
       })
       .catch((error) => console.warn("Ignored async error", error));
   }, [isPreviewMode, previewCompanyId]);
+
+  // A company administrator commonly changes branding in another dashboard
+  // tab, then returns to this viewer. Re-fetch the live payload on focus so
+  // both the public and protected preview views immediately reflect it.
+  useEffect(() => {
+    const refreshBranding = () => {
+      if (document.visibilityState === "hidden") return;
+      fetchPassportRecord({ applyState: true }).catch(() => {});
+    };
+    window.addEventListener("focus", refreshBranding);
+    document.addEventListener("visibilitychange", refreshBranding);
+    return () => {
+      window.removeEventListener("focus", refreshBranding);
+      document.removeEventListener("visibilitychange", refreshBranding);
+    };
+  }, [fetchPassportRecord]);
 
   // Secondary data loading
   useEffect(() => {

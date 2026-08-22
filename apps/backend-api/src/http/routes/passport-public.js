@@ -879,6 +879,12 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   async function handleCanonicalPassportRequest(req, res) {
     try {
+      // The passport payload carries the live company profile. Revalidate on
+      // every view so a company-logo replacement or removal appears without a
+      // cache-expiry delay.
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       const versionNumber = req.query.version ? Number.parseInt(req.query.version, 10) : null;
       if (req.query.version && (!Number.isInteger(versionNumber) || versionNumber < 1)) {
         return res.status(400).json({ error: "version must be a positive integer" });
@@ -1316,6 +1322,9 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   app.get("/api/public/companies/:companySlug/profile", publicReadRateLimit, async (req, res) => {
     try {
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       const company = await hydrateCompanyBySlug(req.params.companySlug);
       if (!company?.isActive) return res.status(404).json({ error: "Company not found" });
       return res.json(buildPublicCompanyProfile(company));

@@ -242,14 +242,14 @@ async function run() {
     const missingOriginCookieMutation = await fetchJson(integrationBase, {
       method: "POST",
       headers: {
-        cookie: `${process.env.SESSION_COOKIE_NAME || "dppSession"}=${adminToken}`,
+        cookie: `${process.env.NODE_ENV === "production" ? "__Host-dppSession" : (process.env.SESSION_COOKIE_NAME || "dppSession")}=${adminToken}`,
         "content-type": "application/json",
       },
       body: "{}",
     });
     assert.equal(missingOriginCookieMutation.response.status, 403);
     const cookieOnlyHeaders = {
-      cookie: `${process.env.SESSION_COOKIE_NAME || "dppSession"}=${adminToken}`,
+      cookie: `${process.env.NODE_ENV === "production" ? "__Host-dppSession" : (process.env.SESSION_COOKIE_NAME || "dppSession")}=${adminToken}`,
       "content-type": "application/json",
       origin: getAllowedMutationOrigin(),
     };

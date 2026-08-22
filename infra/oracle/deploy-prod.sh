@@ -422,6 +422,7 @@ case "$DEPLOY_TARGET" in
     require_https_url_env "APP_URL"
     require_https_url_env "SERVER_URL"
     require_empty_env_var "COOKIE_DOMAIN"
+    require_empty_env_var "SESSION_COOKIE_NAME"
     require_distinct_secret_env_vars "JWT_SECRET" "PEPPER_V1"
     require_distinct_secret_env_vars "JWT_SECRET" "OTP_HMAC_SECRET"
     require_distinct_secret_env_vars "JWT_SECRET" "REPOSITORY_FILE_LINK_SECRET"

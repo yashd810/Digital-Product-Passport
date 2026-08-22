@@ -64,6 +64,14 @@ module.exports = function registerCompanyRoutes(app, {
       return null;
     }
   };
+  const setFreshCompanyProfileHeaders = (res) => {
+    // Branding is intentionally mutable. Never let an authenticated browser
+    // or intermediary retain an old company logo after an administrator
+    // replaces or removes it.
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  };
   const governanceImportTokens = new Set([
     "confidentiality",
     "classification",
@@ -192,6 +200,7 @@ module.exports = function registerCompanyRoutes(app, {
 
   app.get("/api/companies/:companyId/profile", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
+      setFreshCompanyProfileHeaders(res);
       const r = await pool.query(
         `SELECT "companyName" AS "companyName",
                 "companyLogo" AS "companyLogo",
@@ -211,6 +220,7 @@ module.exports = function registerCompanyRoutes(app, {
 
   app.post("/api/companies/:companyId/profile", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
+      setFreshCompanyProfileHeaders(res);
       let companyLogo = null;
       if (req.body?.companyLogo !== null && req.body?.companyLogo !== undefined && req.body.companyLogo !== "") {
         try {

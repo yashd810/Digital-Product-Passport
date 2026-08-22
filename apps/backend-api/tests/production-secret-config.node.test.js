@@ -154,6 +154,7 @@ test("production environment template fixes data-volume identities and disables 
   assert.match(values.get("POSTGRES_VOLUME_NAME"), /^[A-Za-z0-9][A-Za-z0-9_.-]*$/);
   assert.equal(values.get("RUN_SCHEMA_MIGRATIONS"), "false");
   assert.equal(values.has("COOKIE_DOMAIN"), false, "production cookies must remain host-only");
+  assert.equal(values.has("SESSION_COOKIE_NAME"), false, "production session cookie name must not be configurable");
   assert.equal(values.get(["DPP", "DEPLOY", "TARGET"].join("_")), ["REPLACE", "WITH", "DEPLOY", "TARGET"].join("_"));
 });
 
@@ -183,6 +184,7 @@ test("production deployment fails closed rather than selecting a fresh database 
   const deployScript = fs.readFileSync(deployScriptPath, "utf8");
   assert.match(deployScript, /require_exact_env_value "RUN_SCHEMA_MIGRATIONS" "false"/);
   assert.match(deployScript, /require_empty_env_var "COOKIE_DOMAIN"/);
+  assert.match(deployScript, /require_empty_env_var "SESSION_COOKIE_NAME"/);
   assert.match(deployScript, /require_exact_env_value "BACKUP_PROVIDER_ENABLED" "true"/);
   assert.match(deployScript, /require_exact_env_value "BACKUP_PROVIDER_REQUIRED" "true"/);
   assert.match(deployScript, /require_exact_env_value "DB_BACKUP_ENABLED" "true"/);

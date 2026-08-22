@@ -3,7 +3,6 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const net = require("net");
 const { isPrivateOrReservedHostname, normalizeHostname } = require("../shared/security/network-address");
 const { normalizeConfiguredOrigin } = require("../shared/security/configured-origin");
 const {
@@ -262,51 +261,26 @@ function isLoopbackHost(hostname) {
 }
 
 const cookieNamePattern = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
-const cookieDomainPattern = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+const productionSessionCookieName = "__Host-dppSession";
 
-function normalizeSessionCookieName(value) {
-  const rawValue = value === undefined || value === null || value === ""
-    ? "dppSession"
-    : String(value);
+function normalizeSessionCookieName(value, { isProduction = process.env.NODE_ENV === "production" } = {}) {
+  const configuredValue = value === undefined || value === null ? "" : String(value);
+  const rawValue = configuredValue || (isProduction ? productionSessionCookieName : "dppSession");
   if (rawValue.trim() !== rawValue || /[\u0000-\u001F\u007F\s]/.test(rawValue) || !cookieNamePattern.test(rawValue)) {
     throw new Error("SESSION_COOKIE_NAME must be a valid cookie token");
   }
+  if (isProduction && configuredValue && configuredValue !== productionSessionCookieName) {
+    throw new Error(`SESSION_COOKIE_NAME is fixed to ${productionSessionCookieName} in production`);
+  }
+  if (isProduction) return productionSessionCookieName;
   return rawValue;
-}
-
-function normalizeCookieDomain(value, serverOrigin = process.env.SERVER_URL) {
-  const rawValue = String(value || "");
-  if (!rawValue) return null;
-  if (rawValue.trim() !== rawValue || /[\u0000-\u001F\u007F\s\\/]/.test(rawValue)) {
-    throw new Error("COOKIE_DOMAIN must be a DNS parent domain without whitespace, paths, or control characters");
-  }
-
-  const domain = (rawValue.startsWith(".") ? rawValue.slice(1) : rawValue).toLowerCase();
-  if (!cookieDomainPattern.test(domain) || net.isIP(domain)) {
-    throw new Error("COOKIE_DOMAIN must be a valid non-IP DNS domain");
-  }
-
-  let apiHostname;
-  try {
-    apiHostname = normalizeHostname(new URL(normalizeConfiguredOrigin(serverOrigin, "SERVER_URL")).hostname);
-  } catch {
-    throw new Error("COOKIE_DOMAIN requires a valid SERVER_URL");
-  }
-  if (apiHostname !== domain && !apiHostname.endsWith(`.${domain}`)) {
-    throw new Error("COOKIE_DOMAIN must be the API hostname or one of its parent domains");
-  }
-  return domain;
 }
 
 function assertCookieConfiguration({ logger, isProduction = process.env.NODE_ENV === "production" }) {
   try {
-    normalizeSessionCookieName(process.env.SESSION_COOKIE_NAME);
-    const cookieDomain = normalizeCookieDomain(process.env.COOKIE_DOMAIN, process.env.SERVER_URL);
-    // The session cookie is issued by the API origin, so it does not need a
-    // parent-domain scope for dashboard requests. A parent scope would expose
-    // it to every sibling subdomain (including marketing/viewer properties).
-    if (isProduction && cookieDomain) {
-      throw new Error("COOKIE_DOMAIN must be unset in production so session cookies remain host-only");
+    normalizeSessionCookieName(process.env.SESSION_COOKIE_NAME, { isProduction });
+    if (process.env.COOKIE_DOMAIN !== undefined && process.env.COOKIE_DOMAIN !== "") {
+      throw new Error("COOKIE_DOMAIN is unsupported; session cookies are always host-only");
     }
   } catch (error) {
     logger.error({ err: error }, "Invalid session-cookie configuration");
@@ -676,7 +650,6 @@ module.exports = {
   isPlainRecord,
   normalizeIncomingJsonValue,
   normalizeOutgoingJsonValue,
-  normalizeCookieDomain,
   normalizeSessionCookieName,
   normalizeStorageRequestKey,
   toBooleanEnv,

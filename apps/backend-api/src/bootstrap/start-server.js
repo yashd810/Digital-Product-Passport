@@ -21,7 +21,6 @@ const {
   isPlainRecord,
   normalizeIncomingJsonValue,
   normalizeOutgoingJsonValue,
-  normalizeCookieDomain,
   normalizeSessionCookieName,
   normalizeStorageRequestKey,
   toBooleanEnv,
@@ -63,6 +62,7 @@ const createBackupProviderService         = require("../platform/backups/backup-
 const canonicalizeJson                    = require("../platform/serialization/canonicalize-json");
 const { generateDppRecordId }             = require("../modules/passports/services/dpp-record-id");
 const { parseAssetSourceCredentials }     = require("../shared/assets/asset-source-config");
+const { serializeHostOnlyCookie }         = require("../shared/security/host-only-cookie");
 const { getApiOrigin, getPublicViewerOrigin } = require("../shared/security/configured-origin");
 
 global.console = logger.console;
@@ -134,10 +134,9 @@ const jwtSecret             = process.env.JWT_SECRET;
 const jwtExpiry             = "7d";
 const pepper                 = process.env.PEPPER_V1;
 const currentPepperVersion = 1;
-const sessionCookieName    = normalizeSessionCookieName(process.env.SESSION_COOKIE_NAME);
+const sessionCookieName    = normalizeSessionCookieName(process.env.SESSION_COOKIE_NAME, { isProduction });
 const cookieSecure          = isProduction || process.env.COOKIE_SECURE === "true";
 const cookieSameSite       = String(process.env.COOKIE_SAME_SITE || "lax").trim().toLowerCase();
-const cookieDomain          = normalizeCookieDomain(process.env.COOKIE_DOMAIN, runtimeApiOrigin);
 const assetSourceAllowedHosts = new Set(
   String(process.env.ASSET_SOURCE_ALLOWED_HOSTS || "")
     .split(",").map(v => v.trim().toLowerCase()).filter(Boolean)
@@ -223,26 +222,14 @@ const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1, ex
 const hashOpaqueToken = (value) => crypto.createHash("sha256").update(String(value)).digest("hex");
 const generateOneTimeToken = () => crypto.randomBytes(32).toString("base64url");
 
-const serializeCookie = (name, value, options = {}) => {
-  const parts = [`${name}=${encodeURIComponent(value)}`];
-  if (options.maxAge !== undefined) parts.push(`Max-Age=${Math.floor(options.maxAge / 1000)}`);
-  if (options.expires) parts.push(`Expires=${options.expires.toUTCString()}`);
-  parts.push(`Path=${options.path || "/"}`);
-  if (options.httpOnly) parts.push("HttpOnly");
-  if (options.secure) parts.push("Secure");
-  if (options.sameSite) parts.push(`SameSite=${options.sameSite}`);
-  if (options.domain) parts.push(`Domain=${options.domain}`);
-  return parts.join("; ");
-};
-
 const authCookieOptions = {
   httpOnly: true, secure: cookieSecure, sameSite: cookieSameSite,
-  domain: cookieDomain || undefined, path: "/", maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: "/", maxAge: 7 * 24 * 60 * 60 * 1000,
 };
-const setAuthCookie   = (res, token) => res.setHeader("Set-Cookie", serializeCookie(sessionCookieName, token, authCookieOptions));
+const setAuthCookie   = (res, token) => res.setHeader("Set-Cookie", serializeHostOnlyCookie(sessionCookieName, token, authCookieOptions));
 const clearAuthCookie = (res) => res.setHeader(
   "Set-Cookie",
-  serializeCookie(sessionCookieName, "", { ...authCookieOptions, maxAge: 0, expires: new Date(0) })
+  serializeHostOnlyCookie(sessionCookieName, "", { ...authCookieOptions, maxAge: 0, expires: new Date(0) })
 );
 const appendSetCookie = (res, cookie) => {
   const existing = res.getHeader("Set-Cookie");
@@ -258,11 +245,11 @@ const oauthTransactionCookieOptions = {
 };
 const setOauthTransactionCookie = (res, token) => appendSetCookie(
   res,
-  serializeCookie("oauth_transaction", token, oauthTransactionCookieOptions)
+  serializeHostOnlyCookie("oauth_transaction", token, oauthTransactionCookieOptions)
 );
 const clearOauthTransactionCookie = (res) => appendSetCookie(
   res,
-  serializeCookie("oauth_transaction", "", { ...oauthTransactionCookieOptions, maxAge: 0, expires: new Date(0) })
+  serializeHostOnlyCookie("oauth_transaction", "", { ...oauthTransactionCookieOptions, maxAge: 0, expires: new Date(0) })
 );
 
 // ─── SHARED SERVICES ────────────────────────────────────────────────────────
