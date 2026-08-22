@@ -20,8 +20,11 @@ install -o root -g root -m 0644 \
 
 systemctl daemon-reload
 # Reenable rather than enable so an upgrade removes an older multi-user.target
-# wants-link and installs the current Docker-start wants-link atomically.
-systemctl reenable --now dpp-container-imds-firewall.service
+# wants-link and installs the current Docker-start wants-link atomically. A
+# one-shot unit can remain active after Docker recreates its chains, so restart
+# it explicitly to force the IMDS rule back into the new DOCKER-USER chain.
+systemctl reenable dpp-container-imds-firewall.service
+systemctl restart dpp-container-imds-firewall.service
 /usr/local/sbin/dpp-container-imds-firewall check
 
 echo "Docker container access to OCI IMDS is blocked. Host-originated access is unchanged."

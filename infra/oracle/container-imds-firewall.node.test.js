@@ -69,7 +69,8 @@ test("container IMDS rule is re-applied whenever Docker starts or restarts", () 
   assert.match(unit, /^PartOf=docker\.service$/m);
   assert.match(unit, /^WantedBy=docker\.service$/m);
   assert.doesNotMatch(unit, /^WantedBy=multi-user\.target$/m);
-  assert.match(installer, /systemctl reenable --now dpp-container-imds-firewall\.service/);
+  assert.match(installer, /systemctl reenable dpp-container-imds-firewall\.service/);
+  assert.match(installer, /systemctl restart dpp-container-imds-firewall\.service/);
 });
 
 test("production deployments install the persistent Docker IMDS control after Compose", () => {
