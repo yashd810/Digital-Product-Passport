@@ -12,6 +12,8 @@ BACKEND_RESTORE_DUMP="$BACKEND_BACKUP_DIR/restore.dump"
 BACKEND_RESTORE_MANIFEST="$BACKEND_BACKUP_DIR/restore-manifest.json"
 BACKEND_DRILL_EVIDENCE="$BACKEND_BACKUP_DIR/restore-drill.json"
 POSTGRES_RESTORE_DUMP=""
+POSTGRES_RESTORE_DATABASE=""
+RESTORED_TABLE_COUNT=""
 
 file_mode() {
   local file="$1"
@@ -252,7 +254,8 @@ copy_file_to_backend_for_node() {
   docker exec -i "$BACKEND_CONTAINER" node -e '
 const fs = require("fs");
 const target = process.argv.at(-1);
-const noFollow = fs.constants.O_NOFOLLOW || 0;
+const noFollow = fs.constants.O_NOFOLLOW;
+if (!noFollow) process.exit(1);
 const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | noFollow;
 let fd;
 
@@ -347,12 +350,61 @@ cleanup_postgres_temp() {
   fi
 }
 
+cleanup_postgres_restore_database() {
+  if [ -n "$POSTGRES_RESTORE_DATABASE" ]; then
+    docker exec -u postgres "$POSTGRES_CONTAINER" dropdb -U "$DB_USER" --maintenance-db="$DB_NAME" --if-exists "$POSTGRES_RESTORE_DATABASE" >/dev/null 2>&1 || true
+    POSTGRES_RESTORE_DATABASE=""
+  fi
+}
+
+drop_postgres_restore_database() {
+  if [ -z "$POSTGRES_RESTORE_DATABASE" ]; then
+    return 0
+  fi
+  docker exec -u postgres "$POSTGRES_CONTAINER" dropdb -U "$DB_USER" --maintenance-db="$DB_NAME" --if-exists "$POSTGRES_RESTORE_DATABASE"
+  POSTGRES_RESTORE_DATABASE=""
+}
+
+restore_dump_to_temporary_database() {
+  local table_count_query
+  local source_table_count
+
+  cleanup_postgres_restore_database
+  POSTGRES_RESTORE_DATABASE="dpp_restore_drill_$(date -u +%Y%m%d%H%M%S)_$RANDOM$RANDOM"
+  if ! [[ "$POSTGRES_RESTORE_DATABASE" =~ ^dpp_restore_drill_[0-9]{14}_[0-9]{1,10}$ ]]; then
+    echo "PostgreSQL temporary restore database name was invalid."
+    exit 1
+  fi
+
+  docker exec -u postgres "$POSTGRES_CONTAINER" createdb -U "$DB_USER" --maintenance-db="$DB_NAME" --template=template0 "$POSTGRES_RESTORE_DATABASE"
+  echo "Restoring backup into isolated temporary database..."
+  docker exec -u postgres "$POSTGRES_CONTAINER" pg_restore \
+    --exit-on-error \
+    --single-transaction \
+    --no-owner \
+    --no-privileges \
+    -U "$DB_USER" \
+    -d "$POSTGRES_RESTORE_DATABASE" \
+    "$POSTGRES_RESTORE_DUMP" >/dev/null
+
+  table_count_query="SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';"
+  source_table_count="$(docker exec -u postgres "$POSTGRES_CONTAINER" psql -X -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -Atqc "$table_count_query")"
+  RESTORED_TABLE_COUNT="$(docker exec -u postgres "$POSTGRES_CONTAINER" psql -X -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$POSTGRES_RESTORE_DATABASE" -Atqc "$table_count_query")"
+  if ! [[ "$source_table_count" =~ ^[1-9][0-9]*$ ]] || [ "$source_table_count" != "$RESTORED_TABLE_COUNT" ]; then
+    echo "Temporary database restore table count did not match the production backup."
+    exit 1
+  fi
+
+  drop_postgres_restore_database
+}
+
 cleanup() {
   cleanup_file "$HOST_DUMP"
   cleanup_file "$HOST_MANIFEST"
   cleanup_file "$HOST_DRILL_EVIDENCE"
   cleanup_remote_temp
   cleanup_postgres_temp
+  cleanup_postgres_restore_database
 }
 
 trap cleanup EXIT
@@ -370,7 +422,7 @@ run_backup() {
   # independent stream limit.
   (
     ulimit -f "$(((DB_BACKUP_MAX_BYTES + 511) / 512))"
-    docker exec "$POSTGRES_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" -F c > "$HOST_DUMP"
+    docker exec -u postgres "$POSTGRES_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" -F c > "$HOST_DUMP"
   )
   assert_private_host_file "$HOST_DUMP"
   copy_file_to_backend_for_node "$HOST_DUMP" "$BACKEND_UPLOAD_DUMP"
@@ -405,8 +457,9 @@ run_drill() {
   assert_private_host_file "$HOST_DUMP"
   assert_private_host_file "$HOST_MANIFEST"
   copy_file_to_postgres_for_restore "$HOST_DUMP"
-  echo "Verifying PostgreSQL custom dump readability..."
+  echo "Verifying PostgreSQL custom dump archive..."
   docker exec -u postgres "$POSTGRES_CONTAINER" pg_restore -l "$POSTGRES_RESTORE_DUMP" >/dev/null
+  restore_dump_to_temporary_database
 
   MANIFEST_SHA="$(python3 - "$HOST_MANIFEST" <<'PY'
 import json, sys
@@ -430,10 +483,10 @@ print(data.get("manifestKey",""))
 PY
 )"
   VERIFY_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  python3 - "$HOST_DRILL_EVIDENCE" "$VERIFY_AT" "$COMPOSE_PROJECT_NAME" "$DB_NAME" "$(hostname)" "$DUMP_KEY" "$MANIFEST_KEY" "$MANIFEST_SHA" <<'PY'
+  python3 - "$HOST_DRILL_EVIDENCE" "$VERIFY_AT" "$COMPOSE_PROJECT_NAME" "$DB_NAME" "$(hostname)" "$DUMP_KEY" "$MANIFEST_KEY" "$MANIFEST_SHA" "$RESTORED_TABLE_COUNT" <<'PY'
 import json, sys
 
-path, verified_at, compose_project_name, database_name, host, dump_key, manifest_key, manifest_sha = sys.argv[1:]
+path, verified_at, compose_project_name, database_name, host, dump_key, manifest_key, manifest_sha, restored_table_count = sys.argv[1:]
 with open(path, "w", encoding="utf-8") as fh:
     json.dump({
         "schemaVersion": 1,
@@ -445,7 +498,8 @@ with open(path, "w", encoding="utf-8") as fh:
         "dumpKey": dump_key,
         "manifestKey": manifest_key,
         "backupSha256": manifest_sha,
-        "verificationMethod": "pg_restore -l readability check",
+        "verificationMethod": "isolated temporary database pg_restore",
+        "restoredPublicTableCount": int(restored_table_count),
         "result": "passed",
     }, fh)
     fh.write("\n")

@@ -18,7 +18,8 @@ Backups in this system are not a side note. They are part of how released passpo
 2. Does production storage configuration pass the runtime guards?
 3. Are OCI/systemd backup jobs installed and healthy?
 4. Are object-storage credentials and prefixes still valid?
-5. Does the latest backup download and pass `pg_restore -l` readability checks?
+5. Does the latest backup pass both signed-download readability checks and an
+   isolated temporary-database restore drill?
 
 ## Important Runtime Guard
 
@@ -90,9 +91,14 @@ sudo systemctl start dpp-db-backup.service
 sudo systemctl status dpp-db-backup.service --no-pager
 sudo systemctl start dpp-db-backup-verify.service
 sudo systemctl status dpp-db-backup-verify.service --no-pager
+sudo systemctl start dpp-db-backup-drill.service
+sudo systemctl status dpp-db-backup-drill.service --no-pager
 ```
 
-Expected result: both services exit with status `0/SUCCESS`. If the backup
+Expected result: all three services exit with status `0/SUCCESS`. The drill
+restores the latest signed backup into an isolated temporary PostgreSQL database,
+compares its public-table count with the production source, removes that
+temporary database, and uploads signed evidence of the result. If the backup
 output reports `retainedObjectsSkipped`, OCI is preserving older backup objects
 under the bucket retention rule. Do not remove the retention rule during routine
 cleanup unless the owner explicitly accepts that compliance/security change.
