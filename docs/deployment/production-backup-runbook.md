@@ -133,6 +133,18 @@ overwrite each other's temporary files. The systemd units allow up to two hours
 for a large backup or restore check; investigate a timeout rather than launching
 a parallel manual run.
 
+## Manifest-Integrity Key Incident Response
+
+Do not rotate `DB_BACKUP_MANIFEST_HMAC_SECRET` as routine maintenance: it
+authenticates the backup manifests required to trust older recovery objects. If
+the key is exposed or suspected compromised, treat every manifest authenticated
+with it as untrusted instead of adding a compatibility fallback. Generate a new
+independent 256-bit key in both protected production profiles, redeploy the
+backend, then immediately run one backup, signed verification, and isolated
+restore drill. That successful drill creates the new trusted recovery baseline.
+Retain older immutable objects according to the bucket policy, but do not use
+their old manifests as evidence of integrity after the incident.
+
 Production backend deployment requires both application backup replication
 (`BACKUP_PROVIDER_ENABLED=true` and `BACKUP_PROVIDER_REQUIRED=true`) and host
 PostgreSQL backups (`DB_BACKUP_ENABLED=true`). Disabled flags fail the deployment
