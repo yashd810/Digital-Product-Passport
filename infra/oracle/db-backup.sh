@@ -11,6 +11,7 @@ BACKEND_UPLOAD_DUMP="$BACKEND_BACKUP_DIR/upload.dump"
 BACKEND_RESTORE_DUMP="$BACKEND_BACKUP_DIR/restore.dump"
 BACKEND_RESTORE_MANIFEST="$BACKEND_BACKUP_DIR/restore-manifest.json"
 BACKEND_DRILL_EVIDENCE="$BACKEND_BACKUP_DIR/restore-drill.json"
+POSTGRES_RESTORE_DUMP=""
 
 file_mode() {
   local file="$1"
@@ -205,11 +206,6 @@ if [ -z "$POSTGRES_CONTAINER" ] || [ -z "$BACKEND_CONTAINER" ]; then
   exit 1
 fi
 
-# Keep full database dumps on the persistent data filesystem rather than an
-# in-memory /tmp mount. This permits a read-only backend root filesystem without
-# doubling a large backup into the host's limited RAM.
-docker exec -u 0 "$BACKEND_CONTAINER" install -d -o node -g node -m 0700 "$BACKEND_BACKUP_DIR"
-
 DB_USER="${DB_USER:-$(read_env_var DB_USER)}"
 DB_NAME="${DB_NAME:-$(read_env_var DB_NAME)}"
 if [ -z "$DB_USER" ] || [ -z "$DB_NAME" ]; then
@@ -232,24 +228,112 @@ cleanup_file() {
   fi
 }
 
+assert_private_host_file() {
+  local target="$1"
+
+  if [ ! -f "$target" ] || [ -L "$target" ] || [ "$(file_mode "$target")" != "600" ]; then
+    echo "Backup staging file is not a regular owner-only file: $target"
+    exit 1
+  fi
+  if [ "$(id -u)" -eq 0 ] && [ "$(file_owner "$target")" != "0" ]; then
+    echo "Backup staging file must be root-owned when the backup job runs as root: $target"
+    exit 1
+  fi
+}
+
 copy_file_to_backend_for_node() {
   local source="$1"
   local destination="$2"
 
-  docker cp "$source" "$BACKEND_CONTAINER:$destination"
-  docker exec -u 0 "$BACKEND_CONTAINER" chown node:node "$destination"
-  docker exec -u 0 "$BACKEND_CONTAINER" chmod 0600 "$destination"
+  # The API container deliberately drops every capability, including CHOWN.
+  # Stream as its normal unprivileged user instead of using a privileged docker
+  # exec to repair ownership after docker cp. O_NOFOLLOW and the private parent
+  # directory prevent an in-container symlink from becoming a host backup sink.
+  docker exec -i "$BACKEND_CONTAINER" node -e '
+const fs = require("fs");
+const target = process.argv.at(-1);
+const noFollow = fs.constants.O_NOFOLLOW || 0;
+const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | noFollow;
+let fd;
+
+function fail() {
+  try { if (fd !== undefined) fs.closeSync(fd); } catch {}
+  process.exit(1);
 }
 
-secure_backend_file_for_node() {
+function writeAll(buffer) {
+  let offset = 0;
+  while (offset < buffer.length) {
+    const written = fs.writeSync(fd, buffer, offset, buffer.length - offset);
+    if (!written) throw new Error("Short write while staging database backup");
+    offset += written;
+  }
+}
+
+try {
+  fd = fs.openSync(target, flags, 0o600);
+  const stat = fs.fstatSync(fd);
+  if (!stat.isFile()) throw new Error("Backend backup target must be a regular file");
+  fs.fchmodSync(fd, 0o600);
+  process.stdin.on("data", writeAll);
+  process.stdin.on("error", fail);
+  process.stdin.on("end", () => {
+    try {
+      fs.fsyncSync(fd);
+      fs.closeSync(fd);
+      fd = undefined;
+      process.exit(0);
+    } catch {
+      fail();
+    }
+  });
+  process.stdin.resume();
+} catch {
+  fail();
+}
+' "$destination" < "$source"
+}
+
+assert_private_backend_directory() {
   local destination="$1"
 
-  docker exec -u 0 "$BACKEND_CONTAINER" chown node:node "$destination"
-  docker exec -u 0 "$BACKEND_CONTAINER" chmod 0600 "$destination"
+  docker exec "$BACKEND_CONTAINER" node -e '
+const fs = require("fs");
+const target = process.argv.at(-1);
+const stat = fs.lstatSync(target);
+if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== process.getuid() || (stat.mode & 0o077) !== 0) {
+  process.exit(1);
+}
+' "$destination"
+}
+
+assert_private_backend_file() {
+  local destination="$1"
+
+  docker exec "$BACKEND_CONTAINER" node -e '
+const fs = require("fs");
+const target = process.argv.at(-1);
+const stat = fs.lstatSync(target);
+if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== process.getuid() || (stat.mode & 0o077) !== 0) {
+  process.exit(1);
+}
+' "$destination"
+}
+
+copy_file_to_postgres_for_restore() {
+  local source="$1"
+
+  cleanup_postgres_temp
+  POSTGRES_RESTORE_DUMP="$(docker exec -u postgres "$POSTGRES_CONTAINER" sh -c 'umask 077; mktemp /tmp/dpp-db-restore.XXXXXX')"
+  if ! [[ "$POSTGRES_RESTORE_DUMP" =~ ^/tmp/dpp-db-restore\.[A-Za-z0-9]{6,}$ ]]; then
+    echo "PostgreSQL restore staging path was invalid."
+    exit 1
+  fi
+  docker exec -i -u postgres "$POSTGRES_CONTAINER" sh -c 'cat > "$1"; chmod 0600 "$1"' dpp-db-restore "$POSTGRES_RESTORE_DUMP" < "$source"
 }
 
 cleanup_remote_temp() {
-  docker exec -u 0 "$BACKEND_CONTAINER" rm -f -- \
+  docker exec "$BACKEND_CONTAINER" rm -f -- \
     "$BACKEND_UPLOAD_DUMP" \
     "$BACKEND_RESTORE_DUMP" \
     "$BACKEND_RESTORE_MANIFEST" \
@@ -257,7 +341,10 @@ cleanup_remote_temp() {
 }
 
 cleanup_postgres_temp() {
-  docker exec -u 0 "$POSTGRES_CONTAINER" rm -f -- /tmp/dpp-db-restore.dump >/dev/null 2>&1 || true
+  if [ -n "$POSTGRES_RESTORE_DUMP" ]; then
+    docker exec -u postgres "$POSTGRES_CONTAINER" rm -f -- "$POSTGRES_RESTORE_DUMP" >/dev/null 2>&1 || true
+    POSTGRES_RESTORE_DUMP=""
+  fi
 }
 
 cleanup() {
@@ -270,6 +357,11 @@ cleanup() {
 
 trap cleanup EXIT
 
+# Keep full database dumps on the persistent data filesystem rather than an
+# in-memory /tmp mount. Deployment initializes this directory as the unprivileged
+# API user; refuse to run if that least-privilege boundary is not intact.
+assert_private_backend_directory "$BACKEND_BACKUP_DIR"
+
 run_backup() {
   echo "Creating PostgreSQL backup from $POSTGRES_CONTAINER..."
   # pg_dump writes through the host shell. Set a per-process file limit before
@@ -280,6 +372,7 @@ run_backup() {
     ulimit -f "$(((DB_BACKUP_MAX_BYTES + 511) / 512))"
     docker exec "$POSTGRES_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" -F c > "$HOST_DUMP"
   )
+  assert_private_host_file "$HOST_DUMP"
   copy_file_to_backend_for_node "$HOST_DUMP" "$BACKEND_UPLOAD_DUMP"
   echo "Uploading backup to OCI Object Storage through $BACKEND_CONTAINER..."
   docker exec -w /app "$BACKEND_CONTAINER" node scripts/db-backup-object-storage.js upload --file "$BACKEND_UPLOAD_DUMP"
@@ -289,13 +382,15 @@ run_backup() {
 run_verify() {
   echo "Downloading latest backup from OCI Object Storage..."
   docker exec -w /app "$BACKEND_CONTAINER" node scripts/db-backup-object-storage.js download-latest --output "$BACKEND_RESTORE_DUMP" --manifest-output "$BACKEND_RESTORE_MANIFEST"
-  secure_backend_file_for_node "$BACKEND_RESTORE_DUMP"
-  secure_backend_file_for_node "$BACKEND_RESTORE_MANIFEST"
+  assert_private_backend_file "$BACKEND_RESTORE_DUMP"
+  assert_private_backend_file "$BACKEND_RESTORE_MANIFEST"
   docker cp "$BACKEND_CONTAINER:$BACKEND_RESTORE_DUMP" "$HOST_DUMP"
   docker cp "$BACKEND_CONTAINER:$BACKEND_RESTORE_MANIFEST" "$HOST_MANIFEST"
-  docker cp "$HOST_DUMP" "$POSTGRES_CONTAINER:/tmp/dpp-db-restore.dump"
+  assert_private_host_file "$HOST_DUMP"
+  assert_private_host_file "$HOST_MANIFEST"
+  copy_file_to_postgres_for_restore "$HOST_DUMP"
   echo "Verifying PostgreSQL custom dump readability..."
-  docker exec "$POSTGRES_CONTAINER" pg_restore -l /tmp/dpp-db-restore.dump >/dev/null
+  docker exec -u postgres "$POSTGRES_CONTAINER" pg_restore -l "$POSTGRES_RESTORE_DUMP" >/dev/null
   cleanup_file "$HOST_DUMP"
   cleanup_file "$HOST_MANIFEST"
 }
@@ -303,13 +398,15 @@ run_verify() {
 run_drill() {
   echo "Running restore drill from latest OCI Object Storage backup..."
   docker exec -w /app "$BACKEND_CONTAINER" node scripts/db-backup-object-storage.js download-latest --output "$BACKEND_RESTORE_DUMP" --manifest-output "$BACKEND_RESTORE_MANIFEST"
-  secure_backend_file_for_node "$BACKEND_RESTORE_DUMP"
-  secure_backend_file_for_node "$BACKEND_RESTORE_MANIFEST"
+  assert_private_backend_file "$BACKEND_RESTORE_DUMP"
+  assert_private_backend_file "$BACKEND_RESTORE_MANIFEST"
   docker cp "$BACKEND_CONTAINER:$BACKEND_RESTORE_DUMP" "$HOST_DUMP"
   docker cp "$BACKEND_CONTAINER:$BACKEND_RESTORE_MANIFEST" "$HOST_MANIFEST"
-  docker cp "$HOST_DUMP" "$POSTGRES_CONTAINER:/tmp/dpp-db-restore.dump"
+  assert_private_host_file "$HOST_DUMP"
+  assert_private_host_file "$HOST_MANIFEST"
+  copy_file_to_postgres_for_restore "$HOST_DUMP"
   echo "Verifying PostgreSQL custom dump readability..."
-  docker exec "$POSTGRES_CONTAINER" pg_restore -l /tmp/dpp-db-restore.dump >/dev/null
+  docker exec -u postgres "$POSTGRES_CONTAINER" pg_restore -l "$POSTGRES_RESTORE_DUMP" >/dev/null
 
   MANIFEST_SHA="$(python3 - "$HOST_MANIFEST" <<'PY'
 import json, sys

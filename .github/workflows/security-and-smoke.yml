@@ -256,6 +256,7 @@ jobs:
           apps/backend-api/tests/host-only-cookie.node.test.js
           apps/backend-api/tests/runtime-config.node.test.js
           infra/oracle/container-imds-firewall.node.test.js
+          infra/oracle/db-backup.node.test.js
           infra/docker/postgres/Dockerfile.node.test.js
           scripts/deploy/check-deployment-runner.node.test.js
           scripts/deploy/production-deploy-workflow.node.test.js
