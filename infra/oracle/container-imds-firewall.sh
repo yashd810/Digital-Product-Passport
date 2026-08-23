@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 # Block Docker-forwarded traffic to the OCI instance metadata endpoint without
-# changing host-originated access. Install through install-container-imds-firewall.sh
-# only after the host-network change has been approved.
+# changing host-originated access. OCI can provide Docker with DNS at the same
+# link-local address, so a dedicated chain returns only DNS (TCP/UDP 53) to
+# DOCKER-USER and rejects every other connection to that address. Returning
+# from the dedicated chain preserves future DOCKER-USER policy after this
+# control; a top-level RETURN rule would bypass it.
+# Install through install-container-imds-firewall.sh only after the host-network
+# change has been approved.
 
 set -euo pipefail
 
 MODE="${1:-check}"
 IMDS_ADDRESS="169.254.169.254/32"
-RULE_COMMENT="dpp-block-container-imds"
+IMDS_CHAIN="DPP-CONTAINER-IMDS-GUARD"
+BLOCK_RULE_COMMENT="dpp-block-container-imds"
+DNS_RULE_COMMENT="dpp-allow-container-dns"
+JUMP_RULE_COMMENT="dpp-container-imds-guard"
 TEST_MODE="${DPP_FIREWALL_TEST_MODE:-false}"
 IPTABLES_CMD="${DPP_IPTABLES_CMD:-iptables}"
 
@@ -34,10 +42,48 @@ if [ "$TEST_MODE" != "true" ] && [ -n "${DPP_IPTABLES_CMD:-}" ]; then
 fi
 command -v "$IPTABLES_CMD" >/dev/null 2>&1 || fail "iptables command is unavailable"
 
-RULE=(
+# This also matches the broad top-level rule installed by previous releases.
+# During an upgrade, it is temporarily kept at the top of DOCKER-USER while
+# the owned chain is rebuilt, so no transition permits metadata access.
+LEGACY_BLOCK_RULE=(
   -d "$IMDS_ADDRESS"
-  -m comment --comment "$RULE_COMMENT"
+  -m comment --comment "$BLOCK_RULE_COMMENT"
   -j REJECT --reject-with icmp-port-unreachable
+)
+
+JUMP_RULE=(
+  -d "$IMDS_ADDRESS"
+  -m comment --comment "$JUMP_RULE_COMMENT"
+  -j "$IMDS_CHAIN"
+)
+
+DNS_UDP_RULE=(
+  -p udp --dport 53
+  -m comment --comment "$DNS_RULE_COMMENT"
+  -j RETURN
+)
+
+DNS_TCP_RULE=(
+  -p tcp --dport 53
+  -m comment --comment "$DNS_RULE_COMMENT"
+  -j RETURN
+)
+
+BLOCK_RULE=(
+  -m comment --comment "$BLOCK_RULE_COMMENT"
+  -j REJECT --reject-with icmp-port-unreachable
+)
+
+# Retire direct DNS returns from the short-lived implementation. A RETURN in
+# DOCKER-USER skips any later user policy; a RETURN in the owned chain does not.
+DIRECT_DNS_UDP_RULE=(
+  -d "$IMDS_ADDRESS"
+  "${DNS_UDP_RULE[@]}"
+)
+
+DIRECT_DNS_TCP_RULE=(
+  -d "$IMDS_ADDRESS"
+  "${DNS_TCP_RULE[@]}"
 )
 
 iptables_run() {
@@ -50,31 +96,104 @@ require_docker_user_chain() {
   fi
 }
 
-rule_exists() {
-  iptables_run -C DOCKER-USER "${RULE[@]}" >/dev/null 2>&1
+chain_exists() {
+  iptables_run -S "$IMDS_CHAIN" >/dev/null 2>&1
+}
+
+docker_rule_exists() {
+  iptables_run -C DOCKER-USER "$@" >/dev/null 2>&1
+}
+
+chain_rule_exists() {
+  iptables_run -C "$IMDS_CHAIN" "$@" >/dev/null 2>&1
+}
+
+remove_docker_rule() {
+  while docker_rule_exists "$@"; do
+    iptables_run -D DOCKER-USER "$@"
+  done
+}
+
+chain_rules_are_ordered() {
+  local rules
+  rules="$(iptables_run -S "$IMDS_CHAIN" | awk -v chain="$IMDS_CHAIN" -v dns="$DNS_RULE_COMMENT" -v block="$BLOCK_RULE_COMMENT" '
+    $1 != "-A" || $2 != chain { next }
+    index($0, dns) && $0 ~ /-p tcp/ && $0 ~ /--dport 53/ && $0 ~ /-j RETURN/ { print "tcp"; next }
+    index($0, dns) && $0 ~ /-p udp/ && $0 ~ /--dport 53/ && $0 ~ /-j RETURN/ { print "udp"; next }
+    index($0, block) && $0 ~ /-j REJECT/ { print "block"; next }
+    { print "unexpected" }
+  ')"
+  [ "$rules" = $'tcp\nudp\nblock' ]
+}
+
+required_rules_are_active() {
+  chain_exists \
+    && docker_rule_exists "${JUMP_RULE[@]}" \
+    && ! docker_rule_exists "${LEGACY_BLOCK_RULE[@]}" \
+    && ! docker_rule_exists "${DIRECT_DNS_UDP_RULE[@]}" \
+    && ! docker_rule_exists "${DIRECT_DNS_TCP_RULE[@]}" \
+    && chain_rule_exists "${DNS_UDP_RULE[@]}" \
+    && chain_rule_exists "${DNS_TCP_RULE[@]}" \
+    && chain_rule_exists "${BLOCK_RULE[@]}" \
+    && chain_rules_are_ordered
+}
+
+ensure_imds_chain() {
+  if ! chain_exists; then
+    iptables_run -N "$IMDS_CHAIN"
+  fi
+}
+
+apply_rules() {
+  if required_rules_are_active; then
+    return 0
+  fi
+
+  ensure_imds_chain
+
+  # Keep a broad reject at the top of DOCKER-USER while the owned chain is
+  # rebuilt. This temporarily pauses bridge DNS but never opens a path to IMDS.
+  # The temporary rule is removed only after the chain and its jump are ready.
+  iptables_run -I DOCKER-USER 1 "${LEGACY_BLOCK_RULE[@]}"
+  iptables_run -F "$IMDS_CHAIN"
+  iptables_run -A "$IMDS_CHAIN" "${BLOCK_RULE[@]}"
+  iptables_run -I "$IMDS_CHAIN" 1 "${DNS_UDP_RULE[@]}"
+  iptables_run -I "$IMDS_CHAIN" 1 "${DNS_TCP_RULE[@]}"
+
+  remove_docker_rule "${DIRECT_DNS_UDP_RULE[@]}"
+  remove_docker_rule "${DIRECT_DNS_TCP_RULE[@]}"
+  remove_docker_rule "${JUMP_RULE[@]}"
+  iptables_run -I DOCKER-USER 1 "${JUMP_RULE[@]}"
+  remove_docker_rule "${LEGACY_BLOCK_RULE[@]}"
+}
+
+remove_rules() {
+  remove_docker_rule "${DIRECT_DNS_UDP_RULE[@]}"
+  remove_docker_rule "${DIRECT_DNS_TCP_RULE[@]}"
+  remove_docker_rule "${JUMP_RULE[@]}"
+  remove_docker_rule "${LEGACY_BLOCK_RULE[@]}"
+
+  if chain_exists; then
+    iptables_run -F "$IMDS_CHAIN"
+    iptables_run -X "$IMDS_CHAIN"
+  fi
 }
 
 case "$MODE" in
   apply)
     require_docker_user_chain
-    if ! rule_exists; then
-      # DOCKER-USER is traversed only for forwarded container traffic. Host
-      # OUTPUT traffic, including approved host IMDS diagnostics, is unchanged.
-      iptables_run -I DOCKER-USER 1 "${RULE[@]}"
-    fi
-    rule_exists || fail "rule was not present after apply"
-    echo "Container IMDS firewall rule is active."
+    apply_rules
+    required_rules_are_active || fail "dedicated DNS exception and IMDS rejection were not active after apply"
+    echo "Container IMDS firewall and DNS exception are active."
     ;;
   check)
     require_docker_user_chain
-    rule_exists || fail "required DOCKER-USER IMDS rejection rule is missing"
-    echo "Container IMDS firewall rule is active."
+    required_rules_are_active || fail "required dedicated DNS exception or IMDS rejection rule is missing or out of order"
+    echo "Container IMDS firewall and DNS exception are active."
     ;;
   remove)
     require_docker_user_chain
-    while rule_exists; do
-      iptables_run -D DOCKER-USER "${RULE[@]}"
-    done
-    echo "Container IMDS firewall rule removed; host access was unchanged."
+    remove_rules
+    echo "Container IMDS firewall and DNS exception removed; host access was unchanged."
     ;;
 esac

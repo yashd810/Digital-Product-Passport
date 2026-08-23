@@ -73,7 +73,12 @@ should be closed externally.
 OCI instance metadata at `169.254.169.254` is intentionally reachable from the
 host, but application containers do not need it. Docker bridge traffic can
 otherwise reach IMDSv2, increasing the impact of a future container compromise
-when instance-principal policies or sensitive instance metadata exist.
+when instance-principal policies or sensitive instance metadata exist. OCI can
+also provide that link-local address as Docker's resolver. The control therefore
+jumps only traffic to that address into an owned chain, returns TCP/UDP port 53
+to `DOCKER-USER`, then rejects every other connection. Returning from the owned
+chain means any later `DOCKER-USER` policy still applies; metadata HTTP traffic
+is never permitted.
 
 Every successful production rollout installs and verifies the repository's
 reversible `DOCKER-USER` control after Docker has created its chains. For an
