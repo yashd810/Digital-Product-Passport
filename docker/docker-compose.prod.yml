@@ -23,6 +23,12 @@ services:
       retries: 8
       start_period: 20s
     restart: unless-stopped
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     depends_on:
       backend-api:
         condition: service_healthy
@@ -57,6 +63,12 @@ services:
       retries: 8
       start_period: 20s
     restart: unless-stopped
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     depends_on:
       backend-api:
         condition: service_healthy
@@ -103,6 +115,12 @@ services:
       retries: 12
       start_period: 30s
     restart: unless-stopped
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     depends_on:
       backend-storage-init:
         condition: service_completed_successfully
@@ -137,6 +155,12 @@ services:
       SERVER_URL: "${SERVER_URL:?SERVER_URL is required}"
       VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:?VITE_PUBLIC_VIEWER_URL is required}"
     command: ["node", "scripts/migrate-db.js"]
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -161,6 +185,12 @@ services:
     volumes:
       - localStorageData:/data
     restart: "no"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     network_mode: none
     read_only: true
     pids_limit: 32
@@ -198,6 +228,12 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     networks:
       - application
     security_opt:
@@ -231,6 +267,12 @@ services:
       retries: 20
       start_period: 5s
     restart: unless-stopped
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     networks:
       - database
     security_opt:

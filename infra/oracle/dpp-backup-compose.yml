@@ -30,13 +30,26 @@ services:
     volumes:
       - /var/lib/dpp-db-backups/container:/backup
     networks:
-      - application
+      # The uploader only needs OCI Object Storage egress. Keeping it off the
+      # backend application network prevents a backup credential compromise
+      # from becoming lateral access to the API or database containers.
+      - backup-egress
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
 
 networks:
-  application:
-    external: true
-    name: "${COMPOSE_PROJECT_NAME:-dpp}_application"
+  # A separate non-internal bridge gives the uploader its own outbound egress.
+  # The backup command accepts only HTTPS OCI Object Storage endpoints; no
+  # application or database service joins this network.
+  backup-egress:
+    name: "${COMPOSE_PROJECT_NAME:-dpp}_backup-egress"
+    driver: bridge
+    internal: false

@@ -4,7 +4,9 @@ terraform {
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = ">= 5.0.0"
+      # Provider upgrades are an explicit reviewed maintenance action. The
+      # committed lock file supplies the matching verified archive hashes.
+      version = "= 8.24.0"
     }
   }
 }
@@ -30,6 +32,12 @@ resource "oci_core_instance" "deployment_runner" {
     hostname_label   = var.hostname_label
     nsg_ids          = var.network_security_group_ids
     subnet_id        = var.subnet_ocid
+  }
+
+  # IMDSv1 is unauthenticated and makes SSRF consequences substantially more
+  # severe. The runner bootstrap uses no IMDSv1-only behavior.
+  instance_options {
+    are_legacy_imds_endpoints_disabled = true
   }
 
   dynamic "shape_config" {

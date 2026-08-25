@@ -339,11 +339,12 @@ controlled `db-migrate` run, and then the normal backend starts
 with startup migrations disabled. The flags are shell-only maintenance actions;
 do not add them to `/etc/dpp/dpp.env`.
 
-Do not use `infra/oracle/bootstrap.sh` from an SSH deployment account or a
-mutable checkout. The root release entry point requires an explicit target:
-use `backend` on the database/API host and `frontend` on the website host. Use
-`all` only for a deliberately single-host deployment. This prevents a command
-from creating duplicate services on the split OCI hosts.
+The legacy mutable-checkout bootstrap path has been removed. Do not clone or
+execute an application checkout from the SSH deployment account. The root
+release entry point requires an explicit target: use `backend` on the
+database/API host and `frontend` on the website host. Use `all` only for a
+deliberately single-host deployment. This prevents a command from creating
+duplicate services on the split OCI hosts.
 
 Do not use `docker compose down -v`, `docker volume rm`, or
 `DPP_INITIALIZE_POSTGRES_VOLUME=true`, or

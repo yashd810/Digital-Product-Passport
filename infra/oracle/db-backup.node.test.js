@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(testDir, "..", "..");
 const backupScript = path.join(testDir, "db-backup.sh");
 const backupInstaller = path.join(testDir, "install-db-backup-jobs.sh");
 const backupComposeDescriptor = path.join(testDir, "dpp-backup-compose.yml");
@@ -16,6 +17,54 @@ const backupServices = [
   ["dpp-db-backup-verify.service", "verify"],
   ["dpp-db-backup-drill.service", "drill"],
 ];
+const productionComposeFiles = [
+  {
+    path: path.join(repoRoot, "docker", "docker-compose.prod.yml"),
+    services: [
+      "frontend-app",
+      "public-passport-viewer",
+      "backend-api",
+      "db-migrate",
+      "backend-storage-init",
+      "marketing-site",
+      "postgres",
+    ],
+  },
+  {
+    path: path.join(repoRoot, "docker", "docker-compose.prod.backend.yml"),
+    services: ["backend-api", "db-migrate", "backend-storage-init", "postgres"],
+  },
+  {
+    path: path.join(repoRoot, "docker", "docker-compose.prod.frontend.yml"),
+    services: ["frontend-app", "public-passport-viewer", "marketing-site"],
+  },
+  {
+    path: backupComposeDescriptor,
+    services: ["db-backup-uploader"],
+  },
+];
+
+function serviceBlocks(source, sourcePath) {
+  const servicesStart = source.indexOf("services:\n");
+  assert.notEqual(servicesStart, -1, `${sourcePath} must contain a services section`);
+  const afterServices = source.slice(servicesStart + "services:\n".length);
+  const nextTopLevelSection = afterServices.search(/^(?:volumes|networks|configs|secrets):/m);
+  const serviceSection = afterServices.slice(0, nextTopLevelSection === -1 ? undefined : nextTopLevelSection);
+  const starts = [...serviceSection.matchAll(/^  ([A-Za-z0-9_-]+):\n/gm)];
+
+  return new Map(starts.map((match, index) => [
+    match[1],
+    serviceSection.slice(match.index, starts[index + 1]?.index),
+  ]));
+}
+
+function assertBoundedLocalLogging(serviceBlock, serviceName, sourcePath) {
+  assert.match(
+    serviceBlock,
+    /^    logging:\n      driver: local\n      options:\n        max-size: "10m"\n        max-file: "3"\n        compress: "true"$/m,
+    `${sourcePath} service ${serviceName} must cap local Docker logs at three compressed 10 MiB files`,
+  );
+}
 
 test("database backup staging uses an isolated uploader instead of the web container", () => {
   const source = readFileSync(backupScript, "utf8");
@@ -41,6 +90,37 @@ test("database backup staging uses an isolated uploader instead of the web conta
   assert.match(source, /--single-transaction/);
   assert.match(source, /dropdb -U "\$DB_ADMIN_USER" --maintenance-db="\$DB_NAME" --if-exists "\$POSTGRES_RESTORE_DATABASE"/);
   assert.match(source, /restoredPublicTableCount/);
+});
+
+test("every production service uses bounded local Docker logging", () => {
+  for (const compose of productionComposeFiles) {
+    const source = readFileSync(compose.path, "utf8");
+    const blocks = serviceBlocks(source, compose.path);
+    assert.deepEqual(
+      [...blocks.keys()],
+      compose.services,
+      `${compose.path} production services changed; update the logging hardening test deliberately`,
+    );
+    for (const [serviceName, serviceBlock] of blocks) {
+      assertBoundedLocalLogging(serviceBlock, serviceName, compose.path);
+    }
+  }
+});
+
+test("DB backup uploader has isolated OCI egress instead of backend-network access", () => {
+  const descriptor = readFileSync(backupComposeDescriptor, "utf8");
+  const uploader = serviceBlocks(descriptor, backupComposeDescriptor).get("db-backup-uploader");
+
+  assert.ok(uploader, "missing db-backup-uploader service");
+  assert.match(uploader, /^      - backup-egress$/m);
+  assert.doesNotMatch(uploader, /^      - application$/m);
+  assert.doesNotMatch(uploader, /^      - database$/m);
+  assert.doesNotMatch(descriptor, /^  application:/m);
+  assert.doesNotMatch(descriptor, /^  database:/m);
+  assert.match(
+    descriptor,
+    /^  backup-egress:\n    name: "\$\{COMPOSE_PROJECT_NAME:-dpp\}_backup-egress"\n    driver: bridge\n    internal: false$/m,
+  );
 });
 
 test("scheduled backup jobs execute root-owned installed assets without a mutable checkout", () => {
@@ -75,7 +155,8 @@ test("scheduled backup jobs execute root-owned installed assets without a mutabl
   assert.match(descriptor, /^    user: "1000:1000"$/m);
   assert.match(descriptor, /^    read_only: true$/m);
   assert.match(descriptor, /^      - \/var\/lib\/dpp-db-backups\/container:\/backup$/m);
-  assert.match(descriptor, /^    external: true$/m);
+  assert.match(descriptor, /^  backup-egress:$/m);
+  assert.doesNotMatch(descriptor, /^  application:$/m);
   assert.equal(descriptor.includes(["DB_BACKUP", "MANIFEST_HMAC_SECRET:"].join("_")), true);
   assert.doesNotMatch(descriptor, /^    env_file:/m);
   assert.doesNotMatch(descriptor, /REPLACE_|SECRET_ACCESS_KEY=[^$]/);

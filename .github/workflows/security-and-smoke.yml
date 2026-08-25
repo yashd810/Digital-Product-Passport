@@ -247,7 +247,6 @@ jobs:
           node --test apps/marketing-site/configure-runtime.node.test.js
       - name: Check deployment shell scripts
         run: |
-          bash -n infra/oracle/bootstrap.sh
           bash -n infra/oracle/check-edge-policy-config.sh
           bash -n infra/oracle/check-edge-tls.sh
           bash -n infra/oracle/check-live-edge.sh
@@ -275,10 +274,13 @@ jobs:
             apps/backend-api/tests/company-logo-freshness.node.test.js \
             apps/backend-api/tests/host-only-cookie.node.test.js \
             apps/backend-api/tests/logger-redaction.node.test.js \
+            apps/backend-api/tests/production-secret-config.node.test.js \
             apps/backend-api/tests/runtime-config.node.test.js \
             apps/backend-api/tests/runtime-database-role.node.test.js \
+            infra/oracle/build-context-secrets.node.test.js \
             infra/oracle/container-imds-firewall.node.test.js \
             infra/oracle/db-backup.node.test.js \
+            infra/oracle/deployment-runner-terraform.node.test.js \
             infra/oracle/object-storage-backups.node.test.js \
             infra/oracle/root-release-deployer.node.test.js \
             infra/docker/postgres/Dockerfile.node.test.js \

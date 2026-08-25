@@ -19,6 +19,32 @@ yarn-error.log*
 
 **/.env
 **/.env.*
+# Build contexts are the repository root, so protect both dotfiles and the
+# external-style production profiles that may be copied beneath it.
+*.env
+*.env.*
+**/*.env
+**/*.env.*
+*.tfvars
+*.tfvars.json
+**/*.tfvars
+**/*.tfvars.json
+*.tfstate
+*.tfstate.*
+**/*.tfstate
+**/*.tfstate.*
+.terraform
+.terraform/**
+**/.terraform
+**/.terraform/**
+.oci
+.oci/**
+**/.oci
+**/.oci/**
+.ssh
+.ssh/**
+**/.ssh
+**/.ssh/**
 **/*.pem
 **/*.key
 **/*.p12

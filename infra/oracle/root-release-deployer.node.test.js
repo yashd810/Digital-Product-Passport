@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -8,10 +8,12 @@ import { fileURLToPath } from "node:url";
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const releaseDeployer = path.join(testDir, "dpp-root-release-deployer.sh");
 const installer = path.join(testDir, "install-root-release-deployer.sh");
-const cloudInit = path.join(testDir, "cloud-init.yaml");
+const deploymentRunnerCloudInit = path.join(testDir, "deployment-runner/cloud-init.yaml.tftpl");
+const legacyBootstrap = path.join(testDir, "bootstrap.sh");
+const legacyCloudInit = path.join(testDir, "cloud-init.yaml");
 const source = readFileSync(releaseDeployer, "utf8");
 const installerSource = readFileSync(installer, "utf8");
-const cloudInitSource = readFileSync(cloudInit, "utf8");
+const deploymentRunnerCloudInitSource = readFileSync(deploymentRunnerCloudInit, "utf8");
 
 test("root release entry point stages a clean immutable Git release without trusting /opt/dpp", () => {
   assert.match(source, /^#!\/bin\/bash -p$/m);
@@ -125,9 +127,17 @@ test("installer copies a checksum-verified root-only entry point instead of trus
   assert.doesNotMatch(installerSource, /cp -f/);
 });
 
-test("new OCI cloud-init does not grant the deployment account Docker-root access", () => {
-  assert.match(cloudInitSource, /install -d -o root -g root -m 0700 \/opt\/dpp-releases/);
-  assert.match(cloudInitSource, /install -d -o root -g root -m 0700 \/etc\/dpp/);
-  assert.doesNotMatch(cloudInitSource, /usermod -aG docker/);
-  assert.doesNotMatch(cloudInitSource, /chown ubuntu:ubuntu \/opt\/dpp/);
+test("current deployment runner bootstrap does not grant Docker-root access", () => {
+  assert.match(deploymentRunnerCloudInitSource, /- name: \$\{runner_user\}/);
+  assert.doesNotMatch(deploymentRunnerCloudInitSource, /usermod -aG docker/);
+  assert.doesNotMatch(deploymentRunnerCloudInitSource, /docker-ce/);
+  assert.doesNotMatch(deploymentRunnerCloudInitSource, /chown ubuntu:ubuntu \/opt\/dpp/);
+});
+
+test("root-owned release helper is the only supported production execution path", () => {
+  assert.equal(existsSync(legacyBootstrap), false, "legacy mutable-checkout bootstrap must stay removed");
+  assert.equal(existsSync(legacyCloudInit), false, "legacy OCI host bootstrap must stay removed");
+  assert.match(source, /require_installed_entrypoint/);
+  assert.match(source, /\/bin\/bash "\$APP_DIR\/infra\/oracle\/deploy-prod\.sh"/);
+  assert.doesNotMatch(source, /bootstrap\.sh/);
 });

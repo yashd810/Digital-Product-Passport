@@ -20,9 +20,9 @@ on:
           - backend
           - frontend
       revision:
-        description: Optional 40-character commit SHA reachable from origin/main (use only for an approved rollback)
+        description: Required 40-character commit SHA on origin/main with a successful Security And Smoke push run (verified rollback only)
         type: string
-        required: false
+        required: true
 
 permissions:
   contents: read
@@ -35,21 +35,29 @@ concurrency:
 
 jobs:
   resolve-release:
-    # workflow_run is accepted only after CI passed for a push to protected main.
-    # workflow_dispatch is intentionally limited to commits reachable from main.
+    # workflow_run is accepted only after CI passed for a push to protected main
+    # and only while that revision remains the current origin/main tip.
+    # workflow_dispatch permits an intentional rollback only when the requested
+    # main-reachable SHA has independently recorded a successful Security And Smoke push run.
     # The repository variable is set to true only after the dedicated runner
     # and protected production Environment have been verified.
     if: >-
       github.event.repository.private == true &&
       vars.DPP_PRODUCTION_DEPLOY_ENABLED == 'true' &&
-      (github.event_name == 'workflow_dispatch' ||
+      ((github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/main') ||
        (github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.event == 'push' &&
         github.event.workflow_run.head_branch == 'main'))
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
     outputs:
       release_sha: ${{ steps.release.outputs.release_sha }}
       target: ${{ steps.release.outputs.target }}
+      should_deploy: ${{ steps.release.outputs.should_deploy }}
+      require_current_main: ${{ steps.release.outputs.require_current_main }}
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
@@ -60,6 +68,7 @@ jobs:
         env:
           REQUESTED_REVISION: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.revision }}
           REQUESTED_TARGET: ${{ inputs.target || 'all' }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -71,16 +80,18 @@ jobs:
               ;;
           esac
 
-          git fetch --no-tags origin main
-          if [ -n "$REQUESTED_REVISION" ]; then
-            if ! [[ "$REQUESTED_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
-              echo "revision must be a full 40-character Git SHA" >&2
-              exit 1
-            fi
-            release_sha="$REQUESTED_REVISION"
-          else
-            release_sha="$(git rev-parse origin/main)"
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          origin_main="$(git rev-parse origin/main)"
+
+          if [ -z "$REQUESTED_REVISION" ]; then
+            echo "A full 40-character revision is required for every production release" >&2
+            exit 1
           fi
+          if ! [[ "$REQUESTED_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "revision must be a full 40-character Git SHA" >&2
+            exit 1
+          fi
+          release_sha="$REQUESTED_REVISION"
 
           git cat-file -e "$release_sha^{commit}"
           if ! git merge-base --is-ancestor "$release_sha" origin/main; then
@@ -88,11 +99,67 @@ jobs:
             exit 1
           fi
 
+          case "$GITHUB_EVENT_NAME" in
+            workflow_run)
+              if [ "$release_sha" != "$origin_main" ]; then
+                echo "Skipping stale automatic release: Security And Smoke passed $release_sha, but origin/main is now $origin_main." >&2
+                printf 'should_deploy=false\n' >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              require_current_main=true
+              ;;
+            workflow_dispatch)
+              if ! command -v jq >/dev/null 2>&1; then
+                echo "jq is required to verify Security And Smoke workflow evidence" >&2
+                exit 1
+              fi
+
+              if ! workflow_runs="$(
+                curl --fail --silent --show-error --location \
+                  --proto '=https' --proto-redir '=https' \
+                  --connect-timeout 10 --max-time 30 \
+                  --retry 3 --retry-all-errors \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "Authorization: Bearer ${GITHUB_TOKEN:?GITHUB_TOKEN is required}" \
+                  -H "X-GitHub-Api-Version: 2022-11-28" \
+                  "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/security-and-smoke.yml/runs?head_sha=$release_sha&event=push&status=completed&per_page=100"
+              )"; then
+                echo "Unable to retrieve Security And Smoke workflow evidence for $release_sha" >&2
+                exit 1
+              fi
+
+              if ! security_run_id="$(printf '%s' "$workflow_runs" | jq -er --arg release_sha "$release_sha" '
+                .workflow_runs
+                | map(select(
+                    .head_sha == $release_sha and
+                    .event == "push" and
+                    .head_branch == "main" and
+                    .conclusion == "success"
+                  ))
+                | first
+                | .id
+              ')"; then
+                echo "Refusing manual release: no successful Security And Smoke push run exists for $release_sha" >&2
+                exit 1
+              fi
+
+              echo "Manual release is backed by successful Security And Smoke run $security_run_id."
+              require_current_main=false
+              ;;
+            *)
+              echo "Unsupported production release trigger: $GITHUB_EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
+
           printf 'release_sha=%s\n' "$release_sha" >> "$GITHUB_OUTPUT"
           printf 'target=%s\n' "$REQUESTED_TARGET" >> "$GITHUB_OUTPUT"
+          printf 'should_deploy=true\n' >> "$GITHUB_OUTPUT"
+          printf 'require_current_main=%s\n' "$require_current_main" >> "$GITHUB_OUTPUT"
 
   deploy:
     needs: resolve-release
+    if: needs.resolve-release.outputs.should_deploy == 'true'
     # Configure this environment in GitHub with required reviewers, protected
     # main-only deployments, and no self-approval. No production secret is
     # stored in GitHub; the dedicated OCI runner holds its local deployment key.
@@ -109,6 +176,7 @@ jobs:
       DPP_DEPLOY_RUNNER_USER: dpp-deploy
       DEPLOY_TARGET: ${{ needs.resolve-release.outputs.target }}
       RELEASE_SHA: ${{ needs.resolve-release.outputs.release_sha }}
+      REQUIRE_CURRENT_MAIN: ${{ needs.resolve-release.outputs.require_current_main }}
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
@@ -121,8 +189,19 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
-          git fetch --no-tags origin main
-          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          case "$REQUIRE_CURRENT_MAIN" in
+            true)
+              test "$RELEASE_SHA" = "$(git rev-parse origin/main)"
+              ;;
+            false)
+              git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+              ;;
+            *)
+              echo "Invalid current-main release guard: $REQUIRE_CURRENT_MAIN" >&2
+              exit 1
+              ;;
+          esac
       - name: Deploy approved release
         run: |
           set -euo pipefail

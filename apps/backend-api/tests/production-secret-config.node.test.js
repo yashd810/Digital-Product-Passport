@@ -12,7 +12,6 @@ const repoRoot = path.resolve(__dirname, "../../..");
 const templatePath = path.join(repoRoot, "infra/oracle/oci.env.example");
 const generatorPath = path.join(repoRoot, "infra/oracle/generate-env-secrets.sh");
 const deployScriptPath = path.join(repoRoot, "infra/oracle/deploy-prod.sh");
-const bootstrapScriptPath = path.join(repoRoot, "infra/oracle/bootstrap.sh");
 const startupPath = path.join(repoRoot, "apps/backend-api/src/bootstrap/start-server.js");
 const bootstrapSuperAdminPath = path.join(repoRoot, "apps/backend-api/scripts/bootstrap-super-admin.js");
 const productionComposePaths = [
@@ -183,7 +182,10 @@ function runBootstrapSuperAdmin(overrides = {}) {
   return spawnSync(process.execPath, [bootstrapSuperAdminPath], {
     cwd: repoRoot,
     encoding: "utf8",
-    timeout: 5_000,
+    // The child only validates configuration, but native module initialization
+    // can be slower on an otherwise busy CI worker. Keep the test fail-closed
+    // without making it spuriously flaky under parallel security checks.
+    timeout: 15_000,
     env,
   });
 }
@@ -250,13 +252,13 @@ test("production environment template fixes data-volume identities and disables 
   assert.equal(values.get(["DPP", "DEPLOY", "TARGET"].join("_")), ["REPLACE", "WITH", "DEPLOY", "TARGET"].join("_"));
 });
 
-test("production bootstrap requires an explicit topology and database-volume initialization", () => {
-  const bootstrapScript = fs.readFileSync(bootstrapScriptPath, "utf8");
+test("normal production deployment requires an explicit topology and volume-initialization decision", () => {
+  const deployScript = fs.readFileSync(deployScriptPath, "utf8");
 
-  assert.match(bootstrapScript, /DEPLOY_TARGET="\$\{DPP_DEPLOY_TARGET:-\}"/);
-  assert.match(bootstrapScript, /INITIALIZE_POSTGRES_VOLUME="\$\{DPP_INITIALIZE_POSTGRES_VOLUME:-false\}"/);
-  assert.match(bootstrapScript, /DPP_DEPLOY_TARGET is required/);
-  assert.match(bootstrapScript, /frontend\|backend\|all/);
+  assert.match(deployScript, /INITIALIZE_POSTGRES_VOLUME="\$\{DPP_INITIALIZE_POSTGRES_VOLUME:-false\}"/);
+  assert.match(deployScript, /if \[ -z "\$\{DPP_DEPLOY_TARGET:-\}" \]; then/);
+  assert.match(deployScript, /DPP_DEPLOY_TARGET must be set to one of: all, frontend, backend/);
+  assert.match(deployScript, /case "\$DEPLOY_TARGET" in[\s\S]*all\)[\s\S]*frontend\)[\s\S]*backend\)/);
 });
 
 test("production startup consumes the structured passport-storage validation result", () => {

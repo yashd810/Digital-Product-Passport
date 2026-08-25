@@ -7,6 +7,8 @@
 /scripts/deploy/ @yashd810
 /.gitleaks.toml @yashd810
 /.gitignore @yashd810
+/.dockerignore @yashd810
+/renovate.json @yashd810
 /apps/*/Dockerfile @yashd810
 /apps/*/.npmrc @yashd810
 /apps/*/package.json @yashd810
