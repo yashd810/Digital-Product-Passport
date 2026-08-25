@@ -104,6 +104,14 @@ output reports `retainedObjectsSkipped`, OCI is preserving older backup objects
 under the bucket retention rule. Do not remove the retention rule during routine
 cleanup unless the owner explicitly accepts that compliance/security change.
 
+For a low-cost object-storage health check between restore drills, run the
+uploader's `check-latest` command from the isolated DB-backup uploader context.
+It authenticates the newest usable manifest and issues only a `HeadObject` call
+for its dump, requiring the object size to match the signed manifest. It never
+downloads the dump, writes or deletes an object, and does **not** verify dump
+content or its checksum. Keep the scheduled signed-download verification and
+isolated restore drill as the recovery-content checks.
+
 The installer enables these timers only when `DB_BACKUP_ENABLED=true`. With
 `DB_BACKUP_ENABLED=false`, it installs their definitions but disables the three
 timers, and a manual invocation exits with status `3` instead of reporting a

@@ -8,6 +8,7 @@ const {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   DeleteObjectCommand
 } = require("@aws-sdk/client-s3");
@@ -343,6 +344,30 @@ async function findLatestAuthenticatedManifest(client, config, manifestKeys) {
   throw new Error("No authenticated database backup manifests found in object storage");
 }
 
+async function checkLatestBackupMetadata(client, config) {
+  const manifestKeys = await listAllManifestKeys(client, config);
+  if (!manifestKeys.length) {
+    throw new Error("No database backup manifests found in object storage");
+  }
+
+  const { manifest, manifestKey } = await findLatestAuthenticatedManifest(client, config, manifestKeys);
+  const dumpResponse = await client.send(new HeadObjectCommand({
+    Bucket: config.bucket,
+    Key: manifest.dumpKey
+  }));
+  const declaredLength = dumpResponse.ContentLength;
+  if (declaredLength === undefined || declaredLength === null
+    || !Number.isSafeInteger(Number(declaredLength)) || Number(declaredLength) !== manifest.sizeBytes) {
+    throw new Error("Database backup object length did not match its authenticated manifest");
+  }
+
+  return {
+    manifest,
+    manifestKey,
+    sizeBytes: Number(declaredLength),
+  };
+}
+
 function buildKeys(config, now = new Date(), backupId = crypto.randomBytes(16).toString("base64url")) {
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
     throw invalidManifestError("Database backup timestamp is invalid");
@@ -522,6 +547,29 @@ async function downloadLatest() {
   }) + "\n");
 }
 
+async function checkLatest() {
+  const config = readConfig();
+  const client = createClient(config);
+  const { manifest, manifestKey, sizeBytes } = await checkLatestBackupMetadata(client, config);
+
+  // This intentionally verifies only authenticated manifest data and object
+  // metadata. It does not fetch the potentially multi-gigabyte dump or claim
+  // a content checksum verification; use download-latest and a restore drill
+  // when a full recovery-content verification is required.
+  process.stdout.write(JSON.stringify({
+    ok: true,
+    verification: "authenticated-manifest-and-object-metadata",
+    dumpKey: manifest.dumpKey,
+    manifestKey,
+    createdAt: manifest.createdAt,
+    sizeBytes,
+    authenticatedManifest: true,
+    dumpObjectLengthMatchesManifest: true,
+    dumpContentDownloaded: false,
+    dumpContentChecksumVerified: false,
+  }) + "\n");
+}
+
 async function putObjectFile() {
   const config = readConfig();
   const filePath = requireArg("--file");
@@ -572,12 +620,16 @@ async function main() {
     await downloadLatest();
     return;
   }
+  if (command === "check-latest") {
+    await checkLatest();
+    return;
+  }
   if (command === "put-object") {
     await putObjectFile();
     return;
   }
 
-  throw new Error("Usage: node scripts/db-backup-object-storage.js <upload|download-latest|put-object> [options]");
+  throw new Error("Usage: node scripts/db-backup-object-storage.js <upload|download-latest|check-latest|put-object> [options]");
 }
 
 if (require.main === module) {
@@ -591,6 +643,7 @@ module.exports = {
   authenticateManifest,
   buildKeys,
   canonicalManifestPayload,
+  checkLatestBackupMetadata,
   listAllManifestKeys,
   readConfig,
   requireNoFollowFlag,

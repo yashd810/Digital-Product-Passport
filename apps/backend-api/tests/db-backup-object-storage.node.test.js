@@ -9,6 +9,7 @@ const { readDbBackupObjectStorageConfig } = require("../src/shared/backups/db-ba
 const {
   authenticateManifest,
   buildKeys,
+  checkLatestBackupMetadata,
   listAllManifestKeys,
   requireNoFollowFlag,
   signManifest,
@@ -258,4 +259,108 @@ test("database backup manifest inventory paginates safely for immutable multi-ye
   ]);
   assert.equal(calls[0].MaxKeys, 1000);
   assert.equal(calls[1].ContinuationToken, "next-page");
+});
+
+test("metadata-only latest-backup check verifies the signed manifest and dump HEAD length without downloading dump content", async () => {
+  const config = readDbBackupObjectStorageConfig(validDbBackupConfig);
+  const keys = buildKeys(
+    config,
+    new Date("2026-08-16T12:00:00.000Z"),
+    "AaBbCcDdEeFfGgHhIiJjKw"
+  );
+  const manifest = {
+    schemaVersion: 2,
+    type: "postgresCustomDump",
+    dbName: config.dbName,
+    createdAt: keys.createdAt,
+    backupId: keys.backupId,
+    dumpKey: keys.dumpKey,
+    manifestKey: keys.manifestKey,
+    sizeBytes: 123,
+    sha256: "a".repeat(64),
+  };
+  manifest.authentication = {
+    algorithm: "HMAC-SHA256",
+    digest: signManifest(manifest, config.manifestHmacSecret),
+  };
+  const manifestBody = Buffer.from(JSON.stringify(manifest));
+  const calls = [];
+  const client = {
+    async send(command) {
+      calls.push(command);
+      if (command.constructor.name === "ListObjectsV2Command") {
+        return { Contents: [{ Key: keys.manifestKey }], IsTruncated: false };
+      }
+      if (command.constructor.name === "GetObjectCommand") {
+        assert.equal(command.input.Key, keys.manifestKey);
+        return { ContentLength: manifestBody.length, Body: manifestBody };
+      }
+      if (command.constructor.name === "HeadObjectCommand") {
+        assert.equal(command.input.Key, keys.dumpKey);
+        return { ContentLength: manifest.sizeBytes };
+      }
+      throw new Error(`Unexpected object-storage command: ${command.constructor.name}`);
+    },
+  };
+
+  const result = await checkLatestBackupMetadata(client, config);
+
+  assert.deepEqual(result.manifest, manifest);
+  assert.equal(result.manifestKey, keys.manifestKey);
+  assert.equal(result.sizeBytes, manifest.sizeBytes);
+  assert.deepEqual(calls.map((command) => command.constructor.name), [
+    "ListObjectsV2Command",
+    "GetObjectCommand",
+    "HeadObjectCommand",
+  ]);
+  assert.equal(
+    calls.filter((command) => command.constructor.name === "GetObjectCommand").every(
+      (command) => command.input.Key !== keys.dumpKey
+    ),
+    true
+  );
+});
+
+test("metadata-only latest-backup check rejects a dump HEAD length that differs from its signed manifest", async () => {
+  const config = readDbBackupObjectStorageConfig(validDbBackupConfig);
+  const keys = buildKeys(
+    config,
+    new Date("2026-08-16T12:00:00.000Z"),
+    "AaBbCcDdEeFfGgHhIiJjKw"
+  );
+  const manifest = {
+    schemaVersion: 2,
+    type: "postgresCustomDump",
+    dbName: config.dbName,
+    createdAt: keys.createdAt,
+    backupId: keys.backupId,
+    dumpKey: keys.dumpKey,
+    manifestKey: keys.manifestKey,
+    sizeBytes: 123,
+    sha256: "a".repeat(64),
+  };
+  manifest.authentication = {
+    algorithm: "HMAC-SHA256",
+    digest: signManifest(manifest, config.manifestHmacSecret),
+  };
+  const manifestBody = Buffer.from(JSON.stringify(manifest));
+  const client = {
+    async send(command) {
+      if (command.constructor.name === "ListObjectsV2Command") {
+        return { Contents: [{ Key: keys.manifestKey }], IsTruncated: false };
+      }
+      if (command.constructor.name === "GetObjectCommand") {
+        return { ContentLength: manifestBody.length, Body: manifestBody };
+      }
+      if (command.constructor.name === "HeadObjectCommand") {
+        return { ContentLength: manifest.sizeBytes - 1 };
+      }
+      throw new Error(`Unexpected object-storage command: ${command.constructor.name}`);
+    },
+  };
+
+  await assert.rejects(
+    checkLatestBackupMetadata(client, config),
+    /object length did not match its authenticated manifest/
+  );
 });
