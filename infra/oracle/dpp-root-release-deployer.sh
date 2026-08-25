@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 #
 # Root-owned OCI release entry point.  This file is intentionally installed as
 # /usr/local/sbin/dpp-release-deployer by install-root-release-deployer.sh and
@@ -7,6 +7,8 @@
 # /opt/dpp release used by infra/oracle/deploy-prod.sh.
 
 set -euo pipefail
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 umask 077
 
 readonly INSTALL_PATH="/usr/local/sbin/dpp-release-deployer"
@@ -323,7 +325,7 @@ run_deployment() {
   local timeout_seconds="$6"
   local deploy_env=(
     /usr/bin/env -i
-    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    PATH=/usr/sbin:/usr/bin:/sbin:/bin
     HOME=/root
     APP_DIR="$APP_DIR"
     DPP_ENV_FILE="$ENV_FILE"
@@ -354,7 +356,7 @@ cleanup_staging_release() {
 }
 trap cleanup_staging_release EXIT
 
-[ "$(id -u)" -eq 0 ] || fail "must run as root through the dedicated sudo rule"
+[ "$(/usr/bin/id -u)" -eq 0 ] || fail "must run as root through the dedicated sudo rule"
 require_installed_entrypoint
 require_command /usr/bin/git
 require_command /usr/bin/ssh

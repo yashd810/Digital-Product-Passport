@@ -1,14 +1,16 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 # Installs the root-owned DPP release entry point.  This is a one-time
 # bootstrap operation and must be run only from independently verified source
 # by a root operator; the normal deployment account must not be able to run it.
 
 set -euo pipefail
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 umask 077
 
 readonly INSTALL_PATH="/usr/local/sbin/dpp-release-deployer"
 readonly INSTALL_DIRECTORY="/usr/local/sbin"
-readonly SOURCE_PATH="${DPP_ROOT_RELEASE_DEPLOYER_SOURCE:-$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/dpp-root-release-deployer.sh}"
+readonly SOURCE_PATH="${DPP_ROOT_RELEASE_DEPLOYER_SOURCE:-$(CDPATH= cd -- "$(/usr/bin/dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/dpp-root-release-deployer.sh}"
 readonly EXPECTED_SHA256="${DPP_ROOT_RELEASE_DEPLOYER_SHA256:-}"
 
 fail() {
