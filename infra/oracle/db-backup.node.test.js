@@ -78,6 +78,7 @@ test("database backup staging uses an isolated uploader instead of the web conta
   assert.doesNotMatch(source, /O_NOFOLLOW \|\| 0/);
   assert.match(source, /stat\.uid !== process\.getuid\(\)/);
   assert.match(source, /stat\.mode & 0o077/);
+  assert.match(source, /DB_BACKUP_MANIFEST_HMAC_SECRET must be a distinct 64-character lowercase hexadecimal secret/);
   assert.match(source, /fs\.createReadStream\(source\)/);
   assert.doesNotMatch(source, /readFileSync\(source\)/);
   assert.doesNotMatch(source, /POSTGRES_RESTORE_DUMP/);

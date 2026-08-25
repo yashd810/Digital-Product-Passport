@@ -291,7 +291,7 @@ test("production deployment fails closed rather than selecting a fresh database 
   assert.match(deployScript, /require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "SIGNING_PRIVATE_KEY"/);
   assert.match(deployScript, /require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "ASSET_SOURCE_CREDENTIALS_JSON"/);
   assert.match(deployScript, /require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "DB_BACKUP_MANIFEST_HMAC_SECRET"/);
-  assert.match(deployScript, /require_secret_env_var "DB_BACKUP_MANIFEST_HMAC_SECRET"/);
+  assert.match(deployScript, /require_256_bit_hex_secret_env_var "DB_BACKUP_MANIFEST_HMAC_SECRET"/);
   assert.match(deployScript, /require_integer_range_env_var "DB_BACKUP_MAX_BYTES" "1048576" "107374182400"/);
   assert.match(deployScript, /require_integer_range_env_var "DB_BACKUP_RETENTION_COUNT" "1" "128"/);
   assert.match(deployScript, /require_distinct_env_vars "DB_BACKUP_S3_BUCKET" "BACKUP_PROVIDER_BUCKET"/);

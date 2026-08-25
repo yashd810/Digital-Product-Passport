@@ -126,6 +126,16 @@ require_secret_env_var() {
   fi
 }
 
+require_256_bit_hex_secret_env_var() {
+  local key="$1"
+  local value
+  value="$(read_env_var "$key")"
+  if ! [[ "$value" =~ ^[a-f0-9]{64}$ ]]; then
+    echo "Production secret $key must be a 64-character lowercase hexadecimal value"
+    exit 1
+  fi
+}
+
 require_non_placeholder_env_var() {
   local key="$1"
   local value
@@ -505,7 +515,7 @@ case "$DEPLOY_TARGET" in
     require_non_placeholder_env_var "DB_BACKUP_S3_ACCESS_KEY_ID"
     require_non_placeholder_env_var "DB_BACKUP_S3_SECRET_ACCESS_KEY"
     require_secret_env_var "DB_BACKUP_S3_SECRET_ACCESS_KEY"
-    require_secret_env_var "DB_BACKUP_MANIFEST_HMAC_SECRET"
+    require_256_bit_hex_secret_env_var "DB_BACKUP_MANIFEST_HMAC_SECRET"
     require_boolean_env_var "DB_BACKUP_S3_FORCE_PATH_STYLE"
     require_non_placeholder_env_var "DB_BACKUP_S3_PREFIX"
     require_non_placeholder_env_var "DB_BACKUP_EVIDENCE_S3_PREFIX"

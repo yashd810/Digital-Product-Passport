@@ -9,12 +9,15 @@
 /.gitignore @yashd810
 /.dockerignore @yashd810
 /renovate.json @yashd810
+/SECURITY.md @yashd810
 /apps/*/Dockerfile @yashd810
 /apps/*/.npmrc @yashd810
 /apps/*/package.json @yashd810
 /apps/*/package-lock.json @yashd810
+/apps/backend-api/scripts/bootstrap-super-admin.js @yashd810
 /apps/backend-api/src/http/middleware/ @yashd810
 /apps/backend-api/src/http/routes/auth.js @yashd810
 /apps/backend-api/src/platform/security/ @yashd810
+/apps/backend-api/src/shared/backups/ @yashd810
 /apps/backend-api/src/shared/security/ @yashd810
 /apps/frontend-app/src/shared/security/ @yashd810

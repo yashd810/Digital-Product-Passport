@@ -25,9 +25,12 @@ function normalizeStrictPrefix(name, value, fallback) {
 }
 
 function readRequiredBackupConfig(name, rawValue) {
-  const value = String(rawValue || "").trim();
+  const value = String(rawValue || "");
   if (!value) {
     throw new Error(`Missing dedicated DB backup S3 configuration: ${name}`);
+  }
+  if (value.trim() !== value) {
+    throw new Error(`DB backup S3 configuration must not contain leading or trailing whitespace: ${name}`);
   }
   if (/(REPLACE|CHANGE|YOUR_)/i.test(value)) {
     throw new Error(`DB backup S3 configuration must not use a placeholder: ${name}`);
@@ -79,9 +82,16 @@ function validateBackupCredential(name, value) {
   return value;
 }
 
-function validateManifestHmacSecret(value) {
-  if (value.length < 32) {
-    throw new Error("DB_BACKUP_MANIFEST_HMAC_SECRET must contain at least 32 characters");
+function validateManifestHmacSecret(value, secretAccessKey) {
+  // The production generator emits 32 random bytes as lowercase hexadecimal.
+  // Keeping that exact representation prevents a weak, truncated, or
+  // whitespace-containing value from silently becoming the manifest root of
+  // trust when the uploader is invoked outside the host backup wrapper.
+  if (!/^[a-f0-9]{64}$/.test(value)) {
+    throw new Error("DB_BACKUP_MANIFEST_HMAC_SECRET must be a 64-character lowercase hexadecimal secret");
+  }
+  if (value === secretAccessKey) {
+    throw new Error("DB_BACKUP_MANIFEST_HMAC_SECRET must differ from DB_BACKUP_S3_SECRET_ACCESS_KEY");
   }
   return value;
 }
@@ -150,7 +160,8 @@ function readDbBackupObjectStorageConfig({
     readRequiredBackupConfig("DB_BACKUP_S3_SECRET_ACCESS_KEY", secretAccessKey)
   );
   const normalizedManifestHmacSecret = validateManifestHmacSecret(
-    readRequiredBackupConfig("DB_BACKUP_MANIFEST_HMAC_SECRET", manifestHmacSecret)
+    readRequiredBackupConfig("DB_BACKUP_MANIFEST_HMAC_SECRET", manifestHmacSecret),
+    normalizedSecretAccessKey
   );
   const normalizedForcePathStyle = readOptionalBoolean(
     "DB_BACKUP_S3_FORCE_PATH_STYLE",

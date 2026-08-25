@@ -22,7 +22,7 @@ const validDbBackupConfig = {
   bucket: "dpp-prod-db-backups",
   accessKeyId: "db-backup-access-key",
   secretAccessKey: "db-backup-secret-key",
-  manifestHmacSecret: "db-backup-manifest-hmac-secret-at-least-32-characters",
+  manifestHmacSecret: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   forcePathStyle: "true",
   prefix: "db-backups/postgres",
   evidencePrefix: "db-backups/evidence/restore-drills",
@@ -51,7 +51,7 @@ test("DB backup object storage accepts only a complete dedicated configuration",
     bucket: "dpp-prod-db-backups",
     accessKeyId: "db-backup-access-key",
     secretAccessKey: "db-backup-secret-key",
-    manifestHmacSecret: "db-backup-manifest-hmac-secret-at-least-32-characters",
+    manifestHmacSecret: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     forcePathStyle: true,
     prefix: "db-backups/postgres",
     evidencePrefix: "db-backups/evidence/restore-drills",
@@ -91,6 +91,31 @@ test("DB backup object storage rejects unsafe endpoint and boolean configuration
     ...validDbBackupConfig,
     retentionCount: "129",
   }), /DB_BACKUP_RETENTION_COUNT/);
+
+  assert.throws(() => readDbBackupObjectStorageConfig({
+    ...validDbBackupConfig,
+    manifestHmacSecret: "a".repeat(32),
+  }), /64-character lowercase hexadecimal secret/);
+
+  assert.throws(() => readDbBackupObjectStorageConfig({
+    ...validDbBackupConfig,
+    manifestHmacSecret: "A".repeat(64),
+  }), /64-character lowercase hexadecimal secret/);
+
+  assert.throws(() => readDbBackupObjectStorageConfig({
+    ...validDbBackupConfig,
+    secretAccessKey: validDbBackupConfig.manifestHmacSecret,
+  }), /must differ from DB_BACKUP_S3_SECRET_ACCESS_KEY/);
+
+  assert.throws(() => readDbBackupObjectStorageConfig({
+    ...validDbBackupConfig,
+    manifestHmacSecret: ` ${validDbBackupConfig.manifestHmacSecret}`,
+  }), /must not contain leading or trailing whitespace/);
+
+  assert.throws(() => readDbBackupObjectStorageConfig({
+    ...validDbBackupConfig,
+    secretAccessKey: `${validDbBackupConfig.secretAccessKey} `,
+  }), /must not contain leading or trailing whitespace/);
 });
 
 test("DB backup object storage defaults the dedicated prefix when it is omitted", () => {

@@ -13,7 +13,6 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { Pool } = require("pg");
 const createPasswordService = require("../src/platform/security/password-service");
 const { validatePasswordPolicy } = require("../src/platform/security/security-service");
 
@@ -59,6 +58,11 @@ function requireEnv(name) {
 }
 
 function createPool() {
+  // Do not initialize the database driver until all local configuration and
+  // credential policy checks have succeeded. Besides avoiding unnecessary
+  // work for invalid invocations, this preserves the fail-closed validation
+  // path when the database runtime is unavailable.
+  const { Pool } = require("pg");
   return new Pool({
     user: requireEnv("DB_USER"),
     password: requireEnv("DB_PASSWORD"),

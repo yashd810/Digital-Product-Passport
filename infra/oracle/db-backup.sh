@@ -118,8 +118,8 @@ validate_db_backup_configuration() {
     echo "DB backup S3 credentials must not contain whitespace"
     exit 1
   fi
-  if [ "$(printf %s "$manifest_hmac_secret" | wc -c | tr -d ' ')" -lt 32 ] || [[ "$manifest_hmac_secret" =~ [[:space:]] ]] || [ "$manifest_hmac_secret" = "$secret_access_key" ]; then
-    echo "DB_BACKUP_MANIFEST_HMAC_SECRET must be a distinct non-whitespace secret of at least 32 characters"
+  if ! [[ "$manifest_hmac_secret" =~ ^[a-f0-9]{64}$ ]] || [ "$manifest_hmac_secret" = "$secret_access_key" ]; then
+    echo "DB_BACKUP_MANIFEST_HMAC_SECRET must be a distinct 64-character lowercase hexadecimal secret"
     exit 1
   fi
   case "$force_path_style" in
