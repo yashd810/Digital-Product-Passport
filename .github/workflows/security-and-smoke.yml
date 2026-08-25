@@ -170,12 +170,18 @@ jobs:
             docker rm -f dpp-ci-postgres >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
-          for attempt in $(seq 1 30); do
+          for attempt in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:3001/health; then
               exit 0
             fi
+            if ! kill -0 "$backend_pid" 2>/dev/null; then
+              echo "::error title=Backend smoke startup::The backend process exited before its health endpoint became ready."
+              cat /tmp/backend-smoke.log
+              exit 1
+            fi
             sleep 1
           done
+          echo "::error title=Backend smoke readiness::The backend did not become healthy within 60 seconds."
           cat /tmp/backend-smoke.log
           exit 1
       - name: Stop hardened PostgreSQL
@@ -256,22 +262,29 @@ jobs:
           bash -n scripts/restart-local-stack.sh
           bash -n scripts/troubleshoot-oci.sh
       - name: Test deployment-runner preflight
-        run: >-
-          node --test
-          .github/scripts/run-gitleaks-fail-closed.node.test.js
-          apps/backend-api/tests/company-logo-freshness.node.test.js
-          apps/backend-api/tests/host-only-cookie.node.test.js
-          apps/backend-api/tests/logger-redaction.node.test.js
-          apps/backend-api/tests/runtime-config.node.test.js
-          apps/backend-api/tests/runtime-database-role.node.test.js
-          infra/oracle/container-imds-firewall.node.test.js
-          infra/oracle/db-backup.node.test.js
-          infra/oracle/object-storage-backups.node.test.js
-          infra/oracle/root-release-deployer.node.test.js
-          infra/docker/postgres/Dockerfile.node.test.js
-          scripts/deploy/check-deployment-runner.node.test.js
-          scripts/deploy/deploy-to-oci.node.test.js
-          scripts/deploy/production-deploy-workflow.node.test.js
+        run: |
+          set -o pipefail
+          test_log="$RUNNER_TEMP/dpp-ops-node-tests.log"
+          if ! node --test --test-concurrency=1 \
+            .github/scripts/run-gitleaks-fail-closed.node.test.js \
+            apps/backend-api/tests/company-logo-freshness.node.test.js \
+            apps/backend-api/tests/host-only-cookie.node.test.js \
+            apps/backend-api/tests/logger-redaction.node.test.js \
+            apps/backend-api/tests/runtime-config.node.test.js \
+            apps/backend-api/tests/runtime-database-role.node.test.js \
+            infra/oracle/container-imds-firewall.node.test.js \
+            infra/oracle/db-backup.node.test.js \
+            infra/oracle/object-storage-backups.node.test.js \
+            infra/oracle/root-release-deployer.node.test.js \
+            infra/docker/postgres/Dockerfile.node.test.js \
+            scripts/deploy/check-deployment-runner.node.test.js \
+            scripts/deploy/deploy-to-oci.node.test.js \
+            scripts/deploy/production-deploy-workflow.node.test.js \
+            2>&1 | tee "$test_log"; then
+            failed_test="$(grep -m 1 -E '^(not ok|✖)' "$test_log" || true)"
+            echo "::error title=Security test cohort::${failed_test:-Node security tests failed; inspect the protected workflow log.}"
+            exit 1
+          fi
       - name: Check deployment-runner Terraform formatting
         run: >-
           docker run --rm
