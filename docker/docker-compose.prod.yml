@@ -80,7 +80,9 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000,mode=1777
     env_file:
-      - path: ${DPP_ENV_FILE:?DPP_ENV_FILE is required and must point to the host-owned production environment file}
+      # deploy-prod.sh derives this allowlisted file from the broader root-only
+      # source env. It intentionally excludes DB_ADMIN_* and DB_BACKUP_*.
+      - path: ${DPP_BACKEND_ENV_FILE:-/etc/dpp/dpp-backend.env}
         required: true
     environment:
       NODE_ENV: production
@@ -114,6 +116,37 @@ services:
     cap_drop:
       - ALL
 
+  # Controlled schema maintenance. This never starts with the API and is the
+  # only Node process that receives the PostgreSQL admin credentials.
+  db-migrate:
+    image: dpp-backend-api:latest
+    profiles: ["maintenance"]
+    read_only: true
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,uid=1000,gid=1000,mode=1777
+    environment:
+      NODE_ENV: production
+      DB_HOST: "${DB_HOST:-postgres}"
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_NAME: "${DB_NAME:?DB_NAME is required}"
+      DB_USER: "${DB_USER:?DB_USER is required}"
+      DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+      DB_ADMIN_USER: "${DB_ADMIN_USER:?DB_ADMIN_USER is required}"
+      DB_ADMIN_PASSWORD: "${DB_ADMIN_PASSWORD:?DB_ADMIN_PASSWORD is required}"
+      SERVER_URL: "${SERVER_URL:?SERVER_URL is required}"
+      VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:?VITE_PUBLIC_VIEWER_URL is required}"
+    command: ["node", "scripts/migrate-db.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - database
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
   backend-storage-init:
     image: alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
     command:
@@ -125,7 +158,6 @@ services:
         /data/repository-files
         /data/uploads
         /data/uploads/symbols
-        && install -d -o 1000 -g 1000 -m 0700 /data/.db-backup-tmp
     volumes:
       - localStorageData:/data
     restart: "no"
@@ -178,7 +210,7 @@ services:
       context: ..
       dockerfile: infra/docker/postgres/Dockerfile
     pull_policy: build
-    image: dpp-postgres:18.4-trixie-gosu1.19-go1.26.6
+    image: dpp-postgres:18.4-trixie-gosu1.19-go1.26.6-debian-security1
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     read_only: true
@@ -188,8 +220,8 @@ services:
       - /var/run/postgresql:rw,nosuid,nodev,size=16m,uid=999,gid=999,mode=0755
     environment:
       POSTGRES_DB: "${DB_NAME:?DB_NAME is required}"
-      POSTGRES_USER: "${DB_USER:?DB_USER is required}"
-      POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+      POSTGRES_USER: "${DB_ADMIN_USER:?DB_ADMIN_USER is required}"
+      POSTGRES_PASSWORD: "${DB_ADMIN_PASSWORD:?DB_ADMIN_PASSWORD is required}"
     volumes:
       - postgresData:/var/lib/postgresql
     healthcheck:

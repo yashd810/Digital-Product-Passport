@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { flattenSchemaFieldsFromSections } from "../../../../shared/passports/passportSchemaUtils";
 import { dedupeLatestReleasedPassports } from "../utils/passportListHelpers";
+import { escapeCsvCell } from "../../../../shared/security/csvSafety";
 import AppSelect from "../../../../shared/components/AppSelect";
 import { useI18n } from "../../../../app/providers/i18n";
 
@@ -150,9 +151,7 @@ export function BulkReviseModal({
         item.message || "",
       ]),
     ];
-    const csv = rows
-      .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+    const csv = rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);

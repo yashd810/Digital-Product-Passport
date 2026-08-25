@@ -24,6 +24,49 @@ fail() {
   exit 1
 }
 
+file_mode() {
+  local file="$1"
+  if stat -c '%a' "$file" >/dev/null 2>&1; then
+    stat -c '%a' "$file"
+  else
+    stat -f '%Lp' "$file"
+  fi
+}
+
+file_owner() {
+  local file="$1"
+  if stat -c '%u' "$file" >/dev/null 2>&1; then
+    stat -c '%u' "$file"
+  else
+    stat -f '%u' "$file"
+  fi
+}
+
+require_installed_root_owned_script() {
+  local script_path="${BASH_SOURCE[0]}"
+  local script_mode
+
+  # Test mode intentionally runs the checked-in source against a fake
+  # iptables command.  Production invocations must use the root-owned copy
+  # installed below /usr/local so a systemd restart never consumes /opt/dpp.
+  if [ "$TEST_MODE" = "true" ]; then
+    return 0
+  fi
+  if [ "$script_path" != "/usr/local/sbin/dpp-container-imds-firewall" ]; then
+    fail "must run from /usr/local/sbin/dpp-container-imds-firewall, not a checkout path"
+  fi
+  if [ -L "$script_path" ] || [ ! -f "$script_path" ]; then
+    fail "installed firewall script must be a regular non-symlinked file"
+  fi
+  if [ "$(file_owner "$script_path")" != "0" ]; then
+    fail "installed firewall script must be owned by root"
+  fi
+  script_mode="$(file_mode "$script_path")"
+  if (( (8#$script_mode & 8#022) != 0 )); then
+    fail "installed firewall script must not be writable by group or others"
+  fi
+}
+
 case "$MODE" in
   apply|check|remove) ;;
   *) fail "usage: $0 [apply|check|remove]" ;;
@@ -33,6 +76,8 @@ case "$TEST_MODE" in
   true|false) ;;
   *) fail "DPP_FIREWALL_TEST_MODE must be true or false" ;;
 esac
+
+require_installed_root_owned_script
 
 if [ "$TEST_MODE" != "true" ] && [ "$(id -u)" -ne 0 ]; then
   fail "must run as root"

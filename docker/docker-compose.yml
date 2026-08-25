@@ -125,7 +125,6 @@ services:
         /data/repository-files
         /data/uploads
         /data/uploads/symbols
-        && install -d -o 1000 -g 1000 -m 0700 /data/.db-backup-tmp
     volumes:
       - local_storage:/data
     network_mode: none
@@ -175,7 +174,7 @@ services:
       context: ..
       dockerfile: infra/docker/postgres/Dockerfile
     pull_policy: build
-    image: dpp-postgres:18.4-trixie-gosu1.19-go1.26.6
+    image: dpp-postgres:18.4-trixie-gosu1.19-go1.26.6-debian-security1
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     read_only: true

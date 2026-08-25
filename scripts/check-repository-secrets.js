@@ -10,6 +10,17 @@ const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, encodin
   .split("\0")
   .filter(Boolean)
   .map((file) => file.replaceAll("\\", "/"));
+// CI scans the checked-out revision, but developers need the same protection
+// before staging a newly created file.  Include ordinary untracked files while
+// respecting repository ignore rules so private local env files stay local.
+const untracked = execFileSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], {
+  cwd: repoRoot,
+  encoding: "utf8",
+})
+  .split("\0")
+  .filter(Boolean)
+  .map((file) => file.replaceAll("\\", "/"));
+const candidateFiles = [...new Set([...tracked, ...untracked])].sort();
 
 const allowedEnvTemplate = (file) => /\.(example|sample|template)$/i.test(file);
 const isEnvLike = (file) => {
@@ -20,7 +31,7 @@ const isEnvLike = (file) => {
     || name.includes(".env.");
 };
 
-const envFileViolations = tracked
+const envFileViolations = candidateFiles
   .filter((file) => isEnvLike(file) && !allowedEnvTemplate(file))
   .map((file) => `${file}: tracked env-like file`);
 
@@ -36,6 +47,8 @@ const sensitiveKeys = new Set([
   "OTP_HMAC_SECRET",
   "REPOSITORY_FILE_LINK_SECRET",
   "DB_PASSWORD",
+  "DB_ADMIN_PASSWORD",
+  "DB_MIGRATION_PASSWORD",
   "POSTGRES_PASSWORD",
   "STORAGE_S3_ACCESS_KEY_ID",
   "STORAGE_S3_SECRET_ACCESS_KEY",
@@ -44,6 +57,7 @@ const sensitiveKeys = new Set([
   "BACKUP_PROVIDER_KEY",
   "BACKUP_PROVIDER_ACCESS_KEY_ID",
   "BACKUP_PROVIDER_SECRET_ACCESS_KEY",
+  "DB_BACKUP_MANIFEST_HMAC_SECRET",
   "SIGNING_PRIVATE_KEY",
   "SIGNING_PUBLIC_KEY",
   "OAUTH_PROVIDERS_JSON",
@@ -94,14 +108,20 @@ const looksAllowedPlaceholder = (value) => {
     || normalized === "apikey"
     || normalized === "true"
     || normalized === "false"
-    || normalized === "null";
+    || normalized === "null"
+    || normalized === "[]"
+    || normalized === "{}";
 };
 
 const assignmentViolations = [];
 const assignmentPattern = /\b([A-Z][A-Z0-9_]*)\b\s*(?::|=(?!=))\s*([^#\s,}]+)/;
 
-for (const file of tracked) {
-  if (allowedEnvTemplate(file) || ignoredFiles.some((pattern) => pattern.test(file))) continue;
+for (const file of candidateFiles) {
+  // Environment examples must be safe to copy, but they are still tracked
+  // source. Scan their assignments just like every other text file and allow
+  // only explicit placeholders below; otherwise a real credential in a
+  // production template would be invisible to this check.
+  if (ignoredFiles.some((pattern) => pattern.test(file))) continue;
   if (!textLikeExtensions.has(path.posix.extname(file))) continue;
 
   const absolutePath = path.join(repoRoot, file);

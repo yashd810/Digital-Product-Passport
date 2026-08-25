@@ -2,6 +2,16 @@ region                  = "eu-stockholm-1"
 compartment_ocid        = "ocid1.compartment.oc1..replace-me"
 namespace               = "axknlhgrqwn0"
 bucket_name             = "dpp-prod-db-backups"
+
+# The rule is active on first apply and prevents overwrite/deletion for this
+# duration. Keep it aligned with BACKUP_ARCHIVAL_RETENTION_DAYS.
+retention_duration_days = 2555
+
+# Leave unset for the recovery-review period. After a successful backup,
+# verification, restore drill, and peer review, set a specific future RFC3339
+# UTC time at least 14 days ahead so OCI permanently locks the rule then.
+# retention_rule_lock_time = "2026-09-15T12:00:00Z"
+
 enable_lifecycle_delete = false
 lifecycle_delete_after_days = 90
 

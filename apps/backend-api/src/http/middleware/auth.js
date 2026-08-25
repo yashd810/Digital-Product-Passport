@@ -113,6 +113,29 @@ module.exports = function createAuthMiddleware({ jwt, pool, jwtSecret, sessionCo
         return res.status(401).json({ error: "Session is no longer valid" });
       }
 
+      // A local 2FA setting is meaningful only when every accepted session was
+      // created by the OTP-completion route.  Session-version invalidation on
+      // enable/disable is the primary control; this claim check is a second,
+      // fail-closed guard for a token that somehow predates or bypasses that
+      // transition.  `mfaVerifiedAt` and `amr` are server-signed JWT claims.
+      const hasVerifiedLocalMfa = (
+        payload.preAuth !== true
+        && typeof payload.mfaVerifiedAt === "string"
+        && payload.mfaVerifiedAt.trim().length > 0
+        && Array.isArray(payload.amr)
+        && payload.amr.includes("otp")
+      );
+      if (currentUser.twoFactorEnabled && !hasVerifiedLocalMfa) {
+        return res.status(401).json({ error: "Two-factor authentication required" });
+      }
+
+      // Every authenticated response can contain tenant, profile, or audit
+      // data.  Keep it out of browser and intermediary caches by default;
+      // individual download routes may add stricter compatible directives.
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+
       req.user = {
         userId: currentUser.id,
         email: currentUser.email,

@@ -7,6 +7,8 @@ const { compilePassportTypeProfile } = require("../passports/services/passport-t
 const {
   flattenSchemaFieldsFromSections,
   isSafePassportTypeName,
+  parseQualifiedSqlIdentifier,
+  passportRuntimeSchema,
   passportTypeNameMaxLength,
   walkSchemaSections,
 } = require("../../shared/passports/passport-helpers");
@@ -473,7 +475,9 @@ module.exports = function registerCatalogRoutes(app, deps) {
       await pool.query("DELETE FROM \"passportTypes\" WHERE id = $1", [typeId]);
 
       const tableName = getTable(typeName);
-      if (!/^"[A-Za-z][A-Za-z0-9]*"$/.test(tableName)) {
+      try {
+        parseQualifiedSqlIdentifier(tableName, { expectedSchema: passportRuntimeSchema });
+      } catch (_error) {
         throw new Error(`Refusing to drop table with unexpected name: ${tableName}`);
       }
       await pool.query(`DROP TABLE IF EXISTS ${tableName}`);

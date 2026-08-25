@@ -7,7 +7,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/dpp-db-backup backup
-WorkingDirectory=/opt/dpp
+WorkingDirectory=/
 User=root
 Group=root
 TimeoutStartSec=2h
@@ -32,3 +32,4 @@ RemoveIPC=true
 SystemCallArchitectures=native
 RestrictAddressFamilies=AF_UNIX
 ReadWritePaths=/var/lib/dpp-db-backups
+InaccessiblePaths=/opt/dpp

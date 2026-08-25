@@ -365,7 +365,14 @@ function createArchiveHistoryHelpers({
       );
       if (!lineageRes.rows.length) return;
       const lineageId = lineageRes.rows[0].lineageId;
-      const resolvedPassportType = passportType || tableName.replace(/^passports_/, "");
+      // All production callers resolve a canonical passport type before they
+      // obtain a schema-qualified dynamic table name. Never derive a logical
+      // type from that SQL identifier: a qualified name is not a safe type
+      // value and silently storing it would corrupt archive metadata.
+      const resolvedPassportType = String(passportType || "").trim();
+      if (!resolvedPassportType) {
+        throw new Error("passportType is required when marking older versions obsolete");
+      }
       const affectedRes = await client.query(
         `SELECT *
          FROM ${tableName}

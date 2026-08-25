@@ -285,10 +285,9 @@ After the backend is deployed, use the production admin UI:
 
 ### Optional: direct seed in production
 
-SSH into the backend OCI host, then run:
+SSH into the backend OCI host through the approved administrator account, then run:
 
 ```bash
-cd /opt/dpp
 BACKEND_CONTAINER="$(sudo docker ps --filter 'label=com.docker.compose.service=backend-api' --format '{{.Names}}' | head -n1)"
 test -n "$BACKEND_CONTAINER" || { echo "Backend Compose service is not running"; exit 1; }
 sudo docker exec "$BACKEND_CONTAINER" node scripts/seed-passport-types.js --module=<moduleKey>
@@ -297,7 +296,6 @@ sudo docker exec "$BACKEND_CONTAINER" node scripts/seed-passport-types.js --modu
 Example:
 
 ```bash
-cd /opt/dpp
 BACKEND_CONTAINER="$(sudo docker ps --filter 'label=com.docker.compose.service=backend-api' --format '{{.Names}}' | head -n1)"
 test -n "$BACKEND_CONTAINER" || { echo "Backend Compose service is not running"; exit 1; }
 sudo docker exec "$BACKEND_CONTAINER" node scripts/seed-passport-types.js --module=example-product:v1
@@ -309,14 +307,12 @@ Compose creates and avoids guessing a container name.
 Grant production company access during direct seed:
 
 ```bash
-cd /opt/dpp
 BACKEND_CONTAINER="$(sudo docker ps --filter 'label=com.docker.compose.service=backend-api' --format '{{.Names}}' | head -n1)"
 test -n "$BACKEND_CONTAINER" || { echo "Backend Compose service is not running"; exit 1; }
 sudo docker exec "$BACKEND_CONTAINER" node scripts/seed-passport-types.js --module=<moduleKey> --company-id=12
 ```
 
 ```bash
-cd /opt/dpp
 BACKEND_CONTAINER="$(sudo docker ps --filter 'label=com.docker.compose.service=backend-api' --format '{{.Names}}' | head -n1)"
 test -n "$BACKEND_CONTAINER" || { echo "Backend Compose service is not running"; exit 1; }
 sudo docker exec "$BACKEND_CONTAINER" node scripts/seed-passport-types.js --module=<moduleKey> --grant-all-active-companies

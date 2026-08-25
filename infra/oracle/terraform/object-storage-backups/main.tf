@@ -22,9 +22,35 @@ resource "oci_objectstorage_bucket" "db_backups" {
 
   auto_tiering = "Disabled"
 
+  # A retention rule is active as soon as it is created. The optional lock is
+  # deliberately scheduled only after the recovery review documented with this
+  # module; an OCI lock becomes irreversible after its mandatory delay.
+  retention_rules {
+    display_name = "dpp-db-backup-retention"
+
+    duration {
+      time_amount = var.retention_duration_days
+      time_unit   = "DAYS"
+    }
+
+    time_rule_locked = var.retention_rule_lock_time
+  }
+
   metadata = {
     purpose = "dpp-db-backups"
     managed = "terraform"
+  }
+
+  lifecycle {
+    # A bucket destroy would undermine the retention policy even when no
+    # objects happen to be present. Removing this guard is a deliberate,
+    # reviewed break-glass change outside the normal Terraform workflow.
+    prevent_destroy = true
+
+    precondition {
+      condition     = !var.enable_lifecycle_delete || var.lifecycle_delete_after_days >= var.retention_duration_days
+      error_message = "Lifecycle deletion must not run before the DB-backup retention duration expires."
+    }
   }
 }
 

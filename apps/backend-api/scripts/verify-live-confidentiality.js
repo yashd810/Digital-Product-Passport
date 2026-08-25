@@ -8,7 +8,10 @@ const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
 const { Pool } = require("pg");
 const { createApiKeyHelpers } = require("../src/modules/passports/api-key-helpers");
-const { flattenSchemaFieldsFromSections } = require("../src/shared/passports/passport-helpers");
+const {
+  flattenSchemaFieldsFromSections,
+  getTable,
+} = require("../src/shared/passports/passport-helpers");
 const {
   encodePassportAttachmentAccessToken,
 } = require("../src/shared/repository/repository-file-links");
@@ -19,7 +22,7 @@ dotenv.config({
 });
 
 const typeName = "verificationProbe";
-const tableName = "\"verificationProbePassports\"";
+const tableName = getTable(typeName);
 const companyName = "Codex Verification Company";
 
 function createPool() {
@@ -93,13 +96,9 @@ async function removeProbeData(pool, companyId = null, typeId = null) {
         [dppIds]
       ).catch(() => {});
     }
-    await pool.query("SET session_replication_role = replica");
-    try {
-      await pool.query("DELETE FROM \"auditLogAnchors\" WHERE \"companyId\" = ANY($1::int[])", [ids]);
-      await pool.query("DELETE FROM \"auditLogs\" WHERE \"companyId\" = ANY($1::int[])", [ids]);
-    } finally {
-      await pool.query("SET session_replication_role = origin");
-    }
+    // Audit entries are append-only by design. This verifier intentionally
+    // leaves its scoped audit evidence intact rather than weakening those
+    // production audit controls from the backend runtime.
     await pool.query("DELETE FROM \"apiKeys\" WHERE \"companyId\" = ANY($1::int[])", [ids]).catch(() => {});
     await pool.query("DELETE FROM \"passportAttachments\" WHERE \"companyId\" = ANY($1::int[])", [ids]).catch(() => {});
     await pool.query("DELETE FROM \"passportArchives\" WHERE \"companyId\" = ANY($1::int[])", [ids]).catch(() => {});

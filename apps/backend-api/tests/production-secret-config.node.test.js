@@ -21,11 +21,15 @@ const productionComposePaths = [
 ];
 const frontendComposePath = path.join(repoRoot, "docker/docker-compose.prod.frontend.yml");
 const securityWorkflowPath = path.join(repoRoot, ".github/workflows/security-and-smoke.yml");
+const repositorySecretCheckPath = path.join(repoRoot, "scripts/check-repository-secrets.js");
+const gitleaksConfigPath = path.join(repoRoot, ".gitleaks.toml");
 const composePaths = [
   path.join(repoRoot, "docker/docker-compose.yml"),
   ...productionComposePaths,
   frontendComposePath,
 ];
+const runtimeDatabaseRole = ["dpp", "app"].join("_");
+const migrationDatabaseRole = ["dpp", "admin"].join("_");
 
 function parseEnvLines(content) {
   return new Map(
@@ -39,10 +43,95 @@ function parseEnvLines(content) {
   );
 }
 
+function runRepositorySecretCheckWithTemplate(templateContents, { untrackedFile = null } = {}) {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), "dpp-secret-check-"));
+  try {
+    const fixtureScriptPath = path.join(tempRepo, "scripts/check-repository-secrets.js");
+    const fixtureTemplatePath = path.join(tempRepo, "infra/oracle/oci.env.example");
+    fs.mkdirSync(path.dirname(fixtureScriptPath), { recursive: true });
+    fs.mkdirSync(path.dirname(fixtureTemplatePath), { recursive: true });
+    fs.copyFileSync(repositorySecretCheckPath, fixtureScriptPath);
+    fs.writeFileSync(fixtureTemplatePath, templateContents, "utf8");
+    execFileSync("git", ["init", "--quiet"], { cwd: tempRepo });
+    execFileSync("git", ["add", "scripts/check-repository-secrets.js", "infra/oracle/oci.env.example"], {
+      cwd: tempRepo,
+    });
+    if (untrackedFile) {
+      fs.writeFileSync(path.join(tempRepo, untrackedFile.path), untrackedFile.contents, "utf8");
+    }
+
+    return spawnSync(process.execPath, [fixtureScriptPath], {
+      cwd: tempRepo,
+      encoding: "utf8",
+    });
+  } finally {
+    fs.rmSync(tempRepo, { recursive: true, force: true });
+  }
+}
+
+test("repository secret hygiene scans OCI templates while allowing explicit placeholders", () => {
+  const safeTemplate = runRepositorySecretCheckWithTemplate(
+    "DB_BACKUP_MANIFEST_HMAC_SECRET=REPLACE_WITH_A_DIFFERENT_64_HEX_CHARS\n"
+  );
+  assert.equal(safeTemplate.error, undefined);
+  assert.equal(safeTemplate.status, 0, safeTemplate.stderr);
+
+  const liveLookingTemplateSecret = crypto.randomBytes(32).toString("hex");
+  const unsafeTemplate = runRepositorySecretCheckWithTemplate(
+    `DB_BACKUP_MANIFEST_HMAC_SECRET=${liveLookingTemplateSecret}\n`
+  );
+  assert.equal(unsafeTemplate.error, undefined);
+  assert.equal(unsafeTemplate.status, 1);
+  assert.match(
+    unsafeTemplate.stderr,
+    /infra\/oracle\/oci\.env\.example:1: hardcoded DB_BACKUP_MANIFEST_HMAC_SECRET/
+  );
+
+  const liveLookingAdminSecret = crypto.randomBytes(32).toString("hex");
+  const unsafeAdminTemplate = runRepositorySecretCheckWithTemplate(
+    `DB_ADMIN_PASSWORD=${liveLookingAdminSecret}\n`
+  );
+  assert.equal(unsafeAdminTemplate.error, undefined);
+  assert.equal(unsafeAdminTemplate.status, 1);
+  assert.match(
+    unsafeAdminTemplate.stderr,
+    /infra\/oracle\/oci\.env\.example:1: hardcoded DB_ADMIN_PASSWORD/
+  );
+
+  const liveLookingUntrackedSecret = crypto.randomBytes(32).toString("hex");
+  const unsafeUntrackedFile = runRepositorySecretCheckWithTemplate(
+    "DB_BACKUP_MANIFEST_HMAC_SECRET=REPLACE_WITH_A_DIFFERENT_64_HEX_CHARS\n",
+    {
+      untrackedFile: {
+        path: "new-source.js",
+        contents: `const config = { DB_ADMIN_PASSWORD: ${JSON.stringify(liveLookingUntrackedSecret)} };\n`,
+      },
+    }
+  );
+  assert.equal(unsafeUntrackedFile.error, undefined);
+  assert.equal(unsafeUntrackedFile.status, 1);
+  assert.match(unsafeUntrackedFile.stderr, /new-source\.js:1: hardcoded DB_ADMIN_PASSWORD/);
+});
+
+test("Gitleaks only exempts explicit placeholders in the OCI environment template", () => {
+  const config = fs.readFileSync(gitleaksConfigPath, "utf8");
+  const placeholderAllowlist = config.match(
+    /\[\[allowlists\]\]\ndescription = "Documented OCI environment-template placeholders only"[\s\S]*?(?=\n\[\[allowlists\]\]|\s*$)/
+  )?.[0];
+
+  assert.ok(placeholderAllowlist, "missing the OCI template placeholder allowlist");
+  assert.match(placeholderAllowlist, /condition = "AND"/);
+  assert.match(placeholderAllowlist, /regexTarget = "line"/);
+  assert.match(placeholderAllowlist, /\(\^\|\/\)infra\/oracle\/oci\\\.env\\\.example\$/);
+  assert.match(placeholderAllowlist, /REPLACE\(\?:_WITH\)\?/);
+  assert.doesNotMatch(placeholderAllowlist, /docker\/\\\.env\\\.prod\\\.example/);
+});
+
 test("production environment template declares every required security variable", () => {
   const values = parseEnvLines(fs.readFileSync(templatePath, "utf8"));
   for (const name of [
     "DB_PASSWORD",
+    "DB_ADMIN_PASSWORD",
     "JWT_SECRET",
     "PEPPER_V1",
     "OTP_HMAC_SECRET",
@@ -53,6 +142,9 @@ test("production environment template declares every required security variable"
     assert.equal(values.has(name), true, `missing ${name} from production template`);
     assert.match(values.get(name), /^REPLACE_/);
   }
+  assert.equal(values.get("DB_USER"), runtimeDatabaseRole);
+  assert.equal(values.get("DB_ADMIN_USER"), migrationDatabaseRole);
+  assert.notEqual(values.get("DB_USER"), values.get("DB_ADMIN_USER"));
 });
 
 test("production environment template keeps contact notification and login identities separate", () => {
@@ -188,13 +280,25 @@ test("production deployment fails closed rather than selecting a fresh database 
   assert.match(deployScript, /require_exact_env_value "BACKUP_PROVIDER_ENABLED" "true"/);
   assert.match(deployScript, /require_exact_env_value "BACKUP_PROVIDER_REQUIRED" "true"/);
   assert.match(deployScript, /require_exact_env_value "DB_BACKUP_ENABLED" "true"/);
+  assert.match(deployScript, /require_runtime_postgres_role_env "DB_USER"/);
+  assert.match(deployScript, /require_postgres_role_env "DB_ADMIN_USER"/);
+  assert.match(deployScript, /require_secret_env_var "DB_ADMIN_PASSWORD"/);
+  assert.match(deployScript, /require_distinct_env_vars "DB_USER" "DB_ADMIN_USER"/);
+  assert.match(deployScript, /require_distinct_secret_env_vars "DB_PASSWORD" "DB_ADMIN_PASSWORD"/);
+  assert.match(deployScript, /require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "EMAIL_PASS"/);
+  assert.match(deployScript, /require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "SIGNING_PRIVATE_KEY"/);
+  assert.match(deployScript, /require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "ASSET_SOURCE_CREDENTIALS_JSON"/);
+  assert.match(deployScript, /require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "DB_BACKUP_MANIFEST_HMAC_SECRET"/);
   assert.match(deployScript, /require_secret_env_var "DB_BACKUP_MANIFEST_HMAC_SECRET"/);
   assert.match(deployScript, /require_integer_range_env_var "DB_BACKUP_MAX_BYTES" "1048576" "107374182400"/);
   assert.match(deployScript, /require_integer_range_env_var "DB_BACKUP_RETENTION_COUNT" "1" "128"/);
   assert.match(deployScript, /require_distinct_env_vars "DB_BACKUP_S3_BUCKET" "BACKUP_PROVIDER_BUCKET"/);
   assert.match(deployScript, /Refusing deployment: expected PostgreSQL data volume is missing/);
   assert.match(deployScript, /DPP_INITIALIZE_POSTGRES_VOLUME=true/);
-  assert.match(deployScript, /node scripts\/migrate-db\.js/);
+  assert.match(deployScript, /--profile maintenance[\s\S]*run --rm --no-deps db-migrate/);
+  assert.match(deployScript, /quiesce_backend_for_controlled_migration[\s\S]*stop backend-api/);
+  assert.match(deployScript, /quiesce_backend_for_controlled_migration\n\s*DPP_ENV_FILE=.*docker compose[\s\S]*up --no-build -d postgres/);
+  assert.doesNotMatch(deployScript, /run --rm --no-deps backend-api node scripts\/migrate-db\.js/);
   assert.doesNotMatch(deployScript, /npm run db:migrate/);
   assert.match(deployScript, /rm -sf backend-storage-init/);
   assert.doesNotMatch(deployScript, /COMPOSE_BAKE=.*false/);
@@ -266,7 +370,27 @@ test("offline CI scan containers are network-isolated and resource-bounded", () 
   );
 });
 
-function assertApplicationSecretOutput(values, { includesDbPassword, includesBackupManifestKey = false }) {
+test("Trivy scans exported images without a Docker socket", () => {
+  const workflow = fs.readFileSync(securityWorkflowPath, "utf8");
+  const scanStep = workflow.match(
+    /Scan \$\{\{ matrix\.name \}\} image for fixable high-severity vulnerabilities[\s\S]*?(?=\n      - name:|\n  [A-Za-z0-9_-]+:|$)/
+  )?.[0];
+
+  assert.ok(scanStep, "missing the hardened Trivy scan step");
+  assert.match(scanStep, /docker save --output "\$scan_dir\/image\.tar"/);
+  assert.match(scanStep, /--read-only/);
+  assert.match(scanStep, /--user "\$\(id -u\):\$\(id -g\)"/);
+  assert.match(scanStep, /--cap-drop ALL/);
+  assert.match(scanStep, /--security-opt no-new-privileges/);
+  assert.match(scanStep, /image --input \/cache\/image\.tar/);
+  assert.doesNotMatch(scanStep, /\/var\/run\/docker\.sock/);
+});
+
+function assertApplicationSecretOutput(values, {
+  includesDbPassword,
+  includesDbAdminPassword = false,
+  includesBackupManifestKey = false,
+}) {
   const secretNames = [
     "JWT_SECRET",
     "PEPPER_V1",
@@ -274,6 +398,7 @@ function assertApplicationSecretOutput(values, { includesDbPassword, includesBac
     "REPOSITORY_FILE_LINK_SECRET",
   ];
   if (includesDbPassword) secretNames.unshift("DB_PASSWORD");
+  if (includesDbAdminPassword) secretNames.unshift("DB_ADMIN_PASSWORD");
   if (includesBackupManifestKey) secretNames.push("DB_BACKUP_MANIFEST_HMAC_SECRET");
   const secrets = secretNames.map((name) => values.get(name) || "");
 
@@ -293,7 +418,12 @@ function assertApplicationSecretOutput(values, { includesDbPassword, includesBac
 test("production secret generator emits distinct 256-bit bootstrap values and a P-256 keypair", () => {
   execFileSync("bash", ["-n", generatorPath]);
   const values = parseEnvLines(execFileSync("bash", [generatorPath], { encoding: "utf8" }));
-  assertApplicationSecretOutput(values, { includesDbPassword: true, includesBackupManifestKey: true });
+  assert.equal(values.has("DB_ADMIN_USER"), false, "the deployment template selects the admin role; local generation remains runtime-role compatible");
+  assertApplicationSecretOutput(values, {
+    includesDbPassword: true,
+    includesDbAdminPassword: true,
+    includesBackupManifestKey: true,
+  });
 });
 
 test("application-secret rotation does not silently rotate the database password", () => {

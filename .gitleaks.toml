@@ -10,10 +10,14 @@ paths = [
 ]
 
 [[allowlists]]
-description = "Documented environment placeholders"
+description = "Documented OCI environment-template placeholders only"
+condition = "AND"
+regexTarget = "line"
 paths = [
-  '''(^|/)docker/\.env\.prod\.example$''',
   '''(^|/)infra/oracle/oci\.env\.example$''',
+]
+regexes = [
+  '''^\s*[A-Z][A-Z0-9_]*\s*=\s*(?:REPLACE(?:_WITH)?[A-Z0-9_]*|https://YOUR_[A-Z0-9_]+\.compat\.objectstorage\.[a-z0-9-]+\.oci\.customer-oci\.com)\s*(?:#.*)?$''',
 ]
 
 [[allowlists]]

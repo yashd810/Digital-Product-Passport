@@ -4,6 +4,12 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/dpp}"
 UNIT_DIR="${UNIT_DIR:-/etc/systemd/system}"
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
+BACKUP_COMPOSE_FILE="/etc/dpp/dpp-backup-compose.yml"
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "The DB backup job installer must run as root." >&2
+  exit 1
+fi
 
 read_env_var() {
   local key="$1"
@@ -29,15 +35,20 @@ case "$DB_BACKUP_ENABLED" in
     ;;
 esac
 
-install -m 0755 "$APP_DIR/infra/oracle/db-backup.sh" /usr/local/bin/dpp-db-backup
-install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup.service" "$UNIT_DIR/dpp-db-backup.service"
-install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup.timer" "$UNIT_DIR/dpp-db-backup.timer"
-install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-verify.service" "$UNIT_DIR/dpp-db-backup-verify.service"
-install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-verify.timer" "$UNIT_DIR/dpp-db-backup-verify.timer"
-install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-drill.service" "$UNIT_DIR/dpp-db-backup-drill.service"
-install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-drill.timer" "$UNIT_DIR/dpp-db-backup-drill.timer"
+install -o root -g root -m 0755 "$APP_DIR/infra/oracle/db-backup.sh" /usr/local/bin/dpp-db-backup
+install -d -o root -g root -m 0755 /etc/dpp
+install -o root -g root -m 0644 "$APP_DIR/infra/oracle/dpp-backup-compose.yml" "$BACKUP_COMPOSE_FILE"
+install -o root -g root -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup.service" "$UNIT_DIR/dpp-db-backup.service"
+install -o root -g root -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup.timer" "$UNIT_DIR/dpp-db-backup.timer"
+install -o root -g root -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-verify.service" "$UNIT_DIR/dpp-db-backup-verify.service"
+install -o root -g root -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-verify.timer" "$UNIT_DIR/dpp-db-backup-verify.timer"
+install -o root -g root -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-drill.service" "$UNIT_DIR/dpp-db-backup-drill.service"
+install -o root -g root -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-drill.timer" "$UNIT_DIR/dpp-db-backup-drill.timer"
 
 install -d -o root -g root -m 0700 /var/lib/dpp-db-backups
+# The uploader image runs as the non-root node user (uid/gid 1000). Prepare
+# its private bind-mount source explicitly so Docker never creates it root-owned.
+install -d -o 1000 -g 1000 -m 0700 /var/lib/dpp-db-backups/container
 
 systemctl daemon-reload
 if [ "$DB_BACKUP_ENABLED" = "true" ]; then

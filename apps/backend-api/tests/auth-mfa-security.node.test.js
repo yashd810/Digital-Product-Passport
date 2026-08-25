@@ -50,6 +50,7 @@ function registerHarness({
   hashPassword,
   verifyPassword,
   generateToken,
+  clearAuthCookie,
   createTransporter,
   passwordResetTimingGuard,
 } = {}) {
@@ -74,7 +75,7 @@ function registerHarness({
     generateOtpCode: () => "123456",
     sessionCookieName: "session",
     setAuthCookie: () => {},
-    clearAuthCookie: () => {},
+    clearAuthCookie: clearAuthCookie || (() => {}),
     sendOtpEmail: async () => {},
     createTransporter: createTransporter || (() => ({ sendMail: async () => {} })),
     brandedEmail: () => "",
@@ -96,6 +97,12 @@ function registerHarness({
 
 function postHandler(routes, routePath) {
   const route = routes.find((entry) => entry.method === "post" && entry.routePath === routePath);
+  assert.ok(route, `missing ${routePath}`);
+  return route.handlers.at(-1);
+}
+
+function patchHandler(routes, routePath) {
+  const route = routes.find((entry) => entry.method === "patch" && entry.routePath === routePath);
   assert.ok(route, `missing ${routePath}`);
   return route.handlers.at(-1);
 }
@@ -167,6 +174,43 @@ test("MFA verification rejects pre-auth tokens invalidated by a session-version 
 
   assert.equal(response.statusCode, 401);
   assert.equal(queries.some((sql) => /^\s*UPDATE users/i.test(sql)), false);
+});
+
+test("changing an MFA setting invalidates all existing sessions and clears pending OTPs", async () => {
+  const queries = [];
+  let clearedCookie = false;
+  const routes = registerHarness({
+    pool: {
+      async query(sql, params) {
+        queries.push({ sql, params });
+        if (/^\s*SELECT "passwordHash"/i.test(sql)) {
+          return { rows: [{ passwordHash: "current-password-hash" }] };
+        }
+        if (/^\s*UPDATE users/i.test(sql)) {
+          return { rows: [{ sessionVersion: 6 }] };
+        }
+        throw new Error(`Unexpected query: ${sql}`);
+      },
+    },
+    clearAuthCookie: () => { clearedCookie = true; },
+  });
+  const response = createResponse();
+
+  await patchHandler(routes, "/api/users/me/2fa")({
+    user: { userId: 7 },
+    body: { enable: true, currentPassword: "correct-password" },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, { success: true, twoFactorEnabled: true });
+  assert.equal(clearedCookie, true);
+  const update = queries.find(({ sql }) => /^\s*UPDATE users/i.test(sql));
+  assert.ok(update);
+  assert.match(update.sql, /"sessionVersion"\s*=\s*COALESCE\("sessionVersion",\s*1\)\s*\+\s*1/);
+  assert.match(update.sql, /"otpCodeHash"\s*=\s*NULL/);
+  assert.match(update.sql, /"otpExpiresAt"\s*=\s*NULL/);
+  assert.match(update.sql, /RETURNING\s+"sessionVersion"/);
+  assert.deepEqual(update.params, [true, 7]);
 });
 
 test("an OTP can be claimed only once even when two valid verifications race", async () => {

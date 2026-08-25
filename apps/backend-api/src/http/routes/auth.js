@@ -867,12 +867,18 @@ module.exports = function registerAuthRoutes(app, {
       await pool.query(
         `UPDATE users
          SET "twoFactorEnabled" = $1,
-             "otpCodeHash" = CASE WHEN $1 THEN "otpCodeHash" ELSE NULL END,
-             "otpExpiresAt" = CASE WHEN $1 THEN "otpExpiresAt" ELSE NULL END,
+             "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
+             "otpCodeHash" = NULL,
+             "otpExpiresAt" = NULL,
              "updatedAt" = NOW()
-         WHERE id = $2`,
+         WHERE id = $2
+         RETURNING "sessionVersion" AS "sessionVersion"`,
         [enable, req.user.userId]
       );
+      // Changing the MFA policy deliberately invalidates every existing
+      // browser and bearer session.  The caller must complete a new login so
+      // an enabled account cannot keep using a password-only session.
+      clearAuthCookie(res);
       res.json({ success: true, twoFactorEnabled: enable });
     } catch (e) { logger.error("2FA toggle error:", e.message); res.status(500).json({ error: "Failed to update 2FA setting" }); }
   });

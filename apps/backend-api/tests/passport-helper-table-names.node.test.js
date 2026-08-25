@@ -6,13 +6,23 @@ const {
   getTable,
   isSafePassportStorageFieldKey,
   normalizePassportRow,
+  parseQualifiedSqlIdentifier,
+  passportRuntimeSchema,
   quoteSqlIdentifier,
   toPassportStorageColumnKey,
 } = require("../src/shared/passports/passport-helpers");
 
 test("passport storage table names always start with a valid identifier character", () => {
-  assert.equal(getTable("exampleProductPassportV1"), "\"exampleProductPassportV1Passports\"");
-  assert.equal(getTable("123Passport"), "\"type123PassportPassports\"");
+  assert.equal(getTable("exampleProductPassportV1"), "\"passport_runtime\".\"exampleProductPassportV1Passports\"");
+  assert.equal(getTable("123Passport"), "\"passport_runtime\".\"type123PassportPassports\"");
+  assert.deepEqual(
+    parseQualifiedSqlIdentifier(getTable("exampleProductPassportV1"), { expectedSchema: passportRuntimeSchema }),
+    { schema: "passport_runtime", table: "exampleProductPassportV1Passports" }
+  );
+  assert.throws(
+    () => parseQualifiedSqlIdentifier('"passport_runtime"."batteryPassports"; DROP TABLE users', { expectedSchema: passportRuntimeSchema }),
+    /Invalid qualified SQL identifier/
+  );
 });
 
 test("passport field keys up to 200 characters map deterministically to safe PostgreSQL columns", () => {

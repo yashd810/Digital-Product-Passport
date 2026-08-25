@@ -1,7 +1,27 @@
 import { useEffect, useState } from "react";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { clearPassportFormDrafts } from "../../shared/security/passportFormDraftStorage";
 
 const api = import.meta.env.VITE_API_URL || "";
+
+function getBrowserLocalStorage() {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function clearClientSessionState({ localStorage: storage = getBrowserLocalStorage(), sessionStorage } = {}) {
+  ["user", "companyId"].forEach((key) => {
+    try {
+      storage?.removeItem(key);
+    } catch {
+      // Continue clearing the private browser draft even when persistent storage is unavailable.
+    }
+  });
+  clearPassportFormDrafts(sessionStorage);
+}
 
 export function useSessionAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -37,8 +57,7 @@ export function useSessionAuth() {
         setIsAuthenticated(false);
         setUser(null);
         setCompanyId("");
-        localStorage.removeItem("user");
-        localStorage.removeItem("companyId");
+        clearClientSessionState();
       } finally {
         if (!cancelled) setAuthReady(true);
       }
@@ -64,8 +83,7 @@ export function useSessionAuth() {
     setIsAuthenticated(false);
     setUser(null);
     setCompanyId("");
-    localStorage.removeItem("user");
-    localStorage.removeItem("companyId");
+    clearClientSessionState();
   };
 
   return {

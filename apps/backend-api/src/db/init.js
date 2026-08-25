@@ -83,6 +83,7 @@ async function initDb(pool, {
   getTable,
   createPassportTable,
   inRevisionStatus,
+  moveLegacyPassportTables = null,
 }) {
   await pool.query(`SELECT pg_advisory_lock($1)`, [schemaMigrationLockKey]);
   try {
@@ -1157,6 +1158,22 @@ async function initDb(pool, {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS "idxPassportArchivesDppId"   ON "passportArchives"("dppId")`);
   await pool.query(`CREATE INDEX IF NOT EXISTS "idxPassportArchivesLineage" ON "passportArchives"("lineageId")`);
+
+  // Production reaches this point through the controlled migrator, which has
+  // already made this schema migration-admin owned. The idempotent statement
+  // also keeps the non-production startup path usable on a fresh local DB.
+  await pool.query('CREATE SCHEMA IF NOT EXISTS "passport_runtime"');
+
+  // Move only passportTypes-derived legacy dynamic tables before reconciling
+  // their schema-qualified replacements. This runs inside the same advisory
+  // lock as the remainder of initialization, so initDb can never create a new
+  // table beside an unmigrated public-schema predecessor.
+  if (moveLegacyPassportTables) {
+    if (typeof moveLegacyPassportTables !== "function") {
+      throw new Error("moveLegacyPassportTables must be a function when provided");
+    }
+    await moveLegacyPassportTables();
+  }
 
   // Ensure shared passport tables exist for all passport types.
   // Idempotent — uses CREATE TABLE IF NOT EXISTS.

@@ -13,21 +13,13 @@ SSH_KNOWN_HOSTS="${SSH_KNOWN_HOSTS:-}"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
-SKIP_LIVE_EDGE_CHECK="${DPP_SKIP_LIVE_EDGE_CHECK:-}"
-SKIP_CADDY_RELOAD="${DPP_SKIP_CADDY_RELOAD:-}"
-CADDYFILE="${DPP_CADDYFILE:-}"
 INITIALIZE_POSTGRES_VOLUME="${DPP_INITIALIZE_POSTGRES_VOLUME:-}"
 INITIALIZE_LOCAL_STORAGE_VOLUME="${DPP_INITIALIZE_LOCAL_STORAGE_VOLUME:-}"
-ALLOW_UNVERIFIED_MARKETING_CONTENT="${DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT:-}"
 APP_DIR="/opt/dpp"
 ENV_FILE="/etc/dpp/dpp.env"
-REPO="https://github.com/yashd810/Digital-Product-Passport.git"
-BRANCH="main"
 SSH_CMD="/usr/bin/ssh"
 TIMEOUT_SECONDS="${DPP_DEPLOY_TIMEOUT_SECONDS:-1800}"
 TIMEOUT_CMD=""
-REMOTE_DEPLOY_DIR=""
-REMOTE_DEPLOY_SCRIPT=""
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 PROJECT_ROOT="$(CDPATH= cd -- "$REPO_ROOT/../.." && pwd -P)"
@@ -36,6 +28,8 @@ OCI_BACKEND_IP="${OCI_BACKEND_IP:-}"
 OCI_FRONTEND_IP="${OCI_FRONTEND_IP:-}"
 DEPLOY_REVISION=""
 SSH_TARGET=""
+ROOT_RELEASE_DEPLOYER_SOURCE="$REPO_ROOT/infra/oracle/dpp-root-release-deployer.sh"
+ROOT_RELEASE_DEPLOYER_SHA256=""
 
 quote_for_remote() {
     printf '%q' "$1"
@@ -47,6 +41,26 @@ file_mode() {
         stat -c '%a' "$file"
     else
         stat -f '%Lp' "$file"
+    fi
+}
+
+file_sha256() {
+    local file="$1"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -- "$file" | awk '{ print $1 }'
+    else
+        shasum -a 256 -- "$file" | awk '{ print $1 }'
+    fi
+}
+
+require_optional_boolean() {
+    local variable_name="$1"
+    local value="$2"
+
+    if [ -n "$value" ] && [ "$value" != "true" ] && [ "$value" != "false" ]; then
+        echo "❌ $variable_name must be true or false when set."
+        exit 1
     fi
 }
 
@@ -148,8 +162,8 @@ ssh_target_for_host() {
     local user="$1"
     local host="$2"
 
-    # scp requires brackets around IPv6 literals; SSH accepts the same target
-    # form. The input is validated before this helper is called.
+    # SSH accepts brackets around IPv6 literals. The input is validated before
+    # this helper is called.
     if [[ "$host" == *:* ]]; then
         printf '%s@[%s]' "$user" "$host"
     else
@@ -168,7 +182,7 @@ fi
 
 load_deploy_config
 
-OCI_USER="${OCI_USER:-ubuntu}"
+OCI_USER="${OCI_USER:-dpp-release}"
 SSH_KNOWN_HOSTS="${SSH_KNOWN_HOSTS:-${HOME:-}/.ssh/known_hosts}"
 
 if [ -z "$DEPLOY_TARGET" ]; then
@@ -188,18 +202,12 @@ case "$DEPLOY_TARGET" in
         ;;
 esac
 
-if [ -n "$INITIALIZE_POSTGRES_VOLUME" ] && [ "$INITIALIZE_POSTGRES_VOLUME" != "true" ] && [ "$INITIALIZE_POSTGRES_VOLUME" != "false" ]; then
-    echo "❌ DPP_INITIALIZE_POSTGRES_VOLUME must be true or false when set."
-    exit 1
-fi
+require_optional_boolean "DPP_REMOVE_ORPHANS" "$REMOVE_ORPHANS"
+require_optional_boolean "DPP_INITIALIZE_POSTGRES_VOLUME" "$INITIALIZE_POSTGRES_VOLUME"
+require_optional_boolean "DPP_INITIALIZE_LOCAL_STORAGE_VOLUME" "$INITIALIZE_LOCAL_STORAGE_VOLUME"
 
-if [ -n "$INITIALIZE_LOCAL_STORAGE_VOLUME" ] && [ "$INITIALIZE_LOCAL_STORAGE_VOLUME" != "true" ] && [ "$INITIALIZE_LOCAL_STORAGE_VOLUME" != "false" ]; then
-    echo "❌ DPP_INITIALIZE_LOCAL_STORAGE_VOLUME must be true or false when set."
-    exit 1
-fi
-
-if [ -n "$ALLOW_UNVERIFIED_MARKETING_CONTENT" ] && [ "$ALLOW_UNVERIFIED_MARKETING_CONTENT" != "true" ]; then
-    echo "❌ DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT must be true when explicitly set."
+if [ -n "$COMPOSE_PROJECT_NAME" ] && ! [[ "$COMPOSE_PROJECT_NAME" =~ ^[a-z0-9][a-z0-9_-]{0,62}$ ]]; then
+    echo "❌ COMPOSE_PROJECT_NAME must be a lowercase Docker Compose project name when set."
     exit 1
 fi
 
@@ -247,6 +255,19 @@ if ! [[ "$DEPLOY_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
     echo "❌ Could not determine a full Git commit ID for deployment."
     exit 1
 fi
+if [ -L "$ROOT_RELEASE_DEPLOYER_SOURCE" ] || [ ! -f "$ROOT_RELEASE_DEPLOYER_SOURCE" ]; then
+    echo "❌ Missing non-symlinked root release entry point source: $ROOT_RELEASE_DEPLOYER_SOURCE"
+    exit 1
+fi
+if ! git -C "$REPO_ROOT" ls-files --error-unmatch -- "infra/oracle/dpp-root-release-deployer.sh" >/dev/null 2>&1; then
+    echo "❌ The root release entry point must be a tracked release file."
+    exit 1
+fi
+ROOT_RELEASE_DEPLOYER_SHA256="$(file_sha256 "$ROOT_RELEASE_DEPLOYER_SOURCE")"
+if ! [[ "$ROOT_RELEASE_DEPLOYER_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "❌ Could not calculate the root release entry point SHA-256."
+    exit 1
+fi
 SSH_TARGET="$(ssh_target_for_host "$OCI_USER" "$OCI_IP")"
 
 if [ -z "$SSH_KEY" ]; then
@@ -268,8 +289,8 @@ echo "  Compose Project: ${COMPOSE_PROJECT_NAME:-auto-detect}"
 echo "  App Dir: $APP_DIR"
 echo "  Env File: $ENV_FILE"
 echo "  Timeout: ${TIMEOUT_SECONDS}s"
-echo "  Live Edge Check: ${SKIP_LIVE_EDGE_CHECK:-enabled}"
-echo "  Caddy Reload: ${SKIP_CADDY_RELOAD:-enabled}"
+echo "  Live Edge Check: required"
+echo "  Caddy Reload: required"
 echo "  Revision: $DEPLOY_REVISION"
 echo ""
 
@@ -313,213 +334,60 @@ echo ""
 echo "📦 Starting remote deployment..."
 echo ""
 
-# Create a private local script and a unique private remote directory. The remote
-# path is intentionally generated server-side rather than reusing a fixed remote path.
-DEPLOY_SCRIPT="$(mktemp "${TMPDIR:-/tmp}/dpp-deploy-script.XXXXXX")"
-cleanup_deploy_artifacts() {
-    local exit_code=$?
-
-    trap - EXIT
-    if [ -n "${REMOTE_DEPLOY_DIR:-}" ]; then
-        "$SSH_CMD" "${SSH_OPTS[@]}" "$SSH_TARGET" \
-            "rm -f -- $(quote_for_remote "$REMOTE_DEPLOY_SCRIPT"); rmdir -- $(quote_for_remote "$REMOTE_DEPLOY_DIR")" \
-            >/dev/null 2>&1 || true
-    fi
-    rm -f -- "$DEPLOY_SCRIPT"
-    exit "$exit_code"
+REMOTE_COMMAND="/usr/bin/sudo -n /usr/local/sbin/dpp-release-deployer"
+append_remote_argument() {
+    REMOTE_COMMAND="$REMOTE_COMMAND $(quote_for_remote "$1")"
 }
-trap cleanup_deploy_artifacts EXIT
 
-if ! REMOTE_DEPLOY_DIR="$(
-    "$SSH_CMD" "${SSH_OPTS[@]}" "$SSH_TARGET" \
-        "umask 077 && mktemp -d /tmp/dpp-deploy.XXXXXXXXXX"
-)"; then
-    echo "❌ Failed to create a private remote deployment directory."
-    exit 1
-fi
-if ! [[ "$REMOTE_DEPLOY_DIR" =~ ^/tmp/dpp-deploy\.[A-Za-z0-9]{6,}$ ]]; then
-    echo "❌ Remote deployment directory did not match the expected safe path."
-    REMOTE_DEPLOY_DIR=""
-    exit 1
-fi
-REMOTE_DEPLOY_SCRIPT="$REMOTE_DEPLOY_DIR/deploy.sh"
-
-cat > "$DEPLOY_SCRIPT" << 'EOF'
-#!/bin/bash
-set -euo pipefail
-
-REMOTE_SCRIPT_PATH="${BASH_SOURCE[0]}"
-REMOTE_DEPLOY_DIR="$(CDPATH= cd -- "$(dirname -- "$REMOTE_SCRIPT_PATH")" && pwd -P)"
-if ! [[ "$REMOTE_DEPLOY_DIR" =~ ^/tmp/dpp-deploy\.[A-Za-z0-9]{6,}$ ]]; then
-    echo "Refusing to run a deployment script outside a private deployment directory."
-    exit 1
-fi
-cleanup_remote_deploy_artifacts() {
-    rm -f -- "$REMOTE_SCRIPT_PATH"
-    rmdir -- "$REMOTE_DEPLOY_DIR" 2>/dev/null || true
-}
-trap cleanup_remote_deploy_artifacts EXIT
-
-APP_DIR="/opt/dpp"
-ENV_FILE="/etc/dpp/dpp.env"
-REPO="https://github.com/yashd810/Digital-Product-Passport.git"
-BRANCH="main"
-DEPLOY_TARGET="${DPP_DEPLOY_TARGET:?DPP_DEPLOY_TARGET is required}"
-DEPLOY_USER="${DPP_DEPLOY_USER:?DPP_DEPLOY_USER is required}"
-DEPLOY_REVISION="${DPP_DEPLOY_REVISION:?DPP_DEPLOY_REVISION is required}"
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
-REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
-SKIP_LIVE_EDGE_CHECK="${DPP_SKIP_LIVE_EDGE_CHECK:-}"
-SKIP_CADDY_RELOAD="${DPP_SKIP_CADDY_RELOAD:-}"
-CADDYFILE="${DPP_CADDYFILE:-}"
-INITIALIZE_POSTGRES_VOLUME="${DPP_INITIALIZE_POSTGRES_VOLUME:-}"
-INITIALIZE_LOCAL_STORAGE_VOLUME="${DPP_INITIALIZE_LOCAL_STORAGE_VOLUME:-}"
-ALLOW_UNVERIFIED_MARKETING_CONTENT="${DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT:-}"
-DEPLOY_TIMEOUT_SECONDS="${DPP_DEPLOY_TIMEOUT_SECONDS:-1800}"
-
-if ! [[ "$DEPLOY_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "Refusing deployment with an invalid Git revision."
-    exit 1
-fi
-
-echo "📂 Checking application directory..."
-if [ -L "$APP_DIR" ]; then
-    echo "Refusing to deploy through a symbolic-link application directory: $APP_DIR"
-    exit 1
-fi
-if [ ! -d "$APP_DIR" ]; then
-    echo "📥 Cloning repository..."
-    sudo mkdir -p "$APP_DIR"
-    sudo git clone --branch "$BRANCH" --filter=blob:none --no-checkout "$REPO" "$APP_DIR" 2>&1 | tail -5
-    sudo chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
-    cd "$APP_DIR"
-    git sparse-checkout init --no-cone
-    git sparse-checkout set '/*' '!/local-tools/'
-    git fetch --no-tags origin "$BRANCH"
-    if ! git merge-base --is-ancestor "$DEPLOY_REVISION" "origin/$BRANCH"; then
-        echo "Requested deployment revision is not reachable from origin/$BRANCH."
-        exit 1
-    fi
-    git checkout --detach "$DEPLOY_REVISION"
-else
-    echo "📥 Pulling latest changes..."
-    cd "$APP_DIR"
-    sudo git sparse-checkout init --no-cone
-    sudo git sparse-checkout set '/*' '!/local-tools/'
-    sudo git fetch --no-tags origin "$BRANCH"
-    if ! sudo git merge-base --is-ancestor "$DEPLOY_REVISION" "origin/$BRANCH"; then
-        echo "Requested deployment revision is not reachable from origin/$BRANCH."
-        exit 1
-    fi
-    sudo git checkout --detach "$DEPLOY_REVISION"
-    sudo git sparse-checkout reapply
-fi
-
-echo "✅ Repository ready"
-echo ""
-
-# Check environment file
-if [ ! -f "$ENV_FILE" ]; then
-    echo "⚠️  Environment file not found: $ENV_FILE"
-    exit 1
-fi
-
-echo "✅ Environment file found"
-echo ""
-
-# Run deployment with timeout
-echo "🐳 Building and starting Docker containers (this may take 10-15 minutes)..."
-cd "$APP_DIR"
-DEPLOY_ENV=(
-    DPP_ENV_FILE="$ENV_FILE"
-    DPP_DEPLOY_TARGET="$DEPLOY_TARGET"
-    DPP_DEPLOY_USER="$DEPLOY_USER"
-)
+append_remote_argument "--revision"
+append_remote_argument "$DEPLOY_REVISION"
+append_remote_argument "--target"
+append_remote_argument "$DEPLOY_TARGET"
+append_remote_argument "--expected-helper-sha"
+append_remote_argument "$ROOT_RELEASE_DEPLOYER_SHA256"
+append_remote_argument "--timeout-seconds"
+append_remote_argument "$TIMEOUT_SECONDS"
 if [ -n "$COMPOSE_PROJECT_NAME" ]; then
-    DEPLOY_ENV+=(COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME")
+    append_remote_argument "--compose-project"
+    append_remote_argument "$COMPOSE_PROJECT_NAME"
 fi
 if [ -n "$REMOVE_ORPHANS" ]; then
-    DEPLOY_ENV+=(DPP_REMOVE_ORPHANS="$REMOVE_ORPHANS")
-fi
-if [ -n "$SKIP_LIVE_EDGE_CHECK" ]; then
-    DEPLOY_ENV+=(DPP_SKIP_LIVE_EDGE_CHECK="$SKIP_LIVE_EDGE_CHECK")
-fi
-if [ -n "$SKIP_CADDY_RELOAD" ]; then
-    DEPLOY_ENV+=(DPP_SKIP_CADDY_RELOAD="$SKIP_CADDY_RELOAD")
-fi
-if [ -n "$CADDYFILE" ]; then
-    DEPLOY_ENV+=(DPP_CADDYFILE="$CADDYFILE")
+    append_remote_argument "--remove-orphans"
+    append_remote_argument "$REMOVE_ORPHANS"
 fi
 if [ -n "$INITIALIZE_POSTGRES_VOLUME" ]; then
-    DEPLOY_ENV+=(DPP_INITIALIZE_POSTGRES_VOLUME="$INITIALIZE_POSTGRES_VOLUME")
+    append_remote_argument "--initialize-postgres-volume"
+    append_remote_argument "$INITIALIZE_POSTGRES_VOLUME"
 fi
 if [ -n "$INITIALIZE_LOCAL_STORAGE_VOLUME" ]; then
-    DEPLOY_ENV+=(DPP_INITIALIZE_LOCAL_STORAGE_VOLUME="$INITIALIZE_LOCAL_STORAGE_VOLUME")
+    append_remote_argument "--initialize-local-storage-volume"
+    append_remote_argument "$INITIALIZE_LOCAL_STORAGE_VOLUME"
 fi
-if [ -n "$ALLOW_UNVERIFIED_MARKETING_CONTENT" ]; then
-    DEPLOY_ENV+=(DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT="$ALLOW_UNVERIFIED_MARKETING_CONTENT")
-fi
-timeout "$DEPLOY_TIMEOUT_SECONDS" sudo "${DEPLOY_ENV[@]}" ./infra/oracle/deploy-prod.sh
 
-echo ""
-echo "✅ Deployment process complete!"
-echo ""
-echo "📊 Checking service status..."
-sudo docker ps --no-trunc --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || echo "⚠️ Could not retrieve container status"
-
-EOF
-
-chmod +x "$DEPLOY_SCRIPT"
-
-# Copy script to remote and execute
-echo "📤 Uploading deployment script..."
-if ! scp -q "${SSH_OPTS[@]}" "$DEPLOY_SCRIPT" "$SSH_TARGET:$REMOTE_DEPLOY_SCRIPT"; then
-    echo "❌ Failed to upload deployment script."
+echo "🔒 Verifying the root-owned remote release entry point..."
+if ! "$SSH_CMD" "${SSH_OPTS[@]}" "$SSH_TARGET" \
+    "/usr/bin/sudo -n /usr/local/sbin/dpp-release-deployer --preflight --expected-helper-sha $(quote_for_remote "$ROOT_RELEASE_DEPLOYER_SHA256")"; then
+    echo "❌ The remote root release entry point is missing, untrusted, or does not match this approved release."
+    echo "   Bootstrap it as root using docs/deployment/oci-deployment-runbook.md before retrying."
     exit 1
 fi
-echo "✅ Script uploaded"
 
+echo "✅ Root release entry point verified"
 echo ""
 echo "⏱️  Starting remote deployment (timeout: ${TIMEOUT_SECONDS}s)..."
 echo "---"
 DEPLOY_LOG="$(mktemp "${TMPDIR:-/tmp}/dpp-deploy-output.XXXXXX")"
 chmod 600 "$DEPLOY_LOG"
 
-# Execute with timeout
-REMOTE_ENV="DPP_DEPLOY_TARGET=$(quote_for_remote "$DEPLOY_TARGET")"
-REMOTE_ENV="$REMOTE_ENV DPP_DEPLOY_USER=$(quote_for_remote "$OCI_USER")"
-REMOTE_ENV="$REMOTE_ENV DPP_DEPLOY_REVISION=$(quote_for_remote "$DEPLOY_REVISION")"
-if [ -n "$COMPOSE_PROJECT_NAME" ]; then
-    REMOTE_ENV="$REMOTE_ENV COMPOSE_PROJECT_NAME=$(quote_for_remote "$COMPOSE_PROJECT_NAME")"
-fi
-if [ -n "$REMOVE_ORPHANS" ]; then
-    REMOTE_ENV="$REMOTE_ENV DPP_REMOVE_ORPHANS=$(quote_for_remote "$REMOVE_ORPHANS")"
-fi
-if [ -n "$SKIP_LIVE_EDGE_CHECK" ]; then
-    REMOTE_ENV="$REMOTE_ENV DPP_SKIP_LIVE_EDGE_CHECK=$(quote_for_remote "$SKIP_LIVE_EDGE_CHECK")"
-fi
-if [ -n "$SKIP_CADDY_RELOAD" ]; then
-    REMOTE_ENV="$REMOTE_ENV DPP_SKIP_CADDY_RELOAD=$(quote_for_remote "$SKIP_CADDY_RELOAD")"
-fi
-if [ -n "$CADDYFILE" ]; then
-    REMOTE_ENV="$REMOTE_ENV DPP_CADDYFILE=$(quote_for_remote "$CADDYFILE")"
-fi
-if [ -n "$INITIALIZE_POSTGRES_VOLUME" ]; then
-    REMOTE_ENV="$REMOTE_ENV DPP_INITIALIZE_POSTGRES_VOLUME=$(quote_for_remote "$INITIALIZE_POSTGRES_VOLUME")"
-fi
-if [ -n "$INITIALIZE_LOCAL_STORAGE_VOLUME" ]; then
-    REMOTE_ENV="$REMOTE_ENV DPP_INITIALIZE_LOCAL_STORAGE_VOLUME=$(quote_for_remote "$INITIALIZE_LOCAL_STORAGE_VOLUME")"
-fi
-if [ -n "$ALLOW_UNVERIFIED_MARKETING_CONTENT" ]; then
-    REMOTE_ENV="$REMOTE_ENV DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT=$(quote_for_remote "$ALLOW_UNVERIFIED_MARKETING_CONTENT")"
-fi
-REMOTE_ENV="$REMOTE_ENV DPP_DEPLOY_TIMEOUT_SECONDS=$(quote_for_remote "$TIMEOUT_SECONDS")"
+# The remote command is a fixed root-owned entry point. It receives only
+# validated, quoted scalar arguments; no mutable checkout or /tmp script is
+# uploaded or executed with root privileges.
 set +e
 if [ -n "$TIMEOUT_CMD" ]; then
-    ($TIMEOUT_CMD $((TIMEOUT_SECONDS + 30)) $SSH_CMD "${SSH_OPTS[@]}" "$SSH_TARGET" "$REMOTE_ENV bash $(quote_for_remote "$REMOTE_DEPLOY_SCRIPT")" 2>&1) | tee "$DEPLOY_LOG"
+    ($TIMEOUT_CMD $((TIMEOUT_SECONDS + 30)) $SSH_CMD "${SSH_OPTS[@]}" "$SSH_TARGET" "$REMOTE_COMMAND" 2>&1) | tee "$DEPLOY_LOG"
 else
     echo "⚠️  Local timeout command not found; running SSH deployment without local timeout wrapper."
-    ($SSH_CMD "${SSH_OPTS[@]}" "$SSH_TARGET" "$REMOTE_ENV bash $(quote_for_remote "$REMOTE_DEPLOY_SCRIPT")" 2>&1) | tee "$DEPLOY_LOG"
+    ($SSH_CMD "${SSH_OPTS[@]}" "$SSH_TARGET" "$REMOTE_COMMAND" 2>&1) | tee "$DEPLOY_LOG"
 fi
 PIPE_CODES=("${PIPESTATUS[@]}")
 set -e

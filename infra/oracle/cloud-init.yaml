@@ -15,8 +15,9 @@ runcmd:
   - bash -lc 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list'
   - apt-get update
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-  - usermod -aG docker ubuntu
-  - mkdir -p /opt/dpp
-  - chown ubuntu:ubuntu /opt/dpp
+  # Docker daemon access is root-equivalent. The SSH deployment account uses
+  # only the root-owned release entry point, so it must not join this group.
+  - install -d -o root -g root -m 0700 /opt/dpp-releases
+  - install -d -o root -g root -m 0700 /etc/dpp
 
-final_message: "OCI VM bootstrap complete. SSH in, create /etc/dpp/dpp.env from infra/oracle/oci.env.example, then run /opt/dpp/infra/oracle/bootstrap.sh after cloning the repo."
+final_message: "OCI VM bootstrap complete. Create /etc/dpp/dpp.env and bootstrap the root-owned dpp-release-deployer as documented before normal deployment; do not clone an executable application checkout for the SSH deployment account."

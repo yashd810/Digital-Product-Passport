@@ -17,6 +17,14 @@ The GitHub-hosted jobs run untrusted pull-request code and must never receive a
 production key. The private runner runs only the protected production workflow,
 holds the local SSH deployment identity, and is not an application host.
 
+Before enabling the workflow, bootstrap the root-owned release entry point on
+each application host as described in
+[`oci-deployment-runbook.md`](oci-deployment-runbook.md#root-owned-release-entry-point).
+The runner's SSH account must be a restricted account with no Docker-group or
+broad-sudo access; it may invoke only `/usr/local/sbin/dpp-release-deployer`.
+The normal deployment wrapper compares that installed helper's SHA-256 to the
+approved release and fails closed if they differ.
+
 ## What Is In The Repository
 
 - `.github/workflows/security-and-smoke.yml` runs CI on pull requests and

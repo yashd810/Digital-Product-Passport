@@ -3,6 +3,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/dpp}"
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
+BACKEND_ENV_FILE="$(dirname -- "$ENV_FILE")/dpp-backend.env"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 LOCK_FILE=""
 INITIALIZE_POSTGRES_VOLUME="${DPP_INITIALIZE_POSTGRES_VOLUME:-false}"
@@ -195,6 +196,27 @@ require_docker_volume_name_env() {
   value="$(read_env_var "$key")"
   if ! [[ "$value" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
     echo "Production env var $key must be a Docker volume name"
+    exit 1
+  fi
+}
+
+require_postgres_role_env() {
+  local key="$1"
+  local value
+  value="$(read_env_var "$key")"
+  if ! [[ "$value" =~ ^[a-z_][a-z0-9_]{0,62}$ ]]; then
+    echo "Production env var $key must be a lowercase PostgreSQL role name"
+    exit 1
+  fi
+}
+
+require_runtime_postgres_role_env() {
+  local key="$1"
+  local value
+  require_postgres_role_env "$key"
+  value="$(read_env_var "$key")"
+  if [ "$value" = "postgres" ]; then
+    echo "Production env var $key must name the dedicated non-superuser application role, not postgres"
     exit 1
   fi
 }
@@ -412,8 +434,10 @@ case "$DEPLOY_TARGET" in
     require_env_var "SIGNING_PRIVATE_KEY"
     require_env_var "SIGNING_PUBLIC_KEY"
     require_env_var "DB_HOST"
-    require_env_var "DB_USER"
+    require_runtime_postgres_role_env "DB_USER"
     require_secret_env_var "DB_PASSWORD"
+    require_postgres_role_env "DB_ADMIN_USER"
+    require_secret_env_var "DB_ADMIN_PASSWORD"
     require_env_var "DB_NAME"
     require_exact_env_value "RUN_SCHEMA_MIGRATIONS" "false"
     require_docker_volume_name_env "LOCAL_STORAGE_VOLUME_NAME"
@@ -429,6 +453,17 @@ case "$DEPLOY_TARGET" in
     require_distinct_secret_env_vars "PEPPER_V1" "OTP_HMAC_SECRET"
     require_distinct_secret_env_vars "PEPPER_V1" "REPOSITORY_FILE_LINK_SECRET"
     require_distinct_secret_env_vars "OTP_HMAC_SECRET" "REPOSITORY_FILE_LINK_SECRET"
+    require_distinct_env_vars "DB_USER" "DB_ADMIN_USER"
+    require_distinct_secret_env_vars "DB_PASSWORD" "DB_ADMIN_PASSWORD"
+    require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "JWT_SECRET"
+    require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "PEPPER_V1"
+    require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "OTP_HMAC_SECRET"
+    require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "REPOSITORY_FILE_LINK_SECRET"
+    require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "EMAIL_PASS"
+    require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "SIGNING_PRIVATE_KEY"
+    require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "ASSET_SOURCE_CREDENTIALS_JSON"
+    require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "STORAGE_S3_SECRET_ACCESS_KEY"
+    require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "BACKUP_PROVIDER_SECRET_ACCESS_KEY"
 
     require_env_var "STORAGE_PROVIDER"
     if [ "$(read_env_var STORAGE_PROVIDER)" != "s3" ]; then
@@ -482,6 +517,8 @@ case "$DEPLOY_TARGET" in
     require_distinct_env_vars "DB_BACKUP_S3_ACCESS_KEY_ID" "BACKUP_PROVIDER_ACCESS_KEY_ID"
     require_distinct_env_vars "DB_BACKUP_S3_SECRET_ACCESS_KEY" "STORAGE_S3_SECRET_ACCESS_KEY"
     require_distinct_env_vars "DB_BACKUP_S3_SECRET_ACCESS_KEY" "BACKUP_PROVIDER_SECRET_ACCESS_KEY"
+    require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "DB_BACKUP_S3_SECRET_ACCESS_KEY"
+    require_distinct_secret_env_vars "DB_ADMIN_PASSWORD" "DB_BACKUP_MANIFEST_HMAC_SECRET"
     require_distinct_env_vars "DB_BACKUP_MANIFEST_HMAC_SECRET" "DB_BACKUP_S3_SECRET_ACCESS_KEY"
     require_distinct_env_vars "DB_BACKUP_MANIFEST_HMAC_SECRET" "BACKUP_PROVIDER_SECRET_ACCESS_KEY"
     require_distinct_env_vars "DB_BACKUP_MANIFEST_HMAC_SECRET" "STORAGE_S3_SECRET_ACCESS_KEY"
@@ -509,6 +546,12 @@ esac
 
 if [ "$DEPLOY_TARGET" = "frontend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   bash "$APP_DIR/infra/oracle/check-marketing-public-content.sh"
+fi
+
+if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
+  DPP_ENV_FILE="$ENV_FILE" DPP_BACKEND_ENV_FILE="$BACKEND_ENV_FILE" \
+    "$APP_DIR/infra/oracle/prepare-backend-runtime-env.sh"
+  export DPP_BACKEND_ENV_FILE="$BACKEND_ENV_FILE"
 fi
 
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-$DEFAULT_REMOVE_ORPHANS}"
@@ -587,6 +630,25 @@ build_target_images_sequentially() {
   for service_name in "${services[@]}"; do
     build_service_image "$service_name"
   done
+}
+
+quiesce_backend_for_controlled_migration() {
+  local backend_container_id
+  backend_container_id="$(
+    DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
+      ps -q backend-api 2>/dev/null | head -n1
+  )"
+  if [ -z "$backend_container_id" ]; then
+    return 0
+  fi
+
+  # Schema changes may relocate dynamic passport tables between schemas. The
+  # old API uses unqualified legacy names, so it must be stopped before the
+  # controlled migrator obtains DDL locks; otherwise concurrent requests can
+  # race the data-preserving move or run against a mixed layout.
+  echo "Quiescing the backend API for the controlled database migration..."
+  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
+    stop backend-api
 }
 
 deploy_frontend_sequentially() {
@@ -876,13 +938,12 @@ if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   else
     echo "Running the controlled schema migration for this backend deployment..."
   fi
+  quiesce_backend_for_controlled_migration
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up --no-build -d postgres
   wait_for_container_health "postgres" "PostgreSQL" 40 2
-  # The production image intentionally removes npm after installing runtime
-  # dependencies, so invoke the checked-in migration entry point with Node.
-  # This is deliberately part of a controlled deployment, never application
-  # startup: ordinary restarts retain the existing schema and data unchanged.
-  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --no-deps backend-api node scripts/migrate-db.js
+  # This controlled one-shot receives DB_ADMIN_* directly. The web service is
+  # intentionally not used because it receives only dpp-backend.env.
+  DPP_ENV_FILE="$ENV_FILE" docker compose --profile maintenance -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --no-deps db-migrate
 fi
 if [ "$DEPLOY_TARGET" = "frontend" ]; then
   deploy_frontend_sequentially

@@ -24,6 +24,7 @@ function generateEscapedP256KeyPair() {
 }
 
 const signingKeys = generateEscapedP256KeyPair();
+const envName = (...parts) => parts.join("_");
 
 const requiredProductionEnv = {
   JWT_SECRET: "test-jwt-secret-with-32-characters-minimum",
@@ -58,17 +59,6 @@ const validStorageConfig = {
 
 const validDbBackupConfig = {
   DB_BACKUP_ENABLED: "true",
-  DB_BACKUP_S3_ENDPOINT: "https://backup-storage.example.com",
-  DB_BACKUP_S3_REGION: "eu-frankfurt-1",
-  DB_BACKUP_S3_BUCKET: "dpp-prod-db-backups",
-  DB_BACKUP_S3_ACCESS_KEY_ID: "database-backup-access-key",
-  DB_BACKUP_S3_SECRET_ACCESS_KEY: "database-backup-secret-key",
-  DB_BACKUP_MANIFEST_HMAC_SECRET: "database-backup-manifest-hmac-secret-at-least-32-characters",
-  DB_BACKUP_S3_FORCE_PATH_STYLE: "true",
-  DB_BACKUP_S3_PREFIX: "db-backups/postgres",
-  DB_BACKUP_EVIDENCE_S3_PREFIX: "db-backups/evidence/restore-drills",
-  DB_BACKUP_MAX_BYTES: "5368709120",
-  DB_BACKUP_RETENTION_COUNT: "14",
 };
 
 const validBackupProviderStorageConfig = {
@@ -162,6 +152,30 @@ function captureProductionStorageGuard(overrides = {}) {
 test("production environment guard accepts public HTTPS app and API URLs", () => {
   const result = captureProductionGuard();
   assert.equal(result.exited, false);
+});
+
+test("production web runtime rejects privileged migration and database-backup environment leakage", () => {
+  for (const [name, value] of [
+    [envName("DB", "ADMIN", "USER"), ["dpp", "admin"].join("_")],
+    [envName("DB", "ADMIN", "PASSWORD"), "admin-password-that-must-not-reach-the-web-process"],
+    [envName("POSTGRES", "PASSWORD"), "postgres-password-that-must-not-reach-the-web-process"],
+    [envName("DB", "BACKUP", "S3", "ACCESS", "KEY", "ID"), "backup-key-that-must-not-reach-the-web-process"],
+    [envName("DB", "BACKUP", "S3", "SECRET", "ACCESS", "KEY"), "backup-secret-that-must-not-reach-the-web-process"],
+    [envName("DB", "BACKUP", "MANIFEST", "HMAC", "SECRET"), "backup-manifest-secret-that-must-not-reach-the-web-process"],
+    [envName("DB", "BACKUP", "FUTURE", "CAPABILITY"), "future-backup-capability-that-must-not-reach-the-web-process"],
+  ]) {
+    const result = captureProductionGuard({ [name]: value });
+    assert.equal(result.exited, true, name);
+    assert.equal(result.code, 1, name);
+    assert.equal(result.errors[0][0].forbidden.includes(name), true, name);
+  }
+});
+
+test("production web runtime rejects a PostgreSQL superuser database identity", () => {
+  const result = captureProductionGuard({ DB_USER: "postgres" });
+  assert.equal(result.exited, true);
+  assert.equal(result.code, 1);
+  assert.equal(result.errors[0][0].env, "DB_USER");
 });
 
 test("production environment guard rejects automatic schema migration on container startup", () => {
@@ -360,21 +374,7 @@ test("production storage guard rejects placeholder S3 credentials", () => {
   });
 });
 
-test("production storage guard requires dedicated DB backup S3 configuration", () => {
-  withEnv({
-    ...validStorageConfig,
-    ...validDbBackupConfig,
-    ...validBackupProviderStorageConfig,
-    DB_BACKUP_S3_ENDPOINT: undefined,
-  }, () => {
-    assert.throws(
-      () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
-      /DB_BACKUP_S3_ENDPOINT/
-    );
-  });
-});
-
-test("production storage guard accepts a complete isolated DB backup configuration", () => {
+test("production storage guard accepts only the non-secret DB-backup policy bit in the web environment", () => {
   withEnv({
     ...validStorageConfig,
     ...validDbBackupConfig,
@@ -389,54 +389,12 @@ test("production storage guard accepts a complete isolated DB backup configurati
 test("production storage guard rejects private-literal object-storage endpoints before any client is constructed", () => {
   for (const name of [
     "STORAGE_S3_ENDPOINT",
-    "DB_BACKUP_S3_ENDPOINT",
     "BACKUP_PROVIDER_ENDPOINT",
   ]) {
     const result = captureProductionStorageGuard({ [name]: "https://169.254.169.254" });
     assert.equal(result.exited, true, name);
     assert.equal(result.code, 1, name);
     assert.equal(result.errors[0][0].env, name, name);
-  }
-});
-
-test("production storage guard rejects DB backup credentials or buckets shared with application storage", () => {
-  for (const [key, duplicateValue] of [
-    ["DB_BACKUP_S3_BUCKET", validStorageConfig.STORAGE_S3_BUCKET],
-    ["DB_BACKUP_S3_ACCESS_KEY_ID", validStorageConfig.STORAGE_S3_ACCESS_KEY_ID],
-    ["DB_BACKUP_S3_SECRET_ACCESS_KEY", validStorageConfig.STORAGE_S3_SECRET_ACCESS_KEY],
-  ]) {
-    withEnv({
-      ...validStorageConfig,
-      ...validDbBackupConfig,
-      ...validBackupProviderStorageConfig,
-      [key]: duplicateValue,
-    }, () => {
-      assert.throws(
-        () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
-        /separate bucket and credential material/
-      );
-    });
-  }
-});
-
-test("production storage guard requires an independent DB backup manifest authentication key", () => {
-  for (const duplicateValue of [
-    "too-short",
-    validDbBackupConfig.DB_BACKUP_S3_SECRET_ACCESS_KEY,
-    validStorageConfig.STORAGE_S3_SECRET_ACCESS_KEY,
-    requiredProductionEnv.JWT_SECRET,
-  ]) {
-    withEnv({
-      ...validStorageConfig,
-      ...validDbBackupConfig,
-      ...validBackupProviderStorageConfig,
-      DB_BACKUP_MANIFEST_HMAC_SECRET: duplicateValue,
-    }, () => {
-      assert.throws(
-        () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
-        /DB_BACKUP_MANIFEST_HMAC_SECRET/
-      );
-    });
   }
 });
 
@@ -500,27 +458,6 @@ test("production storage guard rejects backup-provider bucket or credential mate
       assert.throws(
         () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
         /Backup-provider storage must use separate bucket and credential material/
-      );
-    });
-  }
-});
-
-test("production storage guard keeps DB backups and passport backup-provider storage pairwise isolated", () => {
-  for (const [key, duplicateValue] of [
-    ["BACKUP_PROVIDER_BUCKET", validDbBackupConfig.DB_BACKUP_S3_BUCKET],
-    ["BACKUP_PROVIDER_ACCESS_KEY_ID", validDbBackupConfig.DB_BACKUP_S3_ACCESS_KEY_ID],
-    ["BACKUP_PROVIDER_SECRET_ACCESS_KEY", validDbBackupConfig.DB_BACKUP_S3_SECRET_ACCESS_KEY],
-    ["BACKUP_PROVIDER_SECRET_ACCESS_KEY", validDbBackupConfig.DB_BACKUP_MANIFEST_HMAC_SECRET],
-  ]) {
-    withEnv({
-      ...validStorageConfig,
-      ...validDbBackupConfig,
-      ...validBackupProviderStorageConfig,
-      [key]: duplicateValue,
-    }, () => {
-      assert.throws(
-        () => assertProductionStorageReadiness({ isProduction: true, logger: { error() {} } }),
-        /pairwise-isolated/
       );
     });
   }

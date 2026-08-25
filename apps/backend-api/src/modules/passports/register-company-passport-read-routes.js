@@ -4,6 +4,7 @@ const {
   flattenSchemaFieldsFromSections,
 } = require("../../shared/passports/passport-helpers");
 const { getSafeErrorMessage } = require("../../shared/http/error-response");
+const { serializeCsvCell } = require("../../shared/security/csv-cell");
 
 module.exports = function registerCompanyPassportReadRoutes(app, deps) {
   const {
@@ -260,13 +261,6 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
         }));
       }
 
-      const escapeCell = (value) => {
-        const stringValue = Array.isArray(value) || (typeof value === "object" && value !== null)
-          ? JSON.stringify(value)
-          : String(value ?? "");
-        return `"${stringValue.replace(/"/g, '""')}"`;
-      };
-
       const fieldRows = [
         ["dppId", ...rows.map((row) => row.dppId)],
         ["modelName", ...rows.map((row) => row.modelName || "")],
@@ -276,7 +270,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       ];
 
       const headerRow = ["Field Name", ...rows.map((_, index) => `Passport ${index + 1}`)];
-      const csvLines = [headerRow, ...fieldRows].map((row) => row.map(escapeCell).join(","));
+      const csvLines = [headerRow, ...fieldRows].map((row) => row.map(serializeCsvCell).join(","));
 
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="${resolvedPassportType}_export.csv"`);

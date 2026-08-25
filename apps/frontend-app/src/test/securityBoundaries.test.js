@@ -1,6 +1,8 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { buildDraftStorageKey } from "../passports/form/passportFormDrafts";
+import { clearClientSessionState } from "../app/hooks/useSessionAuth";
+import { clearPassportFormDrafts } from "../shared/security/passportFormDraftStorage";
 import { decodePassportListRouteSegment } from "../user/dashboard/passports/hooks/usePassportListState";
 import { readSafePdfResponse } from "../shared/security/documentSafety";
 import { clearSensitiveHashParameter } from "../shared/security/sensitiveLocation";
@@ -10,6 +12,19 @@ function responseFor(body, type = "application/pdf", extraHeaders = {}) {
     status: 200,
     headers: { "Content-Type": type, ...extraHeaders },
   });
+}
+
+function createStorage(entries = {}) {
+  const values = new Map(Object.entries(entries));
+  return {
+    get length() {
+      return values.size;
+    },
+    getItem: (key) => values.get(key) ?? null,
+    key: (index) => [...values.keys()][index] ?? null,
+    removeItem: (key) => values.delete(key),
+    snapshot: () => Object.fromEntries(values),
+  };
 }
 
 describe("browser security boundaries", () => {
@@ -80,6 +95,28 @@ describe("browser security boundaries", () => {
     expect(first).not.toBe(second);
     expect(first).toContain("user%3Aone");
     expect(first).toContain("battery%3Av1");
+  });
+
+  test("clears only passport form drafts from session storage during client session cleanup", () => {
+    const sessionStorage = createStorage({
+      "passport-form-draft:user-a:create:1:battery%3Av1:new": "private draft",
+      "passport-form-draft:user-b:edit:1:battery%3Av1:dpp-1": "other private draft",
+      "dpp-lazy-recovery:passport-form": "attempted",
+    });
+    const localStorage = { removeItem: vi.fn() };
+
+    expect(clearPassportFormDrafts(sessionStorage)).toBe(2);
+    expect(sessionStorage.snapshot()).toEqual({ "dpp-lazy-recovery:passport-form": "attempted" });
+
+    const secondSessionStorage = createStorage({
+      "passport-form-draft:user-a:create:1:battery%3Av1:new": "private draft",
+      "dpp-lazy-recovery:passport-form": "attempted",
+    });
+    clearClientSessionState({ localStorage, sessionStorage: secondSessionStorage });
+
+    expect(localStorage.removeItem).toHaveBeenCalledWith("user");
+    expect(localStorage.removeItem).toHaveBeenCalledWith("companyId");
+    expect(secondSessionStorage.snapshot()).toEqual({ "dpp-lazy-recovery:passport-form": "attempted" });
   });
 
   test("treats malformed percent-encoded route state as invalid instead of crashing", () => {

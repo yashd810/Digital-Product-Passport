@@ -47,4 +47,22 @@ RUN git clone --depth 1 --branch "$GOSU_VERSION" https://github.com/tianon/gosu.
 FROM postgres:18.4-trixie@sha256:22c89fe0d0f507606260237fd55e51f6137f58b2d5bcf6152242b96d9fe8f9a4
 
 COPY --from=gosu-build /gosu /usr/local/bin/gosu
-RUN chmod 0555 /usr/local/bin/gosu
+# The pinned upstream base is intentionally retained for reproducibility, but
+# it predates the Debian 13 util-linux security update. Upgrade only the
+# affected packages during the controlled image build and remove APT metadata
+# so no fixable OS vulnerabilities remain in the runtime layer.
+RUN set -eux; \
+  chmod 0555 /usr/local/bin/gosu; \
+  apt-get update; \
+  apt-get install --only-upgrade -y --no-install-recommends \
+    bsdutils \
+    libblkid1 \
+    liblastlog2-2 \
+    libmount1 \
+    libsmartcols1 \
+    libuuid1 \
+    login \
+    mount \
+    util-linux; \
+  apt-get clean; \
+  rm -rf /var/lib/apt/lists/*

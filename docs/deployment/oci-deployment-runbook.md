@@ -83,11 +83,11 @@ is never permitted.
 Every successful production rollout installs and verifies the repository's
 reversible `DOCKER-USER` control after Docker has created its chains. For an
 existing host that has not yet received this hardened deployment, install it
-once manually:
+once manually through the approved administrator account and the verified
+root-owned release:
 
 ```bash
-cd /opt/dpp
-sudo APP_DIR=/opt/dpp bash infra/oracle/install-container-imds-firewall.sh
+sudo APP_DIR=/opt/dpp /bin/bash /opt/dpp/infra/oracle/install-container-imds-firewall.sh
 sudo /usr/local/sbin/dpp-container-imds-firewall check
 ```
 
@@ -107,7 +107,7 @@ step.
 ## Credential and Host-Key Preflight
 
 Keep `/etc/dpp/dpp.env` outside the repository as a regular root-owned mode-`600`
-file. Generate the five independent 256-bit values and matching P-256 signing
+file. Generate the required distinct 256-bit values and matching P-256 signing
 pair with `bash infra/oracle/generate-env-secrets.sh`; do not reuse a value from
 another purpose or environment. Scheduled ERP/API jobs store only a
 `credentialRef`; keep their real headers or bodies in
@@ -115,12 +115,47 @@ another purpose or environment. Scheduled ERP/API jobs store only a
 reference must also be constrained to its company IDs, exact public HTTPS URLs,
 and allowed `GET`/`POST` methods.
 
+Use separate PostgreSQL identities in that root-only source file:
+
+- `DB_USER` / `DB_PASSWORD` is the dedicated `dpp_app` runtime login. It is
+  non-superuser, has no role memberships, cannot create databases or roles, and
+  receives only the application grants plus `CREATE` in the dedicated
+  `passport_runtime` schema for dynamic passport tables. It must not receive
+  `CREATE` in `public` or another shared schema.
+- `DB_ADMIN_USER` / `DB_ADMIN_PASSWORD` is for PostgreSQL bootstrap and the
+  one-shot `db-migrate` service only. It is never injected into the long-running
+  API container. For later administrative-role rotation it must be the database
+  owner, or otherwise have the required `CREATEROLE` and object-ownership
+  privileges; do not grant those powers to `dpp_app`.
+
+For a fresh installation, use the names in `infra/oracle/oci.env.example`.
+For an existing database whose API still uses `postgres`, do not set
+`DB_ADMIN_USER=dpp_admin` until that role already exists. During the first
+role-separation release, retain the current privileged login as
+`DB_ADMIN_USER` (usually `postgres`) with its existing password, set `DB_USER`
+to `dpp_app`, and set a newly generated, distinct `DB_PASSWORD`. The controlled
+`db-migrate` job creates and hardens `dpp_app` without resetting data. This is a
+normal controlled API restart, not a destructive database migration. Afterwards
+you may create and rotate to a dedicated administrative login under a separate
+approved change.
+
+Each backend release derives `/etc/dpp/dpp-backend.env` atomically from the
+broad root-only source. The web process receives only the allowlisted runtime
+values; it fails closed if `DB_ADMIN_*`, `POSTGRES_*`, or privileged
+`DB_BACKUP_*` values are present. Do not hand-edit that derived file or point
+the API at `/etc/dpp/dpp.env`.
+
 When host-level database backups are enabled, configure a second OCI
 S3-compatible customer-secret pair in `DB_BACKUP_S3_ACCESS_KEY_ID` and
 `DB_BACKUP_S3_SECRET_ACCESS_KEY`, scoped only to the distinct
 `DB_BACKUP_S3_BUCKET`. Do not reuse the `STORAGE_S3_*` credential or bucket.
 The backend startup and deployment checks reject missing, placeholder, or
-duplicated DB-backup credential material.
+duplicated DB-backup credential material. The long-running API does not receive
+those DB-backup credentials: the installed root-owned
+`/etc/dpp/dpp-backup-compose.yml` starts a short-lived, non-root uploader with
+only the DB-backup object-storage configuration. The descriptor contains no
+secret values and is independent of `/opt/dpp`; do not replace it with a Compose
+file from the application checkout.
 
 Production backend deployment is fail-closed: application backup replication
 must be enabled and required, and host-level DB backups must be enabled. Supply
@@ -135,6 +170,103 @@ The deployment and troubleshooting helpers require a non-symlinked private key
 that is not group/world-readable and a pre-verified `known_hosts` file. Verify
 the OCI instance fingerprint in the OCI Console before adding it; do not rely on
 trust-on-first-use during production deployment.
+
+## Root-Owned Release Entry Point
+
+Normal production deployment never executes a root-impacting script from the
+SSH account's checkout. Each application host instead uses this fixed chain:
+
+```text
+trusted deployment runner
+  -> SSH deployment account (no Docker group and no broad sudo)
+  -> sudo /usr/local/sbin/dpp-release-deployer
+  -> fresh root-owned /opt/dpp-releases/.stage.* checkout
+  -> atomic rename to /opt/dpp
+  -> root-owned infra/oracle/deploy-prod.sh from that verified release
+```
+
+The entry point fetches only the requested full SHA after proving it is
+reachable from `origin/main`. It ignores existing checkout, Git, and SSH
+configuration; disables hooks and submodules; rejects symlinks, special files,
+untracked/ignored files, mutable permissions, and unexpected ownership. Before
+activation it moves the old checkout into a root-owned archive below
+`/opt/dpp-releases`. That archive is forensic/rollback evidence only: roll back
+through the normal deployment helper with its known Git SHA, never by running
+an archived checkout directly. Named Docker volumes are not moved or deleted.
+
+This requires a one-time, out-of-band root bootstrap on **each** frontend and
+backend host. It cannot safely bootstrap itself from `/opt/dpp`: if the SSH
+deployment account can alter a checkout or run arbitrary `sudo`/Docker commands,
+it already has root-equivalent control. Perform these actions through a trusted
+administrator or Bastion session, using files whose commit and SHA-256 were
+verified outside the target host:
+
+1. Copy the reviewed `dpp-root-release-deployer.sh` and
+   `install-root-release-deployer.sh` to a root-owned, mode-`0700` temporary
+   directory such as `/root/dpp-release-bootstrap`. Do **not** run either from
+   an old `/opt/dpp` checkout. Before transfer, record the helper SHA-256 from
+   the approved protected-release commit on a separate trusted system. Compare
+   the root-only copy to that recorded value, then pass the same lowercase value
+   to the installer; do not derive the expected value from an unprotected host
+   copy:
+
+   ```bash
+   sudo install -d -o root -g root -m 0700 /root/dpp-release-bootstrap
+   # Transfer the two reviewed files through the approved administrator path.
+   expected_sha='<SHA-256 recorded from the approved release on a separate trusted system>'
+   actual_sha="$(sha256sum /root/dpp-release-bootstrap/dpp-root-release-deployer.sh | awk '{ print $1 }')"
+   [ "$actual_sha" = "$expected_sha" ] || { echo 'release helper digest mismatch' >&2; exit 1; }
+   sudo env \
+     DPP_ROOT_RELEASE_DEPLOYER_SOURCE=/root/dpp-release-bootstrap/dpp-root-release-deployer.sh \
+     DPP_ROOT_RELEASE_DEPLOYER_SHA256="$expected_sha" \
+     /bin/bash /root/dpp-release-bootstrap/install-root-release-deployer.sh
+   ```
+
+2. Create a GitHub **read-only deploy key** restricted to this repository, and
+   install it plus independently verified GitHub host keys as root-only files.
+   Do not use a personal access token, an SSH agent, or the old checkout's Git
+   configuration.
+
+   ```bash
+   sudo install -o root -g root -m 0600 /root/dpp-release-bootstrap/release-readonly.key /etc/dpp/release-readonly.key
+   sudo install -o root -g root -m 0600 /root/dpp-release-bootstrap/github-known_hosts /etc/dpp/release-known_hosts
+   ```
+
+3. Use a dedicated SSH deployment account (for example `dpp-release`) on each
+   host. Create it with its own runner-controlled public key, then set its home
+   directory and `.ssh` directory to user-owned modes `0750` and `0700`; its
+   `authorized_keys` file must be mode `0600`. Remove it from the `docker`
+   group and remove any broad `sudo` grant; Docker-daemon access and `ALL` sudo
+   both bypass this control. Do not demote the existing administrator account
+   until a separate Bastion/break-glass path is proven. Through `visudo`, allow
+   only the root-owned release entry point and keep sudo's environment reset
+   enabled:
+
+   ```sudoers
+   Defaults:dpp-release env_reset
+   dpp-release ALL=(root) NOPASSWD: NOSETENV: /usr/local/sbin/dpp-release-deployer
+   ```
+
+   Replace `dpp-release` with the actual account recorded as `OCI_USER` in the
+   protected deployment profile. Audit the result with `sudo -l -U
+   dpp-release`; do not leave a cloud-init/default `ALL` rule in force for that
+   account. Update `oci-deploy.env` to use this dedicated account and its
+   restricted SSH key.
+
+4. As the restricted deployment account, verify the installed entry point:
+
+   ```bash
+   expected_sha="$(sha256sum /usr/local/sbin/dpp-release-deployer | awk '{ print $1 }')"
+   sudo -n /usr/local/sbin/dpp-release-deployer \
+     --preflight --expected-helper-sha "$expected_sha"
+   ```
+
+The normal `scripts/deploy/deploy-to-oci.sh` wrapper performs this same
+preflight before every deployment and compares the installed helper digest to
+the helper committed in the approved runner release. If a release changes the
+entry-point source, repeat this root-admin installation step first; the normal
+deployment intentionally fails closed rather than upgrading a root trust anchor
+from application code.
 
 ## Team CI/CD Deployment Runner
 
@@ -189,29 +321,29 @@ missing PostgreSQL or local-storage volume, preventing a typo or a changed
 Compose project from silently selecting an empty store.
 
 Keep `RUN_SCHEMA_MIGRATIONS=false` for normal production operation. Every
-controlled backend deployment runs the checked-in `node scripts/migrate-db.js`
-entry point once, before recreating the API; ordinary service restarts never run
-it. For a deliberate first database initialization or an approved fresh-data reset, run
-the deployment helper once with its one-time volume-initialization flags:
+controlled backend deployment runs the isolated `db-migrate` service once,
+before recreating the API; ordinary service restarts never run it. For a
+deliberate first database initialization or an approved fresh-data reset, run
+the normal deployment helper once with its one-time volume-initialization flags:
 
 ```bash
-cd /opt/dpp
-sudo env DPP_ENV_FILE=/etc/dpp/dpp.env DPP_DEPLOY_TARGET=backend \
+DPP_DEPLOY_TARGET=backend \
   DPP_INITIALIZE_POSTGRES_VOLUME=true \
-  DPP_INITIALIZE_LOCAL_STORAGE_VOLUME=true ./infra/oracle/deploy-prod.sh
+  DPP_INITIALIZE_LOCAL_STORAGE_VOLUME=true \
+  bash scripts/deploy/deploy-to-oci.sh
 ```
 
 When and only when a named persistent volume did not exist, its matching
 explicit flag creates it. A fresh PostgreSQL volume is started, receives one
-controlled `node scripts/migrate-db.js` run, and then the normal backend starts
+controlled `db-migrate` run, and then the normal backend starts
 with startup migrations disabled. The flags are shell-only maintenance actions;
 do not add them to `/etc/dpp/dpp.env`.
 
-`bootstrap.sh` also requires an explicit `DPP_DEPLOY_TARGET`; it does not
-default to `all`. Use `backend` on the database/API host and `frontend` on the
-website host. Use `all` only for a deliberately single-host deployment. This
-prevents a bootstrap command from creating duplicate services on the split OCI
-hosts.
+Do not use `infra/oracle/bootstrap.sh` from an SSH deployment account or a
+mutable checkout. The root release entry point requires an explicit target:
+use `backend` on the database/API host and `frontend` on the website host. Use
+`all` only for a deliberately single-host deployment. This prevents a command
+from creating duplicate services on the split OCI hosts.
 
 Do not use `docker compose down -v`, `docker volume rm`, or
 `DPP_INITIALIZE_POSTGRES_VOLUME=true`, or
@@ -230,10 +362,12 @@ details, legal dates, liability amount, governing law, or court location. The
 guard intentionally does not supply those facts; obtain them from the business
 and legal owner before deploying.
 
-If the business owner explicitly authorizes a short-lived exception, use the
-invocation-only `DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT=true` flag with a
-frontend deployment. It emits a warning and must not be stored in an env file;
-replace the placeholders and redeploy as soon as the facts are available.
+If the business owner explicitly authorizes a short-lived exception, treat it
+as a separate root-only operational change with recorded approval. The normal
+deployment wrapper deliberately rejects `DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT`
+so the restricted SSH deployment account cannot suppress this release gate.
+Never store the flag in an env file; replace the placeholders and redeploy as
+soon as the facts are available.
 
 ## Application Secret Rotation
 
@@ -244,7 +378,7 @@ is changed in the same maintenance window. Instead, create a root-only temporary
 rotation file on the backend host:
 
 ```bash
-sudo sh -c 'umask 077; cd /opt/dpp && bash infra/oracle/generate-env-secrets.sh --rotate-application-secrets > /root/dpp-rotation.env'
+sudo sh -c 'umask 077; bash /opt/dpp/infra/oracle/generate-env-secrets.sh --rotate-application-secrets > /root/dpp-rotation.env'
 sudoedit /etc/dpp/dpp.env
 ```
 
@@ -262,12 +396,14 @@ database table is retained.
 ## Safe Update Procedure
 
 1. Commit and push the exact code to deploy on `main`.
-2. Check each host is using the existing compose project before deploying:
+2. Through the approved administrator/Bastion account, check each host is using
+   the existing compose project before deploying. The restricted deployment
+   account intentionally has neither Docker access nor general sudo:
 
 ```bash
 ssh -i "$SSH_KEY" -o UserKnownHostsFile="$SSH_KNOWN_HOSTS" \
-  -o StrictHostKeyChecking=yes ubuntu@<host-ip> \
-  'cd /opt/dpp && git log -1 --oneline && sudo docker ps --format "{{.Names}}\t{{.Ports}}"'
+  -o StrictHostKeyChecking=yes <administrator>@<host-ip> \
+  'sudo git -C /opt/dpp log -1 --oneline && sudo docker ps --format "{{.Names}}\t{{.Ports}}"'
 ```
 
 3. Deploy the backend host first. With the default external
@@ -284,14 +420,17 @@ DPP_DEPLOY_TARGET=backend bash scripts/deploy/deploy-to-oci.sh
 DPP_DEPLOY_TARGET=frontend bash scripts/deploy/deploy-to-oci.sh
 ```
 
-The deploy helper pulls `main`, reuses `COMPOSE_PROJECT_NAME` from
+The root release entry point fetches the requested reachable `main` revision
+into a fresh immutable checkout, reuses `COMPOSE_PROJECT_NAME` from
 `/etc/dpp/dpp.env`, runs `docker compose up --build -d`, reloads Caddy, and
 performs local and public health checks. Do not run with a different compose
 project name unless you are deliberately creating a separate environment. For
 split hosts, it intentionally requires separate `backend` and `frontend`
-deployments rather than treating the two hosts as one `all` target. Explicit
-shell variables can be used for a one-off override, but never source the private
-deployment profile into a shell.
+deployments rather than treating the two hosts as one `all` target. The normal
+wrapper does not permit live-edge, Caddy, or marketing-content bypass flags;
+any exceptional root-only operation needs separate approval and a verified
+root-owned release checkout. Never source the private deployment profile into a
+shell.
 
 For backend deployments, the helper also verifies the named local-storage and
 Postgres Docker volumes exist before compose starts. It prepares
@@ -317,23 +456,28 @@ curl -fsS "$SERVER_URL/health"
 curl -fsS "$APP_URL/"
 curl -fsS "$VITE_PUBLIC_VIEWER_URL/"
 curl -fsS "$MARKETING_URL/"
-bash infra/oracle/check-edge-policy-config.sh
+sudo /bin/bash /opt/dpp/infra/oracle/check-edge-policy-config.sh
 ```
 
-On the backend host:
+On the backend host, through the approved administrator account:
 
 ```bash
-cd /opt/dpp
-sudo docker compose -p dpp -f docker/docker-compose.prod.backend.yml \
+sudo docker compose -p dpp -f /opt/dpp/docker/docker-compose.prod.backend.yml \
   --env-file /etc/dpp/dpp.env exec -T backend-api node -e \
   'fetch("http://127.0.0.1:3001/health/storage").then(async (response) => { process.stdout.write(await response.text()); process.exit(response.ok ? 0 : 1); }).catch(() => process.exit(1));'
-sudo docker compose -p dpp -f docker/docker-compose.prod.backend.yml \
-  --env-file /etc/dpp/dpp.env exec -T backend-api node scripts/migrate-db.js
-sudo docker compose -p dpp -f docker/docker-compose.prod.backend.yml \
+sudo docker compose -p dpp -f /opt/dpp/docker/docker-compose.prod.backend.yml \
   --env-file /etc/dpp/dpp.env exec -T backend-api node scripts/check-passport-storage.js
-sudo docker compose -p dpp -f docker/docker-compose.prod.backend.yml \
+sudo docker compose -p dpp -f /opt/dpp/docker/docker-compose.prod.backend.yml \
   --env-file /etc/dpp/dpp.env exec -T backend-api node scripts/verify-live-confidentiality.js
+sudo docker compose -p dpp -f /opt/dpp/docker/docker-compose.prod.backend.yml \
+  --env-file /etc/dpp/dpp.env exec -T backend-api node -e \
+  'const { Pool } = require("pg"); const pool = new Pool({ host: process.env.DB_HOST, port: Number(process.env.DB_PORT), user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME }); pool.query(`SELECT has_schema_privilege(current_user, '\''passport_runtime'\'', '\''CREATE'\'') AS runtime_create, has_schema_privilege(current_user, '\''public'\'', '\''CREATE'\'') AS public_create`).then(({ rows: [row] }) => { process.stdout.write(JSON.stringify(row)); process.exit(row.runtime_create && !row.public_create ? 0 : 1); }).catch(() => process.exit(1)).finally(() => pool.end());'
 ```
+
+Do **not** run `db-migrate` manually while the API is live. The root release
+entry point performs that one-shot maintenance operation only after it has
+quiesced the API during a controlled backend deployment. Treat any separate
+migration as an approved maintenance window, not a post-deployment check.
 
 Check external port exposure from your workstation:
 

@@ -25,6 +25,16 @@ function invalidManifestError(message) {
   return error;
 }
 
+function requireNoFollowFlag() {
+  const noFollow = fs.constants.O_NOFOLLOW;
+  if (typeof noFollow !== "number" || noFollow === 0) {
+    // Downloaded dumps and manifests are sensitive recovery artifacts. Do not
+    // silently weaken their symlink boundary on an unsupported platform.
+    throw new Error("O_NOFOLLOW is required for secure database-backup staging");
+  }
+  return noFollow;
+}
+
 function readArg(flag, fallback = null) {
   const index = process.argv.indexOf(flag);
   if (index === -1) return fallback;
@@ -199,7 +209,7 @@ function authenticateManifest(manifest, config, { expectedManifestKey = null } =
 
 async function writeSensitiveFile(filePath, content) {
   await fs.promises.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
-  const noFollow = fs.constants.O_NOFOLLOW || 0;
+  const noFollow = requireNoFollowFlag();
   const handle = await fs.promises.open(
     filePath,
     fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | noFollow,
@@ -216,7 +226,7 @@ async function writeSensitiveFile(filePath, content) {
 async function writeSensitiveObjectStream(filePath, body, maxBytes, expectedSha256 = null) {
   await fs.promises.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
   const partialPath = `${filePath}.${process.pid}.${crypto.randomBytes(16).toString("hex")}.partial`;
-  const noFollow = fs.constants.O_NOFOLLOW || 0;
+  const noFollow = requireNoFollowFlag();
   let handle = null;
   let committed = false;
   let totalBytes = 0;
@@ -583,6 +593,7 @@ module.exports = {
   canonicalManifestPayload,
   listAllManifestKeys,
   readConfig,
+  requireNoFollowFlag,
   signManifest,
   writeSensitiveFile,
   writeSensitiveObjectStream,

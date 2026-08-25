@@ -93,13 +93,20 @@ Current production-style behavior:
 - transactional email requires a working SMTP account and provider-specific app
   password in the protected production environment; verify its connection
   before enabling the public contact form or account-email workflows
-- production PostgreSQL receives only its database name, user, and password;
-  it does not load the full DPP environment file
+- the long-running API receives an allowlisted root-owned
+  `/etc/dpp/dpp-backend.env`, not the broad `/etc/dpp/dpp.env`: it has only the
+  `dpp_app` runtime database login and fails closed if admin or DB-backup
+  credentials leak into its environment
+- PostgreSQL bootstrap and the one-shot `db-migrate` service receive the
+  separate `DB_ADMIN_USER` / `DB_ADMIN_PASSWORD` identity directly; production
+  requires it to differ from `DB_USER`
 - normal production starts use `RUN_SCHEMA_MIGRATIONS=false` and only verify the
-  schema; the controlled backend deployment runs `node scripts/migrate-db.js`
-  once before recreating the API, rather than on every container restart
+  schema; the controlled backend deployment runs the isolated `db-migrate`
+  service once before recreating the API, rather than on every container restart
 - enabled host-level DB backups require a dedicated S3-compatible credential
-  and backup bucket, separate from application file storage
+  and backup bucket, separate from application file storage; systemd invokes a
+  root-installed, checkout-independent backup descriptor that gives those
+  credentials only to a one-shot non-root uploader
 - enabled application backup replication requires dedicated
   `BACKUP_PROVIDER_*` S3-compatible storage and never falls back to
   `STORAGE_S3_*` application-file storage

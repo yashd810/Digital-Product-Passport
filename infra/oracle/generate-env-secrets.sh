@@ -7,7 +7,8 @@ usage() {
   cat <<'USAGE'
 Usage: bash infra/oracle/generate-env-secrets.sh [--bootstrap|--rotate-application-secrets]
 
-  --bootstrap (default)             Generate DB_PASSWORD, the DB backup manifest
+  --bootstrap (default)             Generate separate DB_ADMIN_PASSWORD and
+                                    DB_PASSWORD values, the DB backup manifest
                                     integrity key, and all application secrets
                                     for a new database/environment.
   --rotate-application-secrets      Generate only application secrets and a new
@@ -57,6 +58,7 @@ public_key="$(printf '%s\n' "$private_key" | openssl pkey -pubout)"
 
 if [ "$mode" = "bootstrap" ]; then
   printf '%s\n' '# Paste these distinct values into the mode-600 production env file.'
+  printf '%s=%s\n' 'DB_ADMIN_PASSWORD' "$(random_256_bit_hex)"
   printf '%s=%s\n' 'DB_PASSWORD' "$(random_256_bit_hex)"
   # This protects existing backup manifests and therefore is intentionally not
   # emitted by --rotate-application-secrets.

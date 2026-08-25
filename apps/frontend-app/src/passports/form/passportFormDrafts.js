@@ -6,6 +6,7 @@ import {
   extractFieldValuesFromElements,
 } from "../../shared/passports/schemaKeyUtils";
 import { selectPassportDataEntryValues } from "../../shared/passports/passportSchemaVisibility";
+import { passportFormDraftStoragePrefix } from "../../shared/security/passportFormDraftStorage";
 
 /**
  * Pure draft and record helpers for Passport Form.
@@ -21,14 +22,13 @@ export function getFieldInputPrompt(field) {
 
 export function buildDraftStorageKey({ userId, mode, companyId, passportType, dppId }) {
   const parts = [
-    "passport-form-draft",
     userId || "no-user",
     mode || "create",
     companyId || "no-company",
     passportType || "no-type",
     dppId || "new",
   ];
-  return parts.map((part) => encodeURIComponent(String(part))).join(":");
+  return `${passportFormDraftStoragePrefix}${parts.map((part) => encodeURIComponent(String(part))).join(":")}`;
 }
 
 export function normalizePersistedComparisonValue(value) {

@@ -10,6 +10,7 @@ const {
   authenticateManifest,
   buildKeys,
   listAllManifestKeys,
+  requireNoFollowFlag,
   signManifest,
   writeSensitiveFile,
   writeSensitiveObjectStream,
@@ -162,6 +163,13 @@ test("downloaded database backups and manifests are written with owner-only perm
   } finally {
     await fs.promises.rm(directory, { recursive: true, force: true });
   }
+});
+
+test("database backup staging requires O_NOFOLLOW rather than weakening symlink protection", () => {
+  assert.equal(typeof requireNoFollowFlag(), "number");
+  assert.notEqual(requireNoFollowFlag(), 0);
+  const source = fs.readFileSync(path.join(__dirname, "../scripts/db-backup-object-storage.js"), "utf8");
+  assert.doesNotMatch(source, /O_NOFOLLOW \|\| 0/);
 });
 
 test("database backup downloads stream only the exact signed size and checksum into a private file", async () => {

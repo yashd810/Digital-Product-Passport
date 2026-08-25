@@ -207,9 +207,13 @@ jobs:
           bash infra/oracle/generate-env-secrets.sh >> "$DPP_CI_ENV_DIR/local-compose.env"
           cp infra/oracle/oci.env.example "$DPP_CI_ENV_DIR/oci.env"
           chmod 600 "$DPP_CI_ENV_DIR/local-compose.env" "$DPP_CI_ENV_DIR/oci.env"
+          DPP_ENV_FILE="$DPP_CI_ENV_DIR/oci.env" \
+          DPP_BACKEND_ENV_FILE="$DPP_CI_ENV_DIR/dpp-backend.env" \
+            bash infra/oracle/prepare-backend-runtime-env.sh
       - run: DPP_ENV_FILE="$RUNNER_TEMP/dpp-env/local-compose.env" docker compose -f docker/docker-compose.yml --env-file "$RUNNER_TEMP/dpp-env/local-compose.env" config -q
-      - run: DPP_ENV_FILE="$RUNNER_TEMP/dpp-env/oci.env" docker compose -f docker/docker-compose.prod.yml --env-file "$RUNNER_TEMP/dpp-env/oci.env" config -q
-      - run: DPP_ENV_FILE="$RUNNER_TEMP/dpp-env/oci.env" docker compose -f docker/docker-compose.prod.backend.yml --env-file "$RUNNER_TEMP/dpp-env/oci.env" config -q
+      - run: DPP_ENV_FILE="$RUNNER_TEMP/dpp-env/oci.env" DPP_BACKEND_ENV_FILE="$RUNNER_TEMP/dpp-env/dpp-backend.env" docker compose -f docker/docker-compose.prod.yml --env-file "$RUNNER_TEMP/dpp-env/oci.env" config -q
+      - run: DPP_ENV_FILE="$RUNNER_TEMP/dpp-env/oci.env" DPP_BACKEND_ENV_FILE="$RUNNER_TEMP/dpp-env/dpp-backend.env" docker compose -f docker/docker-compose.prod.backend.yml --env-file "$RUNNER_TEMP/dpp-env/oci.env" config -q
+      - run: DPP_ENV_FILE="$RUNNER_TEMP/dpp-env/oci.env" docker compose -f infra/oracle/dpp-backup-compose.yml --env-file "$RUNNER_TEMP/dpp-env/oci.env" config -q
       - run: docker compose -f docker/docker-compose.prod.frontend.yml --env-file "$RUNNER_TEMP/dpp-env/oci.env" config -q
       - run: sh infra/oracle/check-edge-policy-config.sh
 
@@ -240,8 +244,11 @@ jobs:
           bash -n infra/oracle/container-imds-firewall.sh
           bash -n infra/oracle/db-backup.sh
           bash -n infra/oracle/deploy-prod.sh
+          bash -n infra/oracle/prepare-backend-runtime-env.sh
           bash -n infra/oracle/install-container-imds-firewall.sh
           bash -n infra/oracle/install-db-backup-jobs.sh
+          bash -n infra/oracle/dpp-root-release-deployer.sh
+          bash -n infra/oracle/install-root-release-deployer.sh
           bash -n scripts/deploy/bootstrap-actions-deployment-runner.sh
           bash -n scripts/deploy/check-deployment-runner.sh
           bash -n scripts/deploy/deploy-to-oci.sh
@@ -254,11 +261,16 @@ jobs:
           .github/scripts/run-gitleaks-fail-closed.node.test.js
           apps/backend-api/tests/company-logo-freshness.node.test.js
           apps/backend-api/tests/host-only-cookie.node.test.js
+          apps/backend-api/tests/logger-redaction.node.test.js
           apps/backend-api/tests/runtime-config.node.test.js
+          apps/backend-api/tests/runtime-database-role.node.test.js
           infra/oracle/container-imds-firewall.node.test.js
           infra/oracle/db-backup.node.test.js
+          infra/oracle/object-storage-backups.node.test.js
+          infra/oracle/root-release-deployer.node.test.js
           infra/docker/postgres/Dockerfile.node.test.js
           scripts/deploy/check-deployment-runner.node.test.js
+          scripts/deploy/deploy-to-oci.node.test.js
           scripts/deploy/production-deploy-workflow.node.test.js
       - name: Check deployment-runner Terraform formatting
         run: >-
@@ -272,6 +284,20 @@ jobs:
           --tmpfs /tmp:rw,noexec,nosuid,size=32m
           -v "$PWD:/workspace:ro"
           -w /workspace/infra/oracle/terraform/deployment-runner
+          hashicorp/terraform@sha256:f5ac787eee9d292b6a3b97d40f04019ce08189d356233fc73d5ec7ef8529cce2
+          fmt -check
+      - name: Check object-storage-backups Terraform formatting
+        run: >-
+          docker run --rm
+          --network none
+          --read-only
+          --cap-drop ALL
+          --security-opt no-new-privileges
+          --pids-limit 64
+          --memory 128m
+          --tmpfs /tmp:rw,noexec,nosuid,size=32m
+          -v "$PWD:/workspace:ro"
+          -w /workspace/infra/oracle/terraform/object-storage-backups
           hashicorp/terraform@sha256:f5ac787eee9d292b6a3b97d40f04019ce08189d356233fc73d5ec7ef8529cce2
           fmt -check
 
@@ -360,9 +386,29 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
       - name: Scan ${{ matrix.name }} image for fixable high-severity vulnerabilities
-        run: >-
-          docker run --rm
-          -v /var/run/docker.sock:/var/run/docker.sock
-          aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
-          image --ignore-unfixed --exit-code 1 --severity HIGH,CRITICAL
-          dpp-ci-${{ matrix.name }}:scan
+        run: |
+          set -euo pipefail
+          scan_dir="$(mktemp -d "$RUNNER_TEMP/dpp-trivy.XXXXXX")"
+          cleanup() { rm -rf -- "$scan_dir"; }
+          trap cleanup EXIT
+          # Scan an exported image instead of mounting the runner's Docker
+          # socket.  A scanner with that socket is root-equivalent on the CI
+          # host, while this temporary tarball is read-only input.
+          docker save --output "$scan_dir/image.tar" "dpp-ci-${{ matrix.name }}:scan"
+          chmod 0644 "$scan_dir/image.tar"
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 256 \
+            --memory 1024m \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m \
+            -v "$scan_dir:/cache:rw" \
+            -e HOME=/cache \
+            -e TRIVY_CACHE_DIR=/cache \
+            -e TMPDIR=/cache \
+            -e TRIVY_NO_PROGRESS=true \
+            -e TRIVY_SKIP_VERSION_CHECK=true \
+            aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f \
+            image --input /cache/image.tar --ignore-unfixed --exit-code 1 --severity HIGH,CRITICAL

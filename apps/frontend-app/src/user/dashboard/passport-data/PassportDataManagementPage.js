@@ -5,6 +5,7 @@ import {
   assertTextSize,
   maxStructuredImportBytes,
 } from "../../../shared/security/fileSafety";
+import { escapeCsvCell } from "../../../shared/security/csvSafety";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
 import AppSelect from "../../../shared/components/AppSelect";
@@ -104,7 +105,7 @@ function parseCsvRows(text) {
 }
 
 function exportRowsToCsv(rows, fields, filename) {
-  const esc = (value) => `"${serializeCell(value).replace(/"/g, "\"\"")}"`;
+  const esc = (value) => escapeCsvCell(serializeCell(value));
   const lines = [
     fields.map((field) => esc(field.key)).join(","),
     ...rows.map((row) => fields.map((field) => esc(row[field.key] ?? "")).join(",")),

@@ -28,6 +28,7 @@ LockPersonality=true
 MemoryDenyWriteExecute=true
 RestrictAddressFamilies=AF_UNIX AF_NETLINK
 CapabilityBoundingSet=CAP_NET_ADMIN
+InaccessiblePaths=/opt/dpp
 
 [Install]
 # Tie the persistent rule to every Docker start. `PartOf` propagates explicit

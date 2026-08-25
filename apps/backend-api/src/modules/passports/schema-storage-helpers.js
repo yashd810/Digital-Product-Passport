@@ -6,6 +6,8 @@ const {
   assertCanonicalSchemaSections,
   flattenSchemaFieldsFromSections,
   isSafePassportStorageFieldKey,
+  parseQualifiedSqlIdentifier,
+  passportRuntimeSchema,
   toPassportStorageColumnKey,
 } = require("../../shared/passports/passport-helpers");
 
@@ -22,8 +24,8 @@ function createSchemaStorageHelpers({
   livePassportSystemColumnDefinitions,
   inRevisionStatusesSql,
 }) {
-  function unquoteSqlIdentifier(identifier) {
-    return String(identifier || "").replace(/^"|"$/g, "").replace(/""/g, "\"");
+  function parseRuntimePassportTable(tableName) {
+    return parseQualifiedSqlIdentifier(tableName, { expectedSchema: passportRuntimeSchema });
   }
 
   function buildDbIndexName(...parts) {
@@ -43,12 +45,12 @@ function createSchemaStorageHelpers({
   }
 
   async function getLiveTableColumnMap(tableName) {
-    const rawTableName = unquoteSqlIdentifier(tableName);
+    const { schema, table } = parseRuntimePassportTable(tableName);
     const columns = await pool.query(
       `SELECT column_name AS "columnName", data_type AS "dataType"
        FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = $1`,
-      [rawTableName]
+       WHERE table_schema = $1 AND table_name = $2`,
+      [schema, table]
     );
     return new Map(columns.rows.map((row) => [row.columnName, row.dataType]));
   }
@@ -277,7 +279,7 @@ function createSchemaStorageHelpers({
 
   async function createPassportTable(typeName, { createdBy = null, eventType = "createOrReconcileTable" } = {}) {
     const tableName = getTable(typeName);
-    const rawTableName = unquoteSqlIdentifier(tableName);
+    const { table: rawTableName } = parseRuntimePassportTable(tableName);
     const typeRes = await pool.query(
       'SELECT "fieldsJson" AS "fieldsJson" FROM "passportTypes" WHERE "typeName" = $1',
       [typeName]
@@ -316,8 +318,8 @@ function createSchemaStorageHelpers({
         "releaseStatus" VARCHAR(50)  NOT NULL DEFAULT 'draft',
         "versionNumber" INTEGER      NOT NULL DEFAULT 1,
         "qrCode"        TEXT,
-        "createdBy"     INTEGER      REFERENCES users(id) ON DELETE SET NULL,
-        "updatedBy"     INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+        "createdBy"     INTEGER      REFERENCES "public".users(id) ON DELETE SET NULL,
+        "updatedBy"     INTEGER      REFERENCES "public".users(id) ON DELETE SET NULL,
         "createdAt"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "updatedAt"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "deletedAt"     TIMESTAMPTZ${customColsDDL}
@@ -351,6 +353,8 @@ function createSchemaStorageHelpers({
 
     await recordPassportTypeSchemaEvent({
       typeName,
+      // Preserve the existing event/UI value (physical table name only) while
+      // SQL execution remains schema-qualified through getTable.
       tableName: rawTableName,
       schemaVersion: getTypeSchemaVersion(typeRes.rows[0].fieldsJson),
       eventType,
@@ -365,13 +369,13 @@ function createSchemaStorageHelpers({
     const fields = flattenTypeFields(fieldsJson);
     const issues = getPassportStorageFieldKeyIssues(fields);
     const tableName = getTable(typeName);
-    const rawTableName = unquoteSqlIdentifier(tableName);
+    const { schema: tableSchema, table: rawTableName } = parseRuntimePassportTable(tableName);
     const tableExists = await pool.query(
       `SELECT 1
        FROM information_schema.tables
-       WHERE table_schema = 'public' AND table_name = $1
+       WHERE table_schema = $1 AND table_name = $2
        LIMIT 1`,
-      [rawTableName]
+      [tableSchema, rawTableName]
     ).then((result) => result.rows.length > 0);
 
     if (!tableExists) {

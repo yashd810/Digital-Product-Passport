@@ -34,11 +34,14 @@ test("PostgreSQL rebuilds gosu with the pinned fixed Go toolchain", () => {
     dockerfile,
     /^FROM postgres:18\.4-trixie@sha256:22c89fe0d0f507606260237fd55e51f6137f58b2d5bcf6152242b96d9fe8f9a4$/m,
   );
+  assert.match(dockerfile, /apt-get install --only-upgrade -y --no-install-recommends[\s\\]+bsdutils[\s\\]+libblkid1[\s\\]+liblastlog2-2[\s\\]+libmount1[\s\\]+libsmartcols1[\s\\]+libuuid1[\s\\]+login[\s\\]+mount[\s\\]+util-linux/);
+  assert.match(dockerfile, /rm -rf \/var\/lib\/apt\/lists\/\*/);
 });
 
 test("all Compose variants use the rebuilt PostgreSQL image tag", () => {
   for (const compose of composeFiles) {
-    assert.match(compose, /image: dpp-postgres:18\.4-trixie-gosu1\.19-go1\.26\.6/);
+    assert.match(compose, /image: dpp-postgres:18\.4-trixie-gosu1\.19-go1\.26\.6-debian-security1/);
+    assert.doesNotMatch(compose, /dpp-postgres:18\.4-trixie-gosu1\.19-go1\.26\.6(?:\s|$)/);
     assert.doesNotMatch(compose, /dpp-postgres:18\.4-trixie-gosu1\.19-go1\.26\.5/);
   }
 });

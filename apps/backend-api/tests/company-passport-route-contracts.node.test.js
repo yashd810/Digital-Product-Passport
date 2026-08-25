@@ -183,6 +183,85 @@ test("company passport export keeps draft and inRevision as separate filters", a
   }
 });
 
+test("company passport CSV exports literalize untrusted spreadsheet formulas", async () => {
+  const formula = "\t=HYPERLINK(\"https://attacker.invalid\")";
+  const routes = registerReadRoutes(async (sql) => {
+    if (sql.includes('FROM "passportTypes"')) {
+      return { rows: [{ fieldsJson: { sections: [] } }] };
+    }
+    if (sql.includes('FROM "batteryPassports"')) {
+      return { rows: [{ dppId: "dpp-1", modelName: formula, internalAliasId: "BAT-1", releaseStatus: "draft" }] };
+    }
+    throw new Error(`Unexpected query: ${sql}`);
+  });
+  const route = routes.find((entry) => (
+    entry.method === "get"
+    && entry.routePath === "/api/companies/:companyId/passports/export-drafts"
+  ));
+  const response = createResponse();
+
+  await route.handlers.at(-1)({
+    params: { companyId: "7" },
+    query: { passportType: "batteryPassportV1", format: "csv", status: "draft" },
+    user: { role: "companyAdmin" },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /"'\t=HYPERLINK\(""https:\/\/attacker\.invalid""\)"/);
+});
+
+test("template-draft CSV exports literalize untrusted spreadsheet formulas", async () => {
+  const { app, routes } = createRouteApp();
+  const formula = " \r\n@SUM(1+1)";
+  registerCompanyRoutes(app, {
+    pool: {
+      async query(sql) {
+        if (sql.includes('FROM "passportTemplates"')) {
+          return { rows: [{ id: 4, companyId: "7", passportType: "batteryPassportV1", name: "Template" }] };
+        }
+        if (sql.includes('FROM "passportTemplateFields"')) return { rows: [] };
+        if (sql.includes('FROM "passportTypes"')) return { rows: [{ fieldsJson: { sections: [] } }] };
+        if (sql.includes('FROM "batteryPassports"')) {
+          return { rows: [{ dppId: "dpp-1", modelName: formula, internalAliasId: "BAT-1" }] };
+        }
+        throw new Error(`Unexpected query: ${sql}`);
+      },
+    },
+    authenticateToken: noopMiddleware,
+    checkCompanyAccess: noopMiddleware,
+    checkCompanyAdmin: noopMiddleware,
+    requireEditor: noopMiddleware,
+    getTable: () => '"batteryPassports"',
+    getPassportFieldValue: (row, key) => row[key],
+    getPassportTypeSchema: async () => ({
+      typeName: "batteryPassportV1",
+      schemaFields: [],
+      fieldsJson: { sections: [] },
+    }),
+    hasCompanyPassportTypeAccess: async () => true,
+    assertPassportTypeStorageReady: async () => {},
+    normalizePassportRequestBody: (value) => value,
+    editableReleaseStatusesSql: "('draft')",
+    systemPassportFields: new Set(),
+    complianceService: {},
+    productIdentifierService: {},
+  });
+  const route = routes.find((entry) => (
+    entry.method === "get"
+    && entry.routePath === "/api/companies/:companyId/templates/:templateId/export-drafts"
+  ));
+  const response = createResponse();
+
+  await route.handlers.at(-1)({
+    params: { companyId: "7", templateId: "4" },
+    query: { format: "csv" },
+    user: { role: "editor" },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /"' \r\n@SUM\(1\+1\)"/);
+});
+
 test("company passport export rejects unknown status filters", async () => {
   const routes = registerReadRoutes(async (sql) => {
     if (sql.includes('FROM "passportTypes"')) {

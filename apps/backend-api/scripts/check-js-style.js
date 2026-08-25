@@ -75,6 +75,11 @@ const allowedUpperSnakeStringTokens = new Set([
   "QR_CODE_MODEL_2",
   "TG_OP",
   "TG_TABLE_NAME",
+  // These privileged environment names are redaction paths, not application
+  // identifiers. Their producers are validated by prefix rather than direct
+  // process.env access, so discover them here explicitly.
+  "DB_MIGRATION_PASSWORD",
+  "POSTGRES_PASSWORD",
 ]);
 const forbiddenIdentifierPatterns = [
   {

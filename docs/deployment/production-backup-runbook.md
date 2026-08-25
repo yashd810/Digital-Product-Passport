@@ -68,11 +68,12 @@ application-secret rotation because older manifests must remain verifiable.
 
 Use a separate OCI customer-secret pair with permission only for the separate
 DB-backup bucket. It must not reuse the application file-storage access key,
-secret, or bucket. The backup runner inherits those DB-backup values from the
-already-running backend container; it does not pass credentials on a host
-command line and never falls back to `STORAGE_S3_*` values. Rotate a DB-backup
-credential by updating `/etc/dpp/dpp.env` and redeploying the backend before
-running a backup, verification, or restore drill.
+secret, or bucket. The backup runner reads those DB-backup values only from the
+root-only host environment file and passes them to the short-lived, non-root
+uploader through `/etc/dpp/dpp-backup-compose.yml`. It never reuses the
+long-running backend container or falls back to `STORAGE_S3_*` values. Rotate
+a DB-backup credential by updating `/etc/dpp/dpp.env` and redeploying the
+backend before running a backup, verification, or restore drill.
 
 ## OCI Backup Notes
 
@@ -113,17 +114,18 @@ The backup, verification, and drill services run with a read-only host
 filesystem except for `/var/lib/dpp-db-backups`, private temporary/device
 namespaces, kernel and control-group protections, no privilege escalation, and
 only Unix-domain socket creation. They still require the Docker daemon socket;
-that socket remains a high-trust boundary, so only root-owned checked-in scripts
-may be installed as these service entrypoints.
+that socket remains a high-trust boundary, so only root-installed, root-owned
+assets and the root-owned descriptor outside the application checkout may be
+used as service entrypoints.
 
-Database dumps transferred through the backend container use the mode-`700`
-`/data/.db-backup-tmp` directory and are removed by the job trap. They do not
-use the backend's memory-backed `/tmp`; this keeps large dumps compatible with
-the read-only container root filesystem without consuming the host's limited
-RAM twice. The runner applies the configured maximum dump size to both
-`pg_dump` staging and object-store downloads; downloads stream directly into
-a mode-`600` temporary file, verify their signed length and checksum, then
-atomically replace the restore artifact.
+Database dumps use the root-owned `/var/lib/dpp-db-backups` host staging area;
+the isolated uploader sees only its non-root `/backup` mount. Large dump
+validation and isolated restore stream the verified archive into PostgreSQL,
+instead of staging it in the database container's memory-backed `/tmp`. The
+runner applies the configured maximum dump size to both `pg_dump` staging and
+object-store downloads; downloads stream directly into a mode-`600` temporary
+file, verify their signed length and checksum, then atomically replace the
+restore artifact.
 
 The backup runner requires `/etc/dpp/dpp.env` to be a regular mode-`600` file,
 requires an explicit `DB_BACKUP_ENABLED=true|false`, and refuses to fall back to

@@ -177,6 +177,30 @@ module.exports = function createBackupProviderService({
     return condition ? "proven" : "notProven";
   }
 
+  function buildImmutableArchivalEvidence({
+    archivalStorageMode = "",
+    retentionDays = null,
+    operatorEvidenceUri = "",
+  } = {}) {
+    const hasOperatorConfiguration = Boolean(archivalStorageMode && operatorEvidenceUri);
+
+    // A deployment variable or URI is an operator-supplied pointer, not proof
+    // that OCI retention rules are enabled, locked, or applied to this bucket.
+    // Do not change this to `proven` unless this service has independently
+    // verified the live provider controls (and, where applicable, a
+    // cryptographically verifiable retention attestation).
+    return {
+      status: "notProven",
+      evidenceSource: hasOperatorConfiguration ? "operatorConfiguration" : "none",
+      operatorConfigurationStatus: hasOperatorConfiguration ? "configured" : "notConfigured",
+      liveValidationStatus: "notAvailable",
+      cryptographicValidationStatus: "notAvailable",
+      mode: archivalStorageMode || null,
+      retentionDays: retentionDays || null,
+      evidenceUri: operatorEvidenceUri || null,
+    };
+  }
+
   async function getContinuityEvidence({ companyId } = {}) {
     const normalizedCompanyId = Number.parseInt(companyId, 10);
     if (!Number.isFinite(normalizedCompanyId)) {
@@ -209,12 +233,21 @@ module.exports = function createBackupProviderService({
     const lastRestoreDrillAt = normalizeText(process.env.BACKUP_LAST_RESTORE_DRILL_AT, "");
     const immutableEvidenceUri = normalizeText(process.env.BACKUP_ARCHIVAL_IMMUTABILITY_EVIDENCE_URI, "");
     const archivalStorageMode = normalizeText(process.env.BACKUP_ARCHIVAL_STORAGE_MODE, "");
+    const immutableArchivalEvidence = buildImmutableArchivalEvidence({
+      archivalStorageMode,
+      retentionDays: policy.archivalStorage.retentionDays,
+      operatorEvidenceUri: immutableEvidenceUri,
+    });
     const backupProviderConfigured = Number(row.replicationCount) > 0 || buildImplicitProvider(normalizedCompanyId) !== null;
     const missingEvidence = [];
     if (policy.backupProviderRequired && !backupProviderConfigured) missingEvidence.push("backupProvider");
     if (!(Number(row.verifiedReplicationCount) > 0 && latestVerificationAt)) missingEvidence.push("replicationVerification");
     if (!(lastRestoreDrillAt && restoreDrillEvidenceUri)) missingEvidence.push("restoreDrillEvidence");
     if (!(archivalStorageMode && immutableEvidenceUri)) missingEvidence.push("immutabilityEvidence");
+    // An evidence URI and retention configuration are not a validation of the
+    // live OCI bucket controls. Until a provider-backed validator exists,
+    // continuity readiness must remain fail-closed.
+    if (immutableArchivalEvidence.status !== "proven") missingEvidence.push("immutableArchivalValidation");
     const readinessStatus = missingEvidence.length ? "notReady" : "ready";
 
     return {
@@ -248,12 +281,7 @@ module.exports = function createBackupProviderService({
         lastRestoreDrillAt: lastRestoreDrillAt || null,
         evidenceUri: restoreDrillEvidenceUri || null,
       },
-      immutableArchivalEvidence: {
-        status: evidenceStatus(Boolean(archivalStorageMode && immutableEvidenceUri)),
-        mode: archivalStorageMode || null,
-        retentionDays: policy.archivalStorage.retentionDays,
-        evidenceUri: immutableEvidenceUri || null,
-      },
+      immutableArchivalEvidence,
     };
   }
 

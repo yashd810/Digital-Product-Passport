@@ -22,6 +22,7 @@ const {
 } = require("../../modules/passports/import-field-guardrails");
 const { normalizeSafeImageReference } = require("../../shared/passports/passport-uri");
 const { getSafeErrorMessage, handleRouteError } = require("../../shared/http/error-response");
+const { serializeCsvCell } = require("../../shared/security/csv-cell");
 const {
   buildTemplateFieldPolicy,
   filterStoredTemplateFields,
@@ -699,13 +700,6 @@ module.exports = function registerCompanyRoutes(app, {
         }));
       }
 
-      const escCell = (v) => {
-        const stringValue = Array.isArray(v) || (typeof v === "object" && v !== null)
-          ? JSON.stringify(v)
-          : String(v ?? "");
-        return `"${stringValue.replace(/"/g, '""')}"`;
-      };
-
       const fieldRows = [
       ["dppId", ...rows.map((r) => r.dppId || "")],
       ["modelName", ...rows.map((r) => r.modelName || "")],
@@ -716,7 +710,7 @@ module.exports = function registerCompanyRoutes(app, {
       )];
 
       const headerRow = ["Field Name", ...rows.map((_, i) => `Passport ${i + 1}`)];
-      const csvLines = [headerRow, ...fieldRows].map((row) => row.map(escCell).join(","));
+      const csvLines = [headerRow, ...fieldRows].map((row) => row.map(serializeCsvCell).join(","));
 
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="${tmpl.passportType}_drafts.csv"`);

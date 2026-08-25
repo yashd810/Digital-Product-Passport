@@ -122,8 +122,23 @@ test("container IMDS rule is re-applied whenever Docker starts or restarts", () 
   assert.match(unit, /^PartOf=docker\.service$/m);
   assert.match(unit, /^WantedBy=docker\.service$/m);
   assert.doesNotMatch(unit, /^WantedBy=multi-user\.target$/m);
+  assert.match(unit, /^InaccessiblePaths=\/opt\/dpp$/m);
+  assert.match(
+    installer,
+    /install -o root -g root -m 0755[\s\S]*?\/usr\/local\/sbin\/dpp-container-imds-firewall/,
+  );
   assert.match(installer, /systemctl reenable dpp-container-imds-firewall\.service/);
   assert.match(installer, /systemctl restart dpp-container-imds-firewall\.service/);
+});
+
+test("checkout copies cannot be used as the production firewall entry point", () => {
+  const result = spawnSync("bash", [firewallScript, "check"], {
+    env: { ...process.env, DPP_FIREWALL_TEST_MODE: "false" },
+    encoding: "utf8",
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /must run from \/usr\/local\/sbin\/dpp-container-imds-firewall/);
 });
 
 test("production deployments install the persistent Docker IMDS control after Compose", () => {

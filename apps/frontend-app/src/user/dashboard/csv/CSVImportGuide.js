@@ -6,6 +6,7 @@ import {
   assertLocalFileSize,
   assertRecordCount,
 } from "../../../shared/security/fileSafety";
+import { escapeCsvCell } from "../../../shared/security/csvSafety";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import { useI18n } from "../../../app/providers/i18n";
 import "../../../shared/styles/Dashboard.css";
@@ -114,7 +115,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
           csvRows.push([field.key, "", "", ""]);
         }
       });
-      const csvContent = csvRows.map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
+      const csvContent = csvRows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);

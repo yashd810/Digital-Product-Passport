@@ -13,6 +13,105 @@ function restoreEnv(name, value) {
   else process.env[name] = value;
 }
 
+function setEnvironmentForTest(t, values) {
+  const previous = Object.fromEntries(
+    Object.keys(values).map((name) => [name, process.env[name]])
+  );
+  for (const [name, value] of Object.entries(values)) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+  t.after(() => {
+    for (const [name, value] of Object.entries(previous)) restoreEnv(name, value);
+  });
+}
+
+function createContinuityEvidenceService({ row } = {}) {
+  return createBackupProviderService({
+    pool: {
+      async query(sql) {
+        assert.match(sql, /FROM "passportBackupReplications"/);
+        return { rows: [row || {}] };
+      },
+    },
+    storageService: {},
+    buildCanonicalPassportPayload: () => ({}),
+  });
+}
+
+test("configured archival policy is never reported as proven OCI retention", async (t) => {
+  setEnvironmentForTest(t, {
+    BACKUP_PROVIDER_REQUIRED: "false",
+    BACKUP_ARCHIVAL_STORAGE_MODE: "ociObjectStorage",
+    BACKUP_ARCHIVAL_RETENTION_DAYS: "365",
+    BACKUP_ARCHIVAL_IMMUTABILITY_EVIDENCE_URI: "oci://dpp-prod-db-backups/retention-attestation.json",
+    BACKUP_RESTORE_DRILL_EVIDENCE_URI: "https://evidence.example.test/restore-drill",
+    BACKUP_LAST_RESTORE_DRILL_AT: "2026-08-01T00:00:00.000Z",
+  });
+
+  const now = new Date().toISOString();
+  const service = createContinuityEvidenceService({
+    row: {
+      replicationCount: 1,
+      syncedReplicationCount: 1,
+      failedReplicationCount: 0,
+      verifiedReplicationCount: 1,
+      failedVerificationCount: 0,
+      latestReplicationAt: now,
+      latestVerificationAt: now,
+    },
+  });
+
+  const evidence = await service.getContinuityEvidence({ companyId: 7 });
+
+  assert.equal(evidence.immutableArchivalEvidence.status, "notProven");
+  assert.equal(evidence.immutableArchivalEvidence.evidenceSource, "operatorConfiguration");
+  assert.equal(evidence.immutableArchivalEvidence.operatorConfigurationStatus, "configured");
+  assert.equal(evidence.immutableArchivalEvidence.liveValidationStatus, "notAvailable");
+  assert.equal(evidence.immutableArchivalEvidence.cryptographicValidationStatus, "notAvailable");
+  assert.equal(evidence.immutableArchivalEvidence.mode, "ociObjectStorage");
+  assert.equal(evidence.immutableArchivalEvidence.retentionDays, 365);
+  assert.equal(evidence.immutableArchivalEvidence.evidenceUri, "oci://dpp-prod-db-backups/retention-attestation.json");
+  assert.equal(evidence.readiness.status, "notReady");
+  assert.deepEqual(evidence.readiness.missingEvidence, ["immutableArchivalValidation"]);
+});
+
+test("missing archival configuration remains not proven and identifies both missing controls", async (t) => {
+  setEnvironmentForTest(t, {
+    BACKUP_PROVIDER_REQUIRED: "false",
+    BACKUP_ARCHIVAL_STORAGE_MODE: undefined,
+    BACKUP_ARCHIVAL_RETENTION_DAYS: undefined,
+    BACKUP_ARCHIVAL_IMMUTABILITY_EVIDENCE_URI: undefined,
+    BACKUP_RESTORE_DRILL_EVIDENCE_URI: "https://evidence.example.test/restore-drill",
+    BACKUP_LAST_RESTORE_DRILL_AT: "2026-08-01T00:00:00.000Z",
+  });
+
+  const now = new Date().toISOString();
+  const service = createContinuityEvidenceService({
+    row: {
+      replicationCount: 1,
+      syncedReplicationCount: 1,
+      failedReplicationCount: 0,
+      verifiedReplicationCount: 1,
+      failedVerificationCount: 0,
+      latestReplicationAt: now,
+      latestVerificationAt: now,
+    },
+  });
+
+  const evidence = await service.getContinuityEvidence({ companyId: 7 });
+
+  assert.equal(evidence.immutableArchivalEvidence.status, "notProven");
+  assert.equal(evidence.immutableArchivalEvidence.evidenceSource, "none");
+  assert.equal(evidence.immutableArchivalEvidence.operatorConfigurationStatus, "notConfigured");
+  assert.equal(evidence.immutableArchivalEvidence.evidenceUri, null);
+  assert.equal(evidence.readiness.status, "notReady");
+  assert.deepEqual(evidence.readiness.missingEvidence, [
+    "immutabilityEvidence",
+    "immutableArchivalValidation",
+  ]);
+});
+
 test("implicit env backup provider is normalized before passport replication", async (t) => {
   const previousEnabled = process.env.BACKUP_PROVIDER_ENABLED;
   const previousKey = process.env.BACKUP_PROVIDER_KEY;

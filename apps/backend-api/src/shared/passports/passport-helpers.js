@@ -25,6 +25,11 @@ const passportFieldKeyMaxLength = 200;
 const passportStorageFieldKeyPattern = /^[a-z][A-Za-z0-9]*$/;
 const passportTypeNamePattern = /^[a-z][A-Za-z0-9]+$/;
 const passportTypeNameMaxLength = postgresIdentifierMaxBytes - "Passports".length;
+// Dynamic passport tables are intentionally kept out of PostgreSQL's shared
+// public schema. The runtime API can create tables in this narrowly scoped
+// schema without gaining a general-purpose public-schema DDL capability.
+const passportRuntimeSchema = "passport_runtime";
+const postgresIdentifierPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 const systemPassportFields = new Set([
   "id",
@@ -153,6 +158,31 @@ const quoteSqlIdentifier = (value) => {
   return `"${storageIdentifier.replace(/"/g, "\"\"")}"`;
 };
 
+// `quoteSqlIdentifier` deliberately remains constrained to the application
+// field/table naming convention. Schemas use PostgreSQL's broader, still safe
+// identifier grammar (notably the underscore in passport_runtime), so keep the
+// two responsibilities separate instead of weakening field-key validation.
+const quotePostgresIdentifier = (value) => {
+  const identifier = String(value || "").trim();
+  if (!postgresIdentifierPattern.test(identifier) || !hasPostgresIdentifierLength(identifier)) {
+    throw new Error(`Invalid PostgreSQL identifier: ${identifier}`);
+  }
+  return `"${identifier.replace(/"/g, "\"\"")}"`;
+};
+
+function parseQualifiedSqlIdentifier(value, { expectedSchema = null } = {}) {
+  const candidate = String(value || "").trim();
+  const match = candidate.match(/^"([A-Za-z_][A-Za-z0-9_]*)"\."([A-Za-z_][A-Za-z0-9_]*)"$/);
+  if (!match || !hasPostgresIdentifierLength(match[1]) || !hasPostgresIdentifierLength(match[2])) {
+    throw new Error(`Invalid qualified SQL identifier: ${candidate}`);
+  }
+  const [, schema, table] = match;
+  if (expectedSchema && schema !== expectedSchema) {
+    throw new Error(`Unexpected SQL schema: ${schema}`);
+  }
+  return { schema, table };
+}
+
 const joinQuotedSqlIdentifiers = (identifiers = []) =>
   identifiers.map((identifier) => quoteSqlIdentifier(identifier)).join(", ");
 
@@ -174,7 +204,7 @@ const toCamelIdentifier = (value) => {
   }).join("");
 };
 
-const getTable = (typeName) => {
+const getPassportTableIdentifier = (typeName) => {
   if (!typeName) throw new Error("typeName is required for table lookup");
   const safe = toStorageSlug(typeName);
   if (!safe) throw new Error("typeName must contain at least one alphanumeric character");
@@ -183,8 +213,12 @@ const getTable = (typeName) => {
   if (!hasPostgresIdentifierLength(tableIdentifier)) {
     throw new Error(`Invalid SQL identifier: ${tableIdentifier}`);
   }
-  return quoteSqlIdentifier(tableIdentifier);
+  return tableIdentifier;
 };
+
+const getTable = (typeName) => (
+  `${quotePostgresIdentifier(passportRuntimeSchema)}.${quoteSqlIdentifier(getPassportTableIdentifier(typeName))}`
+);
 
 const normalizeReleaseStatus = (status) => status;
 
@@ -1122,6 +1156,7 @@ module.exports = {
   postgresIdentifierMaxBytes,
   passportFieldKeyMaxLength,
   passportTypeNameMaxLength,
+  passportRuntimeSchema,
   systemPassportFields,
   editablePassportStatuses,
   getTable,
@@ -1162,7 +1197,10 @@ module.exports = {
   toPassportStorageColumnKey,
   isSafePassportTypeName,
   quoteSqlIdentifier,
+  quotePostgresIdentifier,
+  parseQualifiedSqlIdentifier,
   joinQuotedSqlIdentifiers,
+  getPassportTableIdentifier,
   getPassportFieldLookupKeys,
   getPassportFieldValue,
   getAssetFieldMap,
