@@ -1,7 +1,9 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 # Explicit, reversible installer for the Docker-to-OCI-IMDS host firewall rule.
 
 set -euo pipefail
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 APP_DIR="${APP_DIR:-/opt/dpp}"
 UNIT_DIR="${UNIT_DIR:-/etc/systemd/system}"

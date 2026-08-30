@@ -1,9 +1,11 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 # Installs one dedicated GitHub Actions deployment runner. Run this only on the
 # separate, private OCI runner VM created for DPP production deployments.
 
 set -euo pipefail
 umask 077
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 RUNNER_USER="${DPP_DEPLOY_RUNNER_USER:-dpp-deploy}"
 RUNNER_HOME="${DPP_DEPLOY_RUNNER_HOME:-/opt/actions-runner}"

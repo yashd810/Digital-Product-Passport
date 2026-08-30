@@ -1,9 +1,11 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 # Copies a verified OCI deployment identity onto the dedicated runner without
 # retaining workstation paths or source files.
 
 set -euo pipefail
 umask 077
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 RUNNER_USER="${DPP_DEPLOY_RUNNER_USER:-dpp-deploy}"
 RUNNER_CONFIG_DIR="${DPP_DEPLOY_RUNNER_CONFIG_DIR:-/etc/dpp-deployer}"
@@ -11,6 +13,7 @@ SOURCE_CONFIG="${DPP_DEPLOY_CONFIG_SOURCE:-}"
 SOURCE_KEY="${DPP_DEPLOY_KEY_SOURCE:-}"
 SOURCE_KNOWN_HOSTS="${DPP_DEPLOY_KNOWN_HOSTS_SOURCE:-}"
 REPLACE_EXISTING="${DPP_REPLACE_RUNNER_DEPLOY_CONFIG:-}"
+readonly REQUIRED_OCI_USER="dpp-release"
 
 fail() {
   echo "Deployment-runner configuration install failed: $*" >&2
@@ -104,6 +107,7 @@ for host in "$oci_backend_ip" "$oci_frontend_ip"; do
   [[ "$host" =~ ^[A-Za-z0-9][A-Za-z0-9.:-]*$ ]] || fail "configured OCI host is invalid"
 done
 [[ "$oci_user" =~ ^[a-z_][a-z0-9_-]*$ ]] || fail "configured OCI user is invalid"
+[ "$oci_user" = "$REQUIRED_OCI_USER" ] || fail "configured OCI user must be the dedicated restricted account: $REQUIRED_OCI_USER"
 
 dest_config="$RUNNER_CONFIG_DIR/oci-deploy.env"
 dest_key="$RUNNER_CONFIG_DIR/oci-deploy.key"

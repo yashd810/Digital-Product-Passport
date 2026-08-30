@@ -5,7 +5,12 @@ const crypto = require("node:crypto");
 const { EventEmitter } = require("node:events");
 const test = require("node:test");
 const createOauthService = require("../src/platform/identity/oauth-service");
-const { fetchPinnedOauth, normalizeRedirectPath, validateOauthUrl } = createOauthService;
+const {
+  fetchPinnedOauth,
+  normalizeOauthProvider,
+  normalizeRedirectPath,
+  validateOauthUrl,
+} = createOauthService;
 
 function restoreEnv(name, value) {
   if (value === undefined) delete process.env[name];
@@ -20,6 +25,7 @@ function createProviderEnv(overrides = {}) {
     clientSecret: "client-secret",
     autoLinkByEmail: true,
     allowCreateUser: false,
+    allowedEmailDomains: ["example.com"],
     allowedEndpointOrigins: ["https://issuer.example"],
     ...overrides,
   }]);
@@ -103,6 +109,55 @@ function createOauthTestService({ jwt, fetchImpl, dnsLookup = publicDnsLookup, p
   });
 }
 
+function createVerifiedOauthCallbackFixture({ email = "sso@example.com", subject = "subject-1" } = {}) {
+  const { publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const jwk = publicKey.export({ format: "jwk" });
+  jwk.kid = "kid-1";
+  jwk.alg = "RS256";
+
+  return {
+    fetchImpl: async (url) => {
+      const href = String(url);
+      if (href.includes(".well-known/openid-configuration")) {
+        return {
+          ok: true,
+          json: async () => ({
+            issuer: "https://issuer.example",
+            authorization_endpoint: "https://issuer.example/authorize",
+            token_endpoint: "https://issuer.example/token",
+            jwks_uri: "https://issuer.example/jwks",
+            id_token_signing_alg_values_supported: ["RS256"],
+          }),
+        };
+      }
+      if (href === "https://issuer.example/token") {
+        return {
+          ok: true,
+          json: async () => ({ id_token: "id-token" }),
+        };
+      }
+      if (href === "https://issuer.example/jwks") {
+        return {
+          ok: true,
+          json: async () => ({ keys: [jwk] }),
+        };
+      }
+      throw new Error(`Unexpected fetch URL: ${href}`);
+    },
+    jwt: {
+      decode: () => ({ header: { kid: "kid-1", alg: "RS256" } }),
+      verify() {
+        return {
+          sub: subject,
+          email,
+          email_verified: true,
+          nonce: "nonce-1",
+        };
+      },
+    },
+  };
+}
+
 test("OAuth URL validation requires public HTTPS or explicitly enabled development loopback", (t) => {
   const previousAllowInsecureHttp = process.env.OAUTH_ALLOW_INSECURE_HTTP;
   const previousNodeEnv = process.env.NODE_ENV;
@@ -173,6 +228,61 @@ test("OAuth URL validation rejects invalid provider URLs", () => {
     () => validateOauthUrl("https://issuer.example\\openid-configuration", "issuer URL"),
     /issuer URL must be a valid URL/
   );
+});
+
+test("OAuth account linking and just-in-time provisioning are explicit and least privileged", () => {
+  const providerConfig = {
+    key: "test",
+    issuer: "https://issuer.example",
+    clientId: "client-id",
+    clientSecret: "client-secret",
+    allowedEndpointOrigins: ["https://issuer.example"],
+  };
+
+  const defaults = normalizeOauthProvider(providerConfig, 0);
+  assert.equal(defaults.autoLinkByEmail, false);
+  assert.equal(defaults.allowCreateUser, false);
+  assert.equal(defaults.defaultCompanyId, null);
+  assert.equal(defaults.defaultRole, "viewer");
+
+  assert.throws(
+    () => normalizeOauthProvider({ ...providerConfig, autoLinkByEmail: true }, 0),
+    /allowedEmailDomains is required when account linking or user creation is enabled/
+  );
+  assert.throws(
+    () => normalizeOauthProvider({ ...providerConfig, allowCreateUser: true, defaultCompanyId: 7 }, 0),
+    /allowedEmailDomains is required when account linking or user creation is enabled/
+  );
+  assert.throws(
+    () => normalizeOauthProvider({
+      ...providerConfig,
+      allowCreateUser: true,
+      allowedEmailDomains: ["example.com"],
+    }, 0),
+    /defaultCompanyId is required when allowCreateUser is enabled/
+  );
+  assert.throws(
+    () => normalizeOauthProvider({ ...providerConfig, defaultRole: "superAdmin" }, 0),
+    /superAdmin accounts cannot be provisioned through SSO/
+  );
+  assert.throws(
+    () => normalizeOauthProvider({ ...providerConfig, autoLinkByEmail: "true" }, 0),
+    /autoLinkByEmail must be true or false/
+  );
+
+  const explicitProvider = normalizeOauthProvider({
+    ...providerConfig,
+    autoLinkByEmail: true,
+    allowedEmailDomains: ["Example.COM"],
+    allowCreateUser: true,
+    defaultCompanyId: "7",
+    defaultRole: "editor",
+  }, 0);
+  assert.equal(explicitProvider.autoLinkByEmail, true);
+  assert.deepEqual(explicitProvider.allowedEmailDomains, ["example.com"]);
+  assert.equal(explicitProvider.allowCreateUser, true);
+  assert.equal(explicitProvider.defaultCompanyId, 7);
+  assert.equal(explicitProvider.defaultRole, "editor");
 });
 
 test("OAuth discovery rejects public hostnames that resolve to private or reserved addresses", async (t) => {
@@ -450,44 +560,10 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
   const previousProviderEnv = process.env.OAUTH_PROVIDERS_JSON;
   const previousAppUrl = process.env.APP_URL;
   const previousServerUrl = process.env.SERVER_URL;
-  const previousFetch = global.fetch;
   process.env.OAUTH_PROVIDERS_JSON = createProviderEnv();
   process.env.APP_URL = "https://app.example";
   process.env.SERVER_URL = "https://api.example";
-
-  const { publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
-  const jwk = publicKey.export({ format: "jwk" });
-  jwk.kid = "kid-1";
-  jwk.alg = "RS256";
-
-  global.fetch = async (url) => {
-    const href = String(url);
-    if (href.includes(".well-known/openid-configuration")) {
-      return {
-        ok: true,
-        json: async () => ({
-          issuer: "https://issuer.example",
-          authorization_endpoint: "https://issuer.example/authorize",
-          token_endpoint: "https://issuer.example/token",
-          jwks_uri: "https://issuer.example/jwks",
-          id_token_signing_alg_values_supported: ["RS256"],
-        }),
-      };
-    }
-    if (href === "https://issuer.example/token") {
-      return {
-        ok: true,
-        json: async () => ({ id_token: "id-token" }),
-      };
-    }
-    if (href === "https://issuer.example/jwks") {
-      return {
-        ok: true,
-        json: async () => ({ keys: [jwk] }),
-      };
-    }
-    throw new Error(`Unexpected fetch URL: ${href}`);
-  };
+  const { fetchImpl, jwt } = createVerifiedOauthCallbackFixture();
 
   t.after(() => {
     if (previousProviderEnv === undefined) delete process.env.OAUTH_PROVIDERS_JSON;
@@ -496,7 +572,6 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
     else process.env.APP_URL = previousAppUrl;
     if (previousServerUrl === undefined) delete process.env.SERVER_URL;
     else process.env.SERVER_URL = previousServerUrl;
-    global.fetch = previousFetch;
   });
 
   const queries = [];
@@ -522,17 +597,6 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
     },
   };
   const pool = createOauthTransactionPool(queryPool);
-  const jwt = {
-    decode: () => ({ header: { kid: "kid-1", alg: "RS256" } }),
-    verify() {
-      return {
-        sub: "subject-1",
-        email: "sso@example.com",
-        email_verified: true,
-        nonce: "nonce-1",
-      };
-    },
-  };
 
   let cookieToken = null;
   let clearedTransactions = 0;
@@ -551,7 +615,7 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
       throw new Error("hashPassword should not be called for auto-linked users");
     },
     dnsLookup: publicDnsLookup,
-    fetchImpl: global.fetch,
+    fetchImpl,
   });
 
   const { state, bindingToken } = seedOauthTransaction(pool, {
@@ -572,4 +636,69 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
   assert.equal(clearedTransactions, 1);
   assert.match(redirectUrl, /^https:\/\/app\.example\/oauth\/callback\?next=/);
   assert.ok(queries.some(({ sql }) => sql.includes("INSERT INTO \"userIdentities\"")));
+});
+
+test("OAuth never automatically links a super administrator by email", async (t) => {
+  const previousProviderEnv = process.env.OAUTH_PROVIDERS_JSON;
+  const previousAppUrl = process.env.APP_URL;
+  const previousServerUrl = process.env.SERVER_URL;
+  process.env.OAUTH_PROVIDERS_JSON = createProviderEnv();
+  process.env.APP_URL = "https://app.example";
+  process.env.SERVER_URL = "https://api.example";
+  t.after(() => restoreEnv("OAUTH_PROVIDERS_JSON", previousProviderEnv));
+  t.after(() => restoreEnv("APP_URL", previousAppUrl));
+  t.after(() => restoreEnv("SERVER_URL", previousServerUrl));
+
+  const queries = [];
+  const queryPool = {
+    async query(sql, params) {
+      queries.push({ sql, params });
+      if (sql.includes("FROM \"userIdentities\"")) return { rows: [] };
+      if (sql.includes("FROM users") && sql.includes("WHERE email = $1")) {
+        return {
+          rows: [{
+            id: 1,
+            email: "sso@example.com",
+            companyId: null,
+            role: "superAdmin",
+            firstName: "Super",
+            lastName: "Admin",
+            isActive: true,
+            sessionVersion: 1,
+          }],
+        };
+      }
+      return { rows: [] };
+    },
+  };
+  const pool = createOauthTransactionPool(queryPool);
+  const { fetchImpl, jwt } = createVerifiedOauthCallbackFixture();
+  let cookieWasCleared = false;
+  const service = createOauthService({
+    jwt,
+    pool,
+    generateToken: () => {
+      throw new Error("A super administrator must not receive an SSO session through auto-linking");
+    },
+    setAuthCookie: () => {
+      throw new Error("A super administrator must not receive an SSO cookie through auto-linking");
+    },
+    setOauthTransactionCookie: () => {},
+    clearOauthTransactionCookie: () => { cookieWasCleared = true; },
+    cache: { wrap: async (_key, _ttl, loader) => loader() },
+    hashPassword: async () => ({ hash: "hash" }),
+    dnsLookup: publicDnsLookup,
+    fetchImpl,
+  });
+
+  const { state, bindingToken } = seedOauthTransaction(pool);
+  await assert.rejects(
+    service.handleCallback("test", {
+      query: { code: "code-1", state },
+      headers: { cookie: `oauth_transaction=${bindingToken}` },
+    }, {}),
+    /Super administrator accounts must be linked through a controlled provisioning process/
+  );
+  assert.equal(cookieWasCleared, true);
+  assert.equal(queries.some(({ sql }) => sql.includes("INSERT INTO \"userIdentities\"")), false);
 });

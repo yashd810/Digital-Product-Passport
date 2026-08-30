@@ -108,7 +108,7 @@ step.
 
 Keep `/etc/dpp/dpp.env` outside the repository as a regular root-owned mode-`600`
 file. Generate the required distinct 256-bit values and matching P-256 signing
-pair with `bash infra/oracle/generate-env-secrets.sh`; do not reuse a value from
+pair with `/bin/bash -p infra/oracle/generate-env-secrets.sh`; do not reuse a value from
 another purpose or environment. Scheduled ERP/API jobs store only a
 `credentialRef`; keep their real headers or bodies in
 `ASSET_SOURCE_CREDENTIALS_JSON` in that protected host env file. Each credential
@@ -247,11 +247,11 @@ verified outside the target host:
    dpp-release ALL=(root) NOPASSWD: NOSETENV: /usr/local/sbin/dpp-release-deployer
    ```
 
-   Replace `dpp-release` with the actual account recorded as `OCI_USER` in the
-   protected deployment profile. Audit the result with `sudo -l -U
-   dpp-release`; do not leave a cloud-init/default `ALL` rule in force for that
-   account. Update `oci-deploy.env` to use this dedicated account and its
-   restricted SSH key.
+   Keep the account name exactly `dpp-release`; the deployment wrapper rejects
+   arbitrary or legacy administrator account names. Audit the result with
+   `sudo -l -U dpp-release`; do not leave a cloud-init/default `ALL` rule in
+   force for that account. Update `oci-deploy.env` to use this dedicated account
+   and its restricted SSH key.
 
 4. As the restricted deployment account, verify the installed entry point:
 
@@ -373,13 +373,13 @@ soon as the facts are available.
 ## Application Secret Rotation
 
 For a new environment, generate the database password and application secrets
-with `bash infra/oracle/generate-env-secrets.sh --bootstrap`. For an existing
+with `/bin/bash -p infra/oracle/generate-env-secrets.sh --bootstrap`. For an existing
 deployment, do **not** replace `DB_PASSWORD` unless the PostgreSQL role password
 is changed in the same maintenance window. Instead, create a root-only temporary
 rotation file on the backend host:
 
 ```bash
-sudo sh -c 'umask 077; bash /opt/dpp/infra/oracle/generate-env-secrets.sh --rotate-application-secrets > /root/dpp-rotation.env'
+sudo sh -c 'umask 077; /bin/bash -p /opt/dpp/infra/oracle/generate-env-secrets.sh --rotate-application-secrets > /root/dpp-rotation.env'
 sudoedit /etc/dpp/dpp.env
 ```
 

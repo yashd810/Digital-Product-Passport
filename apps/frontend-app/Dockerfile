@@ -2,7 +2,9 @@ FROM node:24.18.0-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a
 WORKDIR /app
 
 COPY apps/frontend-app/package.json apps/frontend-app/package-lock.json apps/frontend-app/.npmrc ./
-RUN npm ci
+RUN test "$(node --version)" = "v24.18.0" \
+  && test "$(npm --version)" = "11.16.0" \
+  && npm ci
 
 COPY apps/frontend-app/ ./
 ARG VITE_API_URL

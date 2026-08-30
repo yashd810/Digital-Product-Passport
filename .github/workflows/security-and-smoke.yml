@@ -56,6 +56,15 @@ jobs:
         # The generic traversal rule flags every guarded path construction; dedicated containment tests cover reviewed call sites.
         run: >-
           docker run --rm
+          --read-only
+          --cap-drop ALL
+          --security-opt no-new-privileges
+          --pids-limit 256
+          --memory 1024m
+          --tmpfs /tmp:rw,noexec,nosuid,nodev,size=128m
+          -e HOME=/tmp
+          -e XDG_CACHE_HOME=/tmp/.cache
+          -e PYTHONDONTWRITEBYTECODE=1
           -v "$PWD:/src:ro"
           -w /src
           returntocorp/semgrep@sha256:d3d1be3a3770514d16a6a57b9761575d7536d70f45a5220274f4ec7d55c442b9
@@ -82,6 +91,10 @@ jobs:
           node-version: 24.18.0
           cache: npm
           cache-dependency-path: apps/backend-api/package-lock.json
+      - name: Verify locked Node and npm toolchain
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.16.0"
       - run: npm ci
       - run: npm run check:syntax
       - run: npm run check:style
@@ -120,6 +133,10 @@ jobs:
           node-version: 24.18.0
           cache: npm
           cache-dependency-path: apps/backend-api/package-lock.json
+      - name: Verify locked Node and npm toolchain
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.16.0"
       - run: npm ci
       - name: Build and start hardened PostgreSQL
         working-directory: ${{ github.workspace }}
@@ -234,6 +251,10 @@ jobs:
           node-version: 24.18.0
           cache: npm
           cache-dependency-path: apps/backend-api/package-lock.json
+      - name: Verify locked Node and npm toolchain
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.16.0"
       - name: Install locked backend dependencies for route security tests
         working-directory: apps/backend-api
         run: npm ci --ignore-scripts --no-audit --fund=false
@@ -271,6 +292,7 @@ jobs:
           test_log="$RUNNER_TEMP/dpp-ops-node-tests.log"
           if ! node --test --test-concurrency=1 \
             .github/scripts/run-gitleaks-fail-closed.node.test.js \
+            .github/scripts/supply-chain-security.node.test.js \
             apps/backend-api/tests/company-logo-freshness.node.test.js \
             apps/backend-api/tests/host-only-cookie.node.test.js \
             apps/backend-api/tests/logger-redaction.node.test.js \
@@ -335,6 +357,10 @@ jobs:
           node-version: 24.18.0
           cache: npm
           cache-dependency-path: apps/frontend-app/package-lock.json
+      - name: Verify locked Node and npm toolchain
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.16.0"
       - run: npm ci
       - run: npm test
       - run: npm run test:contrast
@@ -355,12 +381,21 @@ jobs:
           node-version: 24.18.0
           cache: npm
           cache-dependency-path: apps/public-passport-viewer/package-lock.json
+      - name: Verify locked Node and npm toolchain
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.16.0"
       - run: npm ci
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=moderate
 
   container-builds:
     runs-on: ubuntu-24.04
+    # BuildKit caches are executable build input.  Untrusted pull requests get
+    # their own scope and can never populate a cache consumed by main, schedule,
+    # or manually dispatched trusted builds.
+    env:
+      DPP_BUILD_CACHE_SCOPE: ${{ github.event_name == 'pull_request' && format('pr-{0}-{1}', github.event.pull_request.number, matrix.name) || format('trusted-{0}', matrix.name) }}
     strategy:
       fail-fast: false
       matrix:
@@ -403,8 +438,8 @@ jobs:
           load: true
           tags: dpp-ci-${{ matrix.name }}:scan
           build-args: ${{ matrix.build_args }}
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          cache-from: type=gha,scope=${{ env.DPP_BUILD_CACHE_SCOPE }}
+          cache-to: type=gha,mode=max,scope=${{ env.DPP_BUILD_CACHE_SCOPE }}
       - name: Scan ${{ matrix.name }} image for fixable high-severity vulnerabilities
         run: |
           set -euo pipefail

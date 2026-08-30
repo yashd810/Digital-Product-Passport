@@ -19,6 +19,11 @@ test("normal OCI wrapper invokes only the root-owned release entry point", () =>
   assert.match(source, /--revision/);
   assert.match(source, /--target/);
   assert.match(source, /--timeout-seconds/);
+  assert.match(source, /readonly REQUIRED_OCI_USER="dpp-release"/);
+  assert.match(source, /\[ "\$OCI_USER" != "\$REQUIRED_OCI_USER" \]/);
+  assert.doesNotMatch(source, /echo "  OCI IP: \$OCI_IP"/);
+  assert.doesNotMatch(source, /echo "  Deploy Config: \$DEPLOY_CONFIG_FILE"/);
+  assert.doesNotMatch(source, /SSH into instance: \$SSH_CMD/);
   assert.doesNotMatch(source, /scp -q/);
   assert.doesNotMatch(source, /\/tmp\/dpp-deploy/);
   assert.doesNotMatch(source, /sudo .*deploy-prod\.sh/);

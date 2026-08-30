@@ -1,12 +1,15 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 # Verifies the local prerequisites for the dedicated, non-production GitHub
 # Actions runner that is allowed to deploy DPP production releases.
 
 set -euo pipefail
 umask 077
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 CONFIG_FILE="${DPP_DEPLOY_CONFIG_FILE:-/etc/dpp-deployer/oci-deploy.env}"
 EXPECTED_USER="${DPP_DEPLOY_RUNNER_USER:-dpp-deploy}"
+readonly REQUIRED_OCI_USER="dpp-release"
 
 fail() {
   echo "Deployment runner preflight failed: $*" >&2
@@ -115,6 +118,7 @@ for host in "$oci_backend_ip" "$oci_frontend_ip"; do
   [[ "$host" =~ ^[A-Za-z0-9][A-Za-z0-9.:-]*$ ]] || fail "configured OCI host is invalid"
 done
 [[ "$oci_user" =~ ^[a-z_][a-z0-9_-]*$ ]] || fail "configured OCI user is invalid"
+[ "$oci_user" = "$REQUIRED_OCI_USER" ] || fail "configured OCI user must be the dedicated restricted account: $REQUIRED_OCI_USER"
 require_private_regular_file "$ssh_key" "SSH_KEY"
 require_known_hosts_file "$ssh_known_hosts"
 

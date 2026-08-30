@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 set -euo pipefail
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 

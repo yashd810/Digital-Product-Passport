@@ -18,7 +18,7 @@ function fixture(t, overrides = {}) {
   const settings = {
     backendHost: "backend.example.test",
     frontendHost: "frontend.example.test",
-    user: "ubuntu",
+    user: "dpp-release",
     ...overrides,
   };
 
@@ -77,4 +77,12 @@ test("deployment runner preflight rejects unsupported configuration keys", (t) =
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /unsupported deployment configuration key/);
+});
+
+test("deployment runner preflight rejects a legacy administrator deployment account", (t) => {
+  const { config } = fixture(t, { user: "ubuntu" });
+  const result = run(config);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /dedicated restricted account: dpp-release/);
 });
