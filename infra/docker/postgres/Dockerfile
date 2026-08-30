@@ -48,9 +48,9 @@ FROM postgres:18.4-trixie@sha256:22c89fe0d0f507606260237fd55e51f6137f58b2d5bcf61
 
 COPY --from=gosu-build /gosu /usr/local/bin/gosu
 # The pinned upstream base is intentionally retained for reproducibility, but
-# it predates the Debian 13 util-linux security update. Upgrade only the
-# affected packages during the controlled image build and remove APT metadata
-# so no fixable OS vulnerabilities remain in the runtime layer.
+# it predates the Debian 13 util-linux and OpenSSL security updates. Upgrade
+# only the affected packages during the controlled image build and remove APT
+# metadata so no fixable OS vulnerabilities remain in the runtime layer.
 RUN set -eux; \
   chmod 0555 /usr/local/bin/gosu; \
   apt-get update; \
@@ -62,7 +62,10 @@ RUN set -eux; \
     libsmartcols1 \
     libuuid1 \
     login \
+    libssl3t64 \
     mount \
+    openssl \
+    openssl-provider-legacy \
     util-linux; \
   apt-get clean; \
   rm -rf /var/lib/apt/lists/*
