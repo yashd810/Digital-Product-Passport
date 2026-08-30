@@ -2,12 +2,13 @@ FROM node:24.18.0-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a
 WORKDIR /app
 
 COPY apps/backend-api/package.json apps/backend-api/package-lock.json apps/backend-api/.npmrc ./
-RUN apk add --no-cache --virtual .build-deps python3 build-base \
+RUN apk add --no-cache --upgrade libcrypto3=3.5.8-r0 libssl3=3.5.8-r0 \
+  && apk add --no-cache --virtual .build-deps python3 build-base \
   && test "$(node --version)" = "v24.18.0" \
   && test "$(npm --version)" = "11.16.0" \
   && npm ci --omit=dev \
   && npm cache clean --force \
-  && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
   && apk del .build-deps
 
 COPY apps/backend-api/ ./

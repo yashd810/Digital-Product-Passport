@@ -168,3 +168,13 @@ test("CI and Docker fail closed when Node or npm drift from the supported toolch
     );
   }
 });
+
+test("the backend runtime patches its fixed OpenSSL packages and removes build-only package managers", () => {
+  const backendDockerfile = read("apps/backend-api/Dockerfile");
+
+  assert.match(backendDockerfile, /apk add --no-cache --upgrade libcrypto3=3\.5\.8-r0 libssl3=3\.5\.8-r0/);
+  assert.match(
+    backendDockerfile,
+    /rm -rf \/usr\/local\/lib\/node_modules\/npm \/usr\/local\/lib\/node_modules\/corepack \/usr\/local\/bin\/npm \/usr\/local\/bin\/npx \/usr\/local\/bin\/corepack/
+  );
+});
