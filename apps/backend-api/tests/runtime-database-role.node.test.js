@@ -75,6 +75,7 @@ test("controlled migrations isolate runtime DDL while keeping only required gran
   const quotedRuntimeRole = quote(runtimeRole);
   const quotedAdminRole = quote(adminRole);
   assert.match(formatCall.values[0], /^CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD %L$/);
+  assert.equal(formatCall.sql, "SELECT format($1::text, $2::text, $3::text) AS statement");
   assert.match(sql, new RegExp(`CREATE SCHEMA IF NOT EXISTS "passport_runtime" AUTHORIZATION ${quotedAdminRole}`));
   assert.match(sql, new RegExp(`ALTER SCHEMA "passport_runtime" OWNER TO ${quotedAdminRole}`));
   assert.match(sql, new RegExp(`GRANT ${quotedRuntimeRole} TO ${quotedAdminRole}`));
