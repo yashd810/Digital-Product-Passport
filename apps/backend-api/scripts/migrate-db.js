@@ -61,10 +61,13 @@ const pool = new Pool(migrationDatabaseCredentials);
 async function main() {
   const client = await pool.connect();
   try {
-    // Keep all unqualified migration references pinned to trusted system and
-    // static application schemas. Dynamic passport tables are always fully
-    // qualified and must never be pulled into the migration search path.
-    await client.query("SET search_path TO pg_catalog, public");
+    // `pg_catalog` is searched implicitly before an explicitly configured
+    // path, unless it is named in the path itself. Keeping it implicit lets
+    // unqualified DDL create static application relations in `public` while
+    // still resolving built-ins from the trusted system catalog first.
+    // Dynamic passport tables are always fully qualified and must never be
+    // pulled into the migration search path.
+    await client.query("SET search_path TO public");
     const didService = createDidService({
       publicOrigin: getPublicViewerOrigin(),
       apiOrigin: getApiOrigin(),

@@ -241,7 +241,7 @@ test("only expected qualified dynamic passport tables transfer to the runtime ro
   );
 });
 
-test("controlled migration pins its search path and moves legacy tables before reconciliation", () => {
+test("controlled migration keeps pg_catalog implicit while creating static relations in public", () => {
   const migrationSource = fs.readFileSync(path.resolve(__dirname, "../scripts/migrate-db.js"), "utf8");
   const initSource = fs.readFileSync(path.resolve(__dirname, "../src/db/init.js"), "utf8");
   const preInitOwnership = migrationSource.indexOf("await transferCoreDatabaseOwnership(client");
@@ -250,7 +250,8 @@ test("controlled migration pins its search path and moves legacy tables before r
   const legacyMove = initSource.indexOf("await moveLegacyPassportTables()");
   const passportTableReconciliation = initSource.indexOf("const ptRows = await pool.query");
 
-  assert.match(migrationSource, /SET search_path TO pg_catalog, public/);
+  assert.match(migrationSource, /SET search_path TO public/);
+  assert.equal(migrationSource.includes("SET search_path TO pg_catalog, public"), false);
   assert.equal(migrationSource.includes("passport_runtime, public"), false);
   assert.ok(preInitOwnership >= 0 && preInitOwnership < initCall);
   assert.ok(runtimeSchemaEnsure >= 0 && runtimeSchemaEnsure < legacyMove);
