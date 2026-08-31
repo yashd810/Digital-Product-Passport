@@ -28,6 +28,7 @@ It is not a second architecture guide. Use it when you are already dealing with 
 | `infra/oracle/install-container-imds-firewall.sh` | explicitly installs and enables the approved IMDS rule |
 | `infra/oracle/systemd/*` | systemd units for backup automation |
 | `infra/oracle/terraform/object-storage-backups/*` | Terraform for object-storage backup resources |
+| `docs/deployment/oci-production-state.md` | confirmed live OCI IAM, bucket, and host-release state; update after each infrastructure change |
 
 ## What To Verify During OCI Work
 
