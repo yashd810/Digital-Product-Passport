@@ -118,6 +118,10 @@ The backend smoke workflow now verifies a real PostgreSQL query, explicitly
 enables its fresh schema, and retries startup only once with diagnostic output
 if the process exits before readiness. Always inspect the current `main` run
 before treating a later source revision as verified.
+The container matrix also boots the static frontend and viewer images under
+their production UID with no network, a read-only filesystem, dropped
+capabilities, and no-new-privileges; it validates their rendered Nginx
+configuration and rejects `.env` and `.git` requests before image scanning.
 
 The public repository page was still marked **Public** when this register was
 updated. Public read-only inspection cannot prove owner-only GitHub security

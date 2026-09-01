@@ -461,6 +461,52 @@ jobs:
           build-args: ${{ matrix.build_args }}
           cache-from: type=gha,scope=${{ env.DPP_BUILD_CACHE_SCOPE }}
           cache-to: type=gha,mode=max,scope=${{ env.DPP_BUILD_CACHE_SCOPE }}
+      - name: Smoke-test static Nginx runtime
+        if: matrix.name == 'frontend' || matrix.name == 'public-viewer'
+        run: |
+          set -euo pipefail
+          container_name="dpp-ci-${{ matrix.name }}-runtime"
+          cleanup() {
+            docker rm -f "$container_name" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker run -d --name "$container_name" \
+            --network none \
+            --read-only \
+            --user 101:101 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 128 \
+            --memory 128m \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m,uid=101,gid=101,mode=1777 \
+            --tmpfs /etc/nginx/conf.d:rw,noexec,nosuid,nodev,size=1m,uid=101,gid=101,mode=0755 \
+            -e BACKEND_API_UPSTREAM=http://127.0.0.1:65535 \
+            -e DPP_PUBLIC_API_ORIGIN=https://api.example.test \
+            "dpp-ci-${{ matrix.name }}:scan"
+
+          ready=false
+          for attempt in $(seq 1 30); do
+            if docker exec "$container_name" curl -fsS http://127.0.0.1:8080/ >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! docker inspect -f '{{.State.Running}}' "$container_name" | grep -qx true; then
+              docker logs "$container_name"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            docker logs "$container_name"
+            exit 1
+          fi
+
+          docker exec "$container_name" nginx -t -g 'pid /tmp/nginx-test.pid;'
+          for path in /.env /.git/HEAD; do
+            status="$(docker exec "$container_name" curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080$path")"
+            test "$status" = 404
+          done
       - name: Scan ${{ matrix.name }} image for fixable high-severity vulnerabilities
         run: |
           set -euo pipefail

@@ -74,6 +74,38 @@ test("untrusted pull requests cannot populate trusted BuildKit cache scopes", ()
   assert.doesNotMatch(containerBuildJob, /scope=\$\{\{ matrix\.name \}\}/);
 });
 
+test("static SPA images are smoke-tested under runtime confinement", () => {
+  const workflow = readFileSync(securityWorkflowPath, "utf8");
+  const containerBuildJob = workflow.match(/  container-builds:[\s\S]*$/)?.[0];
+  const smokeMarker = "      - name: Smoke-test static Nginx runtime";
+  const scanMarker = "      - name: Scan ${{ matrix.name }} image for fixable high-severity vulnerabilities";
+
+  assert.ok(containerBuildJob, "missing container-builds job");
+  const start = containerBuildJob.indexOf(smokeMarker);
+  const end = containerBuildJob.indexOf(scanMarker, start);
+  assert.notEqual(start, -1, "missing static Nginx runtime smoke test");
+  assert.notEqual(end, -1, "static Nginx runtime smoke test must run before image scanning");
+  const staticRuntimeSmoke = containerBuildJob.slice(start, end);
+
+  for (const fragment of [
+    "if: matrix.name == 'frontend' || matrix.name == 'public-viewer'",
+    "--network none",
+    "--read-only",
+    "--user 101:101",
+    "--cap-drop ALL",
+    "--security-opt no-new-privileges",
+    "--pids-limit 128",
+    "--memory 128m",
+    "BACKEND_API_UPSTREAM=http://127.0.0.1:65535",
+    "nginx -t -g 'pid /tmp/nginx-test.pid;'",
+    "for path in /.env /.git/HEAD; do",
+    "test \"$status\" = 404",
+  ]) {
+    assert.equal(staticRuntimeSmoke.includes(fragment), true, `static Nginx runtime smoke test is missing ${fragment}`);
+  }
+  assert.doesNotMatch(staticRuntimeSmoke, /docker\.sock/);
+});
+
 test("container build and scanner images are immutable digest references", () => {
   for (const dockerfilePath of dockerfilePaths) {
     const dockerfile = readFileSync(dockerfilePath, "utf8");
