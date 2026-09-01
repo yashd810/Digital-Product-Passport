@@ -13,6 +13,10 @@ const productionComposeFiles = [
   "docker/docker-compose.prod.backend.yml",
   "docker/docker-compose.prod.frontend.yml",
 ];
+const nonRootNginxDockerfiles = [
+  ["apps/frontend-app/Dockerfile", "infra/docker/frontend/nginx.conf.template"],
+  ["apps/public-passport-viewer/Dockerfile", "infra/docker/public-passport-viewer/nginx.conf.template"],
+];
 
 function hasPattern(pattern) {
   return dockerIgnore.split(/\r?\n/).some((line) => line.trim() === pattern);
@@ -61,4 +65,17 @@ test("root Docker build contexts exclude environment, Terraform, and local crede
 
   assert.match(codeOwners, /^\/\.dockerignore\s+@yashd810$/m);
   assert.match(codeOwners, /^\/renovate\.json\s+@yashd810$/m);
+});
+
+test("non-root Nginx images can read templates from private root release checkouts", () => {
+  for (const [dockerfilePath, templatePath] of nonRootNginxDockerfiles) {
+    const dockerfile = readFileSync(path.join(repoRoot, dockerfilePath), "utf8");
+
+    assert.match(dockerfile, /^USER 101:101$/m, `${dockerfilePath} must retain the unprivileged Nginx runtime`);
+    assert.equal(
+      dockerfile.includes(`COPY --chmod=0644 ${templatePath} /etc/nginx/templates/default.conf.template`),
+      true,
+      `${dockerfilePath} must not inherit a root-only template mode from the release checkout`,
+    );
+  }
 });
