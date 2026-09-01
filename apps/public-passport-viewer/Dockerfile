@@ -26,6 +26,9 @@ RUN apk add --no-cache --upgrade curl=8.20.0-r0 libcurl=8.20.0-r0
 ARG VITE_API_URL
 ENV DPP_PUBLIC_API_ORIGIN=${VITE_API_URL}
 COPY --chmod=0644 infra/docker/public-passport-viewer/nginx.conf.template /etc/nginx/templates/default.conf.template
+# See frontend-app: the non-root Nginx runtime needs traversal permission on
+# the template directory even when the root release checkout uses umask 077.
+RUN chmod 0755 /etc/nginx/templates
 COPY --from=build --chown=101:101 /app/apps/public-passport-viewer/dist /usr/share/nginx/html
 USER 101:101
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

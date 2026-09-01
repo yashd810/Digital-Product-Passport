@@ -77,5 +77,10 @@ test("non-root Nginx images can read templates from private root release checkou
       true,
       `${dockerfilePath} must not inherit a root-only template mode from the release checkout`,
     );
+    assert.match(
+      dockerfile,
+      /RUN chmod 0755 \/etc\/nginx\/templates/,
+      `${dockerfilePath} must keep the template directory traversable by the unprivileged Nginx runtime`,
+    );
   }
 });
