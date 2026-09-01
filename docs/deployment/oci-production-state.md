@@ -108,6 +108,14 @@ availability and least-privilege requirement: the containers still run as
 
 ## Repository Governance Pending Owner Action
 
+The current repository source revision is
+`960e5f9701a153b16ff86a01122ab717df3dd61f`. Security And Smoke run 356
+completed with all 14 jobs successful, including secret scanning, static
+analysis, dependency checks, backend smoke, Compose validation, and all five
+container-build matrix entries. The backend smoke workflow now verifies a real
+PostgreSQL query, explicitly enables its fresh schema, and retries startup only
+once with diagnostic output if the process exits before readiness.
+
 The public repository page was still marked **Public** when this register was
 updated. Public read-only inspection cannot prove owner-only GitHub security
 settings, rulesets, environments, or alert state, so do not infer that those
