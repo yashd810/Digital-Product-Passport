@@ -78,6 +78,8 @@ oci_backend_ip=""
 oci_frontend_ip=""
 oci_user=""
 ssh_key=""
+oci_backend_ssh_key=""
+oci_frontend_ssh_key=""
 ssh_known_hosts=""
 seen_keys="|"
 line_number=0
@@ -96,7 +98,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   key="${line%%=*}"
   value="${line#*=}"
   case "$key" in
-    OCI_BACKEND_IP|OCI_FRONTEND_IP|OCI_USER|SSH_KEY|SSH_KNOWN_HOSTS) ;;
+    OCI_BACKEND_IP|OCI_FRONTEND_IP|OCI_USER|SSH_KEY|OCI_BACKEND_SSH_KEY|OCI_FRONTEND_SSH_KEY|SSH_KNOWN_HOSTS) ;;
     *) fail "unsupported deployment configuration key at line $line_number" ;;
   esac
   case "$seen_keys" in
@@ -110,6 +112,8 @@ while IFS= read -r line || [ -n "$line" ]; do
     OCI_FRONTEND_IP) oci_frontend_ip="$value" ;;
     OCI_USER) oci_user="$value" ;;
     SSH_KEY) ssh_key="$value" ;;
+    OCI_BACKEND_SSH_KEY) oci_backend_ssh_key="$value" ;;
+    OCI_FRONTEND_SSH_KEY) oci_frontend_ssh_key="$value" ;;
     SSH_KNOWN_HOSTS) ssh_known_hosts="$value" ;;
   esac
 done < "$CONFIG_FILE"
@@ -119,7 +123,12 @@ for host in "$oci_backend_ip" "$oci_frontend_ip"; do
 done
 [[ "$oci_user" =~ ^[a-z_][a-z0-9_-]*$ ]] || fail "configured OCI user is invalid"
 [ "$oci_user" = "$REQUIRED_OCI_USER" ] || fail "configured OCI user must be the dedicated restricted account: $REQUIRED_OCI_USER"
-require_private_regular_file "$ssh_key" "SSH_KEY"
+if [ -z "$ssh_key" ] && { [ -z "$oci_backend_ssh_key" ] || [ -z "$oci_frontend_ssh_key" ]; }; then
+  fail "configure SSH_KEY or both OCI_BACKEND_SSH_KEY and OCI_FRONTEND_SSH_KEY"
+fi
+[ -z "$ssh_key" ] || require_private_regular_file "$ssh_key" "SSH_KEY"
+[ -z "$oci_backend_ssh_key" ] || require_private_regular_file "$oci_backend_ssh_key" "OCI_BACKEND_SSH_KEY"
+[ -z "$oci_frontend_ssh_key" ] || require_private_regular_file "$oci_frontend_ssh_key" "OCI_FRONTEND_SSH_KEY"
 require_known_hosts_file "$ssh_known_hosts"
 
 git rev-parse --show-toplevel >/dev/null 2>&1 || fail "must run from a Git checkout"

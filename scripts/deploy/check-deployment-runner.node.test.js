@@ -13,6 +13,8 @@ const currentUser = execFileSync("id", ["-un"], { encoding: "utf8" }).trim();
 function fixture(t, overrides = {}) {
   const directory = mkdtempSync(path.join(tmpdir(), "dpp-deployment-runner-"));
   const key = path.join(directory, "deploy.key");
+  const backendKey = path.join(directory, "backend-deploy.key");
+  const frontendKey = path.join(directory, "frontend-deploy.key");
   const knownHosts = path.join(directory, "known_hosts");
   const config = path.join(directory, "oci-deploy.env");
   const settings = {
@@ -23,6 +25,8 @@ function fixture(t, overrides = {}) {
   };
 
   writeFileSync(key, "test-only-private-key\n", { mode: 0o600 });
+  writeFileSync(backendKey, "test-only-backend-private-key\n", { mode: 0o600 });
+  writeFileSync(frontendKey, "test-only-frontend-private-key\n", { mode: 0o600 });
   writeFileSync(knownHosts, "example.test ssh-ed25519 test-only-host-key\n", { mode: 0o600 });
   writeFileSync(
     config,
@@ -30,13 +34,20 @@ function fixture(t, overrides = {}) {
       `OCI_BACKEND_IP=${settings.backendHost}`,
       `OCI_FRONTEND_IP=${settings.frontendHost}`,
       `OCI_USER=${settings.user}`,
-      `SSH_KEY=${key}`,
+      ...(settings.targetSpecific
+        ? [
+            `OCI_BACKEND_SSH_KEY=${backendKey}`,
+            ...(settings.omitFrontendKey ? [] : [`OCI_FRONTEND_SSH_KEY=${frontendKey}`]),
+          ]
+        : [`SSH_KEY=${key}`]),
       `SSH_KNOWN_HOSTS=${knownHosts}`,
       settings.extraLine || "",
     ].filter(Boolean).join("\n") + "\n",
     { mode: settings.configMode || 0o600 },
   );
   chmodSync(key, settings.keyMode || 0o600);
+  chmodSync(backendKey, settings.backendKeyMode || 0o600);
+  chmodSync(frontendKey, settings.frontendKeyMode || 0o600);
   chmodSync(knownHosts, settings.knownHostsMode || 0o600);
   chmodSync(config, settings.configMode || 0o600);
   t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -61,6 +72,22 @@ test("deployment runner preflight accepts a private, complete configuration", (t
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Deployment runner preflight passed/);
+});
+
+test("deployment runner preflight accepts separate restricted controller keys for split hosts", (t) => {
+  const { config } = fixture(t, { targetSpecific: true });
+  const result = run(config);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Deployment runner preflight passed/);
+});
+
+test("deployment runner preflight rejects an incomplete target-specific key pair", (t) => {
+  const { config } = fixture(t, { targetSpecific: true, omitFrontendKey: true });
+  const result = run(config);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /configure SSH_KEY or both OCI_BACKEND_SSH_KEY and OCI_FRONTEND_SSH_KEY/);
 });
 
 test("deployment runner preflight rejects group-readable private material", (t) => {

@@ -153,7 +153,8 @@ on the runner through the approved Bastion session, then run:
 ```bash
 sudo env \
   DPP_DEPLOY_CONFIG_SOURCE=/root/import/oci-deploy.env \
-  DPP_DEPLOY_KEY_SOURCE=/root/import/dpp-oci-deploy.key \
+  DPP_DEPLOY_BACKEND_KEY_SOURCE=/root/import/dpp-oci-backend.key \
+  DPP_DEPLOY_FRONTEND_KEY_SOURCE=/root/import/dpp-oci-frontend.key \
   DPP_DEPLOY_KNOWN_HOSTS_SOURCE=/root/import/known_hosts \
   bash /path/to/checkout/scripts/deploy/install-deployment-runner-config.sh
 ```
@@ -163,9 +164,14 @@ The installer writes only these runner-local files, all mode `600` and owned by
 
 ```text
 /etc/dpp-deployer/oci-deploy.env
-/etc/dpp-deployer/oci-deploy.key
+/etc/dpp-deployer/backend-oci-deploy.key
+/etc/dpp-deployer/frontend-oci-deploy.key
 /etc/dpp-deployer/known_hosts
 ```
+
+For a deliberately single-host environment, use
+`DPP_DEPLOY_KEY_SOURCE` instead. Do not replace two host-specific credentials
+with one broad key merely to simplify runner configuration.
 
 Remove the root-only import directory immediately after a successful
 preflight. For a deliberate credential replacement, set

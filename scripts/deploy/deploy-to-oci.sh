@@ -11,6 +11,8 @@ export PATH
 OCI_USER="${OCI_USER:-}"
 OCI_IP="${OCI_IP:-}"
 SSH_KEY="${SSH_KEY:-}"
+OCI_BACKEND_SSH_KEY="${OCI_BACKEND_SSH_KEY:-}"
+OCI_FRONTEND_SSH_KEY="${OCI_FRONTEND_SSH_KEY:-}"
 SSH_KNOWN_HOSTS="${SSH_KNOWN_HOSTS:-}"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
@@ -154,6 +156,12 @@ load_deploy_config() {
             SSH_KEY)
                 [ -n "$SSH_KEY" ] || SSH_KEY="$value"
                 ;;
+            OCI_BACKEND_SSH_KEY)
+                [ -n "$OCI_BACKEND_SSH_KEY" ] || OCI_BACKEND_SSH_KEY="$value"
+                ;;
+            OCI_FRONTEND_SSH_KEY)
+                [ -n "$OCI_FRONTEND_SSH_KEY" ] || OCI_FRONTEND_SSH_KEY="$value"
+                ;;
             SSH_KNOWN_HOSTS)
                 [ -n "$SSH_KNOWN_HOSTS" ] || SSH_KNOWN_HOSTS="$value"
                 ;;
@@ -231,6 +239,24 @@ if [ -z "$OCI_IP" ]; then
     esac
 fi
 
+# Split production hosts use separate controller keys. Prefer the target's key
+# over a generic key so a compromised controller credential cannot reach both
+# hosts. SSH_KEY remains valid for an intentionally single-host deployment.
+case "$DEPLOY_TARGET" in
+    backend)
+        [ -z "$OCI_BACKEND_SSH_KEY" ] || SSH_KEY="$OCI_BACKEND_SSH_KEY"
+        ;;
+    frontend)
+        [ -z "$OCI_FRONTEND_SSH_KEY" ] || SSH_KEY="$OCI_FRONTEND_SSH_KEY"
+        ;;
+    all)
+        if [ -n "$OCI_BACKEND_SSH_KEY" ] || [ -n "$OCI_FRONTEND_SSH_KEY" ]; then
+            echo "❌ Target-specific SSH keys require separate backend and frontend deployments."
+            exit 1
+        fi
+        ;;
+esac
+
 if [ -z "$OCI_IP" ]; then
     echo "❌ OCI_IP is required."
     echo "Examples:"
@@ -283,8 +309,8 @@ fi
 SSH_TARGET="$(ssh_target_for_host "$OCI_USER" "$OCI_IP")"
 
 if [ -z "$SSH_KEY" ]; then
-    echo "❌ SSH_KEY is required and must point to the OCI deployment private key."
-    echo "Example: SSH_KEY=/secure/path/oci.key DPP_DEPLOY_TARGET=backend OCI_IP=<backend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
+    echo "❌ A deployment SSH key is required. Configure the target-specific OCI_*_SSH_KEY or SSH_KEY."
+    echo "Example: OCI_BACKEND_SSH_KEY=/secure/path/backend.key DPP_DEPLOY_TARGET=backend OCI_IP=<backend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
     exit 1
 fi
 

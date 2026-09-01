@@ -252,7 +252,16 @@ verified outside the target host:
    arbitrary or legacy administrator account names. Audit the result with
    `sudo -l -U dpp-release`; do not leave a cloud-init/default `ALL` rule in
    force for that account. Update `oci-deploy.env` to use this dedicated account
-   and its restricted SSH key.
+   and a separate restricted controller key for each split host:
+
+   ```dotenv
+   OCI_USER=dpp-release
+   OCI_BACKEND_SSH_KEY=/absolute/path/to/backend-controller.key
+   OCI_FRONTEND_SSH_KEY=/absolute/path/to/frontend-controller.key
+   ```
+
+   Use generic `SSH_KEY` only for a real single-host deployment. Do not retain
+   an administrator key in the normal deployment profile.
 
 4. As the restricted deployment account, verify the installed entry point:
 
@@ -294,6 +303,13 @@ builds each service image through Buildx one at a time before Compose starts
 containers, which keeps the small Always Free hosts within their memory budget.
 Do not add `COMPOSE_BAKE=false` to a shell profile or host environment.
 
+The root release helper uses `umask 077`, which is required for private release
+files. Unprivileged Nginx images must therefore set both the template file mode
+and its parent-directory traversal mode explicitly in their Dockerfile. Keep
+`COPY --chmod=0644 .../default.conf.template` followed by
+`RUN chmod 0755 /etc/nginx/templates`; do not solve a startup permission issue
+by running Nginx as root or weakening release-checkout permissions.
+
 On the deployment workstation, keep the private profiles together outside the
 repository at:
 
@@ -310,7 +326,10 @@ secrets.
 Keep `oci-deploy.env` in the same external directory with mode `600`. Copy
 `infra/oracle/oci-deploy.env.example` as its template. The deployment wrapper
 parses only its documented literal deployment keys and never sources it as shell
-code; it contains OCI addressing and local SSH paths, not application secrets.
+code; it contains OCI addressing and target-specific local SSH key paths, not
+application secrets. A split-host profile must use
+`OCI_BACKEND_SSH_KEY` and `OCI_FRONTEND_SSH_KEY`; a generic `SSH_KEY` is only
+for a deliberately single-host deployment.
 
 ## PostgreSQL Persistence And First Bootstrap
 

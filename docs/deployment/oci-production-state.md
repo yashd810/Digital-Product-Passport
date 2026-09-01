@@ -6,7 +6,8 @@
 
 ## Confirmed Baseline
 
-Recorded on 2026-08-31 from the OCI Console and restricted-host preflight.
+Recorded on 2026-09-01 from the OCI Console, restricted-host preflight, and
+post-release verification.
 
 - Production uses separate backend and frontend OCI hosts.
 - The existing `ubuntu` administrator path remains a recovery path. Do not
@@ -14,13 +15,18 @@ Recorded on 2026-08-31 from the OCI Console and restricted-host preflight.
 - The normal deployment identity is `dpp-release` on each host. It has no
   Docker-group membership, no broad sudo, and may run only
   `/usr/local/sbin/dpp-release-deployer` as root.
+- The private deployment profile must contain `OCI_USER=dpp-release` and
+  target-specific `OCI_BACKEND_SSH_KEY` / `OCI_FRONTEND_SSH_KEY` controller
+  keys for the split hosts. It must not retain an administrator key or use
+  `ubuntu` as a normal deployment identity. `SSH_KEY` remains only for a real
+  one-host deployment.
 - The root helper is installed mode `0700`; `/etc/dpp` is `root:root 0750`
   and its source environment file is `root:root 0600`. The `/opt` parent is
   `root:root 0755`, so a mutable login account cannot replace a release.
 - Each host has its own root-owned, read-only GitHub deploy key and the
   independently verified GitHub host key. Private key material is never stored
   in the repository, GitHub Actions, or a user home directory.
-- The reviewed helper digest for release `1b58c5e` was
+- The reviewed helper digest for the installed root release entry point was
   `1f2788c23a2ec6de1a4daa4dee00ad773b764d0b68266fa45e4508b6117782d0`.
   If `dpp-root-release-deployer.sh` changes, repeat the root-admin bootstrap;
   normal deployment must fail closed instead of self-updating root code.
@@ -58,16 +64,47 @@ access because each statement is constrained by `target.bucket.name`.
   credential-rotation change is being performed.
 - `BACKUP_PROVIDER_*` and `DB_BACKUP_*` must use their dedicated buckets and
   distinct customer-secret pairs. Never copy either into the frontend host.
-- The old production database used `postgres` as the runtime account. Its first
-  role-separation deployment must set `DB_USER=dpp_app` with a new secret and
-  retain the old privileged credential only as root-only `DB_ADMIN_*` input to
-  the one-shot migration. The long-running API must never receive `DB_ADMIN_*`.
-- After that controlled release, prove the `dpp_app` grant boundary, run the
-  database backup, signed verification, and isolated restore drill before
-  treating backup hardening as complete.
+- The old production database used `postgres` as the runtime account. The
+  controlled role-separation release is complete: the long-running API uses
+  `dpp_app`, which can create only in `passport_runtime`, cannot create in
+  `public`, cannot assume `postgres`, has no privileged flags or memberships,
+  and owns no public table. The privileged `postgres` credential was rotated
+  after the migration and remains root-only `DB_ADMIN_*` input; it is excluded
+  from the derived API environment.
+- Production backup, signed-manifest verification, and an isolated restore
+  drill all passed on 2026-08-31. The enabled `dpp-db-backup`,
+  `dpp-db-backup-verify`, and `dpp-db-backup-drill` timers provide nightly,
+  weekly, and quarterly coverage respectively. The drill's non-secret evidence
+  is stored under `db-backups/evidence/restore-drills/` in
+  `dpp-prod-db-backups`.
 - Keep the database-backup retention rule editable until a successful restore
-  drill and inventory review. Scheduling a retention lock is irreversible after
-  OCI's delay and needs a separate approved change.
+  drill and inventory review. The drill has now succeeded; the remaining OCI
+  retention-rule lock is irreversible after its delay and requires a separate
+  approved change. Do not create, lock, shorten, or destroy that rule during a
+  normal application release.
+
+## Frontend Release and Edge State
+
+The frontend release at `87264e5a95a565660b97c949bd0d3bde12b21178` is live and
+verified. The root-owned release helper deliberately uses `umask 077`, so the
+two unprivileged Nginx images explicitly keep the template file readable
+(`0644`) and its parent directory traversable (`0755`). This is a runtime
+availability and least-privilege requirement: the containers still run as
+`101:101`, rather than being elevated to work around release-checkout modes.
+
+- `frontend-app`, `public-passport-viewer`, and `marketing-site` were healthy
+  after a clean recreation; their loopback and public HTTPS checks passed.
+- Caddy edge checks returned 200 for the marketing, application, and viewer
+  origins with HSTS, CSP, no-sniff, framing, referrer, and permissions-policy
+  headers. Direct application and database ports were not externally reachable.
+- The container IMDS firewall and its Docker DNS exception are active and match
+  the installed source helper.
+- A one-time root-only marketing-content override was used under explicit
+  business-owner authorization to repair this availability incident. It was not
+  written to any environment file or source code; the normal restricted release
+  wrapper still rejects the override. Replace all legal/contact placeholders in
+  `apps/marketing-site` and make a normal frontend release as soon as approved
+  content is available.
 
 ## Future-Run Checklist
 
@@ -75,7 +112,8 @@ access because each statement is constrained by `target.bucket.name`.
 2. Verify the service-user memberships and exact policy statements only if the
    corresponding users, groups, or buckets changed.
 3. Use `dpp-release`, its target-specific controller key, and the verified
-   OCI known-hosts file for deployments. Never use `ubuntu` for normal release.
+   OCI known-hosts file for deployments. Never use `ubuntu` or an administrator
+   key in `oci-deploy.env` for normal release.
 4. Run the restricted release preflight, deploy backend and frontend separately,
    then verify the live edge, containers, backup services, and a restore drill.
 5. Update this record with the date, scope, and non-secret verification outcome
