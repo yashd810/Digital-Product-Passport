@@ -106,6 +106,33 @@ availability and least-privilege requirement: the containers still run as
   `apps/marketing-site` and make a normal frontend release as soon as approved
   content is available.
 
+## Repository Governance Pending Owner Action
+
+The public repository page was still marked **Public** when this register was
+updated. Public read-only inspection cannot prove owner-only GitHub security
+settings, rulesets, environments, or alert state, so do not infer that those
+controls are enabled from a passing workflow.
+
+Before enabling GitHub-hosted production deployment, the repository owner must:
+
+1. Add an independent reviewer, update `.github/CODEOWNERS`, then activate a
+   `main` ruleset requiring one current Code Owner approval, resolved comments,
+   current required `Security And Smoke` job checks, no force pushes, and no
+   branch deletion.
+2. Create a protected `production` Environment with a separate required
+   reviewer, no self-review, protected `main` as the only deployment branch,
+   and no administrator bypass.
+3. Restrict Actions to the reviewed actions, require full commit-SHA pinning,
+   use read-only workflow tokens, and require approval for every external
+   contributor before a workflow can run.
+4. Enable/verify Dependabot alerts and security updates, secret scanning with
+   push protection, and CodeQL. Keep Renovate as the version-update mechanism
+   unless a deliberate migration is approved, so duplicate dependency PRs are
+   not created.
+5. Keep `DPP_PRODUCTION_DEPLOY_ENABLED` unset and do not attach a self-hosted
+   production runner while this repository is public. See
+   `ci-cd-runbook.md` for the full owner procedure.
+
 ## Future-Run Checklist
 
 1. Read this file and `oci-deployment-runbook.md` before making OCI changes.
