@@ -178,28 +178,49 @@ jobs:
           APP_URL: http://127.0.0.1:3000
           VITE_PUBLIC_VIEWER_URL: http://127.0.0.1:3004
           ALLOWED_ORIGINS: http://127.0.0.1:3000,http://127.0.0.1:3004,http://127.0.0.1:8080
+          RUN_SCHEMA_MIGRATIONS: "true"
         run: |
-          node src/server.js > /tmp/backend-smoke.log 2>&1 &
-          backend_pid=$!
+          backend_pid=""
           cleanup() {
-            kill "$backend_pid" >/dev/null 2>&1 || true
-            wait "$backend_pid" >/dev/null 2>&1 || true
+            if [ -n "$backend_pid" ]; then
+              kill "$backend_pid" >/dev/null 2>&1 || true
+              wait "$backend_pid" >/dev/null 2>&1 || true
+            fi
             docker rm -f dpp-ci-postgres >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
-          for attempt in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:3001/health; then
-              exit 0
-            fi
-            if ! kill -0 "$backend_pid" 2>/dev/null; then
-              echo "::error title=Backend smoke startup::The backend process exited before its health endpoint became ready."
-              cat /tmp/backend-smoke.log
+
+          for startup_attempt in 1 2; do
+            if ! docker exec dpp-ci-postgres psql -U postgres -d dppSystem -tAc 'SELECT 1' | grep -qx '1'; then
+              echo "::error title=Backend smoke database::PostgreSQL did not accept a real query before backend startup."
+              docker logs dpp-ci-postgres
               exit 1
             fi
-            sleep 1
+
+            backend_log="/tmp/backend-smoke-${startup_attempt}.log"
+            node src/server.js > "$backend_log" 2>&1 &
+            backend_pid=$!
+            for readiness_attempt in $(seq 1 60); do
+              if curl -fsS http://127.0.0.1:3001/health; then
+                exit 0
+              fi
+              if ! kill -0 "$backend_pid" 2>/dev/null; then
+                break
+              fi
+              sleep 1
+            done
+
+            echo "Backend smoke startup attempt ${startup_attempt} did not become healthy."
+            cat "$backend_log"
+            kill "$backend_pid" >/dev/null 2>&1 || true
+            wait "$backend_pid" >/dev/null 2>&1 || true
+            backend_pid=""
+            if [ "$startup_attempt" = "1" ]; then
+              echo "::warning title=Backend smoke retry::Retrying once after a failed startup with the same verified database."
+              sleep 2
+            fi
           done
-          echo "::error title=Backend smoke readiness::The backend did not become healthy within 60 seconds."
-          cat /tmp/backend-smoke.log
+          echo "::error title=Backend smoke startup::The backend did not become healthy after two startup attempts."
           exit 1
       - name: Stop hardened PostgreSQL
         if: always()

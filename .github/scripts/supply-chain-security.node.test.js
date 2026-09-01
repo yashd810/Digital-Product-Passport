@@ -113,6 +113,19 @@ test("the networked static analyzer remains read-only and resource-bounded", () 
   assert.doesNotMatch(staticAnalysisJob, /docker\.sock/);
 });
 
+test("backend smoke waits for a usable database and reports a bounded retry", () => {
+  const workflow = readFileSync(securityWorkflowPath, "utf8");
+  const backendSmokeJob = workflow.match(/  backend-smoke:[\s\S]*?(?=\n  [A-Za-z0-9_-]+:|$)/)?.[0];
+
+  assert.ok(backendSmokeJob, "missing backend-smoke job");
+  assert.match(backendSmokeJob, /RUN_SCHEMA_MIGRATIONS: "true"/);
+  assert.match(backendSmokeJob, /docker exec dpp-ci-postgres psql -U postgres -d dppSystem -tAc 'SELECT 1'/);
+  assert.match(backendSmokeJob, /for startup_attempt in 1 2;/);
+  assert.match(backendSmokeJob, /Backend smoke retry/);
+  assert.match(backendSmokeJob, /The backend did not become healthy after two startup attempts/);
+  assert.match(backendSmokeJob, /if ! kill -0 "\$backend_pid" 2>\/dev\/null; then\n\s+break/);
+});
+
 test("npm projects require the supported toolchain and locked, integrity-protected registry packages", () => {
   assert.equal(read(".nvmrc").trim(), requiredNodeVersion);
   assert.match(readFileSync(codeOwnersPath, "utf8"), /^\/\.nvmrc\s+@yashd810$/m);
