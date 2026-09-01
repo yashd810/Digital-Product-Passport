@@ -84,3 +84,20 @@ test("non-root Nginx images can read templates from private root release checkou
     );
   }
 });
+
+test("public SPA Nginx templates reject dotfiles before the SPA fallback", () => {
+  const dotfileBlock = "location ~ /\\. {\n    return 404;\n  }";
+
+  for (const [, templatePath] of nonRootNginxDockerfiles) {
+    const template = readFileSync(path.join(repoRoot, templatePath), "utf8");
+    const dotfileBlockIndex = template.indexOf(dotfileBlock);
+    const spaFallbackIndex = template.indexOf("try_files $uri $uri/ /index.html;");
+
+    assert.notEqual(dotfileBlockIndex, -1, `${templatePath} must reject dot-prefixed request paths`);
+    assert.notEqual(spaFallbackIndex, -1, `${templatePath} must retain the SPA fallback`);
+    assert.ok(
+      dotfileBlockIndex < spaFallbackIndex,
+      `${templatePath} must reject dotfiles before the SPA fallback can serve index.html`,
+    );
+  }
+});

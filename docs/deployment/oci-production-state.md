@@ -94,6 +94,9 @@ availability and least-privilege requirement: the containers still run as
 
 - `frontend-app`, `public-passport-viewer`, and `marketing-site` were healthy
   after a clean recreation; their loopback and public HTTPS checks passed.
+- The SPA frontends reject dot-prefixed request paths before their SPA fallback
+  (including `.env` and `.git` paths), so a future misplaced deployment file
+  cannot be served as a static asset or masked by a successful application shell.
 - Caddy edge checks returned 200 for the marketing, application, and viewer
   origins with HSTS, CSP, no-sniff, framing, referrer, and permissions-policy
   headers. Direct application and database ports were not externally reachable.
