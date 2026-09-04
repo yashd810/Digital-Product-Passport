@@ -76,6 +76,32 @@ jobs:
           --metrics=off
           --quiet
           --error
+      - name: Fully scan Local Tools browser source for SSRF
+        # This large browser-only file exceeds Semgrep's five-second default for
+        # the Express SSRF rule. Scan it separately with a bounded longer
+        # timeout instead of silently losing that rule's coverage.
+        run: >-
+          docker run --rm
+          --read-only
+          --cap-drop ALL
+          --security-opt no-new-privileges
+          --pids-limit 256
+          --memory 1024m
+          --tmpfs /tmp:rw,noexec,nosuid,nodev,size=128m
+          -e HOME=/tmp
+          -e XDG_CACHE_HOME=/tmp/.cache
+          -e PYTHONDONTWRITEBYTECODE=1
+          -v "$PWD:/src:ro"
+          -w /src
+          returntocorp/semgrep@sha256:d3d1be3a3770514d16a6a57b9761575d7536d70f45a5220274f4ec7d55c442b9
+          semgrep scan
+          --config p/default
+          --metrics=off
+          --quiet
+          --error
+          --strict
+          --timeout 30
+          local-tools/passport-module-generator/client/workspace.js
 
   backend:
     runs-on: ubuntu-24.04

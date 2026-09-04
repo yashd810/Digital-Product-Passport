@@ -165,6 +165,24 @@ test("the networked static analyzer remains read-only and resource-bounded", () 
   assert.match(staticAnalysisJob, /--tmpfs \/tmp:rw,noexec,nosuid,nodev,size=128m/);
   assert.match(staticAnalysisJob, /-v "\$PWD:\/src:ro"/);
   assert.doesNotMatch(staticAnalysisJob, /docker\.sock/);
+
+  const localToolsStrictScan = staticAnalysisJob.match(/      - name: Fully scan Local Tools browser source for SSRF[\s\S]*$/)?.[0];
+  assert.ok(localToolsStrictScan, "missing strict Local Tools browser source scan");
+  for (const fragment of [
+    "--read-only",
+    "--cap-drop ALL",
+    "--security-opt no-new-privileges",
+    "--pids-limit 256",
+    "--memory 1024m",
+    "-v \"$PWD:/src:ro\"",
+    "--config p/default",
+    "--strict",
+    "--timeout 30",
+    "local-tools/passport-module-generator/client/workspace.js",
+  ]) {
+    assert.equal(localToolsStrictScan.includes(fragment), true, `strict Local Tools scan is missing ${fragment}`);
+  }
+  assert.doesNotMatch(localToolsStrictScan, /docker\.sock/);
 });
 
 test("backend smoke waits for a usable database and reports a bounded retry", () => {

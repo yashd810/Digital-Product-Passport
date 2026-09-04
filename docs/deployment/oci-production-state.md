@@ -124,6 +124,9 @@ capabilities, and no-new-privileges; it validates their rendered Nginx
 configuration and rejects `.env` and `.git` requests before image scanning.
 The check includes URL-encoded, doubled-slash, and asset-traversal-shaped
 dotfile paths so SPA fallback behavior cannot mask an encoded static-file leak.
+The large browser-only Local Tools workspace receives a separate strict,
+bounded-timeout Semgrep pass so the generic source scan cannot silently lose
+SSRF-rule coverage when its normal per-rule timeout is exceeded.
 The three static Nginx Dockerfiles apply Alpine security updates during each
 build, while the runtime probe uses the base image's `wget` rather than adding
 a separate diagnostic-only HTTP client to production images.
