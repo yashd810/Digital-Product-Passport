@@ -141,6 +141,9 @@ controls are enabled from a passing workflow.
 The backend production lockfile keeps the transitive `qs` parser at `6.16.0`
 or later; both the dependency audit and a focused lockfile assertion protect
 against reintroducing the known denial-of-service advisories.
+The backend image also consumes the scheduled, cache-busted Alpine full
+security upgrade rather than pinning a fixed OpenSSL package revision that
+would inevitably become stale.
 
 Before enabling GitHub-hosted production deployment, the repository owner must:
 
