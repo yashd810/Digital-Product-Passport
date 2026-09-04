@@ -484,7 +484,9 @@ jobs:
           push: false
           load: true
           tags: dpp-ci-${{ matrix.name }}:scan
-          build-args: ${{ matrix.build_args }}
+          build-args: |
+            ${{ matrix.build_args }}
+            DPP_APK_UPGRADE_CACHE_BUST=${{ github.event_name == 'schedule' && github.run_id || 'source' }}
           cache-from: type=gha,scope=${{ env.DPP_BUILD_CACHE_SCOPE }}
           cache-to: type=gha,mode=max,scope=${{ env.DPP_BUILD_CACHE_SCOPE }}
       - name: Smoke-test static Nginx runtime

@@ -22,7 +22,8 @@ RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.30.3-alpine@sha256:b3f2436575bd5be7386518084d842dac414ab4962712afa31e99e0942a56e3b2
 USER root
-RUN apk upgrade --no-cache
+ARG DPP_APK_UPGRADE_CACHE_BUST=source
+RUN test -n "$DPP_APK_UPGRADE_CACHE_BUST" && apk upgrade --no-cache
 ARG VITE_API_URL
 ENV DPP_PUBLIC_API_ORIGIN=${VITE_API_URL}
 COPY --chmod=0644 infra/docker/public-passport-viewer/nginx.conf.template /etc/nginx/templates/default.conf.template

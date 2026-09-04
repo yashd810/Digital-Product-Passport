@@ -128,8 +128,11 @@ The large browser-only Local Tools workspace receives a separate strict,
 bounded-timeout Semgrep pass so the generic source scan cannot silently lose
 SSRF-rule coverage when its normal per-rule timeout is exceeded.
 The three static Nginx Dockerfiles apply Alpine security updates during each
-build, while the runtime probe uses the base image's `wget` rather than adding
-a separate diagnostic-only HTTP client to production images.
+build. The weekly scheduled CI run changes that update layer's trusted cache
+key, ensuring package security updates are rebuilt and scanned rather than
+being indefinitely hidden behind a reused build cache. The runtime probe uses
+the base image's `wget` rather than adding a separate diagnostic-only HTTP
+client to production images.
 
 The public repository page was still marked **Public** when this register was
 updated. Public read-only inspection cannot prove owner-only GitHub security

@@ -71,6 +71,7 @@ test("untrusted pull requests cannot populate trusted BuildKit cache scopes", ()
   );
   assert.match(containerBuildJob, /cache-from: type=gha,scope=\$\{\{ env\.DPP_BUILD_CACHE_SCOPE \}\}/);
   assert.match(containerBuildJob, /cache-to: type=gha,mode=max,scope=\$\{\{ env\.DPP_BUILD_CACHE_SCOPE \}\}/);
+  assert.match(containerBuildJob, /DPP_APK_UPGRADE_CACHE_BUST=\$\{\{ github\.event_name == 'schedule' && github\.run_id \|\| 'source' \}\}/);
   assert.doesNotMatch(containerBuildJob, /scope=\$\{\{ matrix\.name \}\}/);
 });
 
@@ -123,7 +124,8 @@ test("static Nginx images apply supported Alpine security upgrades", () => {
     "apps/marketing-site/Dockerfile",
   ]) {
     const dockerfile = readFileSync(path.join(repoRoot, dockerfilePath), "utf8");
-    assert.match(dockerfile, /^RUN apk upgrade --no-cache$/m, `${dockerfilePath} must apply Alpine security updates`);
+    assert.match(dockerfile, /^ARG DPP_APK_UPGRADE_CACHE_BUST=source$/m, `${dockerfilePath} must expose the scheduled refresh cache key`);
+    assert.match(dockerfile, /^RUN test -n "\$DPP_APK_UPGRADE_CACHE_BUST" && apk upgrade --no-cache$/m, `${dockerfilePath} must apply Alpine security updates`);
     assert.doesNotMatch(dockerfile, /apk add[^\n]*\b(?:lib)?curl=/, `${dockerfilePath} must not pin stale curl packages`);
   }
 });
