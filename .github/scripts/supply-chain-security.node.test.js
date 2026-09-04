@@ -239,6 +239,16 @@ test("npm projects require the supported toolchain and locked, integrity-protect
   }
 });
 
+test("the backend lockfile keeps qs at a patched production version", () => {
+  const backendLock = JSON.parse(read("apps/backend-api/package-lock.json"));
+  const qs = backendLock.packages?.["node_modules/qs"];
+
+  assert.ok(qs, "backend lockfile must include qs");
+  assert.match(qs.version || "", /^6\.(?:1[6-9]|[2-9][0-9])\./, "backend qs must be at least 6.16.0");
+  assert.match(qs.resolved || "", /^https:\/\/registry\.npmjs\.org\/qs\/-\/qs-6\./, "backend qs must use the npm registry");
+  assert.match(qs.integrity || "", /^sha512-/, "backend qs must retain an integrity hash");
+});
+
 test("CI and Docker fail closed when Node or npm drift from the supported toolchain", () => {
   const workflow = readFileSync(securityWorkflowPath, "utf8");
   const ciChecks = [...workflow.matchAll(/- name: Verify locked Node and npm toolchain\n\s+run: \|\n\s+test "\$\(node --version\)" = "v24\.18\.0"\n\s+test "\$\(npm --version\)" = "11\.16\.0"/g)];

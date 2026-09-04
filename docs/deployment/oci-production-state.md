@@ -138,6 +138,9 @@ The public repository page was still marked **Public** when this register was
 updated. Public read-only inspection cannot prove owner-only GitHub security
 settings, rulesets, environments, or alert state, so do not infer that those
 controls are enabled from a passing workflow.
+The backend production lockfile keeps the transitive `qs` parser at `6.16.0`
+or later; both the dependency audit and a focused lockfile assertion protect
+against reintroducing the known denial-of-service advisories.
 
 Before enabling GitHub-hosted production deployment, the repository owner must:
 
