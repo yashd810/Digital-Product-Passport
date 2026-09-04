@@ -503,7 +503,14 @@ jobs:
           fi
 
           docker exec "$container_name" nginx -t
-          for path in /.env /.git/HEAD; do
+          for path in \
+            /.env \
+            /.git/HEAD \
+            /%2eenv \
+            /%2Egit/HEAD \
+            //.env \
+            /assets/%2e%2e/.env \
+            /assets/..%2f.env; do
             response="$(docker exec "$container_name" wget -S --spider "http://127.0.0.1:8080$path" 2>&1 || true)"
             printf '%s\n' "$response" | grep -Eq 'HTTP/[0-9.]+ 404'
           done

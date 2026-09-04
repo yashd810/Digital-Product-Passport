@@ -100,7 +100,14 @@ test("static SPA images are smoke-tested under runtime confinement", () => {
     "nginx -t",
     "wget -qO- http://127.0.0.1:8080/",
     "wget -S --spider",
-    "for path in /.env /.git/HEAD; do",
+    "for path in \\",
+    "/.env \\",
+    "/.git/HEAD \\",
+    "/%2eenv \\",
+    "/%2Egit/HEAD \\",
+    "//.env \\",
+    "/assets/%2e%2e/.env \\",
+    "/assets/..%2f.env; do",
     "grep -Eq 'HTTP/[0-9.]+ 404'",
   ]) {
     assert.equal(staticRuntimeSmoke.includes(fragment), true, `static Nginx runtime smoke test is missing ${fragment}`);
