@@ -97,13 +97,28 @@ test("static SPA images are smoke-tested under runtime confinement", () => {
     "--pids-limit 128",
     "--memory 128m",
     "BACKEND_API_UPSTREAM=http://127.0.0.1:65535",
-    "nginx -t -g 'pid /tmp/nginx-test.pid;'",
+    "nginx -t",
+    "wget -qO- http://127.0.0.1:8080/",
+    "wget -S --spider",
     "for path in /.env /.git/HEAD; do",
-    "test \"$status\" = 404",
+    "grep -Eq 'HTTP/[0-9.]+ 404'",
   ]) {
     assert.equal(staticRuntimeSmoke.includes(fragment), true, `static Nginx runtime smoke test is missing ${fragment}`);
   }
   assert.doesNotMatch(staticRuntimeSmoke, /docker\.sock/);
+  assert.doesNotMatch(staticRuntimeSmoke, /docker exec \"\$container_name\" curl/);
+});
+
+test("static Nginx images apply supported Alpine security upgrades", () => {
+  for (const dockerfilePath of [
+    "apps/frontend-app/Dockerfile",
+    "apps/public-passport-viewer/Dockerfile",
+    "apps/marketing-site/Dockerfile",
+  ]) {
+    const dockerfile = readFileSync(path.join(repoRoot, dockerfilePath), "utf8");
+    assert.match(dockerfile, /^RUN apk upgrade --no-cache$/m, `${dockerfilePath} must apply Alpine security updates`);
+    assert.doesNotMatch(dockerfile, /apk add[^\n]*\b(?:lib)?curl=/, `${dockerfilePath} must not pin stale curl packages`);
+  }
 });
 
 test("container build and scanner images are immutable digest references", () => {

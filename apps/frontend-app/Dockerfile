@@ -20,7 +20,7 @@ RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.30.3-alpine@sha256:b3f2436575bd5be7386518084d842dac414ab4962712afa31e99e0942a56e3b2
 USER root
-RUN apk add --no-cache --upgrade curl=8.20.0-r0 libcurl=8.20.0-r0
+RUN apk upgrade --no-cache
 ARG VITE_API_URL
 ENV DPP_PUBLIC_API_ORIGIN=${VITE_API_URL}
 COPY --chmod=0644 infra/docker/frontend/nginx.conf.template /etc/nginx/templates/default.conf.template

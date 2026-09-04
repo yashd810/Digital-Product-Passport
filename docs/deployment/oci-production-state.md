@@ -122,6 +122,9 @@ The container matrix also boots the static frontend and viewer images under
 their production UID with no network, a read-only filesystem, dropped
 capabilities, and no-new-privileges; it validates their rendered Nginx
 configuration and rejects `.env` and `.git` requests before image scanning.
+The three static Nginx Dockerfiles apply Alpine security updates during each
+build, while the runtime probe uses the base image's `wget` rather than adding
+a separate diagnostic-only HTTP client to production images.
 
 The public repository page was still marked **Public** when this register was
 updated. Public read-only inspection cannot prove owner-only GitHub security
