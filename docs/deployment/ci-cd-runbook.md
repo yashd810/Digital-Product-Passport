@@ -54,7 +54,9 @@ and an OCI administrator who can approve the network rules.
    or Internet gateway. The runner needs outbound TCP/443 to GitHub; it must
    not receive a public IP.
 2. Create an NSG for the runner. Allow only the necessary outbound traffic and
-   attach it to the runner through `network_security_group_ids`.
+   attach it to the runner through `network_security_group_ids`. Terraform
+   rejects an empty or blank NSG list: do not rely on subnet security lists
+   alone for this high-trust host.
 3. On the backend and frontend hosts, allow stateful TCP/22 ingress from the
    runner's private IP/32 (or, preferably, the runner NSG). Do not allow
    GitHub-hosted runner ranges and do not open SSH to the internet.
@@ -76,6 +78,17 @@ terraform validate
 terraform plan -out=deployment-runner.tfplan
 terraform apply deployment-runner.tfplan
 ```
+
+After connecting through OCI Bastion, wait for the first-boot OS security
+updates to finish before registering the Actions runner:
+
+```bash
+sudo cloud-init status --wait
+```
+
+Review the result. If the selected image reports that a reboot is required,
+schedule that controlled reboot and confirm the runner is healthy again before
+installing its deployment identity or production credentials.
 
 The module deliberately does not modify existing frontend/backend NSGs. That
 prevents it from accidentally replacing production network rules. Add the
@@ -202,5 +215,7 @@ push or edit `/opt/dpp` directly for rollback.
 - Never attach the runner label to CI or pull-request workflows.
 - Never put OCI SSH keys, trusted host files, or tenancy credentials in GitHub
   secrets for this design; they remain local to the dedicated runner.
-- Keep the runner patched and replace it if its integrity is in doubt. A runner
-  that can deploy production is a high-trust administrative system.
+- Cloud-init refreshes and upgrades OS packages at first boot. Keep the runner
+  patched after provisioning as well, and replace it if its integrity is in
+  doubt. A runner that can deploy production is a high-trust administrative
+  system.

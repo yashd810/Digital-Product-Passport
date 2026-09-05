@@ -21,6 +21,14 @@ variable "subnet_ocid" {
 variable "network_security_group_ids" {
   type        = list(string)
   description = "Existing NSGs that permit only the runner's required egress and private SSH to DPP hosts"
+
+  validation {
+    condition = (
+      length(var.network_security_group_ids) > 0 &&
+      alltrue([for nsg_id in var.network_security_group_ids : trimspace(nsg_id) != ""])
+    )
+    error_message = "network_security_group_ids must contain at least one nonblank runner NSG OCID. Do not rely on subnet security lists alone."
+  }
 }
 
 variable "image_ocid" {
