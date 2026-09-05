@@ -11,7 +11,7 @@ Security in this app is not one feature. It is layered through authentication, c
 | Authentication | who the user or client is |
 | Company access checks | whether they can access a company’s data |
 | Role checks | whether they are editor, admin, super admin, or viewer |
-| Security group key checks | which selected restricted fields outside readers can access |
+| Security group key checks | which selected restricted fields outside readers can access; key-bearing public responses that can expose them are `private, no-store` and vary by key header |
 | Public-view filtering | which fields are hidden from public representations |
 | Workflow controls | whether lifecycle transitions are allowed |
 | Signing and verification | whether released outputs can be verified |
@@ -23,6 +23,7 @@ Security in this app is not one feature. It is layered through authentication, c
 - `apps/backend-api/src/http/middleware/auth.js:1`
 - `apps/backend-api/src/http/routes/passports.js:34`
 - `apps/backend-api/src/http/routes/passport-public.js:12`
+- `apps/backend-api/src/modules/passports/register-carrier-security-routes.js:1`
 - `apps/backend-api/src/platform/security/signing-service.js:1`
 - `apps/backend-api/src/modules/passports/api-key-helpers.js:1`
 

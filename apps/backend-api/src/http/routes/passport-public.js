@@ -424,6 +424,23 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   function securityGroupReadLimiter(req, res, next) {
     if (!getSecurityGroupKeyFromRequest(req)) return next();
+    // A security-group key can add restricted fields to an otherwise public
+    // response.  Its value is carried in a request header, which is not part
+    // of a normal HTTP cache key, so never let that representation be stored
+    // and reused by an anonymous viewer of the same passport URL.
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    const existingVary = typeof res.getHeader === "function" ? res.getHeader("Vary") : "";
+    const varyNames = String(existingVary || "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const knownVaryNames = new Set(varyNames.map((value) => value.toLowerCase()));
+    for (const headerName of ["X-API-Key", "X-Security-Group-Key"]) {
+      if (!knownVaryNames.has(headerName.toLowerCase())) varyNames.push(headerName);
+    }
+    if (!knownVaryNames.has("*")) res.setHeader("Vary", varyNames.join(", "));
     return publicUnlockRateLimit(req, res, next);
   }
 

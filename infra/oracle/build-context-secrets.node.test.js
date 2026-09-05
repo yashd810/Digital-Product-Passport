@@ -17,6 +17,16 @@ const nonRootNginxDockerfiles = [
   ["apps/frontend-app/Dockerfile", "infra/docker/frontend/nginx.conf.template"],
   ["apps/public-passport-viewer/Dockerfile", "infra/docker/public-passport-viewer/nginx.conf.template"],
 ];
+const publicNginxTemplates = [
+  ["dashboard", "infra/docker/frontend/nginx.conf.template", 3],
+  ["public viewer", "infra/docker/public-passport-viewer/nginx.conf.template", 3],
+  ["marketing site", "infra/docker/website/nginx.conf.template", 4],
+];
+const caddySecurityHeaderTemplates = [
+  "infra/oracle/Caddyfile.backend.template",
+  "infra/oracle/Caddyfile.frontend.template",
+  "infra/oracle/Caddyfile.template",
+];
 
 function hasPattern(pattern) {
   return dockerIgnore.split(/\r?\n/).some((line) => line.trim() === pattern);
@@ -102,16 +112,25 @@ test("public SPA Nginx templates reject dotfiles before the SPA fallback", () =>
   }
 });
 
-test("dashboard Nginx denies framing consistently with its CSP", () => {
-  const templatePath = "infra/docker/frontend/nginx.conf.template";
-  const template = readFileSync(path.join(repoRoot, templatePath), "utf8");
+test("all public Nginx templates deny framing consistently with their CSP", () => {
   const denyHeader = 'add_header X-Frame-Options "DENY" always;';
 
-  assert.match(template, /frame-ancestors 'none'/, `${templatePath} must forbid framing through CSP`);
-  assert.equal(
-    template.split(denyHeader).length - 1,
-    3,
-    `${templatePath} must deny framing at the server, assets, and SPA response layers`,
-  );
-  assert.equal(template.includes('X-Frame-Options "SAMEORIGIN"'), false, `${templatePath} must not weaken CSP in legacy clients`);
+  for (const [label, templatePath, expectedHeaderCount] of publicNginxTemplates) {
+    const template = readFileSync(path.join(repoRoot, templatePath), "utf8");
+    assert.match(template, /frame-ancestors 'none'/, `${label} must forbid framing through CSP`);
+    assert.equal(
+      template.split(denyHeader).length - 1,
+      expectedHeaderCount,
+      `${label} must deny framing in every response context`,
+    );
+    assert.equal(template.includes('X-Frame-Options "SAMEORIGIN"'), false, `${label} must not weaken CSP in legacy clients`);
+  }
+});
+
+test("all public Caddy templates deny framing consistently with upstream CSP", () => {
+  for (const templatePath of caddySecurityHeaderTemplates) {
+    const template = readFileSync(path.join(repoRoot, templatePath), "utf8");
+    assert.match(template, /\(security_headers\)[\s\S]*X-Frame-Options "DENY"/);
+    assert.equal(template.includes('X-Frame-Options "SAMEORIGIN"'), false, `${templatePath} must not weaken upstream CSP in legacy clients`);
+  }
 });
