@@ -187,6 +187,9 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
 
   app.get("/api/companies/:companyId/passports/:dppId/preview-unlock", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
+      // This authenticated response can contain fields unlocked by a
+      // security-group key. It must never be retained after the preview ends.
+      setNoStoreHeaders(res);
       const { companyId, dppId } = req.params;
       const apiKey = getSecurityGroupKeyFromRequest(req);
       if (!apiKey) return res.status(400).json({ error: "apiKey is required" });

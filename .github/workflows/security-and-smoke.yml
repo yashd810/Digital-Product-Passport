@@ -354,6 +354,7 @@ jobs:
             infra/oracle/object-storage-backups.node.test.js \
             apps/backend-api/tests/object-storage-isolation.node.test.js \
             apps/backend-api/tests/public-api-key-cache-control.node.test.js \
+            apps/backend-api/tests/raw-error-response-routes.node.test.js \
             infra/oracle/root-release-deployer.node.test.js \
             infra/docker/postgres/Dockerfile.node.test.js \
             scripts/check-repository-secrets.node.test.js \
