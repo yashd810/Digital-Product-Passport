@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../shared/table/tableControls";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
+import { clearClientSessionState } from "../../app/hooks/useSessionAuth";
 import UserProfile from "../../user/profile/UserProfile";
 import "../styles/AdminDashboard.css";
 
@@ -183,7 +184,7 @@ function AdminSecurity({ user }) {
       await loadSuperAdmins();
 
       if (data.revokedCurrentSessionUser) {
-        localStorage.clear();
+        clearClientSessionState();
         window.location.href = "/login";
       }
     } catch (err) {

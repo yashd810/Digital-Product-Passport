@@ -1,4 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { buildDraftStorageKey } from "../passports/form/passportFormDrafts";
 import { clearClientSessionState } from "../app/hooks/useSessionAuth";
@@ -117,6 +119,19 @@ describe("browser security boundaries", () => {
     expect(localStorage.removeItem).toHaveBeenCalledWith("user");
     expect(localStorage.removeItem).toHaveBeenCalledWith("companyId");
     expect(secondSessionStorage.snapshot()).toEqual({ "dpp-lazy-recovery:passport-form": "attempted" });
+  });
+
+  test("forced access revocations use the shared cleanup path instead of leaving private form drafts behind", () => {
+    const componentPaths = [
+      "../admin/pages/AdminSecurity.js",
+      "../admin/components/AdminCompanyActions.js",
+    ];
+
+    for (const componentPath of componentPaths) {
+      const source = readFileSync(fileURLToPath(new URL(componentPath, import.meta.url)), "utf8");
+      expect(source).toContain("clearClientSessionState();");
+      expect(source).not.toContain("localStorage.clear()");
+    }
   });
 
   test("treats malformed percent-encoded route state as invalid instead of crashing", () => {

@@ -101,3 +101,17 @@ test("public SPA Nginx templates reject dotfiles before the SPA fallback", () =>
     );
   }
 });
+
+test("dashboard Nginx denies framing consistently with its CSP", () => {
+  const templatePath = "infra/docker/frontend/nginx.conf.template";
+  const template = readFileSync(path.join(repoRoot, templatePath), "utf8");
+  const denyHeader = 'add_header X-Frame-Options "DENY" always;';
+
+  assert.match(template, /frame-ancestors 'none'/, `${templatePath} must forbid framing through CSP`);
+  assert.equal(
+    template.split(denyHeader).length - 1,
+    3,
+    `${templatePath} must deny framing at the server, assets, and SPA response layers`,
+  );
+  assert.equal(template.includes('X-Frame-Options "SAMEORIGIN"'), false, `${templatePath} must not weaken CSP in legacy clients`);
+});
