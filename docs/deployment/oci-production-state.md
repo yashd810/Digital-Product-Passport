@@ -58,6 +58,40 @@ Allow group Default/dpp-db-backup-writers to manage objects in tenancy where tar
 It does not grant bucket management, pre-authenticated-request, or tenancy-admin
 access because each statement is constrained by `target.bucket.name`.
 
+### Active Application-Storage Isolation Remediation (2026-09-05)
+
+A read-only, per-identity isolation probe found that the current application
+storage customer-secret can list both backup buckets. Its own application-files
+bucket is reachable and anonymous listing is denied, but **zero of two** backup
+bucket probes were denied. This is an OCI IAM incident and blocks the next
+production release. The two dedicated backup identities passed the same probe:
+each can reach only its own bucket, is denied by both peer buckets, and cannot
+list its own bucket anonymously.
+
+Do not change, delete, or recreate either backup user, group, bucket, or policy
+while correcting this. First inspect the existing application-storage user's
+group memberships and every policy that applies to those groups. Remove only
+the application user from any backup-writer group and remove only an
+application-group statement that grants a backup bucket. If that user cannot be
+made application-only without affecting another workload, create a dedicated
+application service user and a dedicated, application-only group instead; do
+not reuse either backup group.
+
+The resulting application identity must have exactly these bucket-scoped
+permissions (substituting its real Identity Domain if it is not `Default`):
+
+```text
+Allow group Default/dpp-app-storage-writers to read buckets in tenancy where target.bucket.name = 'dpp-prod-files'
+Allow group Default/dpp-app-storage-writers to manage objects in tenancy where target.bucket.name = 'dpp-prod-files'
+```
+
+Generate a new Customer Secret Key only for that isolated application identity,
+replace only `STORAGE_S3_ACCESS_KEY_ID` and `STORAGE_S3_SECRET_ACCESS_KEY` in
+the protected production profile and backend host environment, run all three
+per-identity probes successfully, then revoke the previous application key.
+The prior application secret appeared in an interactive session, so it must not
+remain active after the replacement passes. Never record either key here.
+
 ## Storage and Database Rules
 
 - Keep `STORAGE_S3_*` for `dpp-prod-files` unchanged unless its own approved
