@@ -95,8 +95,11 @@ Current production-style behavior:
   before enabling the public contact form or account-email workflows
 - the long-running API receives an allowlisted root-owned
   `/etc/dpp/dpp-backend.env`, not the broad `/etc/dpp/dpp.env`: it has only the
-  `dpp_app` runtime database login and fails closed if admin or DB-backup
-  credentials leak into its environment
+  `dpp_app` runtime database login. Each backend deployment verifies that file
+  again before Compose starts: it rejects malformed or duplicate assignments,
+  `DB_ADMIN_*`, `POSTGRES_*`, migration/bootstrap controls, and every
+  `DB_BACKUP_*` value except the non-secret `DB_BACKUP_ENABLED` policy flag,
+  without printing environment values
 - PostgreSQL bootstrap and the one-shot `db-migrate` service receive the
   separate `DB_ADMIN_USER` / `DB_ADMIN_PASSWORD` identity directly; production
   requires it to differ from `DB_USER`

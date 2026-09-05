@@ -563,6 +563,8 @@ fi
 if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   DPP_ENV_FILE="$ENV_FILE" DPP_BACKEND_ENV_FILE="$BACKEND_ENV_FILE" \
     "$APP_DIR/infra/oracle/prepare-backend-runtime-env.sh"
+  DPP_BACKEND_ENV_FILE="$BACKEND_ENV_FILE" \
+    "$APP_DIR/infra/oracle/verify-backend-runtime-env.sh"
   export DPP_BACKEND_ENV_FILE="$BACKEND_ENV_FILE"
 fi
 

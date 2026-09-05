@@ -23,6 +23,7 @@ const privilegedScripts = [
   path.join(testDir, "install-container-imds-firewall.sh"),
   path.join(testDir, "container-imds-firewall.sh"),
   path.join(testDir, "prepare-backend-runtime-env.sh"),
+  path.join(testDir, "verify-backend-runtime-env.sh"),
   path.join(testDir, "render-caddyfile.sh"),
   path.join(testDir, "generate-env-secrets.sh"),
   path.join(testDir, "..", "..", "scripts", "deploy", "bootstrap-actions-deployment-runner.sh"),
