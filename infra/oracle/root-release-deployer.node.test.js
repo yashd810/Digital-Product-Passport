@@ -25,6 +25,7 @@ const privilegedScripts = [
   path.join(testDir, "prepare-backend-runtime-env.sh"),
   path.join(testDir, "verify-backend-runtime-env.sh"),
   path.join(testDir, "render-caddyfile.sh"),
+  path.join(testDir, "check-live-edge.sh"),
   path.join(testDir, "generate-env-secrets.sh"),
   path.join(testDir, "..", "..", "scripts", "deploy", "bootstrap-actions-deployment-runner.sh"),
   path.join(testDir, "..", "..", "scripts", "deploy", "install-deployment-runner-config.sh"),

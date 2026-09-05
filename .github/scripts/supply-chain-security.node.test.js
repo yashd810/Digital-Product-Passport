@@ -84,6 +84,8 @@ test("every third-party GitHub Action is SHA-pinned and workflows avoid elevated
   const securityWorkflow = readFileSync(securityWorkflowPath, "utf8");
   assert.match(securityWorkflow, /^permissions:\n  contents: read$/m);
   assert.doesNotMatch(securityWorkflow, /\$\{\{\s*secrets\./);
+  assert.match(readFileSync(codeOwnersPath, "utf8"), /^\/scripts\/check-repository-secrets\.js\s+@yashd810$/m);
+  assert.match(readFileSync(codeOwnersPath, "utf8"), /^\/scripts\/check-repository-secrets\.node\.test\.js\s+@yashd810$/m);
 });
 
 test("untrusted pull requests cannot populate trusted BuildKit cache scopes", () => {

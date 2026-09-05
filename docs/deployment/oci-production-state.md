@@ -94,9 +94,14 @@ availability and least-privilege requirement: the containers still run as
 
 - `frontend-app`, `public-passport-viewer`, and `marketing-site` were healthy
   after a clean recreation; their loopback and public HTTPS checks passed.
-- The SPA frontends reject dot-prefixed request paths before their SPA fallback
-  (including `.env` and `.git` paths), so a future misplaced deployment file
-  cannot be served as a static asset or masked by a successful application shell.
+- Source templates and their container-runtime CI probe reject dot-prefixed
+  request paths before the SPA fallback (including literal, URL-encoded,
+  doubled-slash, and traversal-shaped `.env`/`.git` variants). That source
+  guarantee is **not currently live**: on 2026-09-05, the public dashboard and
+  viewer each returned `200` for all seven probes, masking the requests with
+  their SPA shells. The marketing site rejected the same probes. Treat the
+  frontend edge as failed until a normal frontend release completes and the
+  post-release `check-live-edge.sh` verifier records non-`2xx`/`3xx` responses.
 - Caddy edge checks returned 200 for the marketing, application, and viewer
   origins with HSTS, CSP, no-sniff, framing, referrer, and permissions-policy
   headers. Direct application and database ports were not externally reachable.

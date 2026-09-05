@@ -491,6 +491,17 @@ curl -fsS "$MARKETING_URL/"
 sudo /bin/bash /opt/dpp/infra/oracle/check-edge-policy-config.sh
 ```
 
+The normal restricted release also runs `check-live-edge.sh`. In addition to
+headers and Host/SNI mismatch handling, it sends literal, URL-encoded,
+doubled-slash, and traversal-shaped `.env`/`.git` paths to every static public
+edge. A `2xx` or `3xx` response fails the release: a SPA shell must not mask a
+dotfile request as a successful page. Run it manually after an edge or CDN
+change with the root-only environment file:
+
+```bash
+sudo DPP_ENV_FILE=/etc/dpp/dpp.env /bin/bash -p /opt/dpp/infra/oracle/check-live-edge.sh
+```
+
 On the backend host, through the approved administrator account:
 
 ```bash

@@ -347,6 +347,7 @@ jobs:
             apps/backend-api/tests/runtime-config.node.test.js \
             apps/backend-api/tests/runtime-database-role.node.test.js \
             infra/oracle/build-context-secrets.node.test.js \
+            infra/oracle/check-live-edge.node.test.js \
             infra/oracle/container-imds-firewall.node.test.js \
             infra/oracle/db-backup.node.test.js \
             infra/oracle/deployment-runner-terraform.node.test.js \
@@ -354,6 +355,7 @@ jobs:
             apps/backend-api/tests/object-storage-isolation.node.test.js \
             infra/oracle/root-release-deployer.node.test.js \
             infra/docker/postgres/Dockerfile.node.test.js \
+            scripts/check-repository-secrets.node.test.js \
             scripts/deploy/check-deployment-runner.node.test.js \
             scripts/deploy/deploy-to-oci.node.test.js \
             scripts/deploy/production-deploy-workflow.node.test.js \

@@ -241,29 +241,29 @@ test("backend runtime verifier rejects privileged and DB-backup capability names
   const deploymentSource = readFileSync(productionDeploymentScript, "utf8");
   const fixtures = [
     {
-      lines: ["DB_BACKUP_ENABLED=true", "DB_BACKUP_S3_SECRET_ACCESS_KEY=backup-fixture-value"],
+      lines: ["DB_BACKUP_ENABLED=true", "DB_BACKUP_S3_SECRET_ACCESS_KEY=test-backup-fixture-value"],
       expectedError: /forbidden database-backup capability names/,
-      secret: "backup-fixture-value",
+      secret: "test-backup-fixture-value",
     },
     {
-      lines: ["DB_PASSWORD=runtime-fixture-value", "DB_ADMIN_PASSWORD=admin-fixture-value"],
+      lines: ["DB_PASSWORD=test-runtime-fixture-value", "DB_ADMIN_PASSWORD=test-admin-fixture-value"],
       expectedError: /forbidden privileged capability names/,
-      secret: "admin-fixture-value",
+      secret: "test-admin-fixture-value",
     },
     {
-      lines: ["DB_PASSWORD=runtime-fixture-value", "DB_MIGRATION_PASSWORD=migration-fixture-value"],
+      lines: ["DB_PASSWORD=test-runtime-fixture-value", "DB_MIGRATION_PASSWORD=test-migration-fixture-value"],
       expectedError: /forbidden privileged capability names/,
-      secret: "migration-fixture-value",
+      secret: "test-migration-fixture-value",
     },
     {
-      lines: ["DB_PASSWORD=runtime-fixture-value", "POSTGRES_PASSWORD=postgres-fixture-value"],
+      lines: ["DB_PASSWORD=test-runtime-fixture-value", "POSTGRES_PASSWORD=test-postgres-fixture-value"],
       expectedError: /forbidden privileged capability names/,
-      secret: "postgres-fixture-value",
+      secret: "test-postgres-fixture-value",
     },
     {
-      lines: ["DB_PASSWORD=runtime-fixture-value", "RUN_SCHEMA_MIGRATIONS=true"],
+      lines: ["DB_PASSWORD=test-runtime-fixture-value", "RUN_SCHEMA_MIGRATIONS=true"],
       expectedError: /forbidden privileged capability names/,
-      secret: "runtime-fixture-value",
+      secret: "test-runtime-fixture-value",
     },
   ];
 
@@ -280,7 +280,7 @@ test("backend runtime verifier rejects privileged and DB-backup capability names
       assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(fixture.secret));
     }
 
-    writeFileSync(runtimePath, "DB_BACKUP_ENABLED=true\nDB_PASSWORD=runtime-fixture-value\n", { mode: 0o600 });
+    writeFileSync(runtimePath, "DB_BACKUP_ENABLED=true\nDB_PASSWORD=test-runtime-fixture-value\n", { mode: 0o600 });
     chmodSync(runtimePath, 0o600);
     const permittedPolicyFlag = spawnSync("bash", [verifyBackendRuntimeEnv], {
       env: { PATH: process.env.PATH || "", DPP_BACKEND_ENV_FILE: runtimePath },
@@ -288,7 +288,7 @@ test("backend runtime verifier rejects privileged and DB-backup capability names
     });
     assert.equal(permittedPolicyFlag.status, 0, permittedPolicyFlag.stderr);
 
-    writeFileSync(runtimePath, "DB_PASSWORD=runtime-fixture-value\nnot-an-assignment-fixture\n", { mode: 0o600 });
+    writeFileSync(runtimePath, "DB_PASSWORD=test-runtime-fixture-value\nnot-an-assignment-fixture\n", { mode: 0o600 });
     chmodSync(runtimePath, 0o600);
     const malformed = spawnSync("bash", [verifyBackendRuntimeEnv], {
       env: { PATH: process.env.PATH || "", DPP_BACKEND_ENV_FILE: runtimePath },
@@ -298,7 +298,7 @@ test("backend runtime verifier rejects privileged and DB-backup capability names
     assert.match(malformed.stderr, /must contain only well-formed assignments/);
     assert.doesNotMatch(`${malformed.stdout}${malformed.stderr}`, /not-an-assignment-fixture/);
 
-    writeFileSync(runtimePath, "DB_PASSWORD=first-value\nDB_PASSWORD=second-value\n", { mode: 0o600 });
+    writeFileSync(runtimePath, "DB_PASSWORD=test-first-value\nDB_PASSWORD=test-second-value\n", { mode: 0o600 });
     chmodSync(runtimePath, 0o600);
     const duplicate = spawnSync("bash", [verifyBackendRuntimeEnv], {
       env: { PATH: process.env.PATH || "", DPP_BACKEND_ENV_FILE: runtimePath },
@@ -306,7 +306,7 @@ test("backend runtime verifier rejects privileged and DB-backup capability names
     });
     assert.equal(duplicate.status, 1);
     assert.match(duplicate.stderr, /must not contain duplicate assignments/);
-    assert.doesNotMatch(`${duplicate.stdout}${duplicate.stderr}`, /first-value|second-value/);
+    assert.doesNotMatch(`${duplicate.stdout}${duplicate.stderr}`, /test-first-value|test-second-value/);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
