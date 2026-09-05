@@ -167,6 +167,17 @@ distinct buckets and credential pairs. Enabling these controls requires an
 approved OCI bucket/IAM configuration; never weaken the gate to bypass missing
 infrastructure.
 
+Before release and after every OCI customer-secret or IAM change, run
+`apps/backend-api/scripts/verify-object-storage-isolation.js` once for each
+storage identity. Each invocation must receive only that identity's credential
+pair plus the two non-secret peer descriptors (bucket name, endpoint, region,
+and path-style setting). Do not use a full production environment file that
+includes all three credential pairs. Treat all three scope reports as one
+verification set: every scope must reach its own configured bucket, and deny
+both peers at their own configured endpoints. OCI can intentionally represent a
+denied peer bucket as `404`, so one scope report alone does not prove the peer
+exists; the matching peer's own successful report completes that proof.
+
 The deployment and troubleshooting helpers require a non-symlinked private key
 that is not group/world-readable and a pre-verified `known_hosts` file. Verify
 the OCI instance fingerprint in the OCI Console before adding it; do not rely on

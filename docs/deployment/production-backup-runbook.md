@@ -43,6 +43,73 @@ runtime and deployment guards reject a missing, placeholder, or reused
 application-storage value. Backup writes and verification reads use only the
 backup-provider client; they never fall back to application file storage.
 
+Different bucket names and customer-secret values alone do **not** prove IAM
+isolation. Before a production release, after a credential change, and during
+each security review, run the read-only check three times, from three separate
+restricted environments. The operator must ensure that each environment file is
+mode `600`, owned by the identity running the check, and contains only the
+selected identity's own configuration and credential pair. Do **not** give a
+single verifier process a full production environment file containing all three
+credential pairs.
+
+The two peer descriptors are non-secret inputs: each includes the peer bucket
+name, endpoint, region, and path-style mode. Substitute the three configured
+targets below, keeping each scope's two *other* targets as its peer descriptors:
+
+```bash
+cd apps/backend-api
+
+node --env-file=/secure/path/application-storage-isolation.env \
+  scripts/verify-object-storage-isolation.js \
+  --scope application-storage \
+  --deny-bucket <provider-backup-bucket> \
+  --deny-endpoint <provider-backup-endpoint> \
+  --deny-region <provider-backup-region> \
+  --deny-force-path-style <true-or-false> \
+  --deny-bucket <database-backup-bucket> \
+  --deny-endpoint <database-backup-endpoint> \
+  --deny-region <database-backup-region> \
+  --deny-force-path-style <true-or-false>
+
+node --env-file=/secure/path/provider-backup-isolation.env \
+  scripts/verify-object-storage-isolation.js \
+  --scope provider-backup \
+  --deny-bucket <application-storage-bucket> \
+  --deny-endpoint <application-storage-endpoint> \
+  --deny-region <application-storage-region> \
+  --deny-force-path-style <true-or-false> \
+  --deny-bucket <database-backup-bucket> \
+  --deny-endpoint <database-backup-endpoint> \
+  --deny-region <database-backup-region> \
+  --deny-force-path-style <true-or-false>
+
+node --env-file=/secure/path/database-backup-isolation.env \
+  scripts/verify-object-storage-isolation.js \
+  --scope database-backup \
+  --deny-bucket <application-storage-bucket> \
+  --deny-endpoint <application-storage-endpoint> \
+  --deny-region <application-storage-region> \
+  --deny-force-path-style <true-or-false> \
+  --deny-bucket <provider-backup-bucket> \
+  --deny-endpoint <provider-backup-endpoint> \
+  --deny-region <provider-backup-region> \
+  --deny-force-path-style <true-or-false>
+```
+
+It issues only bounded `ListObjectsV2` requests (`MaxKeys=1`) and one anonymous
+list probe for the selected bucket. A successful list can return at most one
+object name; the verifier discards it without logging it. It never downloads
+object content, prints bucket names, object names, endpoints, or credentials,
+and it never writes, deletes, or changes OCI state. A complete green suite has
+all three reports with `"ok":true`, an accessible own bucket, two denied peers,
+and a denied anonymous list. OCI can mask a denied bucket as `404`, so do not
+accept one report in isolation: the matching peer's own successful report is
+required to establish that the same configured peer bucket exists. A
+cross-bucket success, unexpected status, or network/authentication failure is
+an OCI IAM incident: replace or re-scope the affected customer-secret user
+before deployment; do not weaken the check merely because the environment
+values differ.
+
 ## Public Handover Boundary
 
 Backup replication does not automatically publish a passport. A public request

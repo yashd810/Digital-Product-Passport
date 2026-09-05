@@ -351,6 +351,7 @@ jobs:
             infra/oracle/db-backup.node.test.js \
             infra/oracle/deployment-runner-terraform.node.test.js \
             infra/oracle/object-storage-backups.node.test.js \
+            apps/backend-api/tests/object-storage-isolation.node.test.js \
             infra/oracle/root-release-deployer.node.test.js \
             infra/docker/postgres/Dockerfile.node.test.js \
             scripts/deploy/check-deployment-runner.node.test.js \

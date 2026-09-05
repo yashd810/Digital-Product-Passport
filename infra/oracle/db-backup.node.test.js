@@ -251,6 +251,11 @@ test("backend runtime verifier rejects privileged and DB-backup capability names
       secret: "admin-fixture-value",
     },
     {
+      lines: ["DB_PASSWORD=runtime-fixture-value", "DB_MIGRATION_PASSWORD=migration-fixture-value"],
+      expectedError: /forbidden privileged capability names/,
+      secret: "migration-fixture-value",
+    },
+    {
       lines: ["DB_PASSWORD=runtime-fixture-value", "POSTGRES_PASSWORD=postgres-fixture-value"],
       expectedError: /forbidden privileged capability names/,
       secret: "postgres-fixture-value",
