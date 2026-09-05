@@ -127,6 +127,10 @@ dotfile paths so SPA fallback behavior cannot mask an encoded static-file leak.
 The large browser-only Local Tools workspace receives a separate strict,
 bounded-timeout Semgrep pass so the generic source scan cannot silently lose
 SSRF-rule coverage when its normal per-rule timeout is exceeded.
+The standalone Local Tools generator is dependency-free by design, so it does
+not have a misleading empty npm audit; a supply-chain regression test instead
+rejects package-manager artifacts and literal third-party imports while CI runs
+its syntax, Node test, and browser-source scan checks.
 The three static Nginx Dockerfiles apply Alpine security updates during each
 build. The weekly scheduled CI run changes that update layer's trusted cache
 key, ensuring package security updates are rebuilt and scanned rather than

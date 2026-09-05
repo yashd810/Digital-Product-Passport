@@ -5,6 +5,14 @@ modules and semantic dictionary files. It is kept in the repository so its
 export format and security boundaries are covered by the backend test suite;
 it is not bundled into, deployed with, or reachable from the runtime app.
 
+## Security and Dependencies
+
+The generator intentionally has no npm manifest, lockfile, or third-party
+runtime/build dependency. `npm audit` is therefore not applicable to this
+standalone Node tool. CI instead enforces that boundary, performs syntax and
+Node test checks, and scans the browser workspace separately; an introduced
+dependency must move through the audited npm-project controls deliberately.
+
 Run it from the repo root:
 
 ```bash

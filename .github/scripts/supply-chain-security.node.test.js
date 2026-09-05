@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { builtinModules } from "node:module";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -25,6 +26,23 @@ const npmProjects = [
   "apps/frontend-app",
   "apps/public-passport-viewer",
 ].map((relativePath) => path.join(repoRoot, relativePath));
+const generatorRoot = path.join(repoRoot, "local-tools", "passport-module-generator");
+const generatorPackageManagerArtifacts = [
+  ".npmrc",
+  ".yarnrc.yml",
+  "package.json",
+  "package-lock.json",
+  "npm-shrinkwrap.json",
+  "node_modules",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "bun.lock",
+  "bun.lockb",
+];
+const builtinModuleSpecifiers = new Set([
+  ...builtinModules,
+  ...builtinModules.map((moduleName) => `node:${moduleName}`),
+]);
 
 const requiredNodeVersion = "24.18.0";
 const requiredNpmVersion = "11.16.0";
@@ -37,6 +55,14 @@ function packageNameFromLockPath(lockPath) {
   const packagePath = lockPath.split("node_modules/").at(-1);
   const segments = packagePath.split("/");
   return packagePath.startsWith("@") ? segments.slice(0, 2).join("/") : segments[0];
+}
+
+function listJavaScriptFiles(directoryPath) {
+  return readdirSync(directoryPath, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directoryPath, entry.name);
+    if (entry.isDirectory()) return listJavaScriptFiles(entryPath);
+    return entry.isFile() && entry.name.endsWith(".js") ? [entryPath] : [];
+  });
 }
 
 test("every third-party GitHub Action is SHA-pinned and workflows avoid elevated PR triggers", () => {
@@ -235,6 +261,38 @@ test("npm projects require the supported toolchain and locked, integrity-protect
           `${projectPath} must explicitly allow or deny lifecycle scripts for ${packageName}`
         );
       }
+    }
+  }
+});
+
+test("the Local Tools generator remains a dependency-free, separately verified Node tool", () => {
+  for (const artifact of generatorPackageManagerArtifacts) {
+    assert.equal(
+      existsSync(path.join(generatorRoot, artifact)),
+      false,
+      `Local Tools generator must not add ${artifact} without moving to the audited npm-project controls`
+    );
+  }
+
+  const sourcePaths = listJavaScriptFiles(generatorRoot);
+  assert.ok(sourcePaths.length > 0, "Local Tools generator source must be present");
+
+  for (const sourcePath of sourcePaths) {
+    const source = readFileSync(sourcePath, "utf8");
+    const relativeSourcePath = path.relative(repoRoot, sourcePath);
+    const literalModuleSpecifiers = [
+      ...source.matchAll(/\brequire\(\s*["']([^"']+)["']\s*\)/g),
+      ...source.matchAll(/\bimport\s+(?:[^;'"()\n]+?\s+from\s+)?["']([^"']+)["']/g),
+      ...source.matchAll(/\bimport\(\s*["']([^"']+)["']\s*\)/g),
+    ].map((match) => match[1]);
+
+    for (const specifier of literalModuleSpecifiers) {
+      if (specifier.startsWith(".")) continue;
+      assert.equal(
+        builtinModuleSpecifiers.has(specifier),
+        true,
+        `${relativeSourcePath} must not introduce a third-party dependency outside the audited npm projects: ${specifier}`
+      );
     }
   }
 });
