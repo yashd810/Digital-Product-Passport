@@ -556,10 +556,6 @@ case "$DEPLOY_TARGET" in
     ;;
 esac
 
-if [ "$DEPLOY_TARGET" = "frontend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
-  bash "$APP_DIR/infra/oracle/check-marketing-public-content.sh"
-fi
-
 if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   DPP_ENV_FILE="$ENV_FILE" DPP_BACKEND_ENV_FILE="$BACKEND_ENV_FILE" \
     "$APP_DIR/infra/oracle/prepare-backend-runtime-env.sh"

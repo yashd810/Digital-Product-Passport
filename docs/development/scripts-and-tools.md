@@ -53,7 +53,6 @@ Examples:
 - `scripts/deploy/install-deployment-runner-config.sh`
 - `scripts/troubleshoot-oci.sh`
 - `infra/oracle/generate-env-secrets.sh`
-- `infra/oracle/check-marketing-public-content.sh`
 
 `restart-local-stack.sh` reads the external
 `/Users/yashdesai/Desktop/Digital Product Passport/Project Files/env/local-compose.env`
@@ -79,10 +78,6 @@ environment file. For an existing deployment, use
 running database role cannot be accidentally desynchronised. Redirect either
 output to a mode-`600` temporary file rather than a tracked file or terminal
 transcript.
-
-`check-marketing-public-content.sh` is a production deployment preflight for
-the public marketing site. It rejects known placeholder legal and contact data;
-it does not invent company, address, jurisdiction, or support-contact details.
 
 The dedicated production Actions runner is documented in
 [`../deployment/ci-cd-runbook.md`](../deployment/ci-cd-runbook.md). It is not a

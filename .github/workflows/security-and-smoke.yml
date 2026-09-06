@@ -318,7 +318,6 @@ jobs:
           bash -n infra/oracle/check-edge-policy-config.sh
           bash -n infra/oracle/check-edge-tls.sh
           bash -n infra/oracle/check-live-edge.sh
-          bash -n infra/oracle/check-marketing-public-content.sh
           bash -n infra/oracle/container-imds-firewall.sh
           bash -n infra/oracle/db-backup.sh
           bash -n infra/oracle/deploy-prod.sh

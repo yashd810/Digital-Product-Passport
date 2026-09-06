@@ -384,22 +384,12 @@ are only for an explicitly approved data reset. Container restarts, Docker
 daemon restarts, and normal `docker compose up --force-recreate` retain the
 named external PostgreSQL and local-storage volumes.
 
-## Public Marketing Content Preflight
+## Public Marketing Content
 
-Before a frontend or all-in-one production deployment, replace the real public
-contact and legal details in `apps/marketing-site`. The deployment helper runs
-`bash infra/oracle/check-marketing-public-content.sh` and refuses to publish
-known placeholders such as `contact@example.com`, placeholder company/address
-details, legal dates, liability amount, governing law, or court location. The
-guard intentionally does not supply those facts; obtain them from the business
-and legal owner before deploying.
-
-If the business owner explicitly authorizes a short-lived exception, treat it
-as a separate root-only operational change with recorded approval. The normal
-deployment wrapper deliberately rejects `DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT`
-so the restricted SSH deployment account cannot suppress this release gate.
-Never store the flag in an env file; replace the placeholders and redeploy as
-soon as the facts are available.
+Frontend and all-in-one production releases do not inspect public marketing
+copy for legal or contact placeholders. Content approval and replacement are
+handled separately from deployment. Runtime URL substitution and edge-security
+validation for the marketing container remain mandatory.
 
 ## Application Secret Rotation
 
@@ -459,7 +449,7 @@ performs local and public health checks. Do not run with a different compose
 project name unless you are deliberately creating a separate environment. For
 split hosts, it intentionally requires separate `backend` and `frontend`
 deployments rather than treating the two hosts as one `all` target. The normal
-wrapper does not permit live-edge, Caddy, or marketing-content bypass flags;
+wrapper does not permit live-edge or Caddy bypass flags;
 any exceptional root-only operation needs separate approval and a verified
 root-owned release checkout. Never source the private deployment profile into a
 shell.

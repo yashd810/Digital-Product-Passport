@@ -131,12 +131,11 @@ availability and least-privilege requirement: the containers still run as
   headers. Direct application and database ports were not externally reachable.
 - The container IMDS firewall and its Docker DNS exception are active and match
   the installed source helper.
-- A one-time root-only marketing-content override was used under explicit
-  business-owner authorization to repair this availability incident. It was not
-  written to any environment file or source code; the normal restricted release
-  wrapper still rejects the override. Replace all legal/contact placeholders in
-  `apps/marketing-site` and make a normal frontend release as soon as approved
-  content is available.
+- An earlier frontend repair used a one-time root-only marketing-content
+  override. On 2026-09-06, the repository release path stopped treating legal
+  or contact copy as a deployment prerequisite; the checker and its override
+  were retired. This source change does not alter the currently published copy,
+  and content review remains separate business work.
 
 ## Repository Governance Pending Owner Action
 

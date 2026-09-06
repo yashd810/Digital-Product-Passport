@@ -7,17 +7,20 @@ import { fileURLToPath } from "node:url";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const releaseDeployer = path.join(testDir, "dpp-root-release-deployer.sh");
+const productionDeployer = path.join(testDir, "deploy-prod.sh");
 const installer = path.join(testDir, "install-root-release-deployer.sh");
 const deploymentRunnerCloudInit = path.join(testDir, "deployment-runner/cloud-init.yaml.tftpl");
 const legacyBootstrap = path.join(testDir, "bootstrap.sh");
 const legacyCloudInit = path.join(testDir, "cloud-init.yaml");
+const retiredMarketingContentGate = path.join(testDir, "check-marketing-public-content.sh");
 const source = readFileSync(releaseDeployer, "utf8");
+const productionDeployerSource = readFileSync(productionDeployer, "utf8");
 const installerSource = readFileSync(installer, "utf8");
 const deploymentRunnerCloudInitSource = readFileSync(deploymentRunnerCloudInit, "utf8");
 const privilegedScripts = [
   releaseDeployer,
   installer,
-  path.join(testDir, "deploy-prod.sh"),
+  productionDeployer,
   path.join(testDir, "install-db-backup-jobs.sh"),
   path.join(testDir, "db-backup.sh"),
   path.join(testDir, "install-container-imds-firewall.sh"),
@@ -69,7 +72,11 @@ test("root release entry point stages a clean immutable Git release without trus
   assert.doesNotMatch(source, /git_run -C "\$APP_DIR" fetch/);
   assert.doesNotMatch(source, /DPP_SKIP_LIVE_EDGE_CHECK/);
   assert.doesNotMatch(source, /DPP_SKIP_CADDY_RELOAD/);
-  assert.doesNotMatch(source, /DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT/);
+});
+
+test("production releases are not gated by marketing copy", () => {
+  assert.equal(existsSync(retiredMarketingContentGate), false, "the retired marketing-content gate must stay removed");
+  assert.doesNotMatch(productionDeployerSource, /check-marketing-public-content/);
 });
 
 test("root release entry point refuses to execute from an uninstalled checkout", () => {

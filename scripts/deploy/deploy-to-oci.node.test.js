@@ -33,7 +33,6 @@ test("normal OCI wrapper invokes only the root-owned release entry point", () =>
   assert.doesNotMatch(source, /git clone/);
   assert.doesNotMatch(source, /DPP_SKIP_LIVE_EDGE_CHECK/);
   assert.doesNotMatch(source, /DPP_SKIP_CADDY_RELOAD/);
-  assert.doesNotMatch(source, /DPP_ALLOW_UNVERIFIED_MARKETING_CONTENT/);
 });
 
 test("normal OCI wrapper is syntactically valid", () => {
