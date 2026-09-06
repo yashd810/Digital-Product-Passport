@@ -17,6 +17,11 @@ Security in this app is not one feature. It is layered through authentication, c
 | Signing and verification | whether released outputs can be verified |
 | Audit and backup hooks | whether important actions can be traced or replicated |
 
+Workflow mutations require both a valid authenticated session and the editor
+capability before their company, assignment, and workflow-state checks run. A
+read-only `viewer` cannot approve, reject, release, or remove a workflow even
+when assigned as its reviewer or approver.
+
 ## Main Security Files
 
 - `apps/backend-api/src/http/routes/auth.js:1`
