@@ -15,7 +15,8 @@ RUN node configure-runtime.js && rm configure-runtime.js nginx.conf.template
 
 FROM nginxinc/nginx-unprivileged:1.30.3-alpine@sha256:b3f2436575bd5be7386518084d842dac414ab4962712afa31e99e0942a56e3b2
 USER root
-RUN apk add --no-cache --upgrade curl=8.20.0-r0 libcurl=8.20.0-r0
+ARG DPP_APK_UPGRADE_CACHE_BUST=source
+RUN test -n "$DPP_APK_UPGRADE_CACHE_BUST" && apk upgrade --no-cache
 COPY --from=configuration --chown=101:101 /site/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=configuration --chown=101:101 /site/*.html /usr/share/nginx/html/
 COPY --from=configuration --chown=101:101 /site/*.css /site/*.js /usr/share/nginx/html/

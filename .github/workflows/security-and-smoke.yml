@@ -76,6 +76,32 @@ jobs:
           --metrics=off
           --quiet
           --error
+      - name: Fully scan Local Tools browser source for SSRF
+        # This large browser-only file exceeds Semgrep's five-second default for
+        # the Express SSRF rule. Scan it separately with a bounded longer
+        # timeout instead of silently losing that rule's coverage.
+        run: >-
+          docker run --rm
+          --read-only
+          --cap-drop ALL
+          --security-opt no-new-privileges
+          --pids-limit 256
+          --memory 1024m
+          --tmpfs /tmp:rw,noexec,nosuid,nodev,size=128m
+          -e HOME=/tmp
+          -e XDG_CACHE_HOME=/tmp/.cache
+          -e PYTHONDONTWRITEBYTECODE=1
+          -v "$PWD:/src:ro"
+          -w /src
+          returntocorp/semgrep@sha256:d3d1be3a3770514d16a6a57b9761575d7536d70f45a5220274f4ec7d55c442b9
+          semgrep scan
+          --config p/default
+          --metrics=off
+          --quiet
+          --error
+          --strict
+          --timeout 30
+          local-tools/passport-module-generator/client/workspace.js
 
   backend:
     runs-on: ubuntu-24.04
@@ -321,12 +347,17 @@ jobs:
             apps/backend-api/tests/runtime-config.node.test.js \
             apps/backend-api/tests/runtime-database-role.node.test.js \
             infra/oracle/build-context-secrets.node.test.js \
+            infra/oracle/check-live-edge.node.test.js \
             infra/oracle/container-imds-firewall.node.test.js \
             infra/oracle/db-backup.node.test.js \
             infra/oracle/deployment-runner-terraform.node.test.js \
             infra/oracle/object-storage-backups.node.test.js \
+            apps/backend-api/tests/object-storage-isolation.node.test.js \
+            apps/backend-api/tests/public-api-key-cache-control.node.test.js \
+            apps/backend-api/tests/raw-error-response-routes.node.test.js \
             infra/oracle/root-release-deployer.node.test.js \
             infra/docker/postgres/Dockerfile.node.test.js \
+            scripts/check-repository-secrets.node.test.js \
             scripts/deploy/check-deployment-runner.node.test.js \
             scripts/deploy/deploy-to-oci.node.test.js \
             scripts/deploy/production-deploy-workflow.node.test.js \
@@ -458,9 +489,64 @@ jobs:
           push: false
           load: true
           tags: dpp-ci-${{ matrix.name }}:scan
-          build-args: ${{ matrix.build_args }}
+          build-args: |
+            ${{ matrix.build_args }}
+            DPP_APK_UPGRADE_CACHE_BUST=${{ github.event_name == 'schedule' && github.run_id || 'source' }}
           cache-from: type=gha,scope=${{ env.DPP_BUILD_CACHE_SCOPE }}
           cache-to: type=gha,mode=max,scope=${{ env.DPP_BUILD_CACHE_SCOPE }}
+      - name: Smoke-test static Nginx runtime
+        if: matrix.name == 'frontend' || matrix.name == 'public-viewer'
+        run: |
+          set -euo pipefail
+          container_name="dpp-ci-${{ matrix.name }}-runtime"
+          cleanup() {
+            docker rm -f "$container_name" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker run -d --name "$container_name" \
+            --network none \
+            --read-only \
+            --user 101:101 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 128 \
+            --memory 128m \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m,uid=101,gid=101,mode=1777 \
+            --tmpfs /etc/nginx/conf.d:rw,noexec,nosuid,nodev,size=1m,uid=101,gid=101,mode=0755 \
+            -e BACKEND_API_UPSTREAM=http://127.0.0.1:65535 \
+            -e DPP_PUBLIC_API_ORIGIN=https://api.example.test \
+            "dpp-ci-${{ matrix.name }}:scan"
+
+          ready=false
+          for attempt in $(seq 1 30); do
+            if docker exec "$container_name" wget -qO- http://127.0.0.1:8080/ >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! docker inspect -f '{{.State.Running}}' "$container_name" | grep -qx true; then
+              docker logs "$container_name"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            docker logs "$container_name"
+            exit 1
+          fi
+
+          docker exec "$container_name" nginx -t
+          for path in \
+            /.env \
+            /.git/HEAD \
+            /%2eenv \
+            /%2Egit/HEAD \
+            //.env \
+            /assets/%2e%2e/.env \
+            /assets/..%2f.env; do
+            response="$(docker exec "$container_name" wget -S --spider "http://127.0.0.1:8080$path" 2>&1 || true)"
+            printf '%s\n' "$response" | grep -Eq 'HTTP/[0-9.]+ 404'
+          done
       - name: Scan ${{ matrix.name }} image for fixable high-severity vulnerabilities
         run: |
           set -euo pipefail

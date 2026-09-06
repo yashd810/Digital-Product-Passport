@@ -5,6 +5,8 @@
 /infra/ @yashd810
 /docker/ @yashd810
 /scripts/deploy/ @yashd810
+/scripts/check-repository-secrets.js @yashd810
+/scripts/check-repository-secrets.node.test.js @yashd810
 /.gitleaks.toml @yashd810
 /.gitignore @yashd810
 /.dockerignore @yashd810

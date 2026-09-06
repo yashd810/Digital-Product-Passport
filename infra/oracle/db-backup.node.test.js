@@ -12,6 +12,8 @@ const backupScript = path.join(testDir, "db-backup.sh");
 const backupInstaller = path.join(testDir, "install-db-backup-jobs.sh");
 const backupComposeDescriptor = path.join(testDir, "dpp-backup-compose.yml");
 const prepareBackendRuntimeEnv = path.join(testDir, "prepare-backend-runtime-env.sh");
+const verifyBackendRuntimeEnv = path.join(testDir, "verify-backend-runtime-env.sh");
+const productionDeploymentScript = path.join(testDir, "deploy-prod.sh");
 const backupServices = [
   ["dpp-db-backup.service", "backup"],
   ["dpp-db-backup-verify.service", "verify"],
@@ -211,6 +213,13 @@ test("backend runtime environment derivation retains only allowlisted web-proces
     assert.doesNotMatch(output, new RegExp(`^${["DB_BACKUP", "MANIFEST_HMAC_SECRET"].join("_")}=`, "m"));
     assert.doesNotMatch(output, /^UNRELATED_PRIVILEGED_VALUE=/m);
 
+    const verification = spawnSync("bash", [verifyBackendRuntimeEnv], {
+      env: { PATH: process.env.PATH || "", DPP_BACKEND_ENV_FILE: outputPath },
+      encoding: "utf8",
+    });
+    assert.equal(verification.status, 0, verification.stderr);
+    assert.match(verification.stdout, /Backend runtime environment verification passed/);
+
     if (typeof process.getuid === "function" && process.getuid() === 0) {
       chmodSync(tempDir, 0o777);
       const weakDirectory = spawnSync("bash", [prepareBackendRuntimeEnv], {
@@ -224,4 +233,86 @@ test("backend runtime environment derivation retains only allowlisted web-proces
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test("backend runtime verifier rejects privileged and DB-backup capability names without exposing values", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "dpp-backend-runtime-verifier-"));
+  const runtimePath = path.join(tempDir, "dpp-backend.env");
+  const deploymentSource = readFileSync(productionDeploymentScript, "utf8");
+  const fixtures = [
+    {
+      lines: ["DB_BACKUP_ENABLED=true", "DB_BACKUP_S3_SECRET_ACCESS_KEY=test-backup-fixture-value"],
+      expectedError: /forbidden database-backup capability names/,
+      secret: "test-backup-fixture-value",
+    },
+    {
+      lines: ["DB_PASSWORD=test-runtime-fixture-value", "DB_ADMIN_PASSWORD=test-admin-fixture-value"],
+      expectedError: /forbidden privileged capability names/,
+      secret: "test-admin-fixture-value",
+    },
+    {
+      lines: ["DB_PASSWORD=test-runtime-fixture-value", "DB_MIGRATION_PASSWORD=test-migration-fixture-value"],
+      expectedError: /forbidden privileged capability names/,
+      secret: "test-migration-fixture-value",
+    },
+    {
+      lines: ["DB_PASSWORD=test-runtime-fixture-value", "POSTGRES_PASSWORD=test-postgres-fixture-value"],
+      expectedError: /forbidden privileged capability names/,
+      secret: "test-postgres-fixture-value",
+    },
+    {
+      lines: ["DB_PASSWORD=test-runtime-fixture-value", "RUN_SCHEMA_MIGRATIONS=true"],
+      expectedError: /forbidden privileged capability names/,
+      secret: "test-runtime-fixture-value",
+    },
+  ];
+
+  try {
+    for (const fixture of fixtures) {
+      writeFileSync(runtimePath, `${fixture.lines.join("\n")}\n`, { mode: 0o600 });
+      chmodSync(runtimePath, 0o600);
+      const result = spawnSync("bash", [verifyBackendRuntimeEnv], {
+        env: { PATH: process.env.PATH || "", DPP_BACKEND_ENV_FILE: runtimePath },
+        encoding: "utf8",
+      });
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, fixture.expectedError);
+      assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(fixture.secret));
+    }
+
+    writeFileSync(runtimePath, "DB_BACKUP_ENABLED=true\nDB_PASSWORD=test-runtime-fixture-value\n", { mode: 0o600 });
+    chmodSync(runtimePath, 0o600);
+    const permittedPolicyFlag = spawnSync("bash", [verifyBackendRuntimeEnv], {
+      env: { PATH: process.env.PATH || "", DPP_BACKEND_ENV_FILE: runtimePath },
+      encoding: "utf8",
+    });
+    assert.equal(permittedPolicyFlag.status, 0, permittedPolicyFlag.stderr);
+
+    writeFileSync(runtimePath, "DB_PASSWORD=test-runtime-fixture-value\nnot-an-assignment-fixture\n", { mode: 0o600 });
+    chmodSync(runtimePath, 0o600);
+    const malformed = spawnSync("bash", [verifyBackendRuntimeEnv], {
+      env: { PATH: process.env.PATH || "", DPP_BACKEND_ENV_FILE: runtimePath },
+      encoding: "utf8",
+    });
+    assert.equal(malformed.status, 1);
+    assert.match(malformed.stderr, /must contain only well-formed assignments/);
+    assert.doesNotMatch(`${malformed.stdout}${malformed.stderr}`, /not-an-assignment-fixture/);
+
+    writeFileSync(runtimePath, "DB_PASSWORD=test-first-value\nDB_PASSWORD=test-second-value\n", { mode: 0o600 });
+    chmodSync(runtimePath, 0o600);
+    const duplicate = spawnSync("bash", [verifyBackendRuntimeEnv], {
+      env: { PATH: process.env.PATH || "", DPP_BACKEND_ENV_FILE: runtimePath },
+      encoding: "utf8",
+    });
+    assert.equal(duplicate.status, 1);
+    assert.match(duplicate.stderr, /must not contain duplicate assignments/);
+    assert.doesNotMatch(`${duplicate.stdout}${duplicate.stderr}`, /test-first-value|test-second-value/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+
+  assert.match(
+    deploymentSource,
+    /DPP_BACKEND_ENV_FILE="\$BACKEND_ENV_FILE" \\\n+    "\$APP_DIR\/infra\/oracle\/verify-backend-runtime-env\.sh"/,
+  );
 });

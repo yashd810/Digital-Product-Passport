@@ -33,12 +33,13 @@ post-release verification.
 
 ## Object Storage and OCI IAM
 
-Do **not** create replacement groups, duplicate policies, or Dynamic Groups.
+Do **not** create replacement groups, duplicate policies, or Dynamic Groups for
+the backup identities.
 The confirmed normal Identity Domain setup is:
 
 | Purpose | Bucket | Service user | Group |
 | --- | --- | --- | --- |
-| Application files | `dpp-prod-files` | Existing application-storage identity | Existing application-storage group |
+| Application files | `dpp-prod-files` | `dpp-app-storage` | `dpp-app-storage-writers` |
 | Backup-provider replication | `dpp-prod-backups` | `dpp-backup-provider` | `dpp-backup-provider-writers` |
 | PostgreSQL backups | `dpp-prod-db-backups` | `dpp-db-backup` | `dpp-db-backup-writers` |
 
@@ -57,6 +58,29 @@ Allow group Default/dpp-db-backup-writers to manage objects in tenancy where tar
 `manage objects` is required for backup creation, reads, and retention pruning.
 It does not grant bucket management, pre-authenticated-request, or tenancy-admin
 access because each statement is constrained by `target.bucket.name`.
+
+### Application-Storage Isolation Remediated (2026-09-06)
+
+The prior application customer-secret could list both backup buckets. It has
+been replaced by the dedicated `dpp-app-storage` identity and application-only
+group, without changing either backup identity, group, bucket, or policy. The
+application group has exactly these bucket-scoped permissions:
+
+```text
+Allow group Default/dpp-app-storage-writers to read buckets in tenancy where target.bucket.name = 'dpp-prod-files'
+Allow group Default/dpp-app-storage-writers to manage objects in tenancy where target.bucket.name = 'dpp-prod-files'
+```
+
+On 2026-09-06, the protected profile was mode `0600`, contained one
+application credential pair (no duplicate `STORAGE_S3_*` assignments), and the
+three independent, read-only probes all passed: application storage,
+backup-provider, and database-backup each reached only its own bucket; both
+peer buckets and anonymous listing were denied. The probes did not read object
+contents or make mutations.
+
+The former personal-account application key and the interim key exposed in an
+interactive session must be revoked if either is still active. Never record a
+Customer Secret Key or access-key value in this document.
 
 ## Storage and Database Rules
 
@@ -94,9 +118,14 @@ availability and least-privilege requirement: the containers still run as
 
 - `frontend-app`, `public-passport-viewer`, and `marketing-site` were healthy
   after a clean recreation; their loopback and public HTTPS checks passed.
-- The SPA frontends reject dot-prefixed request paths before their SPA fallback
-  (including `.env` and `.git` paths), so a future misplaced deployment file
-  cannot be served as a static asset or masked by a successful application shell.
+- Source templates and their container-runtime CI probe reject dot-prefixed
+  request paths before the SPA fallback (including literal, URL-encoded,
+  doubled-slash, and traversal-shaped `.env`/`.git` variants). That source
+  guarantee is **not currently live**: on 2026-09-05, the public dashboard and
+  viewer each returned `200` for all seven probes, masking the requests with
+  their SPA shells. The marketing site rejected the same probes. Treat the
+  frontend edge as failed until a normal frontend release completes and the
+  post-release `check-live-edge.sh` verifier records non-`2xx`/`3xx` responses.
 - Caddy edge checks returned 200 for the marketing, application, and viewer
   origins with HSTS, CSP, no-sniff, framing, referrer, and permissions-policy
   headers. Direct application and database ports were not externally reachable.
@@ -118,11 +147,36 @@ The backend smoke workflow now verifies a real PostgreSQL query, explicitly
 enables its fresh schema, and retries startup only once with diagnostic output
 if the process exits before readiness. Always inspect the current `main` run
 before treating a later source revision as verified.
+The container matrix also boots the static frontend and viewer images under
+their production UID with no network, a read-only filesystem, dropped
+capabilities, and no-new-privileges; it validates their rendered Nginx
+configuration and rejects `.env` and `.git` requests before image scanning.
+The check includes URL-encoded, doubled-slash, and asset-traversal-shaped
+dotfile paths so SPA fallback behavior cannot mask an encoded static-file leak.
+The large browser-only Local Tools workspace receives a separate strict,
+bounded-timeout Semgrep pass so the generic source scan cannot silently lose
+SSRF-rule coverage when its normal per-rule timeout is exceeded.
+The standalone Local Tools generator is dependency-free by design, so it does
+not have a misleading empty npm audit; a supply-chain regression test instead
+rejects package-manager artifacts and literal third-party imports while CI runs
+its syntax, Node test, and browser-source scan checks.
+The three static Nginx Dockerfiles apply Alpine security updates during each
+build. The weekly scheduled CI run changes that update layer's trusted cache
+key, ensuring package security updates are rebuilt and scanned rather than
+being indefinitely hidden behind a reused build cache. The runtime probe uses
+the base image's `wget` rather than adding a separate diagnostic-only HTTP
+client to production images.
 
 The public repository page was still marked **Public** when this register was
 updated. Public read-only inspection cannot prove owner-only GitHub security
 settings, rulesets, environments, or alert state, so do not infer that those
 controls are enabled from a passing workflow.
+The backend production lockfile keeps the transitive `qs` parser at `6.16.0`
+or later; both the dependency audit and a focused lockfile assertion protect
+against reintroducing the known denial-of-service advisories.
+The backend image also consumes the scheduled, cache-busted Alpine full
+security upgrade rather than pinning a fixed OpenSSL package revision that
+would inevitably become stale.
 
 Before enabling GitHub-hosted production deployment, the repository owner must:
 

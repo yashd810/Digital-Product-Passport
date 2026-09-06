@@ -15,6 +15,7 @@
   "scripts": {
     "start": "node src/server.js",
     "db:migrate": "node scripts/migrate-db.js",
+    "verify:object-storage-isolation": "node scripts/verify-object-storage-isolation.js",
     "check:passport-storage": "node scripts/check-passport-storage.js",
     "verify:live-confidentiality": "node scripts/verify-live-confidentiality.js",
     "check:boundaries": "node scripts/check-module-boundaries.js",

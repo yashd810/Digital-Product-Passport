@@ -205,7 +205,7 @@ module.exports = function registerWorkflowRoutes(app, {
     }
   });
 
-  app.delete("/api/passports/:dppId/workflow", authenticateToken, async (req, res) => {
+  app.delete("/api/passports/:dppId/workflow", authenticateToken, requireEditor, async (req, res) => {
     try {
       const { dppId: dppId } = req.params;
       const userId = req.user.userId;
@@ -271,7 +271,7 @@ module.exports = function registerWorkflowRoutes(app, {
     }
   });
 
-  app.post("/api/passports/:dppId/workflow/:action", authenticateToken, async (req, res) => {
+  app.post("/api/passports/:dppId/workflow/:action", authenticateToken, requireEditor, async (req, res) => {
     try {
       const { dppId: dppId, action } = req.params;
       const { comment, passportType } = req.body;

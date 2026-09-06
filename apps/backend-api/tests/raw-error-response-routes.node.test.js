@@ -22,9 +22,13 @@ function createResponse() {
   return {
     statusCode: 200,
     body: null,
+    headers: {},
     status(code) {
       this.statusCode = code;
       return this;
+    },
+    setHeader(name, value) {
+      this.headers[name] = value;
     },
     json(body) {
       this.body = body;
@@ -90,6 +94,9 @@ test("preview routes do not expose resolver failures", async () => {
     }, unlockResponse);
     assert.equal(unlockResponse.statusCode, 500);
     assert.deepEqual(unlockResponse.body, { error: "Failed to unlock passport preview" });
+    assert.equal(unlockResponse.headers["Cache-Control"], "no-store");
+    assert.equal(unlockResponse.headers.Pragma, "no-cache");
+    assert.equal(unlockResponse.headers.Expires, "0");
   } finally {
     if (previousServerUrl === undefined) delete process.env.SERVER_URL;
     else process.env.SERVER_URL = previousServerUrl;

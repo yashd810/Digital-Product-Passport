@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { builtinModules } from "node:module";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -25,6 +26,23 @@ const npmProjects = [
   "apps/frontend-app",
   "apps/public-passport-viewer",
 ].map((relativePath) => path.join(repoRoot, relativePath));
+const generatorRoot = path.join(repoRoot, "local-tools", "passport-module-generator");
+const generatorPackageManagerArtifacts = [
+  ".npmrc",
+  ".yarnrc.yml",
+  "package.json",
+  "package-lock.json",
+  "npm-shrinkwrap.json",
+  "node_modules",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "bun.lock",
+  "bun.lockb",
+];
+const builtinModuleSpecifiers = new Set([
+  ...builtinModules,
+  ...builtinModules.map((moduleName) => `node:${moduleName}`),
+]);
 
 const requiredNodeVersion = "24.18.0";
 const requiredNpmVersion = "11.16.0";
@@ -37,6 +55,14 @@ function packageNameFromLockPath(lockPath) {
   const packagePath = lockPath.split("node_modules/").at(-1);
   const segments = packagePath.split("/");
   return packagePath.startsWith("@") ? segments.slice(0, 2).join("/") : segments[0];
+}
+
+function listJavaScriptFiles(directoryPath) {
+  return readdirSync(directoryPath, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directoryPath, entry.name);
+    if (entry.isDirectory()) return listJavaScriptFiles(entryPath);
+    return entry.isFile() && entry.name.endsWith(".js") ? [entryPath] : [];
+  });
 }
 
 test("every third-party GitHub Action is SHA-pinned and workflows avoid elevated PR triggers", () => {
@@ -58,6 +84,8 @@ test("every third-party GitHub Action is SHA-pinned and workflows avoid elevated
   const securityWorkflow = readFileSync(securityWorkflowPath, "utf8");
   assert.match(securityWorkflow, /^permissions:\n  contents: read$/m);
   assert.doesNotMatch(securityWorkflow, /\$\{\{\s*secrets\./);
+  assert.match(readFileSync(codeOwnersPath, "utf8"), /^\/scripts\/check-repository-secrets\.js\s+@yashd810$/m);
+  assert.match(readFileSync(codeOwnersPath, "utf8"), /^\/scripts\/check-repository-secrets\.node\.test\.js\s+@yashd810$/m);
 });
 
 test("untrusted pull requests cannot populate trusted BuildKit cache scopes", () => {
@@ -71,7 +99,63 @@ test("untrusted pull requests cannot populate trusted BuildKit cache scopes", ()
   );
   assert.match(containerBuildJob, /cache-from: type=gha,scope=\$\{\{ env\.DPP_BUILD_CACHE_SCOPE \}\}/);
   assert.match(containerBuildJob, /cache-to: type=gha,mode=max,scope=\$\{\{ env\.DPP_BUILD_CACHE_SCOPE \}\}/);
+  assert.match(containerBuildJob, /DPP_APK_UPGRADE_CACHE_BUST=\$\{\{ github\.event_name == 'schedule' && github\.run_id \|\| 'source' \}\}/);
   assert.doesNotMatch(containerBuildJob, /scope=\$\{\{ matrix\.name \}\}/);
+});
+
+test("static SPA images are smoke-tested under runtime confinement", () => {
+  const workflow = readFileSync(securityWorkflowPath, "utf8");
+  const containerBuildJob = workflow.match(/  container-builds:[\s\S]*$/)?.[0];
+  const smokeMarker = "      - name: Smoke-test static Nginx runtime";
+  const scanMarker = "      - name: Scan ${{ matrix.name }} image for fixable high-severity vulnerabilities";
+
+  assert.ok(containerBuildJob, "missing container-builds job");
+  const start = containerBuildJob.indexOf(smokeMarker);
+  const end = containerBuildJob.indexOf(scanMarker, start);
+  assert.notEqual(start, -1, "missing static Nginx runtime smoke test");
+  assert.notEqual(end, -1, "static Nginx runtime smoke test must run before image scanning");
+  const staticRuntimeSmoke = containerBuildJob.slice(start, end);
+
+  for (const fragment of [
+    "if: matrix.name == 'frontend' || matrix.name == 'public-viewer'",
+    "--network none",
+    "--read-only",
+    "--user 101:101",
+    "--cap-drop ALL",
+    "--security-opt no-new-privileges",
+    "--pids-limit 128",
+    "--memory 128m",
+    "BACKEND_API_UPSTREAM=http://127.0.0.1:65535",
+    "nginx -t",
+    "wget -qO- http://127.0.0.1:8080/",
+    "wget -S --spider",
+    "for path in \\",
+    "/.env \\",
+    "/.git/HEAD \\",
+    "/%2eenv \\",
+    "/%2Egit/HEAD \\",
+    "//.env \\",
+    "/assets/%2e%2e/.env \\",
+    "/assets/..%2f.env; do",
+    "grep -Eq 'HTTP/[0-9.]+ 404'",
+  ]) {
+    assert.equal(staticRuntimeSmoke.includes(fragment), true, `static Nginx runtime smoke test is missing ${fragment}`);
+  }
+  assert.doesNotMatch(staticRuntimeSmoke, /docker\.sock/);
+  assert.doesNotMatch(staticRuntimeSmoke, /docker exec \"\$container_name\" curl/);
+});
+
+test("static Nginx images apply supported Alpine security upgrades", () => {
+  for (const dockerfilePath of [
+    "apps/frontend-app/Dockerfile",
+    "apps/public-passport-viewer/Dockerfile",
+    "apps/marketing-site/Dockerfile",
+  ]) {
+    const dockerfile = readFileSync(path.join(repoRoot, dockerfilePath), "utf8");
+    assert.match(dockerfile, /^ARG DPP_APK_UPGRADE_CACHE_BUST=source$/m, `${dockerfilePath} must expose the scheduled refresh cache key`);
+    assert.match(dockerfile, /^RUN test -n "\$DPP_APK_UPGRADE_CACHE_BUST" && apk upgrade --no-cache$/m, `${dockerfilePath} must apply Alpine security updates`);
+    assert.doesNotMatch(dockerfile, /apk add[^\n]*\b(?:lib)?curl=/, `${dockerfilePath} must not pin stale curl packages`);
+  }
 });
 
 test("container build and scanner images are immutable digest references", () => {
@@ -111,6 +195,24 @@ test("the networked static analyzer remains read-only and resource-bounded", () 
   assert.match(staticAnalysisJob, /--tmpfs \/tmp:rw,noexec,nosuid,nodev,size=128m/);
   assert.match(staticAnalysisJob, /-v "\$PWD:\/src:ro"/);
   assert.doesNotMatch(staticAnalysisJob, /docker\.sock/);
+
+  const localToolsStrictScan = staticAnalysisJob.match(/      - name: Fully scan Local Tools browser source for SSRF[\s\S]*$/)?.[0];
+  assert.ok(localToolsStrictScan, "missing strict Local Tools browser source scan");
+  for (const fragment of [
+    "--read-only",
+    "--cap-drop ALL",
+    "--security-opt no-new-privileges",
+    "--pids-limit 256",
+    "--memory 1024m",
+    "-v \"$PWD:/src:ro\"",
+    "--config p/default",
+    "--strict",
+    "--timeout 30",
+    "local-tools/passport-module-generator/client/workspace.js",
+  ]) {
+    assert.equal(localToolsStrictScan.includes(fragment), true, `strict Local Tools scan is missing ${fragment}`);
+  }
+  assert.doesNotMatch(localToolsStrictScan, /docker\.sock/);
 });
 
 test("backend smoke waits for a usable database and reports a bounded retry", () => {
@@ -165,6 +267,48 @@ test("npm projects require the supported toolchain and locked, integrity-protect
   }
 });
 
+test("the Local Tools generator remains a dependency-free, separately verified Node tool", () => {
+  for (const artifact of generatorPackageManagerArtifacts) {
+    assert.equal(
+      existsSync(path.join(generatorRoot, artifact)),
+      false,
+      `Local Tools generator must not add ${artifact} without moving to the audited npm-project controls`
+    );
+  }
+
+  const sourcePaths = listJavaScriptFiles(generatorRoot);
+  assert.ok(sourcePaths.length > 0, "Local Tools generator source must be present");
+
+  for (const sourcePath of sourcePaths) {
+    const source = readFileSync(sourcePath, "utf8");
+    const relativeSourcePath = path.relative(repoRoot, sourcePath);
+    const literalModuleSpecifiers = [
+      ...source.matchAll(/\brequire\(\s*["']([^"']+)["']\s*\)/g),
+      ...source.matchAll(/\bimport\s+(?:[^;'"()\n]+?\s+from\s+)?["']([^"']+)["']/g),
+      ...source.matchAll(/\bimport\(\s*["']([^"']+)["']\s*\)/g),
+    ].map((match) => match[1]);
+
+    for (const specifier of literalModuleSpecifiers) {
+      if (specifier.startsWith(".")) continue;
+      assert.equal(
+        builtinModuleSpecifiers.has(specifier),
+        true,
+        `${relativeSourcePath} must not introduce a third-party dependency outside the audited npm projects: ${specifier}`
+      );
+    }
+  }
+});
+
+test("the backend lockfile keeps qs at a patched production version", () => {
+  const backendLock = JSON.parse(read("apps/backend-api/package-lock.json"));
+  const qs = backendLock.packages?.["node_modules/qs"];
+
+  assert.ok(qs, "backend lockfile must include qs");
+  assert.match(qs.version || "", /^6\.(?:1[6-9]|[2-9][0-9])\./, "backend qs must be at least 6.16.0");
+  assert.match(qs.resolved || "", /^https:\/\/registry\.npmjs\.org\/qs\/-\/qs-6\./, "backend qs must use the npm registry");
+  assert.match(qs.integrity || "", /^sha512-/, "backend qs must retain an integrity hash");
+});
+
 test("CI and Docker fail closed when Node or npm drift from the supported toolchain", () => {
   const workflow = readFileSync(securityWorkflowPath, "utf8");
   const ciChecks = [...workflow.matchAll(/- name: Verify locked Node and npm toolchain\n\s+run: \|\n\s+test "\$\(node --version\)" = "v24\.18\.0"\n\s+test "\$\(npm --version\)" = "11\.16\.0"/g)];
@@ -182,10 +326,15 @@ test("CI and Docker fail closed when Node or npm drift from the supported toolch
   }
 });
 
-test("the backend runtime patches its fixed OpenSSL packages and removes build-only package managers", () => {
+test("the backend runtime receives scheduled Alpine security upgrades and removes build-only package managers", () => {
   const backendDockerfile = read("apps/backend-api/Dockerfile");
 
-  assert.match(backendDockerfile, /apk add --no-cache --upgrade libcrypto3=3\.5\.8-r0 libssl3=3\.5\.8-r0/);
+  assert.match(backendDockerfile, /^ARG DPP_APK_UPGRADE_CACHE_BUST=source$/m);
+  assert.match(
+    backendDockerfile,
+    /RUN test -n "\$DPP_APK_UPGRADE_CACHE_BUST"[\s\\]+&& apk upgrade --no-cache[\s\\]+&& apk add --no-cache --virtual \.build-deps python3 build-base/
+  );
+  assert.doesNotMatch(backendDockerfile, /\b(?:libcrypto3|libssl3)=/, "backend must not pin an eventually stale OpenSSL package revision");
   assert.match(
     backendDockerfile,
     /rm -rf \/usr\/local\/lib\/node_modules\/npm \/usr\/local\/lib\/node_modules\/corepack \/usr\/local\/bin\/npm \/usr\/local\/bin\/npx \/usr\/local\/bin\/corepack/
