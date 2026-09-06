@@ -70,6 +70,35 @@ test("integration bearer guard allows a non-empty bearer token for authenticatio
   assert.equal(res.body, null);
 });
 
+test("write-role guard fails closed for viewer, missing, and unexpected roles", () => {
+  const { requireEditor } = createAuthMiddleware({
+    jwt: { verify() {} },
+    pool: { query() {} },
+    jwtSecret: "test-secret",
+    sessionCookieName: "session",
+  });
+
+  for (const role of ["viewer", undefined, "futureReadOnlyRole"]) {
+    const res = createResponse();
+    let advanced = false;
+    requireEditor({ user: { role } }, res, () => {
+      advanced = true;
+    });
+    assert.equal(advanced, false);
+    assert.equal(res.statusCode, 403);
+  }
+
+  for (const role of ["editor", "companyAdmin", "superAdmin"]) {
+    const res = createResponse();
+    let advanced = false;
+    requireEditor({ user: { role } }, res, () => {
+      advanced = true;
+    });
+    assert.equal(advanced, true);
+    assert.equal(res.statusCode, 200);
+  }
+});
+
 test("an invalid bearer token cannot fall back to a valid session cookie", async () => {
   const verifiedTokens = [];
   const { authenticateToken } = createAuthMiddleware({

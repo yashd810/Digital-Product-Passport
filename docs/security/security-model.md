@@ -22,6 +22,10 @@ capability before their company, assignment, and workflow-state checks run. A
 read-only `viewer` cannot approve, reject, release, or remove a workflow even
 when assigned as its reviewer or approver.
 
+The write-capability guard is allow-listed: only `editor`, `companyAdmin`, and
+`superAdmin` can mutate company data. Missing or future roles fail closed until
+they receive an explicit authorization decision.
+
 ## Main Security Files
 
 - `apps/backend-api/src/http/routes/auth.js:1`

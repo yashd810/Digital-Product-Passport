@@ -11,15 +11,8 @@ const logger = require("../../platform/observability/logger");
  */
 
 module.exports = function createAuthMiddleware({ jwt, pool, jwtSecret, sessionCookieName }) {
-  const parseCookies = (req) => {
-    const raw = req.headers.cookie || "";
-    return raw.split(";").reduce((acc, part) => {
-      const [name, ...rest] = part.trim().split("=");
-      if (!name) return acc;
-      acc[name] = decodeURIComponent(rest.join("="));
-      return acc;
-    }, {});
-  };
+  const writeRoles = new Set(["superAdmin", "companyAdmin", "editor"]);
+
   const parseCookieValues = (req, cookieName) => {
     const raw = String(req.headers.cookie || "");
     if (!raw) return [];
@@ -173,7 +166,10 @@ module.exports = function createAuthMiddleware({ jwt, pool, jwtSecret, sessionCo
   };
 
   const requireEditor = (req, res, next) => {
-    if (req.user?.role === "viewer")
+    // Do not grant write access merely because a role is not currently named
+    // "viewer".  This fails closed if a future role is added or corrupted
+    // data reaches the session lookup before the database constraint does.
+    if (!writeRoles.has(req.user?.role))
       return res.status(403).json({ error: "Viewers do not have permission to perform this action." });
     next();
   };
@@ -188,7 +184,6 @@ module.exports = function createAuthMiddleware({ jwt, pool, jwtSecret, sessionCo
   };
 
   return {
-    parseCookies,
     requireBearerToken,
     authenticateToken,
     isSuperAdmin,
