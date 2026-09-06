@@ -107,41 +107,41 @@ Customer Secret Key or access-key value in this document.
   approved change. Do not create, lock, shorten, or destroy that rule during a
   normal application release.
 
-## Frontend Release and Edge State
+## Application Release and Edge State
 
-The frontend release at `87264e5a95a565660b97c949bd0d3bde12b21178` is live and
-verified. The root-owned release helper deliberately uses `umask 077`, so the
-two unprivileged Nginx images explicitly keep the template file readable
+Production backend and frontend were refreshed through the restricted release
+path on 2026-09-06. The release includes commit
+`3b3180dbfda9da44d37c15c2c5c053f245c76c54`, which retired the marketing-copy
+deployment gate. The root-owned release helper deliberately uses `umask 077`,
+so the two unprivileged Nginx images explicitly keep the template file readable
 (`0644`) and its parent directory traversable (`0755`). This is a runtime
 availability and least-privilege requirement: the containers still run as
 `101:101`, rather than being elevated to work around release-checkout modes.
 
+- `postgres` and `backend-api` were healthy after the controlled migration;
+  backend health and the internal storage probe passed.
 - `frontend-app`, `public-passport-viewer`, and `marketing-site` were healthy
   after a clean recreation; their loopback and public HTTPS checks passed.
 - Source templates and their container-runtime CI probe reject dot-prefixed
   request paths before the SPA fallback (including literal, URL-encoded,
-  doubled-slash, and traversal-shaped `.env`/`.git` variants). That source
-  guarantee is **not currently live**: on 2026-09-05, the public dashboard and
-  viewer each returned `200` for all seven probes, masking the requests with
-  their SPA shells. The marketing site rejected the same probes. Treat the
-  frontend edge as failed until a normal frontend release completes and the
-  post-release `check-live-edge.sh` verifier records non-`2xx`/`3xx` responses.
+  doubled-slash, and traversal-shaped `.env`/`.git` variants). That guarantee is
+  live: on 2026-09-06, all seven probes returned `404` on each of the marketing,
+  dashboard, and viewer origins.
 - Caddy edge checks returned 200 for the marketing, application, and viewer
   origins with HSTS, CSP, no-sniff, framing, referrer, and permissions-policy
   headers. Direct application and database ports were not externally reachable.
 - The container IMDS firewall and its Docker DNS exception are active and match
   the installed source helper.
-- An earlier frontend repair used a one-time root-only marketing-content
-  override. On 2026-09-06, the repository release path stopped treating legal
-  or contact copy as a deployment prerequisite; the checker and its override
-  were retired. This source change does not alter the currently published copy,
-  and content review remains separate business work.
+- The deployed marketing site still contains placeholder legal/contact copy by
+  explicit owner direction. The release path no longer treats that copy as a
+  deployment prerequisite; content review remains separate business work.
 
 ## Repository Governance Pending Owner Action
 
-At the recorded check, Security And Smoke run 356 completed with all 14 jobs
-successful, including secret scanning, static analysis, dependency checks,
-backend smoke, Compose validation, and all five container-build matrix entries.
+Security And Smoke run 34048042565 completed successfully for commit
+`3b3180dbfda9da44d37c15c2c5c053f245c76c54`, with all 14 jobs passing,
+including secret scanning, static analysis, dependency checks, backend smoke,
+Compose validation, and all five container-build matrix entries.
 The backend smoke workflow now verifies a real PostgreSQL query, explicitly
 enables its fresh schema, and retries startup only once with diagnostic output
 if the process exits before readiness. Always inspect the current `main` run
