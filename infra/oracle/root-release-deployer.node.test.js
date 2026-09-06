@@ -14,6 +14,20 @@ const legacyCloudInit = path.join(testDir, "cloud-init.yaml");
 const source = readFileSync(releaseDeployer, "utf8");
 const installerSource = readFileSync(installer, "utf8");
 const deploymentRunnerCloudInitSource = readFileSync(deploymentRunnerCloudInit, "utf8");
+const privilegedScripts = [
+  releaseDeployer,
+  installer,
+  path.join(testDir, "deploy-prod.sh"),
+  path.join(testDir, "install-db-backup-jobs.sh"),
+  path.join(testDir, "db-backup.sh"),
+  path.join(testDir, "install-container-imds-firewall.sh"),
+  path.join(testDir, "container-imds-firewall.sh"),
+  path.join(testDir, "prepare-backend-runtime-env.sh"),
+  path.join(testDir, "render-caddyfile.sh"),
+  path.join(testDir, "generate-env-secrets.sh"),
+  path.join(testDir, "..", "..", "scripts", "deploy", "bootstrap-actions-deployment-runner.sh"),
+  path.join(testDir, "..", "..", "scripts", "deploy", "install-deployment-runner-config.sh"),
+];
 
 test("root release entry point stages a clean immutable Git release without trusting /opt/dpp", () => {
   assert.match(source, /^#!\/bin\/bash -p$/m);
@@ -49,7 +63,7 @@ test("root release entry point stages a clean immutable Git release without trus
   assert.match(source, /\/usr\/bin\/flock -n 9/);
   assert.match(source, /\/usr\/bin\/env -i/);
   assert.match(source, /PATH=\/usr\/sbin:\/usr\/bin:\/sbin:\/bin/);
-  assert.match(source, /\/bin\/bash "\$APP_DIR\/infra\/oracle\/deploy-prod\.sh"/);
+  assert.match(source, /\/bin\/bash -p "\$APP_DIR\/infra\/oracle\/deploy-prod\.sh"/);
   assert.doesNotMatch(source, /git_run -C "\$APP_DIR" fetch/);
   assert.doesNotMatch(source, /DPP_SKIP_LIVE_EDGE_CHECK/);
   assert.doesNotMatch(source, /DPP_SKIP_CADDY_RELOAD/);
@@ -102,6 +116,19 @@ test("root trust anchors ignore BASH_ENV before their privilege guards", () => {
   }
 });
 
+test("privileged OCI scripts use the fixed Bash interpreter mode and a safe system command path", () => {
+  for (const script of privilegedScripts) {
+    const scriptSource = readFileSync(script, "utf8");
+    assert.match(scriptSource, /^#!\/bin\/bash -p$/m, `${script} must run Bash in privileged mode`);
+    assert.match(
+      scriptSource,
+      /^PATH="\/usr\/sbin:\/usr\/bin:\/sbin:\/bin"$/m,
+      `${script} must replace a caller-controlled command path`,
+    );
+    assert.match(scriptSource, /^export PATH$/m, `${script} must export the fixed command path to child processes`);
+  }
+});
+
 test("root release entry point and installer remain syntactically valid", () => {
   for (const file of [releaseDeployer, installer]) {
     const result = spawnSync("bash", ["-n", file], { encoding: "utf8" });
@@ -138,6 +165,6 @@ test("root-owned release helper is the only supported production execution path"
   assert.equal(existsSync(legacyBootstrap), false, "legacy mutable-checkout bootstrap must stay removed");
   assert.equal(existsSync(legacyCloudInit), false, "legacy OCI host bootstrap must stay removed");
   assert.match(source, /require_installed_entrypoint/);
-  assert.match(source, /\/bin\/bash "\$APP_DIR\/infra\/oracle\/deploy-prod\.sh"/);
+  assert.match(source, /\/bin\/bash -p "\$APP_DIR\/infra\/oracle\/deploy-prod\.sh"/);
   assert.doesNotMatch(source, /bootstrap\.sh/);
 });

@@ -88,7 +88,7 @@ Current production-style behavior:
   file outside the repository, populated deliberately from the intended
   production configuration
 - production secrets must be independently generated; use
-  `bash infra/oracle/generate-env-secrets.sh` to produce the required 256-bit
+  `/bin/bash -p infra/oracle/generate-env-secrets.sh` to produce the required 256-bit
   values and matching P-256 signing pair
 - transactional email requires a working SMTP account and provider-specific app
   password in the protected production environment; verify its connection

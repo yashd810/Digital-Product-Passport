@@ -42,6 +42,7 @@ const maxOauthProviderEndpointOrigins = 16;
 const maxOauthResponseBytes = 1024 * 1024;
 const oauthTransactionTtlSeconds = 10 * 60;
 const oauthTransactionCookieName = "oauth_transaction";
+const provisionableOauthRoles = new Set(["companyAdmin", "editor", "viewer"]);
 
 function isExplicitLoopbackHost(hostname) {
   const normalized = normalizeHostname(hostname);
@@ -135,6 +136,41 @@ function normalizeProviderAllowedEndpointOrigins(provider, providerLabel) {
   return allowedOrigins;
 }
 
+function normalizeOauthBoolean(value, label, fallback = false) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== "boolean") {
+    throw new Error(`${label} must be true or false`);
+  }
+  return value;
+}
+
+function normalizeOauthCompanyId(value, label) {
+  if (value === undefined || value === null || value === "") return null;
+  const normalized = typeof value === "number" ? value : Number(String(value).trim());
+  if (!Number.isSafeInteger(normalized) || normalized < 1) {
+    throw new Error(`${label} must be a positive integer`);
+  }
+  return normalized;
+}
+
+function normalizeOauthRole(value, label) {
+  const normalized = String(value || "viewer").trim();
+  if (!provisionableOauthRoles.has(normalized)) {
+    throw new Error(`${label} must be companyAdmin, editor, or viewer; superAdmin accounts cannot be provisioned through SSO`);
+  }
+  return normalized;
+}
+
+function normalizeAllowedEmailDomains(value, label) {
+  const domains = [...new Set(normalizeArray(value).map((domain) => domain.toLowerCase()))];
+  for (const domain of domains) {
+    if (!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain)) {
+      throw new Error(`${label} must contain valid domain names`);
+    }
+  }
+  return domains;
+}
+
 function normalizeOauthProvider(value, index) {
   const providerLabel = `OAUTH_PROVIDERS_JSON[${index}]`;
   if (!isPlainObject(value)) throw new Error(`${providerLabel} must be an object`);
@@ -159,6 +195,18 @@ function normalizeOauthProvider(value, index) {
     throw new Error(`${providerLabel} must configure an issuer or discoveryUrl`);
   }
 
+  const autoLinkByEmail = normalizeOauthBoolean(value.autoLinkByEmail, `${providerLabel}.autoLinkByEmail`);
+  const allowCreateUser = normalizeOauthBoolean(value.allowCreateUser, `${providerLabel}.allowCreateUser`);
+  const defaultCompanyId = normalizeOauthCompanyId(value.defaultCompanyId, `${providerLabel}.defaultCompanyId`);
+  const defaultRole = normalizeOauthRole(value.defaultRole, `${providerLabel}.defaultRole`);
+  const allowedEmailDomains = normalizeAllowedEmailDomains(value.allowedEmailDomains, `${providerLabel}.allowedEmailDomains`);
+  if ((autoLinkByEmail || allowCreateUser) && allowedEmailDomains.length === 0) {
+    throw new Error(`${providerLabel}.allowedEmailDomains is required when account linking or user creation is enabled`);
+  }
+  if (allowCreateUser && !defaultCompanyId) {
+    throw new Error(`${providerLabel}.defaultCompanyId is required when allowCreateUser is enabled`);
+  }
+
   const provider = {
     key,
     label: String(value.label || key || "Enterprise SSO").trim(),
@@ -167,12 +215,14 @@ function normalizeOauthProvider(value, index) {
     clientId,
     clientSecret,
     scopes: normalizeArray(value.scopes, ["openid", "profile", "email"]),
-    defaultCompanyId: value.defaultCompanyId || null,
-    defaultRole: value.defaultRole || "viewer",
-    autoLinkByEmail: value.autoLinkByEmail !== false,
-    allowCreateUser: value.allowCreateUser !== false,
+    defaultCompanyId,
+    defaultRole,
+    // Linking an IdP identity to an existing password account or creating a
+    // new account is privileged. Keep both paths explicitly opt-in.
+    autoLinkByEmail,
+    allowCreateUser,
     ssoOnly: value.ssoOnly === true,
-    allowedEmailDomains: normalizeArray(value.allowedEmailDomains),
+    allowedEmailDomains,
     idTokenAlgorithms: safeIdTokenAlgorithms(value.idTokenAlgorithms || value.allowedIdTokenAlgorithms, []),
   };
   provider.allowedEndpointOrigins = normalizeProviderAllowedEndpointOrigins({
@@ -713,6 +763,9 @@ function createOauthService({
       if (existingUser.rows.length) {
         user = existingUser.rows[0];
         if (!user.isActive) throw new Error("Your account is inactive");
+        if (user.role === "superAdmin") {
+          throw new Error("Super administrator accounts must be linked through a controlled provisioning process");
+        }
       }
     }
 
@@ -720,7 +773,7 @@ function createOauthService({
       if (!provider.allowCreateUser) {
         throw new Error("No account is linked to this SSO identity yet");
       }
-      if (!provider.defaultCompanyId && provider.defaultRole !== "superAdmin") {
+      if (!provider.defaultCompanyId) {
         throw new Error("This SSO provider is missing a default company mapping");
       }
       const firstName = profile.given_name || String(profile.name || "").split(" ").filter(Boolean).slice(0, 1).join(" ") || null;
@@ -735,7 +788,7 @@ function createOauthService({
           randomPassword.hash,
           firstName,
           lastName,
-          provider.defaultRole === "superAdmin" ? null : provider.defaultCompanyId,
+          provider.defaultCompanyId,
           provider.defaultRole,
           provider.key,
           provider.ssoOnly,
@@ -849,3 +902,4 @@ module.exports.createPinnedDnsLookup = createPinnedDnsLookup;
 module.exports.fetchPinnedOauth = fetchPinnedOauth;
 module.exports.normalizeRedirectPath = normalizeRedirectPath;
 module.exports.validateOauthUrl = validateOauthUrl;
+module.exports.normalizeOauthProvider = normalizeOauthProvider;

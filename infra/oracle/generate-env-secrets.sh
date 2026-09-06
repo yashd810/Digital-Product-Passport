@@ -1,11 +1,13 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 set -euo pipefail
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 mode="bootstrap"
 
 usage() {
   cat <<'USAGE'
-Usage: bash infra/oracle/generate-env-secrets.sh [--bootstrap|--rotate-application-secrets]
+Usage: /bin/bash -p infra/oracle/generate-env-secrets.sh [--bootstrap|--rotate-application-secrets]
 
   --bootstrap (default)             Generate separate DB_ADMIN_PASSWORD and
                                     DB_PASSWORD values, the DB backup manifest

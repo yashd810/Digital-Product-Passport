@@ -418,8 +418,8 @@ function assertApplicationSecretOutput(values, {
 }
 
 test("production secret generator emits distinct 256-bit bootstrap values and a P-256 keypair", () => {
-  execFileSync("bash", ["-n", generatorPath]);
-  const values = parseEnvLines(execFileSync("bash", [generatorPath], { encoding: "utf8" }));
+  execFileSync("/bin/bash", ["-p", "-n", generatorPath]);
+  const values = parseEnvLines(execFileSync("/bin/bash", ["-p", generatorPath], { encoding: "utf8" }));
   assert.equal(values.has("DB_ADMIN_USER"), false, "the deployment template selects the admin role; local generation remains runtime-role compatible");
   assertApplicationSecretOutput(values, {
     includesDbPassword: true,
@@ -430,8 +430,8 @@ test("production secret generator emits distinct 256-bit bootstrap values and a 
 
 test("application-secret rotation does not silently rotate the database password", () => {
   const values = parseEnvLines(execFileSync(
-    "bash",
-    [generatorPath, "--rotate-application-secrets"],
+    "/bin/bash",
+    ["-p", generatorPath, "--rotate-application-secrets"],
     { encoding: "utf8" }
   ));
 

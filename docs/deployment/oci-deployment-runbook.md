@@ -28,6 +28,7 @@ It is not a second architecture guide. Use it when you are already dealing with 
 | `infra/oracle/install-container-imds-firewall.sh` | explicitly installs and enables the approved IMDS rule |
 | `infra/oracle/systemd/*` | systemd units for backup automation |
 | `infra/oracle/terraform/object-storage-backups/*` | Terraform for object-storage backup resources |
+| `docs/deployment/oci-production-state.md` | confirmed live OCI IAM, bucket, and host-release state; update after each infrastructure change |
 
 ## What To Verify During OCI Work
 
@@ -108,7 +109,7 @@ step.
 
 Keep `/etc/dpp/dpp.env` outside the repository as a regular root-owned mode-`600`
 file. Generate the required distinct 256-bit values and matching P-256 signing
-pair with `bash infra/oracle/generate-env-secrets.sh`; do not reuse a value from
+pair with `/bin/bash -p infra/oracle/generate-env-secrets.sh`; do not reuse a value from
 another purpose or environment. Scheduled ERP/API jobs store only a
 `credentialRef`; keep their real headers or bodies in
 `ASSET_SOURCE_CREDENTIALS_JSON` in that protected host env file. Each credential
@@ -247,11 +248,20 @@ verified outside the target host:
    dpp-release ALL=(root) NOPASSWD: NOSETENV: /usr/local/sbin/dpp-release-deployer
    ```
 
-   Replace `dpp-release` with the actual account recorded as `OCI_USER` in the
-   protected deployment profile. Audit the result with `sudo -l -U
-   dpp-release`; do not leave a cloud-init/default `ALL` rule in force for that
-   account. Update `oci-deploy.env` to use this dedicated account and its
-   restricted SSH key.
+   Keep the account name exactly `dpp-release`; the deployment wrapper rejects
+   arbitrary or legacy administrator account names. Audit the result with
+   `sudo -l -U dpp-release`; do not leave a cloud-init/default `ALL` rule in
+   force for that account. Update `oci-deploy.env` to use this dedicated account
+   and a separate restricted controller key for each split host:
+
+   ```dotenv
+   OCI_USER=dpp-release
+   OCI_BACKEND_SSH_KEY=/absolute/path/to/backend-controller.key
+   OCI_FRONTEND_SSH_KEY=/absolute/path/to/frontend-controller.key
+   ```
+
+   Use generic `SSH_KEY` only for a real single-host deployment. Do not retain
+   an administrator key in the normal deployment profile.
 
 4. As the restricted deployment account, verify the installed entry point:
 
@@ -293,6 +303,13 @@ builds each service image through Buildx one at a time before Compose starts
 containers, which keeps the small Always Free hosts within their memory budget.
 Do not add `COMPOSE_BAKE=false` to a shell profile or host environment.
 
+The root release helper uses `umask 077`, which is required for private release
+files. Unprivileged Nginx images must therefore set both the template file mode
+and its parent-directory traversal mode explicitly in their Dockerfile. Keep
+`COPY --chmod=0644 .../default.conf.template` followed by
+`RUN chmod 0755 /etc/nginx/templates`; do not solve a startup permission issue
+by running Nginx as root or weakening release-checkout permissions.
+
 On the deployment workstation, keep the private profiles together outside the
 repository at:
 
@@ -309,7 +326,10 @@ secrets.
 Keep `oci-deploy.env` in the same external directory with mode `600`. Copy
 `infra/oracle/oci-deploy.env.example` as its template. The deployment wrapper
 parses only its documented literal deployment keys and never sources it as shell
-code; it contains OCI addressing and local SSH paths, not application secrets.
+code; it contains OCI addressing and target-specific local SSH key paths, not
+application secrets. A split-host profile must use
+`OCI_BACKEND_SSH_KEY` and `OCI_FRONTEND_SSH_KEY`; a generic `SSH_KEY` is only
+for a deliberately single-host deployment.
 
 ## PostgreSQL Persistence And First Bootstrap
 
@@ -373,13 +393,13 @@ soon as the facts are available.
 ## Application Secret Rotation
 
 For a new environment, generate the database password and application secrets
-with `bash infra/oracle/generate-env-secrets.sh --bootstrap`. For an existing
+with `/bin/bash -p infra/oracle/generate-env-secrets.sh --bootstrap`. For an existing
 deployment, do **not** replace `DB_PASSWORD` unless the PostgreSQL role password
 is changed in the same maintenance window. Instead, create a root-only temporary
 rotation file on the backend host:
 
 ```bash
-sudo sh -c 'umask 077; bash /opt/dpp/infra/oracle/generate-env-secrets.sh --rotate-application-secrets > /root/dpp-rotation.env'
+sudo sh -c 'umask 077; /bin/bash -p /opt/dpp/infra/oracle/generate-env-secrets.sh --rotate-application-secrets > /root/dpp-rotation.env'
 sudoedit /etc/dpp/dpp.env
 ```
 

@@ -61,8 +61,13 @@ function readRuntimeDatabaseRole(environment = process.env) {
 }
 
 async function buildFormattedStatement(pool, template, values) {
+  const formatArguments = values
+    .map((_, index) => `$${index + 2}::text`)
+    .join(", ");
   const result = await pool.query(
-    `SELECT format($1, ${values.map((_, index) => `$${index + 2}`).join(", ")}) AS statement`,
+    formatArguments
+      ? `SELECT format($1::text, ${formatArguments}) AS statement`
+      : "SELECT format($1::text) AS statement",
     [template, ...values]
   );
   const statement = result.rows?.[0]?.statement;

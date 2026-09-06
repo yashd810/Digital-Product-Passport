@@ -132,6 +132,7 @@ test("scheduled backup jobs execute root-owned installed assets without a mutabl
     installer,
     /install -o root -g root -m 0755 "\$APP_DIR\/infra\/oracle\/db-backup\.sh" \/usr\/local\/bin\/dpp-db-backup/,
   );
+  assert.match(installer, /install -d -o root -g root -m 0750 \/etc\/dpp/);
   assert.match(
     installer,
     /install -o root -g root -m 0644 "\$APP_DIR\/infra\/oracle\/dpp-backup-compose\.yml" "\$BACKUP_COMPOSE_FILE"/,

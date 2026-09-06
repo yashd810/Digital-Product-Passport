@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 # Block Docker-forwarded traffic to the OCI instance metadata endpoint without
 # changing host-originated access. OCI can provide Docker with DNS at the same
 # link-local address, so a dedicated chain returns only DNS (TCP/UDP 53) to
@@ -9,6 +9,8 @@
 # change has been approved.
 
 set -euo pipefail
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 MODE="${1:-check}"
 IMDS_ADDRESS="169.254.169.254/32"

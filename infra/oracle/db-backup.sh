@@ -1,6 +1,8 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 set -euo pipefail
 umask 077
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 WORK_DIR="${DB_BACKUP_WORK_DIR:-/var/lib/dpp-db-backups}"

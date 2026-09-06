@@ -43,6 +43,12 @@ server {
     proxy_set_header X-Forwarded-Host $host;
   }
 
+  # Do not let the SPA fallback serve, or hide the accidental presence of,
+  # dot-prefixed deployment files such as .env or .git metadata.
+  location ~ /\. {
+    return 404;
+  }
+
 	  location /assets/ {
 	    try_files $uri =404;
 	    access_log off;

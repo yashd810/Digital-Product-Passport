@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 set -euo pipefail
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 APP_DIR="${APP_DIR:-/opt/dpp}"
 UNIT_DIR="${UNIT_DIR:-/etc/systemd/system}"
@@ -36,7 +38,7 @@ case "$DB_BACKUP_ENABLED" in
 esac
 
 install -o root -g root -m 0755 "$APP_DIR/infra/oracle/db-backup.sh" /usr/local/bin/dpp-db-backup
-install -d -o root -g root -m 0755 /etc/dpp
+install -d -o root -g root -m 0750 /etc/dpp
 install -o root -g root -m 0644 "$APP_DIR/infra/oracle/dpp-backup-compose.yml" "$BACKUP_COMPOSE_FILE"
 install -o root -g root -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup.service" "$UNIT_DIR/dpp-db-backup.service"
 install -o root -g root -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup.timer" "$UNIT_DIR/dpp-db-backup.timer"

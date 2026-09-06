@@ -1,6 +1,8 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 set -euo pipefail
 umask 077
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 # Derive the least-privilege environment consumed by the long-running API.
 # The source file remains root-owned because it is also used by the controlled

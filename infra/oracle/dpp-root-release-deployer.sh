@@ -341,7 +341,7 @@ run_deployment() {
   [ -z "$initialize_postgres_volume" ] || deploy_env+=(DPP_INITIALIZE_POSTGRES_VOLUME="$initialize_postgres_volume")
   [ -z "$initialize_local_storage_volume" ] || deploy_env+=(DPP_INITIALIZE_LOCAL_STORAGE_VOLUME="$initialize_local_storage_volume")
 
-  /usr/bin/timeout --foreground "$timeout_seconds" "${deploy_env[@]}" /bin/bash "$APP_DIR/infra/oracle/deploy-prod.sh"
+  /usr/bin/timeout --foreground "$timeout_seconds" "${deploy_env[@]}" /bin/bash -p "$APP_DIR/infra/oracle/deploy-prod.sh"
 }
 
 RELEASE_STAGE_DIR=""

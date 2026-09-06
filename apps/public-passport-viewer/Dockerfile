@@ -2,7 +2,9 @@ FROM node:24.18.0-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a
 WORKDIR /app/apps/public-passport-viewer
 
 COPY apps/public-passport-viewer/package.json apps/public-passport-viewer/package-lock.json apps/public-passport-viewer/.npmrc ./
-RUN npm ci
+RUN test "$(node --version)" = "v24.18.0" \
+  && test "$(npm --version)" = "11.16.0" \
+  && npm ci
 
 COPY apps/public-passport-viewer/ ./
 COPY apps/frontend-app/src /app/apps/frontend-app/src
@@ -23,7 +25,10 @@ USER root
 RUN apk add --no-cache --upgrade curl=8.20.0-r0 libcurl=8.20.0-r0
 ARG VITE_API_URL
 ENV DPP_PUBLIC_API_ORIGIN=${VITE_API_URL}
-COPY infra/docker/public-passport-viewer/nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --chmod=0644 infra/docker/public-passport-viewer/nginx.conf.template /etc/nginx/templates/default.conf.template
+# See frontend-app: the non-root Nginx runtime needs traversal permission on
+# the template directory even when the root release checkout uses umask 077.
+RUN chmod 0755 /etc/nginx/templates
 COPY --from=build --chown=101:101 /app/apps/public-passport-viewer/dist /usr/share/nginx/html
 USER 101:101
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
