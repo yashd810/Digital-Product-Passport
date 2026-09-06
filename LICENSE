@@ -1,20 +1,38 @@
-PROPRIETARY SOFTWARE LICENSE
+CLAROS DPP PROPRIETARY SOURCE LICENSE
 
-Copyright (c) 2025 Yash Desai. All Rights Reserved.
+Copyright (c) 2025-2026 Yash Desai. All rights reserved.
 
-This software and its source code are the exclusive property of Yash Desai.
+This repository and its source code, documentation, configuration, designs,
+and related materials (collectively, the "Software") are proprietary to Yash
+Desai, except for third-party components that are identified as such and remain
+subject to their own license terms.
 
-RESTRICTIONS:
-- No part of this software, in whole or in part, may be copied, reproduced,
-  distributed, published, or transmitted in any form or by any means without
-  the prior written permission of the owner.
-- Commercial use of this software or any derivative work is strictly prohibited.
-- Access to this software is granted solely at the discretion of the system
-  super administrator. Unauthorized access or use is prohibited.
-- You may not sublicense, sell, rent, lease, or transfer this software
-  to any third party.
+## No License Granted
 
-This software is provided for internal use only. Any use outside of
-explicitly granted access is a violation of this license.
+Except under a separate written agreement signed by the copyright holder, no
+copyright, patent, trademark, or other intellectual-property license is granted
+for the Software. This is not an open-source license.
 
-For permissions or inquiries, contact the owner directly.
+Subject only to rights that cannot legally be excluded, you may not copy,
+reproduce, modify, translate, create derivative works from, distribute,
+publish, sublicense, sell, rent, lease, transfer, make available, host, deploy,
+or otherwise use the Software, in whole or in part, without prior written
+permission from the copyright holder.
+
+## Public GitHub Hosting
+
+Public availability of this repository is not permission to reuse the
+Software. GitHub's terms may provide technical platform rights to view or fork
+a public repository. Those platform rights do not grant a license to use,
+modify, distribute, commercialize, host, or deploy the Software, and do not
+transfer ownership of any intellectual property.
+
+Any authorized copy must retain this notice and all applicable third-party
+notices. Do not represent any copy, fork, derivative, deployment, or service as
+authorized by, affiliated with, or endorsed by the copyright holder unless a
+separate written agreement says so.
+
+## Permission Requests
+
+For permission to use the Software, contact the copyright holder and obtain
+written authorization before use.

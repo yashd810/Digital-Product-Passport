@@ -98,3 +98,14 @@ npm run test
 ## How The System Fits Together
 
 Users work in the dashboard to manage companies, passport types, product passports, repository files, workflows, and access controls. The dashboard calls the backend API with session credentials. The backend validates authentication and company access, runs business logic in modules and services, stores relational data in PostgreSQL, and stores uploaded files through the storage service. Released passports are exposed through public routes used by both the dashboard preview pages and the standalone public viewer.
+
+## License
+
+Claros DPP is proprietary software, not an open-source project. Copyright
+(c) 2025-2026 Yash Desai. All rights reserved.
+
+You need prior written permission from the copyright holder to use, modify,
+distribute, host, or deploy this codebase. A public GitHub repository can be
+viewed or forked through GitHub's platform mechanics, but that does not grant a
+software license or permission to reuse the code. See [LICENSE](./LICENSE) for
+the complete terms.

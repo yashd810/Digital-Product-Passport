@@ -3,8 +3,8 @@ info:
   title: Claros DPP Public and Integration API
   version: "2026-07-22"
   license:
-    name: ISC
-    identifier: ISC
+    name: Proprietary - all rights reserved
+    url: https://github.com/yashd810/Digital-Product-Passport/blob/main/LICENSE
   description: >
     Current external API surface for Digital Product Passports. Public reads use
     `/api/public/passports/{dppId}` and return public fields by default. Selected

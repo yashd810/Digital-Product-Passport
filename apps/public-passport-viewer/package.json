@@ -2,6 +2,7 @@
   "name": "dpp-public-passport-viewer",
   "version": "1.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "engines": {
     "node": "24.18.0",
     "npm": "11.16.0"
