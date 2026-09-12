@@ -156,6 +156,19 @@ mixing unstable distribution libraries would need separate compatibility and
 data/collation verification. The application is not described as having zero
 known vulnerabilities while these findings remain.
 
+For clarity, "unfixed" describes the stable Debian packages used by this image;
+it does not mean that no upstream patch exists. For example, the critical
+`CVE-2026-6653` finding is in the bundled `libxml2` XML parser. Trivy inherits
+NVD's 9.8 rating, while Debian classifies the issue as minor and lists no
+dedicated stable security update. Crafted XML can trigger a use-after-free and
+crash the affected parser. Debian still marks the installed Trixie package as
+vulnerable, but lists newer upstream/testing/unstable versions as fixed.
+[Debian advisory and patch references](https://security-tracker.debian.org/tracker/CVE-2026-6653).
+These package findings do not by themselves establish an exploitable
+application route or a compromise. The source review found no direct calls to
+PostgreSQL's XML parsing/query functions; that is a limited code-path check,
+not proof that every advisory is unreachable.
+
 Production rebuilds images from the audited source and refreshes OS packages
 at release time. Remote image contents were not independently scanned or
 compared by image digest through the restricted release account. The local
