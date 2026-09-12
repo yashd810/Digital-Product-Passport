@@ -44,7 +44,7 @@ If the frontend is the face of the product, the backend is the engine room.
 | `src/http/routes/admin.js` | super-admin operations, company policies, passport type management |
 | `src/http/routes/passports.js` | company-side passport CRUD, lifecycle, backup, and security group API keys |
 | `src/http/routes/passport-public.js` | public passport reads, restricted-field unlocks, verification, DID docs, semantic outputs |
-| `src/http/routes/dpp-api.js` | company-slug integration write routes under `/api/companies/:companySlug/integrations/v1` |
+| `src/http/routes/dpp-api.js` | company-slug integration write routes under `/api/companies/:companySlug/dpp` |
 | `src/http/routes/company.js` | company profile, facilities, templates, import endpoints |
 | `src/http/routes/repository.js` | company repository files and symbols |
 | `src/http/routes/workflow.js` | review workflow and backlog |

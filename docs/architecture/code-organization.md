@@ -53,7 +53,7 @@ local-tools/
 └── passport-module-generator/   # Local-only module authoring tool
     ├── client/                  # Browser workspace controller and styles
     │   ├── ui/                  # Focused browser interactions (details/selects)
-    │   └── workspace/           # Data-only starter specifications
+    │   └── workspace/           # Starter data, header mapping, optional storage
     ├── server.js                # Stable local command-line entrypoint
     ├── server/                  # HTTP API and artifact-generation boundary
     ├── shared/                  # Browser/server-neutral generator rules
@@ -72,8 +72,9 @@ progressively reduced into focused feature modules.
 - Add a feature operation in `src/modules/<feature>/`. A module may depend on
   services, infrastructure, and shared utilities, but never on a route or the
   server entrypoint.
-- Add an adapter for PostgreSQL, storage, mail, or another external system in
-  `src/infrastructure/` or a focused service when its API is reused.
+- Add shared storage, mail, signing, and backup adapters in `src/platform/`.
+  Keep low-level external technology integration, such as PostgreSQL
+  transaction handling, in `src/infrastructure/`.
 - Add a pure helper in `src/shared/` only when it is dependency-light and
   genuinely shared. Otherwise keep it next to the feature that owns it.
 

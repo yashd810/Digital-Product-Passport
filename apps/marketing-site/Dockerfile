@@ -1,4 +1,4 @@
-FROM node:24.18.0-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS configuration
+FROM node:24.21.0-alpine@sha256:be80f76cf40ec8e42b9bec49f60a55e0660f30af58d3e5a25530785b30ea67e2 AS configuration
 WORKDIR /site
 COPY apps/marketing-site/ ./
 COPY infra/docker/website/nginx.conf.template ./nginx.conf.template
@@ -19,7 +19,7 @@ ARG DPP_APK_UPGRADE_CACHE_BUST=source
 RUN test -n "$DPP_APK_UPGRADE_CACHE_BUST" && apk upgrade --no-cache
 COPY --from=configuration --chown=101:101 /site/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=configuration --chown=101:101 /site/*.html /usr/share/nginx/html/
-COPY --from=configuration --chown=101:101 /site/*.css /site/*.js /usr/share/nginx/html/
+COPY --from=configuration --chown=101:101 /site/styles.css /site/shared.js /usr/share/nginx/html/
 COPY --from=configuration --chown=101:101 /site/robots.txt /site/site.webmanifest /site/sitemap.xml /usr/share/nginx/html/
 COPY --from=configuration --chown=101:101 /site/assets/ /usr/share/nginx/html/assets/
 USER 101:101

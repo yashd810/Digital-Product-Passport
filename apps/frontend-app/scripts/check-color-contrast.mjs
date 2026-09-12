@@ -29,6 +29,10 @@ function contrastRatio(foreground, background) {
 }
 
 const checks = [
+  { label: "Authentication primary button text", foreground: "#07111f", background: "#0db5b0", minimum: 4.5 },
+  { label: "Authentication dark input placeholder", foreground: "#b8ccd9", background: "#1c3046", minimum: 4.5 },
+  { label: "Authentication light recovery link", foreground: "#066b70", background: "#ffffff", minimum: 4.5 },
+  { label: "Dashboard light primary button hover", foreground: "#07111f", background: "#0891b2", minimum: 4.5 },
   { label: "Viewer body text", foreground: "#10243a", background: "#ffffff", minimum: 4.5 },
   { label: "Trusted entry secondary text", foreground: "#3f596d", background: "#ffffff", minimum: 4.5 },
   { label: "Trusted entry success text", foreground: "#17653c", background: "#ffffff", minimum: 4.5 },

@@ -35,7 +35,7 @@ function createWorkflowHelpers({
       throw new Error(`${label} must be a valid user identifier`);
     }
     const id = Number(text);
-    if (!Number.isSafeInteger(id)) {
+    if (!Number.isSafeInteger(id) || id > 2_147_483_647) {
       throw new Error(`${label} must be a valid user identifier`);
     }
     return id;
@@ -49,12 +49,13 @@ function createWorkflowHelpers({
        FROM users
        WHERE "companyId" = $1
          AND "isActive" = true
+         AND role IN ('companyAdmin', 'editor')
          AND id = ANY($2::int[])`,
       [companyId, assigneeIds]
     );
     const activeCompanyAssigneeIds = new Set(result.rows.map((row) => Number(row.id)));
     if (assigneeIds.some((id) => !activeCompanyAssigneeIds.has(id))) {
-      throw new Error("Reviewer and approver must be active members of this company");
+      throw new Error("Reviewer and approver must be active members of this company with editor or admin access");
     }
   }
 

@@ -307,7 +307,7 @@ test("production deployment fails closed rather than selecting a fresh database 
   assert.match(deployScript, /unset COMPOSE_BAKE/);
   assert.match(deployScript, /export COMPOSE_PARALLEL_LIMIT=1/);
   assert.match(deployScript, /docker buildx version/);
-  assert.match(deployScript, /docker buildx bake --load -f - "\$service_name"/);
+  assert.match(deployScript, /docker buildx bake --load -f - \\\n\s*--set "\$\{service_name\}\.args\.DPP_APK_UPGRADE_CACHE_BUST=\$\{security_refresh\}" \\\n\s*--set "\$\{service_name\}\.args\.DPP_DEBIAN_UPGRADE_CACHE_BUST=\$\{security_refresh\}" \\\n\s*"\$service_name"/);
   assert.match(deployScript, /UP_ARGS=\(up --no-build/);
   assert.doesNotMatch(deployScript, /up --build/);
 });

@@ -553,6 +553,11 @@
   border-color: rgba(28,55,56,0.2);
 }
 
+.auth-form input::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
 .form-group input:focus {
   outline: none;
   border-color: var(--jet);
@@ -580,7 +585,7 @@
 }
 
 [data-theme="light"] .auth-forgot-link {
-  color: #0db5b0;
+  color: #066b70;
 }
 
 .auth-forgot-link:hover {
@@ -588,10 +593,14 @@
   text-decoration: underline;
 }
 
+[data-theme="light"] .auth-forgot-link:hover {
+  color: #075a63;
+}
+
 .auth-btn {
   padding: 13px 20px;
   background: #0db5b0;
-  color: #ffffff;
+  color: #07111f;
   border: none;
   border-radius: 8px;
   font-size: 16px;
@@ -604,7 +613,7 @@
 
 [data-theme="light"] .auth-btn {
   background: #0db5b0;
-  color: #ffffff;
+  color: #07111f;
 }
 
 .auth-btn:hover:not(:disabled) {
@@ -618,7 +627,7 @@
   width: 100%;
   padding: 13px 20px;
   background: #0db5b0;
-  color: #ffffff;
+  color: #07111f;
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -631,7 +640,7 @@
 
 [data-theme="light"] .btn-submit {
   background: #0db5b0;
-  color: #ffffff;
+  color: #07111f;
 }
 
 .btn-submit:hover:not(:disabled) {
@@ -643,7 +652,7 @@
 
 .auth-link {
   text-align: center;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 14px;
   margin: 16px 0;
   padding: 12px 0;
@@ -656,15 +665,17 @@
   transition: color 0.25s ease;
 }
 
-[data-theme="light"] .auth-link a { color: #0db5b0; }
+[data-theme="light"] .auth-link a { color: #066b70; }
 
 .auth-link a:hover { text-decoration: underline; color: #06d6d0; }
+
+[data-theme="light"] .auth-link a:hover { color: #075a63; }
 
 .auth-footer {
   margin-top: 20px;
   padding: 12px 0;
   text-align: center;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 15px;
 }
 
@@ -677,7 +688,7 @@
 }
 
 [data-theme="light"] .auth-footer a,
-[data-theme="light"] .auth-footer .link-btn { color: #0db5b0; }
+[data-theme="light"] .auth-footer .link-btn { color: #066b70; }
 
 .auth-footer .link-btn {
   appearance: none;
@@ -692,6 +703,11 @@
 .auth-footer .link-btn:hover {
   color: #06d6d0;
   text-decoration: underline;
+}
+
+[data-theme="light"] .auth-footer a:hover,
+[data-theme="light"] .auth-footer .link-btn:hover {
+  color: #075a63;
 }
 
 @media (max-width: 600px) {

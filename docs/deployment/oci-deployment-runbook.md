@@ -313,6 +313,10 @@ clears `COMPOSE_BAKE` rather than setting its deprecated `false` value and
 builds each service image through Buildx one at a time before Compose starts
 containers, which keeps the small Always Free hosts within their memory budget.
 Do not add `COMPOSE_BAKE=false` to a shell profile or host environment.
+Each service build supplies the current UTC date as its Alpine and Debian
+package-upgrade cache keys. A release on a new date refreshes distribution
+security updates even when the Dockerfile and pinned base-image digest have
+not changed.
 
 The root release helper uses `umask 077`, which is required for private release
 files. Unprivileged Nginx images must therefore set both the template file mode
@@ -320,6 +324,10 @@ and its parent-directory traversal mode explicitly in their Dockerfile. Keep
 `COPY --chmod=0644 .../default.conf.template` followed by
 `RUN chmod 0755 /etc/nginx/templates`; do not solve a startup permission issue
 by running Nginx as root or weakening release-checkout permissions.
+The backend also copies its npm manifests with mode `0644`, so the non-root
+Node process can read `package.json` when resolving CommonJS modules from a
+private release checkout. Its runtime image includes source, operational
+scripts, and Passport Modules; backend tests are excluded.
 
 On the deployment workstation, keep the private profiles together outside the
 repository at:
@@ -534,7 +542,7 @@ For the passport confidentiality/security-group refactor, also verify:
 - `X-API-Key` or `X-Security-Group-Key` unlocks only selected restricted fields
 - invalid or wrong-passport keys return `401` or `403`
 - archived released/obsolete passports remain readable
-- integration writes under `/api/companies/:companySlug/integrations/v1` require
+- integration writes under `/api/companies/:companySlug/dpp` require
   `Authorization: Bearer ...`
 - old alias routes such as `/api/passports/by-product/...` and `/api/v1/dpps...`
   stay removed

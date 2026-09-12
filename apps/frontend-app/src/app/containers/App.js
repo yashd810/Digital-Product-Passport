@@ -25,9 +25,8 @@ export default function App() {
   const session = useSessionAuth();
 
   useEffect(() => {
-    const userId = JSON.parse(localStorage.getItem("user") || "null")?.id;
-    applyTheme(getStoredTheme(userId));
-  }, []);
+    applyTheme(getStoredTheme(session.user?.id));
+  }, [session.user?.id]);
 
   return (
     <I18nProvider>

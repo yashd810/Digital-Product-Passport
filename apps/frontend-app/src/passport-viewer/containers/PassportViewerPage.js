@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useDialogFocus } from "../../shared/hooks/useDialogFocus";
+import { readLocalStorage } from "../../shared/utils/browserStorage";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { generateQRCodeBundle, saveQRCodeToDatabase } from "../utils/QRcode";
 import { getViewerBrandTheme } from "../../app/providers/ThemeContext";
@@ -44,8 +46,9 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const location   = useLocation();
 
   // Viewer state
-  const [lang,             setLang]             = useState(() => localStorage.getItem("dppLang") || "en");
+  const [lang]             = useState(() => readLocalStorage("dppLang") || "en");
   const [passport,         setPassport]         = useState(null);
+  const [loadedPassportEndpoint, setLoadedPassportEndpoint] = useState("");
   const [companyData,      setCompanyData]      = useState(null);
   const [typeDef,          setTypeDef]          = useState(null);
   const [publicHistoryPayload, setPublicHistoryPayload] = useState(null);
@@ -69,6 +72,13 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const [securityGroupApiKey, setSecurityGroupApiKey] = useState("");
   const [unlockError,      setUnlockError]       = useState("");
   const [unlocking,        setUnlocking]         = useState(false);
+  const unlockDialogRef = useRef(null);
+  const closeUnlockDialog = () => {
+    setShowRestrictedUnlockForm(false);
+    setUnlockError("");
+    setApiKeyInput("");
+  };
+  useDialogFocus(showRestrictedUnlockForm, unlockDialogRef, closeUnlockDialog);
   const encodedDppId = encodeURIComponent(dppId || "");
   const encodedPreviewId = encodeURIComponent(previewId || "");
   const isPreviewMode = !!previewMode && !!previewId;
@@ -90,19 +100,26 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         : `${api}/api/public/passports/${encodedDppId}`
   );
 
-  const fetchPassportRecord = useCallback(async ({ applyState = false } = {}) => {
+  const activeEndpointRef = useRef(passportEndpoint);
+  activeEndpointRef.current = passportEndpoint;
+
+  const fetchPassportRecord = useCallback(async ({ applyState = false, signal } = {}) => {
     const response = await fetchWithAuth(passportEndpoint, isPreviewMode
-      ? { headers: authHeaders(), cache: "no-store" }
-      : { cache: "no-store" });
+      ? { headers: authHeaders(), cache: "no-store", signal }
+      : { cache: "no-store", signal });
     if (!response.ok) throw new Error("Could not refresh passport resources");
     const data = await response.json();
-    if (applyState) {
+    if (applyState && !signal?.aborted && activeEndpointRef.current === passportEndpoint) {
       const resolvedCompanyId = data?.companyId || previewCompanyId || null;
       setPassport(data);
-      if (data?.companyProfile) setCompanyData(data.companyProfile);
+      setLoadedPassportEndpoint(passportEndpoint);
+      setCompanyData(data?.companyProfile || null);
       if (isPreviewMode && resolvedCompanyId) {
         const profileRes = await fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/profile`, { cache: "no-store" });
-        if (profileRes?.ok) setCompanyData(await profileRes.json());
+        if (profileRes?.ok) {
+          const profile = await profileRes.json();
+          if (!signal?.aborted && activeEndpointRef.current === passportEndpoint) setCompanyData(profile);
+        }
       }
     }
     return data;
@@ -114,6 +131,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     setApiKeyInput("");
     setSecurityGroupApiKey("");
     setUnlockError("");
+    setUnlocking(false);
     setDynamicValues({});
     setDynamicValuesDppId("");
     setSigVerification(null);
@@ -159,53 +177,46 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       setError("Passport not found");
       return;
     }
+    let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       setLoading(true);
       setError("");
       try {
         // 1. Fetch the passport record
-        const data = await fetchPassportRecord({ applyState: true });
-        const resolvedCompanyId = data?.companyId || previewCompanyId || null;
-
+        const data = await fetchPassportRecord({ applyState: true, signal: controller.signal });
+        if (cancelled) return;
         const embeddedViewerSchema = data?.viewerSchema || null;
 
-        // 2. Fetch company branding and type definition when needed
-        const [profileRes, typeRes, historyPayload] = await Promise.all([
-          isPreviewMode && resolvedCompanyId
-            ? fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/profile`, { cache: "no-store" })
-            : Promise.resolve(null),
+        // 2. The record refresh already fetched branding; load schema and history.
+        const [typeRes, historyPayload] = await Promise.all([
           embeddedViewerSchema
             ? Promise.resolve(null)
             : fetchWithAuth(`${api}/api/internal/passport-types/${data.passportType}`, { headers: authHeaders() }),
           fetchPublicHistoryPayload(data),
         ]);
 
-        if (profileRes?.ok) setCompanyData(await profileRes.json());
+        const fetchedType = typeRes?.ok ? await typeRes.json() : null;
+        if (cancelled) return;
         if (embeddedViewerSchema) {
           setTypeDef(embeddedViewerSchema);
-        } else if (typeRes?.ok) {
-          setTypeDef(await typeRes.json());
+        } else if (fetchedType) {
+          setTypeDef(fetchedType);
         } else {
           setTypeDef({ sections: [] });
         }
         setPublicHistoryPayload(historyPayload || { history: [] });
       } catch (e) {
-        setError(e.message);
+        if (!cancelled) setError(e.message);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [dppId, fetchPassportRecord, fetchPublicHistoryPayload, isPreviewMode, previewCompanyId, previewId]);
-
-  useEffect(() => {
-    if (!isPreviewMode || !previewCompanyId) return;
-    fetchWithAuth(`${api}/api/companies/${previewCompanyId}/profile`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d) setCompanyData(d);
-      })
-      .catch((error) => console.warn("Ignored async error", error));
-  }, [isPreviewMode, previewCompanyId]);
 
   // A company administrator commonly changes branding in another dashboard
   // tab, then returns to this viewer. Re-fetch the live payload on focus so
@@ -226,6 +237,8 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   // Secondary data loading
   useEffect(() => {
     if (!passport?.dppId) return;
+    let cancelled = false;
+    setQrCode(null);
     (async () => {
       setQrLoading(true);
       try {
@@ -237,6 +250,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           modelName: passport.modelName,
           granularity: passport.granularity || "item",
         });
+        if (cancelled) return;
         if (generatedBundle?.qrCodeDataUrl) {
           setQrCode(generatedBundle.qrCodeDataUrl);
           if (isPreviewMode && passport.companyId) {
@@ -253,17 +267,19 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
             }
           }
         }
-      } catch (e) {
-        setQrCode(null);
+      } catch {
+        if (!cancelled) setQrCode(null);
       } finally {
-        setQrLoading(false);
+        if (!cancelled) setQrLoading(false);
       }
     })();
+    return () => { cancelled = true; };
   }, [companyData?.companyName, isPreviewMode, passport?.companyId, passport?.dppId, passport?.granularity, passport?.manufacturedBy, passport?.manufacturer, passport?.modelName, passport?.passportType]);
 
   // Fetch + poll dynamic field values every 30 s
   useEffect(() => {
     if (!passport?.dppId || isInactiveView) return;
+    let cancelled = false;
     const dynamicValuesEndpoint = isPreviewMode && passport.companyId
       ? `${api}/api/companies/${encodeURIComponent(passport.companyId)}/passports/${encodeURIComponent(passport.dppId)}/dynamic-values`
       : `${api}/api/public/passports/${encodeURIComponent(passport.dppId)}/dynamic-values`;
@@ -273,7 +289,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         : undefined)
         .then(r => r.ok ? r.json() : null)
         .then(d => {
-          if (d?.values) {
+          if (!cancelled && d?.values) {
             setDynamicValues(d.values);
             setDynamicValuesDppId(passport.dppId);
           }
@@ -281,16 +297,21 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         .catch((error) => console.warn("Ignored async error", error));
     fetchDynamic();
     const timer = setInterval(fetchDynamic, 30000);
-    return () => clearInterval(timer);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [isInactiveView, isPreviewMode, passport?.companyId, passport?.dppId, securityGroupApiKey]);
 
   // Fetch signature verification for released passports
   useEffect(() => {
     if (!passport?.dppId || !isReleasedPassportStatus(passport?.releaseStatus)) return;
-    fetchWithAuth(`${api}/api/public/passports/${passport.dppId}/signature`)
+    let cancelled = false;
+    fetchWithAuth(`${api}/api/public/passports/${encodeURIComponent(passport.dppId)}/signature`)
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setSigVerification(d); })
+      .then(d => { if (!cancelled && d) setSigVerification(d); })
       .catch((error) => console.warn("Ignored async error", error));
+    return () => { cancelled = true; };
   }, [passport?.dppId, passport?.releaseStatus]);
 
   useEffect(() => {
@@ -299,15 +320,17 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     const versionQuery = isInactiveView && passport?.versionNumber
       ? `?version=${encodeURIComponent(passport.versionNumber)}`
       : "";
-    fetchWithAuth(`${api}/api/public/passports/${passport.dppId}/verification-bundle${versionQuery}`)
+    let cancelled = false;
+    fetchWithAuth(`${api}/api/public/passports/${encodeURIComponent(passport.dppId)}/verification-bundle${versionQuery}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d) setVerificationBundle(d); })
+      .then((d) => { if (!cancelled && d) setVerificationBundle(d); })
       .catch((error) => console.warn("Ignored async error", error));
+    return () => { cancelled = true; };
   }, [isInactiveView, passport?.dppId, passport?.releaseStatus, passport?.versionNumber]);
 
   // UI event handlers
   const handleUnlock = async () => {
-    if (!apiKeyInput.trim()) return;
+    if (unlocking || !apiKeyInput.trim()) return;
     setUnlocking(true);
     setUnlockError("");
     try {
@@ -329,6 +352,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         headers: { "X-API-Key": apiKeyInput.trim() },
       });
       const d = await r.json();
+      if (activeEndpointRef.current !== passportEndpoint) return;
       if (!r.ok) throw new Error(d.error || "Invalid API key");
       const restrictedPassport = isPreviewMode
         ? d.passport
@@ -337,15 +361,17 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       setUnlockedPassport(restrictedPassport);
       setSecurityGroupApiKey(apiKeyInput.trim());
       if (!isPreviewMode) {
-        setPublicHistoryPayload(await fetchPublicHistoryPayload(passport, apiKeyInput.trim()));
+        const historyPayload = await fetchPublicHistoryPayload(passport, apiKeyInput.trim());
+        if (activeEndpointRef.current !== passportEndpoint) return;
+        setPublicHistoryPayload(historyPayload);
       }
       if (!isPreviewMode && d?.viewerSchema) setTypeDef(d.viewerSchema);
       setShowRestrictedUnlockForm(false);
       setApiKeyInput("");
     } catch (e) {
-      setUnlockError(e.message);
+      if (activeEndpointRef.current === passportEndpoint) setUnlockError(e.message);
     } finally {
-      setUnlocking(false);
+      if (activeEndpointRef.current === passportEndpoint) setUnlocking(false);
     }
   };
 
@@ -422,6 +448,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
   // Route normalization
   useEffect(() => {
+    if (loadedPassportEndpoint !== passportEndpoint) return;
     const targetPath = isPreviewMode
       ? canonicalPreviewTechnicalPath
       : isInactiveView
@@ -434,9 +461,9 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     if (currentPath !== normalizedTargetPath) {
       navigate(normalizedTargetPath, { replace: true });
     }
-  }, [canonicalInactiveTechnicalPath, canonicalPreviewTechnicalPath, canonicalTechnicalPath, isInactiveView, isPreviewMode, location.pathname, navigate]);
+  }, [canonicalInactiveTechnicalPath, canonicalPreviewTechnicalPath, canonicalTechnicalPath, isInactiveView, isPreviewMode, loadedPassportEndpoint, location.pathname, navigate, passportEndpoint]);
 
-  if (loading) return <div className="loading">Loading passport…</div>;
+  if (loading || (!error && loadedPassportEndpoint !== passportEndpoint)) return <div className="loading">Loading passport…</div>;
   if (error)   return <div className="alert alert-error">{error}</div>;
   if (!passport) return null;
 
@@ -475,26 +502,29 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
       {/* ── Restricted Fields Unlock Modal ── */}
       {showRestrictedUnlockForm && (
-        <div className="restricted-unlock-overlay" onClick={e => { if (e.target === e.currentTarget) setShowRestrictedUnlockForm(false); }}>
-          <div className="restricted-unlock-modal">
-            <button className="restricted-unlock-close" onClick={() => { setShowRestrictedUnlockForm(false); setUnlockError(""); setApiKeyInput(""); }}>✕</button>
+        <div className="restricted-unlock-overlay" onClick={e => { if (e.target === e.currentTarget) closeUnlockDialog(); }}>
+          <div className="restricted-unlock-modal" ref={unlockDialogRef} role="dialog" aria-modal="true" aria-labelledby="restricted-unlock-title" aria-describedby="restricted-unlock-description" tabIndex={-1}>
+            <button type="button" aria-label="Close restricted data dialog" className="restricted-unlock-close" onClick={closeUnlockDialog}>✕</button>
             <div className="restricted-unlock-icon">🔒</div>
-            <h3 className="restricted-unlock-title">Restricted Data</h3>
-            <p className="restricted-unlock-desc">
+            <h3 id="restricted-unlock-title" className="restricted-unlock-title">Restricted Data</h3>
+            <p id="restricted-unlock-description" className="restricted-unlock-desc">
               Enter the security group API key provided by the company. Only the restricted fields selected for that group will become visible.
             </p>
             <input
-              type="text"
+              type="password"
+              aria-label="Security group API key"
+              autoComplete="off"
+              spellCheck={false}
               value={apiKeyInput}
               onChange={e => { setApiKeyInput(e.target.value); setUnlockError(""); }}
               onKeyDown={e => e.key === "Enter" && handleUnlock()}
               placeholder="Enter API key"
               className="restricted-unlock-input"
-              autoFocus
+              data-dialog-initial-focus
             />
-            {unlockError && <div className="restricted-unlock-error">{unlockError}</div>}
+            {unlockError && <div className="restricted-unlock-error" role="alert">{unlockError}</div>}
             <div className="restricted-unlock-actions">
-              <button className="restricted-unlock-btn cancel" onClick={() => { setShowRestrictedUnlockForm(false); setUnlockError(""); setApiKeyInput(""); }}>
+              <button className="restricted-unlock-btn cancel" onClick={closeUnlockDialog}>
                 Cancel
               </button>
               <button className="restricted-unlock-btn submit" onClick={handleUnlock} disabled={unlocking || !apiKeyInput.trim()}>

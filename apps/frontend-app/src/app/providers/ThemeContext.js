@@ -1,3 +1,4 @@
+import { readLocalStorage } from "../../shared/utils/browserStorage";
 // ============================================================
 // THEME SYSTEM
 // Only two themes: dark (default) and light (inverted)
@@ -112,16 +113,17 @@ export function getViewerBrandTheme(branding) {
 }
 
 export function applyTheme(themeKey) {
-  const theme = themes[themeKey] || themes.dark;
+  const normalizedThemeKey = themeKey === "light" ? "light" : "dark";
+  const theme = themes[normalizedThemeKey];
   const root = document.documentElement;
 
   Object.entries(theme).forEach(([key, val]) => {
     if (key.startsWith("--")) root.style.setProperty(key, val);
   });
 
-  root.setAttribute("data-theme", themeKey);
+  root.setAttribute("data-theme", normalizedThemeKey);
 }
 
 export function getStoredTheme(userId) {
-  return localStorage.getItem(`dppTheme:${userId}`) || "dark";
+  return readLocalStorage(`dppTheme:${userId}`) === "light" ? "light" : "dark";
 }

@@ -35,7 +35,6 @@ The current backend pattern is:
 - feature-specific route registration helpers in `src/modules/`
 - feature-owned services in `src/modules/<feature>/services/`, cross-cutting
   capabilities in `src/platform/`, and pure shared helpers in `src/shared/`
-- shared helpers in `src/shared/`
 
 Do not add new code to old top-level folders like `routes/`, `services/`,
 `middleware/`, or `Server/`. Those are no longer the active backend layout.

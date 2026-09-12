@@ -280,7 +280,9 @@ if [ "$OCI_USER" != "$REQUIRED_OCI_USER" ]; then
     exit 1
 fi
 
-if [ ! -d "$REPO_ROOT/.git" ]; then
+# Linked Git worktrees use a .git file; ask Git for the checkout root instead
+# of assuming that every valid checkout owns a .git directory.
+if [ "$(git -C "$REPO_ROOT" rev-parse --show-toplevel 2>/dev/null || true)" != "$REPO_ROOT" ]; then
     echo "❌ Deployment must be launched from a Git checkout: $REPO_ROOT"
     exit 1
 fi

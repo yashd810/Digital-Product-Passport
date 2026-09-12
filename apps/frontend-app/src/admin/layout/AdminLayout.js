@@ -1,3 +1,4 @@
+import { writeLocalStorage } from "../../shared/utils/browserStorage";
 import React, { useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router";
 import { applyTheme, getStoredTheme } from "../../app/providers/ThemeContext";
@@ -23,7 +24,7 @@ function AdminLayout({ user, onLogout }) {
   const handleThemeToggle = () => {
     const next = currentTheme === "dark" ? "light" : "dark";
     setCurrentTheme(next);
-    localStorage.setItem(`dppTheme:${user?.id}`, next);
+    writeLocalStorage(`dppTheme:${user?.id}`, next);
     applyTheme(next);
   };
 

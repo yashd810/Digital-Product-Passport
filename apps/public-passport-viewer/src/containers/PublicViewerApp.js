@@ -1,7 +1,10 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
+import RouteErrorBoundary from "@frontend/app/components/RouteErrorBoundary";
+import { lazyWithRecovery } from "@frontend/shared/utils/lazyWithRecovery";
+import "@frontend/app/styles/App.css";
 
-const PassportViewer = lazy(() => import("@frontend/passport-viewer/containers/PassportViewerPage"));
+const PassportViewer = lazyWithRecovery("public-passport-viewer", () => import("@frontend/passport-viewer/containers/PassportViewerPage"));
 
 function RouteFallback() {
   return <div className="loading dashboard-loading-screen">Loading…</div>;
@@ -17,7 +20,8 @@ function NotFound() {
 
 export default function PublicViewerApp() {
   return (
-    <Suspense fallback={<RouteFallback />}>
+    <RouteErrorBoundary>
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:dppId/:versionNumber/technical/*" element={<PassportViewer />} />
         <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:dppId/:versionNumber" element={<PassportViewer />} />
@@ -28,6 +32,7 @@ export default function PublicViewerApp() {
         <Route path="/not-found" element={<NotFound />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </Suspense>
+      </Suspense>
+    </RouteErrorBoundary>
   );
 }

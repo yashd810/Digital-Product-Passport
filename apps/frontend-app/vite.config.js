@@ -11,6 +11,12 @@ const developmentSecurityHeaders = {
 };
 
 export default defineConfig({
+  optimizeDeps: {
+    rolldownOptions: {
+      // The dependency scanner runs before the source transform plugin below.
+      moduleTypes: { '.js': 'jsx' },
+    },
+  },
   plugins: [
     {
       name: 'treat-js-as-jsx',

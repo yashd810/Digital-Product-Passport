@@ -1,3 +1,4 @@
+import { writeLocalStorage } from "../../shared/utils/browserStorage";
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
@@ -46,9 +47,8 @@ function Login({ setIsAuthenticated, setUser, setCompanyId }) {
   };
 
   const finishLogin = (data) => {
-    // Save user info and company ID; authenticated browser requests use the httpOnly session cookie
-    localStorage.setItem("user", JSON.stringify(data.user));
-    localStorage.setItem("companyId", data.user.companyId || "");
+    // Keep the active user in memory; authenticated requests use the httpOnly session cookie.
+    writeLocalStorage("companyId", data.user.companyId || "");
     setIsAuthenticated(true);
     setUser(data.user);
     setCompanyId(data.user.companyId || "");

@@ -1,4 +1,4 @@
-# The upstream PostgreSQL 18.4 images include a gosu binary built with Go 1.24.6,
+# The upstream PostgreSQL images include a gosu binary built with Go 1.24.6,
 # which has fixed high-severity CVEs. Rebuild that small privilege-drop helper
 # from the pinned upstream 1.19 source using the fixed Go 1.26.6 toolchain.
 #
@@ -44,28 +44,22 @@ RUN git clone --depth 1 --branch "$GOSU_VERSION" https://github.com/tianon/gosu.
   && cd /src \
   && go build -buildvcs=false -trimpath -ldflags='-s -w' -o /gosu .
 
-FROM postgres:18.4-trixie@sha256:22c89fe0d0f507606260237fd55e51f6137f58b2d5bcf6152242b96d9fe8f9a4
+FROM postgres:18.6-trixie@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
 
 COPY --from=gosu-build /gosu /usr/local/bin/gosu
 # The pinned upstream base is intentionally retained for reproducibility, but
-# it predates the Debian 13 util-linux and OpenSSL security updates. Upgrade
-# only the affected packages during the controlled image build and remove APT
-# metadata so no fixable OS vulnerabilities remain in the runtime layer.
+# security fixes continue to arrive for its installed Debian packages. Refresh
+# all installed packages during the controlled build; a fixed package shortlist
+# silently misses later advisories. CI and deployment refresh this cache key.
+ARG DPP_DEBIAN_UPGRADE_CACHE_BUST=source
 RUN set -eux; \
+  test -n "$DPP_DEBIAN_UPGRADE_CACHE_BUST"; \
   chmod 0555 /usr/local/bin/gosu; \
   apt-get update; \
-  apt-get install --only-upgrade -y --no-install-recommends \
-    bsdutils \
-    libblkid1 \
-    liblastlog2-2 \
-    libmount1 \
-    libsmartcols1 \
-    libuuid1 \
-    login \
-    libssl3t64 \
-    mount \
-    openssl \
-    openssl-provider-legacy \
-    util-linux; \
+  apt-get upgrade -y --no-install-recommends; \
+  # Upstream build/signature tooling is not needed by PostgreSQL at runtime.
+  # Keep APT's gpgv verifier and database libraries; remove only these tools.
+  apt-get purge -y --no-install-recommends \
+    gnupg gnupg-l10n gpg gpg-agent gpgconf gpgsm dirmngr; \
   apt-get clean; \
   rm -rf /var/lib/apt/lists/*

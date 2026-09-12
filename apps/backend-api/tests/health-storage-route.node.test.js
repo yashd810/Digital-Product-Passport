@@ -150,5 +150,5 @@ test("production routing excludes the mutating storage probe and deploys its loo
 
   const deployScript = fs.readFileSync(path.join(repoRoot, "infra/oracle/deploy-prod.sh"), "utf8");
   assert.match(deployScript, /wait_for_backend_loopback_http "\/health\/storage" "Backend storage probe"/);
-  assert.match(deployScript, /exec -T backend-api node -e 'fetch\(process\.argv\[1\]\)/);
+  assert.match(deployScript, /exec -T backend-api node -e 'fetch\(process\.argv\[1\], \{ signal: AbortSignal\.timeout\(10_000\) \}\)/);
 });

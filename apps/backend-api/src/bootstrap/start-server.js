@@ -34,6 +34,7 @@ const jwt            = require("jsonwebtoken");
 const multer         = require("multer");
 const fs             = require("fs");
 const { configureHttp, configureHttpErrorHandling } = require("./http");
+const { createUploadValidationError, flatMultipartFieldLimits } = require("../shared/http/multipart-upload");
 const { registerAppRoutes } = require("./register-routes");
 const { registerSupportRoutes } = require("./support-routes");
 const { configureServerLifecycle } = require("./server-lifecycle");
@@ -323,6 +324,7 @@ async function assertCompanyAssetPassportTypeAccess(companyId, passportType) {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
+    ...flatMultipartFieldLimits,
     fileSize: 20 * 1024 * 1024,
     files: 1,
     fields: 8,
@@ -330,11 +332,12 @@ const upload = multer({
     fieldSize: 64 * 1024,
     fieldNameSize: 100,
   },
-  fileFilter: (_, file, cb) => file.mimetype === "application/pdf" ? cb(null, true) : cb(new Error("Only PDF files are allowed"), false),
+  fileFilter: (_, file, cb) => file.mimetype === "application/pdf" ? cb(null, true) : cb(createUploadValidationError("Only PDF files are allowed"), false),
 });
 const repoUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
+    ...flatMultipartFieldLimits,
     fileSize: 50 * 1024 * 1024,
     files: 1,
     fields: 8,
@@ -342,11 +345,12 @@ const repoUpload = multer({
     fieldSize: 64 * 1024,
     fieldNameSize: 100,
   },
-  fileFilter: (_, file, cb) => file.mimetype === "application/pdf" ? cb(null, true) : cb(new Error("Only PDF files are allowed"), false),
+  fileFilter: (_, file, cb) => file.mimetype === "application/pdf" ? cb(null, true) : cb(createUploadValidationError("Only PDF files are allowed"), false),
 });
 const repoSymbolUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
+    ...flatMultipartFieldLimits,
     fileSize: 2 * 1024 * 1024,
     files: 1,
     fields: 8,
@@ -354,7 +358,7 @@ const repoSymbolUpload = multer({
     fieldSize: 64 * 1024,
     fieldNameSize: 100,
   },
-  fileFilter: (_, file, cb) => { const allowed = [".png",".jpg",".jpeg",".webp"]; allowed.includes(path.extname(file.originalname).toLowerCase()) ? cb(null, true) : cb(new Error("Only PNG, JPG, and WebP files are allowed")); },
+  fileFilter: (_, file, cb) => { const allowed = [".png",".jpg",".jpeg",".webp"]; allowed.includes(path.extname(file.originalname).toLowerCase()) ? cb(null, true) : cb(createUploadValidationError("Only PNG, JPG, and WebP files are allowed")); },
 });
 const bufferStartsWith = (buffer, bytes, offset = 0) =>
   Buffer.isBuffer(buffer) && bytes.every((byte, index) => buffer[offset + index] === byte);

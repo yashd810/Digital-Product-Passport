@@ -77,22 +77,26 @@ Start with [docs/README.md](./docs/README.md). The most useful developer entry p
 
 ## Common Commands
 
+Run these from the repository root. Activate the Node version in `.nvmrc`
+before installing or running packages; their `engines` and `packageManager`
+fields pin the supported Node/npm toolchain. There is no root npm package.
+
 ```bash
 # Frontend dashboard
-cd apps/frontend-app
-npm run start
-npm run build
-npm run test
+npm --prefix apps/frontend-app run start
+npm --prefix apps/frontend-app run build
+npm --prefix apps/frontend-app test
 
 # Public viewer
-cd apps/public-passport-viewer
-npm run start
-npm run build
+npm --prefix apps/public-passport-viewer run start
+npm --prefix apps/public-passport-viewer run build
 
 # Backend API
-cd apps/backend-api
-npm run start
-npm run test
+npm --prefix apps/backend-api run start
+npm --prefix apps/backend-api test
+
+# Documentation paths and links
+node scripts/check-documentation.js
 ```
 
 ## How The System Fits Together

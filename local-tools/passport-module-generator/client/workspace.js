@@ -61,6 +61,10 @@ const {
   isModuleFieldHeaderAssignment,
   normalizeSystemHeaderFieldConfirmations,
 } = headerMapping;
+if (!globalThis.PassportModuleWorkspaceStorage) {
+  throw new Error("The workspace storage helper did not load.");
+}
+const workspaceStorage = globalThis.PassportModuleWorkspaceStorage.createWorkspaceStorage();
 
 // ─── STARTER SPECIFICATION CONTRACT ──────────────────────────────────────────
 // The data-only starter spec loads before this controller, keeping example
@@ -257,19 +261,9 @@ function applyWorkspaceState(state = {}) {
   setActiveStep(state.activeStep || "module");
 }
 
-function loadJsonStorage(storage, key) {
-  const raw = storage.getItem(key);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
 function saveSessionNow() {
   try {
-    sessionStorage.setItem(sessionStorageKey, JSON.stringify(readWorkspaceState()));
+    workspaceStorage.write("sessionStorage", sessionStorageKey, readWorkspaceState());
   } catch {
     // Ignore local browser storage failures.
   }
@@ -775,31 +769,6 @@ function setFormValue(id, value) {
 
 function getFormValue(id) {
   return $(`#${id}`)?.value.trim() || "";
-}
-
-function getCheckboxValue(id) {
-  return Boolean($(`#${id}`)?.checked);
-}
-
-function setCheckboxValue(id, value) {
-  const el = $(`#${id}`);
-  if (el) el.checked = Boolean(value);
-}
-
-function getMultiSelectValues(id) {
-  const el = $(`#${id}`);
-  if (!el) return [];
-  return [...el.selectedOptions].map((option) => option.value).filter(Boolean);
-}
-
-function setMultiSelectValues(id, values = []) {
-  const selected = new Set(Array.isArray(values) ? values : String(values || "").split(/[,\n]/).map((item) => item.trim()).filter(Boolean));
-  const el = $(`#${id}`);
-  if (!el) return;
-  [...el.options].forEach((option) => {
-    option.selected = selected.has(option.value);
-  });
-  syncSearchableSelect(el);
 }
 
 function splitWords(value) {
@@ -3656,7 +3625,10 @@ function loadSpec(spec) {
 
 function saveDraft() {
   try {
-    localStorage.setItem(draftStorageKey, JSON.stringify(readWorkspaceState()));
+    if (!workspaceStorage.write("localStorage", draftStorageKey, readWorkspaceState())) {
+      setMessage("Could not save draft in this browser.", "error");
+      return;
+    }
     setMessage("Saved draft locally in this browser.", "success");
   } catch {
     setMessage("Could not save draft in this browser.", "error");
@@ -3664,7 +3636,7 @@ function saveDraft() {
 }
 
 function loadDraft() {
-  const state = loadJsonStorage(localStorage, draftStorageKey);
+  const state = workspaceStorage.read("localStorage", draftStorageKey);
   if (!state) {
     setMessage("No saved draft found in this browser.", "error");
     return;
@@ -3673,13 +3645,13 @@ function loadDraft() {
     applyWorkspaceState(state);
     setMessage("Loaded saved draft from this browser.", "success");
   } catch (error) {
-    localStorage.removeItem(draftStorageKey);
+    workspaceStorage.remove("localStorage", draftStorageKey);
     setMessage(`Discarded incompatible saved draft. ${error.message}`, "error");
   }
 }
 
 function restoreSession() {
-  const state = loadJsonStorage(sessionStorage, sessionStorageKey);
+  const state = workspaceStorage.read("sessionStorage", sessionStorageKey);
   if (!state) {
     setMessage("No saved session found for this browser tab.", "error");
     return;
@@ -3688,7 +3660,7 @@ function restoreSession() {
     applyWorkspaceState(state);
     setMessage("Restored current browser session.", "success");
   } catch (error) {
-    sessionStorage.removeItem(sessionStorageKey);
+    workspaceStorage.remove("sessionStorage", sessionStorageKey);
     setMessage(`Discarded incompatible browser session. ${error.message}`, "error");
   }
 }
@@ -4344,11 +4316,11 @@ setupWorkspaceNavigation();
 setupModuleAutoFill();
 setupSearchableSelects();
 setupSmoothDetails();
-let restoredSession = loadJsonStorage(sessionStorage, sessionStorageKey);
+let restoredSession = workspaceStorage.read("sessionStorage", sessionStorageKey);
 try {
   loadSpec(restoredSession?.spec || sample);
 } catch (error) {
-  sessionStorage.removeItem(sessionStorageKey);
+  workspaceStorage.remove("sessionStorage", sessionStorageKey);
   restoredSession = null;
   loadSpec(sample);
   setMessage(`Discarded incompatible browser session. ${error.message}`, "error");

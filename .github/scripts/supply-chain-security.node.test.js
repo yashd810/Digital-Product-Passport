@@ -44,8 +44,8 @@ const builtinModuleSpecifiers = new Set([
   ...builtinModules.map((moduleName) => `node:${moduleName}`),
 ]);
 
-const requiredNodeVersion = "24.18.0";
-const requiredNpmVersion = "11.16.0";
+const requiredNodeVersion = "24.21.0";
+const requiredNpmVersion = "11.19.0";
 
 function read(relativePath) {
   return readFileSync(path.join(repoRoot, relativePath), "utf8");
@@ -311,7 +311,7 @@ test("the backend lockfile keeps qs at a patched production version", () => {
 
 test("CI and Docker fail closed when Node or npm drift from the supported toolchain", () => {
   const workflow = readFileSync(securityWorkflowPath, "utf8");
-  const ciChecks = [...workflow.matchAll(/- name: Verify locked Node and npm toolchain\n\s+run: \|\n\s+test "\$\(node --version\)" = "v24\.18\.0"\n\s+test "\$\(npm --version\)" = "11\.16\.0"/g)];
+  const ciChecks = [...workflow.matchAll(/- name: Verify locked Node and npm toolchain\n\s+run: \|\n\s+test "\$\(node --version\)" = "v24\.21\.0"\n\s+test "\$\(npm --version\)" = "11\.19\.0"/g)];
 
   assert.equal(ciChecks.length, 5, "every CI npm install job must assert Node and npm versions first");
   assert.match(workflow, /npm ci --ignore-scripts --no-audit --fund=false/);
@@ -320,7 +320,7 @@ test("CI and Docker fail closed when Node or npm drift from the supported toolch
     const dockerfile = readFileSync(dockerfilePath, "utf8");
     assert.match(
       dockerfile,
-      /test "\$\(node --version\)" = "v24\.18\.0"[\s\S]*?test "\$\(npm --version\)" = "11\.16\.0"[\s\S]*?npm ci/,
+      /test "\$\(node --version\)" = "v24\.21\.0"[\s\S]*?test "\$\(npm --version\)" = "11\.19\.0"[\s\S]*?npm ci/,
       `${dockerfilePath} must verify Node and npm before npm ci`
     );
   }

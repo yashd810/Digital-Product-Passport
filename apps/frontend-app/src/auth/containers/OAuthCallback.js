@@ -1,3 +1,4 @@
+import { writeLocalStorage } from "../../shared/utils/browserStorage";
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
@@ -20,8 +21,7 @@ function OAuthCallback({ setIsAuthenticated, setUser, setCompanyId }) {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "SSO session could not be established");
 
-        localStorage.setItem("user", JSON.stringify(data));
-        localStorage.setItem("companyId", data.companyId || "");
+        writeLocalStorage("companyId", data.companyId || "");
         setIsAuthenticated(true);
         setUser(data);
         setCompanyId(data.companyId || "");

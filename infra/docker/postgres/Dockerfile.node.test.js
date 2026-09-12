@@ -32,15 +32,18 @@ test("PostgreSQL rebuilds gosu with the pinned fixed Go toolchain", () => {
   assert.match(dockerfile, /go build -buildvcs=false -trimpath -ldflags='-s -w' -o \/gosu \./);
   assert.match(
     dockerfile,
-    /^FROM postgres:18\.4-trixie@sha256:22c89fe0d0f507606260237fd55e51f6137f58b2d5bcf6152242b96d9fe8f9a4$/m,
+    /^FROM postgres:18\.6-trixie@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280$/m,
   );
-  assert.match(dockerfile, /apt-get install --only-upgrade -y --no-install-recommends[\s\\]+bsdutils[\s\\]+libblkid1[\s\\]+liblastlog2-2[\s\\]+libmount1[\s\\]+libsmartcols1[\s\\]+libuuid1[\s\\]+login[\s\\]+libssl3t64[\s\\]+mount[\s\\]+openssl[\s\\]+openssl-provider-legacy[\s\\]+util-linux/);
+  assert.match(dockerfile, /^ARG DPP_DEBIAN_UPGRADE_CACHE_BUST=source$/m);
+  assert.match(dockerfile, /test -n "\$DPP_DEBIAN_UPGRADE_CACHE_BUST"/);
+  assert.match(dockerfile, /apt-get upgrade -y --no-install-recommends/);
+  assert.doesNotMatch(dockerfile, /apt-get install --only-upgrade/);
   assert.match(dockerfile, /rm -rf \/var\/lib\/apt\/lists\/\*/);
 });
 
 test("all Compose variants use the rebuilt PostgreSQL image tag", () => {
   for (const compose of composeFiles) {
-    assert.match(compose, /image: dpp-postgres:18\.4-trixie-gosu1\.19-go1\.26\.6-debian-security2/);
+    assert.match(compose, /image: dpp-postgres:18\.6-trixie-gosu1\.19-go1\.26\.6-debian-security3/);
     assert.doesNotMatch(compose, /dpp-postgres:18\.4-trixie-gosu1\.19-go1\.26\.6-debian-security1/);
     assert.doesNotMatch(compose, /dpp-postgres:18\.4-trixie-gosu1\.19-go1\.26\.6(?:\s|$)/);
     assert.doesNotMatch(compose, /dpp-postgres:18\.4-trixie-gosu1\.19-go1\.26\.5/);

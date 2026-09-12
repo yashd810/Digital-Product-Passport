@@ -45,6 +45,7 @@ test("workflow submission rejects reviewers and approvers outside the submitting
   );
   assert.equal(queries.length, 1);
   assert.match(queries[0].sql, /"companyId" = \$1/);
+  assert.match(queries[0].sql, /role IN \('companyAdmin', 'editor'\)/);
   assert.deepEqual(queries[0].values, [7, [10, 99]]);
 });
 
@@ -65,6 +66,19 @@ test("workflow submission rejects malformed assignee IDs before any database que
     }),
     /reviewerId must be a valid user identifier/
   );
+});
+
+test("workflow submission rejects user identifiers outside the PostgreSQL integer range", async () => {
+  const helpers = createWorkflowHelper({
+    async query() { assert.fail("out-of-range identifiers must not reach SQL"); },
+  });
+  await assert.rejects(helpers.submitPassportToWorkflow({
+    companyId: 7,
+    dppId: "DPP-1",
+    passportType: "test",
+    userId: 10,
+    reviewerId: 2_147_483_648,
+  }), /reviewerId must be a valid user identifier/);
 });
 
 test("workflow submission scopes passport state changes to the supplied company", async () => {

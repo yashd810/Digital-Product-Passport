@@ -25,7 +25,9 @@ node local-tools/passport-module-generator/server.js
   interaction controllers, including expandable-detail animation and the
   accessible searchable-select adapter, live in `client/ui/`. The neutral
   starter module specification lives separately in `client/workspace/` so it
-  does not inflate the controller.
+  does not inflate the controller. The same folder owns header mapping and
+  optional browser persistence; blocked storage does not prevent editing or
+  downloading a module, and a failed manual draft save is reported in the UI.
 - `shared/` holds browser/server-neutral schema and CSV rules.
 - `server.js` is the stable command-line entrypoint; `server/application.js`
   owns the local HTTP API and artifact download boundary.

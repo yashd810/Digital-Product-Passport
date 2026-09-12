@@ -1,3 +1,4 @@
+import { writeLocalStorage } from "../../../shared/utils/browserStorage";
 import React, { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation, useParams } from "react-router";
 import NotificationsPanel from "../notifications/NotificationsPanel";
@@ -65,7 +66,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
   const handleThemeToggle = () => {
     const next = currentTheme === "dark" ? "light" : "dark";
     setCurrentTheme(next);
-    localStorage.setItem(`dppTheme:${user?.id}`, next);
+    writeLocalStorage(`dppTheme:${user?.id}`, next);
     applyTheme(next);
   };
 

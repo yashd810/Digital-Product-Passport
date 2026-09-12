@@ -38,8 +38,8 @@ apps/backend-api/
     ├── db/               # schema setup and migrations
     ├── http/             # route files and middleware
     ├── infrastructure/   # low-level adapters (currently PostgreSQL transaction handling)
-    ├── modules/          # feature-level route helpers by domain
-    ├── services/         # core service implementations
+    ├── modules/          # feature helpers and feature-owned services by domain
+    ├── platform/         # shared security, storage, backup, and other adapters
     └── shared/           # shared helpers used across backend layers
 ```
 
@@ -50,10 +50,12 @@ apps/frontend-app/src/
 ├── app/              # app bootstrap, shell, providers, routing
 ├── admin/            # super-admin UI
 ├── auth/             # login, register, password reset
+├── audit/            # reusable audit-log feature
+├── dictionary/       # semantic dictionary browser
 ├── manual/           # built-in documentation center
 ├── passports/        # create/edit/history flows
 ├── passport-viewer/  # shared viewer UI used by dashboard and public viewer app
-├── shared/           # shared utilities, dictionary, tables, common styles
+├── shared/           # shared utilities, tables, and common styles
 ├── test/             # frontend tests
 └── user/             # company-side dashboard areas
 ```

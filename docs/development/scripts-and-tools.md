@@ -86,15 +86,25 @@ workflow may use its `dpp-production-deploy` label.
 
 ## Recommended Verification Commands
 
+Run from the repository root with the Node/npm toolchain pinned in `.nvmrc`
+and the application manifests:
+
 ```bash
 # backend
-cd apps/backend-api
-npm test
-npm run check:syntax
-npm run check:boundaries
+npm --prefix apps/backend-api test
+npm --prefix apps/backend-api run check:syntax
+npm --prefix apps/backend-api run check:boundaries
 
 # frontend
-cd apps/frontend-app
-npm run build
-npm run test
+npm --prefix apps/frontend-app run build
+npm --prefix apps/frontend-app test
+
+# standalone generator and documentation
+node --test local-tools/passport-module-generator/tests/*.node.test.js
+node scripts/check-documentation.js
 ```
+
+`check-documentation.js` checks local Markdown link targets and concrete
+repository source-file references across tracked and unignored Markdown files.
+It skips external URLs and placeholder paths; it does not verify remote content
+or Markdown heading anchors.

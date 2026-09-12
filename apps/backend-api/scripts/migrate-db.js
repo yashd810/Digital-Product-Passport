@@ -8,6 +8,7 @@ require("dotenv").config({
 
 const { Pool } = require("pg");
 const { initDb } = require("../src/db/init");
+const { analyzeApplicationGinTables } = require("../src/infrastructure/postgres/analyze-gin-tables");
 const {
   ensureRuntimeDatabaseRole,
   ensurePassportRuntimeSchema,
@@ -123,6 +124,7 @@ async function main() {
       inRevisionStatus,
       moveLegacyPassportTables: async () => moveLegacyPassportTables(client, { getTable }),
     });
+    await analyzeApplicationGinTables(client, { logger });
     // Reapply grants after schema changes, then assign only dynamic passport
     // tables to the runtime role. Core tables remain migration-admin owned.
     if (hasDedicatedMigrationRole) {

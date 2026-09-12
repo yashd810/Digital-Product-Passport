@@ -2,6 +2,7 @@
 
 const path = require("path");
 const logger = require("../../platform/observability/logger");
+const { createUploadValidationError, flatMultipartFieldLimits } = require("../../shared/http/multipart-upload");
 const { getPassportTypeModules } = require("../passports/services/passport-module-registry");
 const { compilePassportTypeProfile } = require("../passports/services/passport-type-profile");
 const {
@@ -640,6 +641,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
   const symbolUpload = multer({
     storage: multer.memoryStorage(),
     limits: {
+      ...flatMultipartFieldLimits,
       fileSize: 2 * 1024 * 1024,
       files: 1,
       fields: 4,
@@ -650,7 +652,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
     fileFilter: (req, file, cb) => {
       const allowed = [".png", ".jpg", ".jpeg", ".webp"];
       if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
-      else cb(new Error("Only PNG, JPG, and WebP files are allowed"));
+      else cb(createUploadValidationError("Only PNG, JPG, and WebP files are allowed"));
     }
   });
 

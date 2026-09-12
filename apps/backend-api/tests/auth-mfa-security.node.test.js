@@ -50,6 +50,7 @@ function registerHarness({
   hashPassword,
   verifyPassword,
   generateToken,
+  setAuthCookie,
   clearAuthCookie,
   createTransporter,
   passwordResetTimingGuard,
@@ -74,7 +75,7 @@ function registerHarness({
     hashOtpCode: hashOtpCode || ((value) => crypto.createHash("sha256").update(String(value)).digest("hex")),
     generateOtpCode: () => "123456",
     sessionCookieName: "session",
-    setAuthCookie: () => {},
+    setAuthCookie: setAuthCookie || (() => {}),
     clearAuthCookie: clearAuthCookie || (() => {}),
     sendOtpEmail: async () => {},
     createTransporter: createTransporter || (() => ({ sendMail: async () => {} })),
@@ -106,6 +107,146 @@ function patchHandler(routes, routePath) {
   assert.ok(route, `missing ${routePath}`);
   return route.handlers.at(-1);
 }
+
+test("logout revokes case-insensitive bearer sessions only at their current session version", async () => {
+  let currentVersion = 5;
+  let clearedCookies = 0;
+  const routes = registerHarness({
+    pool: {
+      async query(sql, params) {
+        assert.match(sql, /WHERE id = \$1 AND COALESCE\("sessionVersion", 1\) = \$2/);
+        assert.deepEqual(params, [7, 5]);
+        if (currentVersion !== params[1]) return { rows: [] };
+        currentVersion += 1;
+        return { rows: [{ id: 7 }] };
+      },
+    },
+    jwt: { verify: () => ({ userId: 7, sessionVersion: 5 }) },
+    clearAuthCookie: () => { clearedCookies += 1; },
+  });
+  const handler = postHandler(routes, "/api/auth/logout");
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = createResponse();
+    await handler({ headers: { authorization: "bEaReR valid-token" } }, response);
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.body, { success: true });
+  }
+  assert.equal(currentVersion, 6, "replaying a revoked token must preserve newer sessions");
+  assert.equal(clearedCookies, 2);
+});
+
+test("logout preserves bearer precedence and never revokes an unrelated fallback cookie", async () => {
+  const verifiedTokens = [];
+  const routes = registerHarness({
+    pool: { query: async () => assert.fail("invalid bearer must not revoke any session") },
+    jwt: {
+      verify(token) {
+        verifiedTokens.push(token);
+        throw new Error("invalid token");
+      },
+    },
+  });
+  const response = createResponse();
+  await postHandler(routes, "/api/auth/logout")({
+    headers: { authorization: "Bearer invalid-token", cookie: "session=valid-cookie" },
+  }, response);
+  assert.deepEqual(verifiedTokens, ["invalid-token"]);
+  assert.equal(response.statusCode, 200);
+});
+
+test("logout reports revocation failure and clears its cookie before responding", async () => {
+  let clearedCookie = false;
+  const routes = registerHarness({
+    pool: { query: async () => { throw new Error("database unavailable"); } },
+    jwt: { verify: () => ({ userId: 7, sessionVersion: 5 }) },
+    clearAuthCookie: () => { clearedCookie = true; },
+  });
+  const response = createResponse();
+  const originalJson = response.json;
+  response.json = function json(body) {
+    assert.equal(clearedCookie, true, "cookie headers must be set before the response is sent");
+    return originalJson.call(this, body);
+  };
+  await postHandler(routes, "/api/auth/logout")({ headers: { cookie: "session=token" } }, response);
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.success, undefined);
+});
+
+test("logout ignores signed tokens without a usable session version", async () => {
+  for (const sessionVersion of [undefined, null, 0, -1, 1.5, "invalid"]) {
+    const routes = registerHarness({
+      pool: { query: async () => assert.fail("invalid session version must not reach the database") },
+      jwt: { verify: () => ({ userId: 7, sessionVersion }) },
+    });
+    const response = createResponse();
+    await postHandler(routes, "/api/auth/logout")({ headers: { cookie: "session=token" } }, response);
+    assert.equal(response.statusCode, 200);
+  }
+});
+
+test("password changes revoke outstanding reset links and commit before issuing a session", async () => {
+  const operations = [];
+  const client = {
+    async query(sql, params) {
+      operations.push(sql);
+      if (sql === "BEGIN" || sql === "COMMIT") return { rows: [] };
+      if (sql.includes('UPDATE "passwordResetTokens"')) {
+        assert.match(sql, /WHERE "userId" = \$1 AND used = false/);
+        assert.deepEqual(params, [7]);
+        return { rows: [] };
+      }
+      if (/^\s*UPDATE users/.test(sql)) {
+        assert.match(sql, /"passwordHash" = \$4/);
+        assert.match(sql, /COALESCE\("sessionVersion", 1\) = \$5 AND "isActive" = true/);
+        assert.deepEqual(params, ["password-hash", 1, 7, "old-hash", 5]);
+        return { rows: [{ id: 7, sessionVersion: 6 }] };
+      }
+      assert.fail(`Unexpected query: ${sql}`);
+    },
+    release() { operations.push("RELEASE"); },
+  };
+  const routes = registerHarness({
+    pool: { query: async () => ({ rows: [{ passwordHash: "old-hash" }] }), connect: async () => client },
+    setAuthCookie: () => { operations.push("COOKIE"); },
+  });
+  const response = createResponse();
+  await patchHandler(routes, "/api/users/me/password")({
+    user: { userId: 7, sessionVersion: 5 },
+    body: { currentPassword: "old-password", newPassword: "new-password" },
+  }, response);
+  assert.equal(response.statusCode, 200);
+  assert.equal(operations[0], "BEGIN");
+  assert.match(operations[1], /UPDATE users/);
+  assert.match(operations[2], /UPDATE "passwordResetTokens"/);
+  assert.deepEqual(operations.slice(-3), ["COMMIT", "RELEASE", "COOKIE"]);
+});
+
+test("password changes roll back on a racing credential change or reset-token database failure", async () => {
+  for (const fails of [false, true]) {
+    const operations = [];
+    const client = {
+      async query(sql) {
+        operations.push(sql);
+        if (sql.includes('UPDATE "passwordResetTokens"')) throw new Error("database failure");
+        if (/^\s*UPDATE users/.test(sql) && fails) return { rows: [{ id: 7, sessionVersion: 6 }] };
+        return { rows: [] };
+      },
+      release() { operations.push("RELEASE"); },
+    };
+    const routes = registerHarness({
+      pool: { query: async () => ({ rows: [{ passwordHash: "old-hash" }] }), connect: async () => client },
+      setAuthCookie: () => assert.fail("failed password changes must not issue a session"),
+    });
+    const response = createResponse();
+    await patchHandler(routes, "/api/users/me/password")({
+      user: { userId: 7, sessionVersion: 5 },
+      body: { currentPassword: "old-password", newPassword: "new-password" },
+    }, response);
+    assert.equal(response.statusCode, fails ? 500 : 409);
+    assert.deepEqual(operations.slice(-2), ["ROLLBACK", "RELEASE"]);
+    assert.equal(operations.includes("COMMIT"), false);
+  }
+});
 
 test("MFA pre-authentication tokens bind the current session version", async () => {
   await withEnvironment(emailEnvironment, async () => {
@@ -262,7 +403,7 @@ test("invalid password-reset tokens are rejected before expensive password hashi
   const client = {
     async query(sql) {
       if (sql === "BEGIN" || sql === "ROLLBACK") return { rows: [] };
-      if (sql.includes('UPDATE "passwordResetTokens"') && sql.includes('RETURNING "userId"')) {
+      if (sql.includes("FOR UPDATE OF u")) {
         return { rows: [] };
       }
       throw new Error(`Unexpected query: ${sql}`);
@@ -282,6 +423,50 @@ test("invalid password-reset tokens are rejected before expensive password hashi
     body: { token: "invalid-token", newPassword: "Strong-password-123!" },
   }, response);
 
+  assert.equal(response.statusCode, 400);
+  assert.equal(hashCalls, 0);
+});
+
+test("password resets lock the user before claiming or invalidating token rows", async () => {
+  const operations = [];
+  const client = {
+    async query(sql) {
+      operations.push(sql);
+      if (sql.includes("FOR UPDATE OF u")) return { rows: [{ id: 7 }] };
+      if (sql.includes('RETURNING "userId"')) return { rows: [{ userId: 7 }] };
+      return { rows: [] };
+    },
+    release() { operations.push("RELEASE"); },
+  };
+  const routes = registerHarness({ pool: { connect: async () => client } });
+  const response = createResponse();
+  await postHandler(routes, "/api/auth/reset-password")({
+    body: { token: "valid-token", newPassword: "Strong-password-123!" },
+  }, response);
+  assert.equal(response.statusCode, 200);
+  assert.equal(operations[0], "BEGIN");
+  assert.match(operations[1], /FOR UPDATE OF u/);
+  assert.match(operations[2], /UPDATE "passwordResetTokens"/);
+  assert.deepEqual(operations.slice(-2), ["COMMIT", "RELEASE"]);
+});
+
+test("password resets recheck token consumption after waiting for the user lock", async () => {
+  let hashCalls = 0;
+  const client = {
+    async query(sql) {
+      if (sql.includes("FOR UPDATE OF u")) return { rows: [{ id: 7 }] };
+      return { rows: [] };
+    },
+    release() {},
+  };
+  const routes = registerHarness({
+    pool: { connect: async () => client },
+    hashPassword: async () => { hashCalls += 1; return { hash: "hash", pepperVersion: 1 }; },
+  });
+  const response = createResponse();
+  await postHandler(routes, "/api/auth/reset-password")({
+    body: { token: "consumed-while-waiting", newPassword: "Strong-password-123!" },
+  }, response);
   assert.equal(response.statusCode, 400);
   assert.equal(hashCalls, 0);
 });

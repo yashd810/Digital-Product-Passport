@@ -1175,7 +1175,7 @@
 /* Create passport CTA in sidebar */
 .sidebar-create-btn {
   background: var(--accent) !important;
-  color: #ffffff !important;
+  color: #07111f !important;
   font-weight: 700 !important;
   border-radius: 8px !important;
   margin-bottom: 10px !important;
@@ -1185,7 +1185,7 @@
 }
 .sidebar-create-btn:hover {
   background: var(--accent-strong) !important;
-  color: #ffffff !important;
+  color: #07111f !important;
   opacity: 1;
 }
 .sidebar-data-btn {
@@ -1233,12 +1233,12 @@
 }
 .sidebar-create-btn.active {
   background: var(--accent) !important;
-  color: #ffffff !important;
+  color: #07111f !important;
   border: none !important;
 }
 [data-theme="light"] .sidebar-create-btn {
   background: var(--accent) !important;
-  color: #ffffff !important;
+  color: #07111f !important;
 }
 [data-theme="light"] .sidebar-create-btn:hover {
   background: var(--accent-strong) !important;

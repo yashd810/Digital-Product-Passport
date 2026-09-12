@@ -1,3 +1,4 @@
+import { readLocalStorage, writeLocalStorage } from "../../shared/utils/browserStorage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 // ── Translation dictionaries ─────────────────────────────────
@@ -1422,14 +1423,14 @@ export const translateFieldValue = (lang, value, type) => {
 export function I18nProvider({ children }) {
   const [lang, setLangState] = useState(
     () => {
-      const storedLanguage = localStorage.getItem("dppLang");
+      const storedLanguage = readLocalStorage("dppLang");
       return supportedLanguageCodes.includes(storedLanguage) ? storedLanguage : "en";
     }
   );
 
   const setLang = (l) => {
     const nextLanguage = supportedLanguageCodes.includes(l) ? l : "en";
-    localStorage.setItem("dppLang", nextLanguage);
+    writeLocalStorage("dppLang", nextLanguage);
     setLangState(nextLanguage);
   };
 

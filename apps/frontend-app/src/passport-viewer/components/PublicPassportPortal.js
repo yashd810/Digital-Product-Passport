@@ -1,4 +1,5 @@
-import React, { useEffect, useId, useMemo, useState } from "react";
+import { useDialogFocus } from "../../shared/hooks/useDialogFocus";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { translateFieldValue, translateSchemaLabel } from "../../app/providers/i18n";
 import { formatPassportStatus } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
@@ -767,6 +768,8 @@ export default function PublicPassportPortal({
   const [activePage, setActivePage] = useState("overview");
   const [activeDataSectionKey, setActiveDataSectionKey] = useState("");
   const [previewImage, setPreviewImage] = useState(null);
+  const imageDialogRef = useRef(null);
+  useDialogFocus(Boolean(previewImage), imageDialogRef, () => setPreviewImage(null));
   const dataSectionPickerId = useId();
   const [publicHistoryState, setPublicHistoryState] = useState(() => (
     publicHistoryPayload
@@ -925,7 +928,20 @@ export default function PublicPassportPortal({
                 type="button"
                 className={activePage === page.key ? "active" : ""}
                 onClick={() => setActivePage(page.key)}
+                onKeyDown={(event) => {
+                  const index = pages.findIndex((candidate) => candidate.key === page.key);
+                  const nextIndex = event.key === "ArrowRight" ? (index + 1) % pages.length
+                    : event.key === "ArrowLeft" ? (index + pages.length - 1) % pages.length
+                      : event.key === "Home" ? 0
+                        : event.key === "End" ? pages.length - 1 : null;
+                  if (nextIndex === null) return;
+                  event.preventDefault();
+                  setActivePage(pages[nextIndex].key);
+                  event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[nextIndex]?.focus();
+                }}
                 role="tab"
+                id={`viewer-tab-${page.key}`}
+                tabIndex={activePage === page.key ? 0 : -1}
                 aria-selected={activePage === page.key ? "true" : "false"}
                 aria-controls={page.key}
               >
@@ -996,7 +1012,7 @@ export default function PublicPassportPortal({
       </header>
 
       <main>
-        <section className={`page${activePage === "overview" ? " active" : ""}`} id="overview" role="tabpanel" hidden={activePage !== "overview"}>
+        <section className={`page${activePage === "overview" ? " active" : ""}`} id="overview" role="tabpanel" aria-labelledby="viewer-tab-overview" hidden={activePage !== "overview"}>
           <div className="grid2 overview-only-layout">
             <article className="card">
               <h2>Product overview</h2>
@@ -1121,7 +1137,7 @@ export default function PublicPassportPortal({
           </div>
         </section>
 
-        <section className={`page${activePage === "data" ? " active" : ""}`} id="data" role="tabpanel" hidden={activePage !== "data"}>
+        <section className={`page${activePage === "data" ? " active" : ""}`} id="data" role="tabpanel" aria-labelledby="viewer-tab-data" hidden={activePage !== "data"}>
           <h2 className="data-title">Passport data</h2>
           <div className="data-section-picker">
             <label htmlFor={dataSectionPickerId}>Choose a passport data section</label>
@@ -1194,7 +1210,7 @@ export default function PublicPassportPortal({
           </div>
         </section>
 
-        <section className={`page${activePage === "trustPage" ? " active" : ""}`} id="trustPage" role="tabpanel" hidden={activePage !== "trustPage"}>
+        <section className={`page${activePage === "trustPage" ? " active" : ""}`} id="trustPage" role="tabpanel" aria-labelledby="viewer-tab-trustPage" hidden={activePage !== "trustPage"}>
           <div className="page-head">
             <div>
               <span className="badge ok">Verification</span>
@@ -1242,7 +1258,7 @@ export default function PublicPassportPortal({
           </section>
         </section>
 
-        <section className={`page${activePage === "documents" ? " active" : ""}`} id="documents" role="tabpanel" hidden={activePage !== "documents"}>
+        <section className={`page${activePage === "documents" ? " active" : ""}`} id="documents" role="tabpanel" aria-labelledby="viewer-tab-documents" hidden={activePage !== "documents"}>
           <div className="page-head">
             <div>
               <span className="badge">Linked resources</span>
@@ -1279,6 +1295,8 @@ export default function PublicPassportPortal({
       {previewImage && (
         <div
           className="pv-image-lightbox"
+          ref={imageDialogRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-label={previewImage.label || "Image preview"}

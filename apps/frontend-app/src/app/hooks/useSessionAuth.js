@@ -1,16 +1,9 @@
 import { useEffect, useState } from "react";
+import { getBrowserLocalStorage, readLocalStorage, writeLocalStorage } from "../../shared/utils/browserStorage";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { clearPassportFormDrafts } from "../../shared/security/passportFormDraftStorage";
 
 const api = import.meta.env.VITE_API_URL || "";
-
-function getBrowserLocalStorage() {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return null;
-  }
-}
 
 export function clearClientSessionState({ localStorage: storage = getBrowserLocalStorage(), sessionStorage } = {}) {
   ["user", "companyId"].forEach((key) => {
@@ -26,15 +19,15 @@ export function clearClientSessionState({ localStorage: storage = getBrowserLoca
 export function useSessionAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
-  const [companyId, setCompanyId] = useState(localStorage.getItem("companyId"));
+  const [companyId, setCompanyId] = useState(() => readLocalStorage("companyId"));
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
 
     (async () => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
       try {
         const response = await fetchWithAuth(`${api}/api/users/me`, {
           credentials: "include",
@@ -49,8 +42,7 @@ export function useSessionAuth() {
         setIsAuthenticated(true);
         setUser(sessionUser);
         setCompanyId(sessionUser.companyId || "");
-        localStorage.setItem("user", JSON.stringify(sessionUser));
-        localStorage.setItem("companyId", sessionUser.companyId || "");
+        writeLocalStorage("companyId", sessionUser.companyId || "");
       } catch {
         clearTimeout(timeout);
         if (cancelled) return;
@@ -65,12 +57,13 @@ export function useSessionAuth() {
 
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
+      controller.abort();
     };
   }, []);
 
   const handleUserUpdate = (updatedUser) => {
     setUser(updatedUser);
-    if (updatedUser) localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
   const handleLogout = async () => {

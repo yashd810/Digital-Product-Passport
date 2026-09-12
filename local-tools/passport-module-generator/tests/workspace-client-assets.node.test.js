@@ -26,11 +26,14 @@ test("workspace helper modules load before the browser controller", () => {
 
   const starterScript = '/client/workspace/starter-spec.js';
   const headerMappingScript = '/client/workspace/header-mapping.js';
+  const storageScript = '/client/workspace/storage.js';
   const controllerScript = '/client/workspace.js';
   assert.ok(indexHtml.indexOf(starterScript) >= 0, "starter specification script is present");
   assert.ok(indexHtml.indexOf(headerMappingScript) >= 0, "header mapping script is present");
+  assert.ok(indexHtml.indexOf(storageScript) >= 0, "workspace storage script is present");
   assert.ok(indexHtml.indexOf(starterScript) < indexHtml.indexOf(controllerScript));
   assert.ok(indexHtml.indexOf(headerMappingScript) < indexHtml.indexOf(controllerScript));
+  assert.ok(indexHtml.indexOf(storageScript) < indexHtml.indexOf(controllerScript));
   assert.ok(starterSpec.startsWith("/**"), "starter specification begins with its ownership note");
   assert.ok(headerMapping.startsWith("/**"), "header mapping begins with its ownership note");
   assert.ok(workspace.startsWith("/**"), "workspace controller begins with its ownership note");

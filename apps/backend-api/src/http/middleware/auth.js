@@ -1,6 +1,7 @@
 "use strict";
 
 const logger = require("../../platform/observability/logger");
+const { getCandidateSessionTokens, parseBearerToken } = require("../../shared/security/session-tokens");
 
 /**
  * Authentication and authorization middleware.
@@ -12,36 +13,6 @@ const logger = require("../../platform/observability/logger");
 
 module.exports = function createAuthMiddleware({ jwt, pool, jwtSecret, sessionCookieName }) {
   const writeRoles = new Set(["superAdmin", "companyAdmin", "editor"]);
-
-  const parseCookieValues = (req, cookieName) => {
-    const raw = String(req.headers.cookie || "");
-    if (!raw) return [];
-    return raw
-      .split(";")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .flatMap((part) => {
-        const [name, ...rest] = part.split("=");
-        if (name !== cookieName) return [];
-        const value = rest.join("=");
-        if (!value) return [];
-        try {
-          return [decodeURIComponent(value)];
-        } catch {
-          return [value];
-        }
-      });
-  };
-  const parseBearerToken = (req) => {
-    const authHeader = String(req.headers["authorization"] || "").trim();
-    const match = authHeader.match(/^Bearer\s+(\S+)$/i);
-    return match ? match[1] : "";
-  };
-  const getCandidateSessionTokens = (req) => {
-    const bearerToken = parseBearerToken(req);
-    if (bearerToken) return [bearerToken];
-    return [...new Set(parseCookieValues(req, sessionCookieName).filter(Boolean))];
-  };
 
   const buildActorIdentity = (row = {}) => ({
     actorIdentifier: row.economicOperatorIdentifier || null,
@@ -57,7 +28,7 @@ module.exports = function createAuthMiddleware({ jwt, pool, jwtSecret, sessionCo
   });
 
   const authenticateToken = async (req, res, next) => {
-    const candidateTokens = getCandidateSessionTokens(req);
+    const candidateTokens = getCandidateSessionTokens(req, sessionCookieName);
     if (!candidateTokens.length) return res.status(401).json({ error: "Access token required" });
     try {
       let payload = null;

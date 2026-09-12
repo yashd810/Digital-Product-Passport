@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -38,4 +39,44 @@ test("normal OCI wrapper invokes only the root-owned release entry point", () =>
 test("normal OCI wrapper is syntactically valid", () => {
   const result = spawnSync("bash", ["-n", deployScript], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
+});
+
+test("normal OCI wrapper accepts a clean linked worktree and stops before SSH without a key", (t) => {
+  const fixture = mkdtempSync(path.join(os.tmpdir(), "dpp-deploy-worktree-"));
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  const primary = path.join(fixture, "primary");
+  const linked = path.join(fixture, "linked");
+  const config = path.join(fixture, "deploy.env");
+  mkdirSync(path.join(primary, "scripts", "deploy"), { recursive: true });
+  mkdirSync(path.join(primary, "infra", "oracle"), { recursive: true });
+  copyFileSync(deployScript, path.join(primary, "scripts", "deploy", "deploy-to-oci.sh"));
+  writeFileSync(path.join(primary, "infra", "oracle", "dpp-root-release-deployer.sh"), "#!/bin/bash\nexit 0\n");
+  writeFileSync(config, "", { mode: 0o600 });
+  const git = (...args) => {
+    const result = spawnSync("git", [
+      "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false",
+      "-c", "user.name=Deployment Test", "-c", "user.email=deployment-test@example.invalid",
+      "-C", primary, ...args,
+    ], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  git("init", "--initial-branch=main");
+  git("add", ".");
+  git("commit", "-m", "Test deployment fixture");
+  git("worktree", "add", "--detach", linked, "HEAD");
+  assert.equal(statSync(path.join(linked, ".git")).isFile(), true);
+  const result = spawnSync("bash", [path.join(linked, "scripts", "deploy", "deploy-to-oci.sh")], {
+    env: {
+      PATH: process.env.PATH,
+      HOME: process.env.HOME,
+      DPP_DEPLOY_CONFIG_FILE: config,
+      DPP_DEPLOY_TARGET: "backend",
+      OCI_IP: "deployment-test.example.invalid",
+    },
+    encoding: "utf8",
+    timeout: 10_000,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stdout, /A deployment SSH key is required/);
+  assert.doesNotMatch(result.stdout, /must be launched from a Git checkout|Testing SSH connection/);
 });

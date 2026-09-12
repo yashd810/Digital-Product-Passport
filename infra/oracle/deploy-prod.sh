@@ -615,10 +615,15 @@ wait_for_service_http() {
 
 build_service_image() {
   local service_name="$1"
+  local security_refresh
+  security_refresh="$(date -u +%Y-%m-%d)"
 
   echo "Building service image sequentially with Buildx: $service_name"
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" config --format json \
-    | docker buildx bake --load -f - "$service_name"
+    | docker buildx bake --load -f - \
+        --set "${service_name}.args.DPP_APK_UPGRADE_CACHE_BUST=${security_refresh}" \
+        --set "${service_name}.args.DPP_DEBIAN_UPGRADE_CACHE_BUST=${security_refresh}" \
+        "$service_name"
 }
 
 build_target_images_sequentially() {
@@ -699,7 +704,7 @@ wait_for_backend_loopback_http() {
   local url="http://127.0.0.1:3001${path}"
   for attempt in $(seq 1 "$attempts"); do
     if DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
-      exec -T backend-api node -e 'fetch(process.argv[1]).then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1));' \
+      exec -T backend-api node -e 'fetch(process.argv[1], { signal: AbortSignal.timeout(10_000) }).then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1));' \
       "$url" >/dev/null 2>&1; then
       echo "✅ $label ready"
       return 0

@@ -19,6 +19,12 @@ const resolveAppDependency = (pkg) => {
 };
 
 export default defineConfig({
+  optimizeDeps: {
+    rolldownOptions: {
+      // Shared React components use JSX in .js files, including during scanning.
+      moduleTypes: { ".js": "jsx" },
+    },
+  },
   plugins: [
     {
       name: "treat-js-as-jsx",

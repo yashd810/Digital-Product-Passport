@@ -75,6 +75,12 @@ HTTPS origin in production.
 
 ## If You Want To Run Apps Individually
 
+Activate the Node version in the root `.nvmrc` first (`nvm install` then
+`nvm use`, if you use nvm). Each package's `engines` and `packageManager` fields
+pin its supported Node and npm versions. Run each example in a separate
+terminal starting at the repository root. For the shared viewer imports,
+install the dashboard dependencies before starting the public viewer.
+
 ### Frontend dashboard
 
 ```bash

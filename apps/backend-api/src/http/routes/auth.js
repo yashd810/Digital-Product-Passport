@@ -9,6 +9,16 @@ const {
 } = require("../../platform/communications/email-service");
 const { getAppOrigin } = require("../../shared/security/configured-origin");
 const { normalizeSafeImageReference } = require("../../shared/passports/passport-uri");
+const { getCandidateSessionTokens } = require("../../shared/security/session-tokens");
+
+const profileTextLimits = new Map([
+  ["firstName", 100],
+  ["lastName", 100],
+  ["phone", 50],
+  ["jobTitle", 120],
+  ["bio", 10_000],
+  ["preferredLanguage", 12],
+]);
 
 async function defaultPasswordResetTimingGuard(startedAt) {
   const configuredFloor = Number.parseInt(process.env.PASSWORD_RESET_MIN_RESPONSE_MS || "750", 10);
@@ -488,23 +498,9 @@ module.exports = function registerAuthRoutes(app, {
 
   // ─── LOGOUT ─────────────────────────────────────────────────────────────────
   app.post("/api/auth/logout", async (req, res) => {
+    let revocationFailed = false;
     try {
-      const authHeader = String(req.headers.authorization || "");
-      const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-      const cookieTokens = String(req.headers.cookie || "")
-        .split(";")
-        .map((part) => part.trim())
-        .filter((part) => part.startsWith(`${sessionCookieName}=`))
-        .map((part) => {
-          const rawValue = part.slice(`${sessionCookieName}=`.length);
-          try {
-            return decodeURIComponent(rawValue);
-          } catch {
-            return rawValue;
-          }
-        })
-        .filter(Boolean);
-      const candidateTokens = [...new Set([bearerToken, ...cookieTokens].filter(Boolean))];
+      const candidateTokens = getCandidateSessionTokens(req, sessionCookieName);
       for (const token of candidateTokens) {
         let payload;
         try {
@@ -516,18 +512,29 @@ module.exports = function registerAuthRoutes(app, {
         } catch (_error) {
           continue;
         }
-        await pool.query(
-          'UPDATE users SET "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $1',
-          [payload.userId]
-        ).catch((error) => {
-          logger.warn({ err: error, userId: payload.userId }, "Failed to revoke session version during logout");
-        });
-        break;
+        const sessionVersion = Number(payload.sessionVersion);
+        if (!Number.isSafeInteger(sessionVersion) || sessionVersion < 1) continue;
+        // An already-revoked token must not invalidate a later login. The
+        // comparison and increment are atomic so repeated logout is harmless.
+        const revoked = await pool.query(
+          `UPDATE users
+           SET "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW()
+           WHERE id = $1 AND COALESCE("sessionVersion", 1) = $2
+           RETURNING id`,
+          [payload.userId, sessionVersion]
+        );
+        if (revoked.rows.length) break;
       }
+    } catch (error) {
+      logger.warn({ err: error }, "Failed to revoke session version during logout");
+      revocationFailed = true;
     } finally {
       clearAuthCookie(res);
-      res.json({ success: true });
     }
+    if (revocationFailed) {
+      return res.status(503).json({ error: "Failed to revoke sessions. Please retry logout." });
+    }
+    res.json({ success: true });
   });
 
   app.get("/api/auth/sso/providers", publicReadRateLimit, async (_req, res) => {
@@ -673,6 +680,20 @@ module.exports = function registerAuthRoutes(app, {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
+        // Serialize credential changes on the user before locking reset-token
+        // rows. Different valid tokens for one user must share this lock order.
+        const resetUser = await client.query(
+          `SELECT u.id
+           FROM users u
+           JOIN "passwordResetTokens" prt ON prt."userId" = u.id
+           WHERE prt."tokenHash" = $1 AND prt.used = false AND prt."expiresAt" > NOW()
+           FOR UPDATE OF u`,
+          [tokenHash]
+        );
+        if (!resetUser.rows.length) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({ error: "Invalid or expired token" });
+        }
         const claimed = await client.query(
           `UPDATE "passwordResetTokens"
            SET used = true
@@ -820,6 +841,9 @@ module.exports = function registerAuthRoutes(app, {
 
   app.patch("/api/users/me", authenticateToken, async (req, res) => {
     try {
+      if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+        return res.status(400).json({ error: "Profile updates must be an object" });
+      }
       const fieldMap = new Map([
         ["firstName", "\"firstName\""],
         ["lastName", "\"lastName\""],
@@ -832,9 +856,25 @@ module.exports = function registerAuthRoutes(app, {
         ["preferredLanguage", "\"preferredLanguage\""],
       ]);
       const updates = [];
+      const assigneeIds = new Set();
       for (const [inputKey, columnName] of fieldMap.entries()) {
         if (!Object.prototype.hasOwnProperty.call(req.body || {}, inputKey)) continue;
         let value = req.body[inputKey] !== undefined ? req.body[inputKey] : null;
+        if (profileTextLimits.has(inputKey) && value !== null) {
+          const maxLength = profileTextLimits.get(inputKey);
+          if (typeof value !== "string" || value.length > maxLength || value.includes("\u0000")) {
+            return res.status(400).json({ error: `${inputKey} must be text with at most ${maxLength} characters` });
+          }
+        }
+        if (["defaultReviewerId", "defaultApproverId"].includes(inputKey) && value !== null && value !== "") {
+          const text = typeof value === "string" || typeof value === "number" ? String(value) : "";
+          const id = Number(text);
+          if (!/^[1-9][0-9]{0,9}$/.test(text) || !Number.isSafeInteger(id) || id > 2_147_483_647) {
+            return res.status(400).json({ error: `${inputKey} must be a valid user identifier` });
+          }
+          value = id;
+          assigneeIds.add(id);
+        }
         if (inputKey === "avatarUrl" && value !== null && value !== "") {
           try {
             value = normalizeSafeImageReference(value);
@@ -845,6 +885,18 @@ module.exports = function registerAuthRoutes(app, {
         updates.push([columnName, value || null]);
       }
       if (!updates.length) return res.status(400).json({ error: "Nothing to update" });
+      if (assigneeIds.size) {
+        const eligible = await pool.query(
+          `SELECT id FROM users
+           WHERE "companyId" = $1 AND "isActive" = true
+             AND role IN ('companyAdmin', 'editor') AND id = ANY($2::int[])`,
+          [req.user.companyId ?? null, [...assigneeIds]]
+        );
+        const eligibleIds = new Set(eligible.rows.map((row) => Number(row.id)));
+        if ([...assigneeIds].some((id) => !eligibleIds.has(id))) {
+          return res.status(400).json({ error: "Default reviewer and approver must be active editors or admins of your company" });
+        }
+      }
       const sets = updates.map(([columnName], i) => `${columnName} = $${i + 1}`).join(", ");
       const vals = updates.map(([, value]) => value);
       await pool.query(`UPDATE users SET ${sets}, "updatedAt" = NOW() WHERE id = $${updates.length + 1}`,
@@ -894,18 +946,39 @@ module.exports = function registerAuthRoutes(app, {
       if (!await verifyPassword(currentPassword, u.rows[0].passwordHash))
         return res.status(401).json({ error: "Current password is incorrect" });
       const { hash, pepperVersion } = await hashPassword(newPassword);
-      const updated = await pool.query(
-        `UPDATE users
-         SET "passwordHash" = $1,
-             "pepperVersion" = $2,
-             "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
-             "otpCodeHash" = NULL,
-             "otpExpiresAt" = NULL,
-             "updatedAt" = NOW()
-         WHERE id = $3
-         RETURNING id, email, "companyId" AS "companyId", role, "sessionVersion" AS "sessionVersion"`,
-        [hash, pepperVersion, req.user.userId]
-      );
+      const client = await pool.connect();
+      let updated;
+      try {
+        await client.query("BEGIN");
+        // Both password-change routes lock the user before reset-token rows.
+        updated = await client.query(
+          `UPDATE users
+           SET "passwordHash" = $1,
+               "pepperVersion" = $2,
+               "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
+               "otpCodeHash" = NULL,
+               "otpExpiresAt" = NULL,
+               "updatedAt" = NOW()
+           WHERE id = $3 AND "passwordHash" = $4
+             AND COALESCE("sessionVersion", 1) = $5 AND "isActive" = true
+           RETURNING id, email, "companyId" AS "companyId", role, "sessionVersion" AS "sessionVersion"`,
+          [hash, pepperVersion, req.user.userId, u.rows[0].passwordHash, req.user.sessionVersion]
+        );
+        if (!updated.rows.length) {
+          await client.query("ROLLBACK");
+          return res.status(409).json({ error: "Account credentials changed. Please log in again." });
+        }
+        await client.query(
+          'UPDATE "passwordResetTokens" SET used = true WHERE "userId" = $1 AND used = false',
+          [req.user.userId]
+        );
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw error;
+      } finally {
+        client.release();
+      }
       const freshToken = generateToken(updated.rows[0], undefined, undefined, undefined, undefined, {
         mfaVerifiedAt: req.user?.mfaVerifiedAt || null,
         amr: req.user?.authenticationMethods || ["pwd"],
@@ -940,6 +1013,7 @@ module.exports = function registerAuthRoutes(app, {
         return res.status(400).json({ error: "Invalid role" });
       const updated = await pool.query('UPDATE users SET role = $1, "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $2 AND "companyId" = $3 RETURNING id, role, "sessionVersion" AS "sessionVersion", "isActive" AS "isActive"',
         [role, req.params.userId, req.params.companyId]);
+      if (!updated.rows.length) return res.status(404).json({ error: "User not found" });
       await logAudit(
         req.params.companyId,
         req.user.userId,
@@ -981,6 +1055,7 @@ module.exports = function registerAuthRoutes(app, {
         return res.status(403).json({ error: "Admin only" });
       const deactivated = await pool.query('UPDATE users SET "isActive" = false, "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $1 AND "companyId" = $2 RETURNING id, role, "sessionVersion" AS "sessionVersion", "isActive" AS "isActive"',
         [req.params.userId, req.params.companyId]);
+      if (!deactivated.rows.length) return res.status(404).json({ error: "User not found" });
       await logAudit(
         req.params.companyId,
         req.user.userId,

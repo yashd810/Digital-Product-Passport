@@ -1,4 +1,5 @@
 // Form coordinator: route/API/draft state; pure helpers and field controls live in sibling modules.
+import { readLocalStorage } from "../../shared/utils/browserStorage";
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
@@ -71,7 +72,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   const effectiveCompanyId = String(
     companyId ||
     user?.companyId ||
-    localStorage.getItem("companyId") ||
+    readLocalStorage("companyId") ||
     ""
   );
 

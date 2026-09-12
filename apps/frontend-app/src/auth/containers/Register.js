@@ -1,3 +1,4 @@
+import { writeLocalStorage } from "../../shared/utils/browserStorage";
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
@@ -111,8 +112,7 @@ function Register({ setIsAuthenticated, setUser, setCompanyId }) {
       if (!response.ok)
         throw new Error(data.error || "Registration failed");
 
-      localStorage.setItem("user",      JSON.stringify(data.user));
-      localStorage.setItem("companyId", data.user.companyId || "");
+      writeLocalStorage("companyId", data.user.companyId || "");
 
       setIsAuthenticated(true);
       setUser(data.user);

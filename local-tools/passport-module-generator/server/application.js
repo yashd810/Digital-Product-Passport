@@ -221,13 +221,6 @@ function uniqueBy(items, keyFn) {
   return result;
 }
 
-function splitList(value) {
-  return clean(value)
-    .split(/[,\n]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 function normalizeHeaderAssignments(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const assignments = Object.fromEntries(
@@ -1554,10 +1547,6 @@ function buildUnits(spec) {
     label: property.unit,
     symbol: property.unit,
   }));
-}
-
-function termIri(spec, term) {
-  return `${semanticBase(spec)}/terms/${term.slug}`;
 }
 
 function buildContext(spec, terms) {
