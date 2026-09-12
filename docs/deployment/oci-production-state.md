@@ -122,9 +122,11 @@ local checks, and residual advisories are recorded in
 | Independent public HTTPS checks | All four origins pass security-header and Host/SNI checks; all 21 protected static paths are rejected. Independent host loopback probes return 200, five direct application/database ports are closed externally, and Caddy/IMDS services are active on both hosts |
 | Production browser checks | All 10 public browser scenarios pass at 390px and 1440px with no unexpected browser/network errors or horizontal overflow; 88 build-listed dashboard/viewer assets match independent fetches, and marketing asset versions match served content hashes |
 
-The backend remains at `f98c00f3b24a986c6afe40047afdfb364fcf64d3`. The later
-commits modify only marketing files; the frontend host received the follow-up
-release after the first live browser pass reproduced narrow-screen overflow.
+The backend remains at `f98c00f3b24a986c6afe40047afdfb364fcf64d3`. The application
+changes through `54db273972fbdb3ce156dfcc7d28632184fb0cb4` modify only marketing
+files; the frontend host received that follow-up release after the first live
+browser pass reproduced narrow-screen overflow. Subsequent audit documentation
+updates do not change the running application revisions.
 [Security And Smoke run 34707156256](https://github.com/yashd810/Digital-Product-Passport/actions/runs/34707156256)
 passed all 14 jobs for `54db273972fbdb3ce156dfcc7d28632184fb0cb4` before that release.
 
@@ -183,6 +185,16 @@ image bytes match the locally scanned bytes; production builds refresh OS
 packages at release time. Continue vendor tracking, image rescanning, and
 verification of the maintained package path. Preserve the existing credential
 revocation and irreversible-retention-lock owner follow-ups recorded in this register.
+
+A local Alpine PostgreSQL candidate reached zero HIGH/CRITICAL findings after
+its inherited `gosu` helper was rebuilt with the repository's pinned Go version.
+However, a synthetic Debian-to-Alpine volume rehearsal changed text ordering
+and left an existing index inconsistent with a fresh sort. Production retains
+the Debian base. A distribution change requires a database migration review
+and restore/collation/index verification; the clean candidate scan alone does
+not authorize or validate that migration. The audit report records the local
+XML probes and unbuilt backport feasibility checks separately. Managed database
+research was deferred at the owner's request.
 
 ## Application Release and Edge State — 6 September Baseline
 

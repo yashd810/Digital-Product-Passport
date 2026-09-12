@@ -169,6 +169,47 @@ application route or a compromise. The source review found no direct calls to
 PostgreSQL's XML parsing/query functions; that is a limited code-path check,
 not proof that every advisory is unreachable.
 
+The follow-up local XML checks exercised two published `CVE-2026-6653` inputs
+through three PostgreSQL XML entry points, then repeated them after encoding
+conversion: 12 SQL probes in disposable, network-isolated containers. The
+original inputs failed UTF-8 validation; converted inputs returned normal XML
+errors or a false well-formedness result. No backend crash was reproduced.
+PostgreSQL's parser options differ from the published crashing library harness,
+and its XML type [does not perform DTD validation](https://www.postgresql.org/docs/18/datatype-xml.html).
+These observations narrow the tested exposure; they do not clear the library
+finding or establish universal non-exploitability.
+
+A separate synthetic-data rehearsal tested PostgreSQL 18.6 on Alpine using a
+new volume first initialized by the audited Debian image. The updated Alpine
+candidate initially had 22 fixable HIGH/CRITICAL findings, all in its inherited
+`gosu` binary's Go 1.24.6 standard library. Rebuilding that helper with the same
+pinned gosu 1.19/Go 1.26.6 inputs used by the repository produced a separate
+local candidate with zero HIGH/CRITICAL findings. Its confined runtime probe
+passed privilege dropping, database initialization, and a SQL query. These
+results do not establish zero findings at every severity or migration safety.
+
+With the Debian-initialized test database's default
+`en_US.utf8` libc locale, the same 14 Unicode values sorted differently after
+the switch from glibc to musl. Existing index order disagreed with a fresh
+sort; rebuilding that test index made it agree with the new order, which still
+differed from Debian's. Case conversion for the sample and the installed
+`citext`, `pgcrypto`, and `plpgsql` extension names were preserved. This limited
+test is evidence against treating a distribution switch as an ordinary image
+refresh. It is not a production locale inventory or full extension validation.
+PostgreSQL documents that [collation changes can invalidate stored indexes](https://www.postgresql.org/docs/18/sql-altercollation.html).
+Production data and the database image were not changed by this rehearsal;
+the synthetic container and volume were removed.
+
+Canonical's final `CVE-2026-6653` backport and the upstream `CVE-2026-86140`
+patch both applied cleanly in dry-run checks against the checksum-verified
+Debian source with its existing distribution patches. This establishes source
+compatibility only. A custom package was not built, regression-tested, or
+deployed; maintaining a private backport would require that additional work
+and ongoing patch ownership. Version-based scanner results would still need
+to be retained and explained. Patch references:
+[Canonical investigation](https://bugs.launchpad.net/ubuntu/+source/libxml2/+bug/2141260),
+[upstream bounds-check fix](https://github.com/GNOME/libxml2/commit/d1686f91dbda141a752200419d35639fd6b38340).
+
 Production rebuilds images from the audited source and refreshes OS packages
 at release time. Remote image contents were not independently scanned or
 compared by image digest through the restricted release account. The local
