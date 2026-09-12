@@ -162,8 +162,11 @@ Ubuntu's [package rebuild record](https://lists.ubuntu.com/archives/noble-change
 also shows why raw version strings alone cannot determine backport coverage.
 Ubuntu still marks [CVE-2026-45692](https://ubuntu.com/security/CVE-2026-45692) and
 [CVE-2026-27589](https://ubuntu.com/security/CVE-2026-27589) for evaluation on Noble.
-Live admin-interface exposure and complete distribution patch applicability
-remain unverified. No internet-reachable exploit was confirmed on these hosts.
+Read-only socket inspection shows port 2019 bound only to loopback on both
+hosts and no port 2021 listener. External TCP probes cannot reach either port
+on either host. Active admin authorization, local administration risks and
+complete distribution patch applicability remain unverified. No
+internet-reachable exploit was confirmed on these hosts.
 Use separately approved administrator maintenance to install a maintained
 Caddy package through the reviewed vendor/distribution channel and inspect
 admin-interface exposure. Validate the rendered configuration before restart;

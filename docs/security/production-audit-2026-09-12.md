@@ -181,9 +181,13 @@ Ubuntu's Noble records for [CVE-2026-45692](https://ubuntu.com/security/CVE-2026
 and [CVE-2026-27589](https://ubuntu.com/security/CVE-2026-27589) still require
 evaluation. The former concerns delegated remote-admin authorization; the latter
 concerns access to the local configuration-loading API. The repository does not
-configure delegated remote administration, but the live admin configuration and
-reachability were not independently inspected. No internet-reachable exploit was confirmed on these hosts
-by this audit, and the distribution's advisory status remains unresolved.
+configure delegated remote administration. Read-only socket inspection shows
+port 2019 listening only on loopback on both hosts and no port 2021 listener;
+external TCP probes cannot reach either port on either host. The active admin
+authorization configuration was not inspected, and these port checks do not
+exclude local administration vulnerabilities. No internet-reachable exploit
+was confirmed on these hosts; the distribution's advisory status remains
+unresolved.
 
 Use a separately approved administrator maintenance change to install a
 maintained Caddy package after reviewing the distribution/upstream update path
