@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const { cpSync, existsSync, mkdtempSync, rmSync } = require("node:fs");
+const { appendFileSync, cpSync, existsSync, mkdtempSync, readFileSync, rmSync } = require("node:fs");
 const { spawnSync } = require("node:child_process");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
@@ -52,5 +52,36 @@ test("marketing renderer refuses private HTTPS endpoints before embedding them i
     });
     assert.notEqual(result.status, 0);
     assert.match(`${result.stdout}${result.stderr}`, /private, reserved, or local network host/);
+  });
+});
+
+test("marketing asset URLs change with their content and remain stable across identical renders", () => {
+  withRenderedMarketingSite({}, (fixtureDir, environment) => {
+    const render = () => {
+      const result = spawnSync(process.execPath, ["configure-runtime.js"], {
+        cwd: fixtureDir, env: environment, encoding: "utf8",
+      });
+      assert.equal(result.status, 0, result.stderr);
+      const page = readFileSync(path.join(fixtureDir, "index.html"), "utf8");
+      return {
+        css: page.match(/href="(styles\.css\?v=[^"]+)"/)[1],
+        js: page.match(/src="(shared\.js\?v=[^"]+)"/)[1],
+      };
+    };
+    const first = render();
+    assert.deepEqual(render(), first);
+    appendFileSync(path.join(fixtureDir, "styles.css"), "\n/* changed stylesheet */\n");
+    const second = render();
+    assert.notEqual(second.css, first.css);
+    assert.equal(second.js, first.js);
+    appendFileSync(path.join(fixtureDir, "shared.js"), "\n// changed script\n");
+    const third = render();
+    assert.equal(third.css, second.css);
+    assert.notEqual(third.js, second.js);
+    for (const pageName of ["product.html", "privacy-policy.html", "terms-of-service.html"]) {
+      const page = readFileSync(path.join(fixtureDir, pageName), "utf8");
+      assert.ok(page.includes(third.css));
+      assert.ok(page.includes(third.js));
+    }
   });
 });

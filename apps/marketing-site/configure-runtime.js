@@ -83,6 +83,22 @@ for (const entry of fs.readdirSync(__dirname, { withFileTypes: true })) {
   fs.writeFileSync(filePath, content);
 }
 
+// Version the rendered bytes so cached assets cannot outlive a deployment.
+// shared.js includes runtime origins, so hash it after placeholder replacement.
+const assetVersions = new Map(["styles.css", "shared.js"].map((name) => [
+  name,
+  crypto.createHash("sha256").update(fs.readFileSync(path.join(__dirname, name))).digest("hex").slice(0, 16),
+]));
+for (const entry of fs.readdirSync(__dirname, { withFileTypes: true })) {
+  if (!entry.isFile() || path.extname(entry.name) !== ".html") continue;
+  const filePath = path.join(__dirname, entry.name);
+  const content = fs.readFileSync(filePath, "utf8").replace(
+    /\b(href|src)=(['"])(styles\.css|shared\.js)(?:\?[^'"]*)?\2/g,
+    (_match, attribute, quote, name) => `${attribute}=${quote}${name}?v=${assetVersions.get(name)}${quote}`,
+  );
+  fs.writeFileSync(filePath, content);
+}
+
 function inlineScriptHashes(siteDirectory) {
   const hashes = new Set();
   const scriptTagPattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
