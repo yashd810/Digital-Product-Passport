@@ -141,7 +141,7 @@
   <!-- What Is DPP -->
   <section class="section section-alt" id="what-is-dpp" aria-labelledby="what-is-title">
     <div class="container">
-      <h2 class="section-title" id="what-is-title">What&nbsp;is&nbsp;a&nbsp;<span class="hl">Digital&nbsp;Product&nbsp;Passport</span>?</h2>
+      <h2 class="section-title" id="what-is-title">What is a <span class="hl">Digital Product Passport</span>?</h2>
       <div class="dpp-explainer">
         <div class="dpp-copy reveal visible">
           <p class="section-lead">
@@ -438,8 +438,14 @@
       });
 
       const toRad = (deg) => (deg * Math.PI) / 180;
+      const compactLayout = window.matchMedia("(max-width: 640px)");
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
       function render(rotationDeg) {
+        if (compactLayout.matches) {
+          nodeElements.forEach((entry) => entry.label.style.removeProperty("transform"));
+          return;
+        }
         const size = container.clientWidth;
         const cx = size / 2;
         const cy = size / 2;
@@ -496,15 +502,30 @@
       let rafId = null;
 
       function tick(ts) {
-        if (!startTime) startTime = ts;
+        if (compactLayout.matches || reducedMotion.matches) {
+          rafId = null;
+          render(0);
+          return;
+        }
+        if (startTime === null) startTime = ts;
         const rotationDeg = ((ts - startTime) / PERIOD) * 360;
         render(rotationDeg);
         rafId = requestAnimationFrame(tick);
       }
 
-      window.addEventListener("resize", () => render(startTime ? ((performance.now() - startTime) / PERIOD) * 360 : 0));
-      render(0);
-      rafId = requestAnimationFrame(tick);
+      function updateLayout() {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        rafId = null;
+        startTime = null;
+        render(0);
+        if (!compactLayout.matches && !reducedMotion.matches) {
+          rafId = requestAnimationFrame(tick);
+        }
+      }
+
+      window.addEventListener("resize", updateLayout);
+      reducedMotion.addEventListener("change", updateLayout);
+      updateLayout();
 
       window.addEventListener("beforeunload", () => {
         if (rafId) cancelAnimationFrame(rafId);

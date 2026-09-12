@@ -1934,7 +1934,7 @@ body.home-page #what-is-dpp .section-lead {
 body.home-page #what-is-title {
   width: 100%;
   max-width: none;
-  white-space: nowrap;
+  white-space: normal;
   margin-bottom: 2rem;
 }
 body.home-page #dpp-contents {
@@ -2139,7 +2139,7 @@ body.home-page .loop-center {
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: #fff;
+  color: var(--dark-text);
   box-shadow:
     0 10px 40px rgba(18, 181, 176, 0.38),
     0 2px 8px rgba(0, 0, 0, 0.08);
@@ -2191,7 +2191,7 @@ body.home-page .loop-node-bubble {
 }
 body.home-page .loop-node-label {
   position: absolute;
-  width: 170px;
+  width: 80px;
   color: #52737e;
   font-size: 0.72rem;
   line-height: 1.52;
@@ -2200,7 +2200,7 @@ body.home-page .loop-node-label {
 }
 body.home-page .loop-node-label strong {
   display: block;
-  color: #12b5b0;
+  color: #087d7a;
   font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: 1px;
@@ -2247,13 +2247,41 @@ body.home-page .loop-node-label strong {
   }
   body.home-page .circularity-diagram {
     width: min(100%, 400px);
+    aspect-ratio: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem 1rem;
+  }
+  body.home-page .loop-svg {
+    display: none;
+  }
+  body.home-page .loop-center {
+    position: static;
+    transform: none;
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: 140px;
+    max-width: 100%;
+  }
+  body.home-page .loop-node {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+  body.home-page .loop-node-bubble {
+    position: static;
+    transform: none;
   }
   body.home-page .loop-node-label {
-    width: 138px;
+    position: static;
+    width: 100%;
     font-size: 0.68rem;
   }
   body.home-page .loop-node-label strong {
-    font-size: 0.58rem;
+    font-size: 0.7rem;
   }
 } /* product.html */
 
