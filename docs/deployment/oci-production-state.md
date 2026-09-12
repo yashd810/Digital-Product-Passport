@@ -107,7 +107,81 @@ Customer Secret Key or access-key value in this document.
   approved change. Do not create, lock, shorten, or destroy that rule during a
   normal application release.
 
-## Application Release and Edge State
+## 12 September 2026 Audit and Release Evidence
+
+Audited application source: `f98c00f3b24a986c6afe40047afdfb364fcf64d3`.
+[Security And Smoke run 34705167290](https://github.com/yashd810/Digital-Product-Passport/actions/runs/34705167290)
+passed all 14 jobs for that revision before the OCI release. The detailed scope,
+local checks, and residual advisories are recorded in
+`production-audit-2026-09-12.md` under `docs/security/`.
+
+| Evidence | Outcome |
+| --- | --- |
+| Restricted backend release | Completed for `f98c00f3b24a986c6afe40047afdfb364fcf64d3` through the trusted helper; controlled migration completed, PostgreSQL 18.6 and API healthy, storage and public HTTPS probes passed |
+| Restricted frontend release | Completed for `54db273972fbdb3ce156dfcc7d28632184fb0cb4`; dashboard, viewer and marketing containers healthy, loopback and public HTTPS checks passed |
+| Independent public HTTPS checks | All four origins pass security-header and Host/SNI checks; all 21 protected static paths are rejected. Independent host loopback probes return 200, five direct application/database ports are closed externally, and Caddy/IMDS services are active on both hosts |
+| Production browser checks | All 10 public browser scenarios pass at 390px and 1440px with no unexpected browser/network errors or horizontal overflow; 88 build-listed dashboard/viewer assets match independent fetches, and marketing asset versions match served content hashes |
+
+The backend remains at `f98c00f3b24a986c6afe40047afdfb364fcf64d3`. The later
+commits modify only marketing files; the frontend host received the follow-up
+release after the first live browser pass reproduced narrow-screen overflow.
+[Security And Smoke run 34707156256](https://github.com/yashd810/Digital-Product-Passport/actions/runs/34707156256)
+passed all 14 jobs for `54db273972fbdb3ce156dfcc7d28632184fb0cb4` before that release.
+
+Both checksum-verified root release preflights passed. The restricted account
+cannot run a separate privileged Docker inspection or read the protected
+checkout for another SHA query. Revision/container evidence is obtained from the
+trusted root helper's checkout checks and release output. Independent HTTPS and
+browser checks verify the public result separately; they do not establish every
+authenticated production workflow.
+
+Read-only checks on 12 September reconfirmed all three S3-compatible identities:
+each listed its own bucket, both peer buckets were denied, and anonymous listing
+was denied. No object contents were read and no objects were modified. The
+backup service last succeeded on 12 September, signed-manifest verification on
+6 September, and the latest restore drill on 31 August 2026. No new restore
+drill was performed during this audit.
+
+The external workstation `production.env` still has a stale runtime database
+login and lacks separate `DB_ADMIN_*` migration credentials. Its file is private,
+but it fails the current database-role guard; its database password was not
+validated. Reconcile it through the trusted host administration path. Do not
+replace the valid root-owned host environment with that stale workstation file.
+
+### Open Host and Vendor Maintenance
+
+Both hosts have pending kernel and libc updates requiring a controlled reboot.
+The observed running kernels are `6.17.0-1018-oracle` on the backend and
+`6.17.0-1014-oracle` on the frontend; pending package records include updates
+through `6.17.0-1020-oracle` and `libc6`. The application release does not reboot
+hosts or activate a new running kernel.
+
+Both hosts have Caddy `2.6.2-6ubuntu0.24.04.3` with Go build metadata `1.22.2`.
+This branch is outside [upstream support](https://github.com/caddyserver/caddy/security/policy).
+Ubuntu's [package rebuild record](https://lists.ubuntu.com/archives/noble-changes/2025-July/048766.html)
+also shows why raw version strings alone cannot determine backport coverage.
+Ubuntu still marks [CVE-2026-45692](https://ubuntu.com/security/CVE-2026-45692) and
+[CVE-2026-27589](https://ubuntu.com/security/CVE-2026-27589) for evaluation on Noble.
+Live admin-interface exposure and complete distribution patch applicability
+remain unverified. No internet-reachable exploit was confirmed on these hosts.
+Use separately approved administrator maintenance to install a maintained
+Caddy package through the reviewed vendor/distribution channel and inspect
+admin-interface exposure. Validate the rendered configuration before restart;
+activate pending kernel/libc updates with controlled reboots and retained
+rollback access. Recheck running versions, TLS, routing, health, and backup
+timers afterward. This is owner follow-up, not authorization to use recovery
+access or broad sudo during an ordinary application release.
+
+The locally audited amd64 PostgreSQL image has zero fixable HIGH/CRITICAL Trivy
+findings, but 50 unfixed package/advisory entries across 11 distinct advisories
+remain. The other four audited images each have zero HIGH/CRITICAL findings.
+These image results are not a scan of the OCI hosts or proof that the deployed
+image bytes match the locally scanned bytes; production builds refresh OS
+packages at release time. Continue vendor tracking, image rescanning, and
+verification of the maintained package path. Preserve the existing credential
+revocation and irreversible-retention-lock owner follow-ups recorded in this register.
+
+## Application Release and Edge State — 6 September Baseline
 
 Production backend and frontend were refreshed through the restricted release
 path on 2026-09-06. The release includes commit
@@ -138,7 +212,7 @@ availability and least-privilege requirement: the containers still run as
 
 ## Repository Governance Pending Owner Action
 
-Security And Smoke run 34048042565 completed successfully for commit
+The prior baseline Security And Smoke run 34048042565 completed successfully for commit
 `3b3180dbfda9da44d37c15c2c5c053f245c76c54`, with all 14 jobs passing,
 including secret scanning, static analysis, dependency checks, backend smoke,
 Compose validation, and all five container-build matrix entries.
@@ -159,10 +233,11 @@ The standalone Local Tools generator is dependency-free by design, so it does
 not have a misleading empty npm audit; a supply-chain regression test instead
 rejects package-manager artifacts and literal third-party imports while CI runs
 its syntax, Node test, and browser-source scan checks.
-The three static Nginx Dockerfiles apply Alpine security updates during each
-build. The weekly scheduled CI run changes that update layer's trusted cache
-key, ensuring package security updates are rebuilt and scanned rather than
-being indefinitely hidden behind a reused build cache. The runtime probe uses
+The three static Nginx Dockerfiles apply Alpine security updates when their
+update layer is rebuilt. The weekly scheduled CI run changes that layer's
+trusted cache key. The current deployment code supplies daily UTC-date refresh
+keys for both Alpine and Debian upgrades, so a later release does not reuse
+the same OS update layer indefinitely. The runtime probe uses
 the base image's `wget` rather than adding a separate diagnostic-only HTTP
 client to production images.
 
